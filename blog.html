@@ -33,6 +33,7 @@
     a{color:inherit; text-decoration:none}
     .container{max-width:var(--max); margin:0 auto; padding:0 18px;}
 
+    /* Header */
     header{
       position:sticky; top:0; z-index:50;
       background: rgba(247,250,255,.86);
@@ -47,7 +48,7 @@
       display:flex; align-items:center; gap:10px;
       text-decoration:none; min-width:0;
     }
-    .brand img{height:54px; width:auto; display:block;}
+    .brand img{height:64px; width:auto; display:block;}
     .tagline{display:none; font-size:12px; color:var(--gray); font-weight:800;}
 
     nav{display:flex; align-items:center; gap:10px;}
@@ -90,11 +91,12 @@
     }
     @media (min-width: 900px){
       .tagline{display:block;}
-      .brand img{height:64px;}
+      .brand img{height:76px;}
     }
 
     main{padding:26px 0 34px}
 
+    /* Hero */
     .hero{
       background: var(--card);
       border:1px solid var(--border);
@@ -127,6 +129,7 @@
     }
     .hero-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;}
 
+    /* Section */
     section{padding:18px 0}
     .section-head{
       display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
@@ -135,22 +138,45 @@
     .section-head h2{margin:0; font-size:18px; letter-spacing:-.01em;}
     .section-head p{margin:0; font-size:13px; color:rgba(11,31,59,.70);}
 
+    /* Grid + cards */
     .grid{
       display:grid;
       grid-template-columns: repeat(3, 1fr);
       gap:12px;
     }
+
     .card{
       background: var(--card);
       border:1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding:16px;
+      overflow:hidden;
       display:flex; flex-direction:column;
-      gap:8px;
-      min-height:120px;
+      min-height: 260px;
     }
     .card:hover{transform:translateY(-2px)}
+    .card-body{
+      padding:14px 16px 16px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      height:100%;
+    }
+
+    .card-media{
+      width:100%;
+      height:150px;
+      border-bottom:1px solid var(--border);
+      background: rgba(11,31,59,.04);
+      overflow:hidden;
+    }
+    .card-media img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
     .pill{
       display:inline-flex; align-items:center; gap:8px;
       font-size:12px; font-weight:900;
@@ -161,9 +187,14 @@
       background:rgba(77,163,255,.85);
       box-shadow:0 0 0 6px rgba(77,163,255,.12);
     }
-    .card h3{margin:0; font-size:15px; letter-spacing:-.01em;}
+    .card h3{margin:0; font-size:16px; letter-spacing:-.01em;}
     .card p{margin:0; color:rgba(11,31,59,.70); font-size:14px;}
     .meta{margin-top:auto; color:rgba(11,31,59,.62); font-size:12px; font-weight:900;}
+
+    @media (max-width: 900px){
+      .grid{grid-template-columns:1fr}
+      .card-media{height:160px;}
+    }
 
     footer{
       margin-top:18px;
@@ -171,10 +202,6 @@
       padding:18px 0 28px;
       color:rgba(11,31,59,.68);
       font-size:12px;
-    }
-
-    @media (max-width: 900px){
-      .grid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -220,10 +247,8 @@
   <main class="container">
     <div class="hero">
       <div class="kicker"><span class="dot"></span> Blog</div>
-      <h1>Short, useful coaching reads.</h1>
-      <p class="lead">
-        Baseball IQ, situational decisions, and youth coaching tools — written to be used at practice and in games.
-      </p>
+      <h1>Short coaching reads. Real game impact.</h1>
+      <p class="lead">Less theory. More “what do we do right now?” for youth baseball (8–14).</p>
 
       <div class="hero-actions">
         <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start with Baseball IQ</a>
@@ -241,26 +266,43 @@
       </div>
 
       <div class="grid">
+
         <a class="card" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">
-          <div class="pill"><span></span> Baseball IQ</div>
-          <h3>Think Before Every Pitch: 3-Question Checklist</h3>
-          <p>The fastest way to reduce hesitation and clean up youth defense.</p>
-          <div class="meta">Read →</div>
+          <div class="card-media">
+            <img src="/assets/images/thumbs/think.jpg" alt="Pre-pitch checklist concept" loading="lazy">
+          </div>
+          <div class="card-body">
+            <div class="pill"><span></span> Baseball IQ</div>
+            <h3>Think Before Every Pitch</h3>
+            <p>3 questions that stop hesitation and clean up youth defense.</p>
+            <div class="meta">Read →</div>
+          </div>
         </a>
 
         <a class="card" href="/articles/why-decision-making-beats-tools.html">
-          <div class="pill"><span></span> Baseball IQ</div>
-          <h3>Why Decision-Making Beats Tools (8–14)</h3>
-          <p>Build a calm defensive identity that wins innings.</p>
-          <div class="meta">Read →</div>
+          <div class="card-media">
+            <img src="/assets/images/thumbs/iq.jpg" alt="Baseball IQ concept" loading="lazy">
+          </div>
+          <div class="card-body">
+            <div class="pill"><span></span> Baseball IQ</div>
+            <h3>Decision-Making Beats Tools</h3>
+            <p>The habits that prevent chaos innings (8–14).</p>
+            <div class="meta">Read →</div>
+          </div>
         </a>
 
         <a class="card" href="/articles/when-not-to-turn-two.html">
-          <div class="pill"><span></span> Situational</div>
-          <h3>When NOT to Turn Two</h3>
-          <p>Stop forcing double plays — take the sure out.</p>
-          <div class="meta">Read →</div>
+          <div class="card-media">
+            <img src="/assets/images/thumbs/when-not.jpg" alt="Double play decision concept" loading="lazy">
+          </div>
+          <div class="card-body">
+            <div class="pill"><span></span> Situational</div>
+            <h3>When NOT to Turn Two</h3>
+            <p>Stop forcing it — take the sure out and win the inning.</p>
+            <div class="meta">Read →</div>
+          </div>
         </a>
+
       </div>
     </section>
   </main>
