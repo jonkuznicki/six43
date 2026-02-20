@@ -226,31 +226,42 @@
     @media (min-width: 901px){
       .brand .tagline{display:block;}
     }
-    /* HEADER LOGO SIZE */
+/* HEADER LAYOUT */
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 0;
+}
+
+/* Brand */
 .brand{
   display:flex;
   align-items:center;
-  gap:14px;
+  gap:10px;
   text-decoration:none;
+  min-width:0;
 }
 
+/* LOGO SIZE (mobile first) */
 .brand img{
-  height:42px;
+  height:54px;
   width:auto;
   display:block;
 }
 
-.tagline{
-  font-size:12px;
-  color:#6B7280;
-  font-weight:700;
-  white-space:nowrap;
+/* Hide tagline on phones so logo can breathe */
+@media (max-width: 640px){
+  .tagline{
+    display:none;
+  }
 }
 
-/* Bigger on desktop */
+/* Desktop size */
 @media (min-width: 900px){
   .brand img{
-    height:56px;
+    height:64px;
   }
 }
 
@@ -391,4 +402,5 @@
   </script>
 </body>
 </html>
+
 
