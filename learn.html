@@ -3,139 +3,184 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Six43 Learn Hub — Baseball IQ, situational baseball, defense, baserunning, and coaching tools for ages 8–14." />
+  <meta name="description" content="SIX43 Learn Hub — Baseball IQ, situational baseball, defense, baserunning, and coaching tools for ages 8–14." />
   <title>Learn | SIX43</title>
 
   <style>
     :root{
       --navy:#0B1F3B;
       --blue:#4DA3FF;
-      --blue2:#86C5FF;
       --gray:#6B7280;
       --bg:#F7FAFF;
       --card:#FFFFFF;
       --border:rgba(11,31,59,.12);
-      --shadow:0 10px 30px rgba(11,31,59,.10);
-      --radius:18px;
-      --max:1120px;
+      --shadow:0 10px 24px rgba(11,31,59,.08);
+      --radius:16px;
+      --max:1040px;
     }
+
     *{box-sizing:border-box}
     body{
       margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color:var(--navy);
-      background: radial-gradient(1200px 600px at 20% -10%, rgba(77,163,255,.20), transparent 60%),
-                  radial-gradient(900px 500px at 90% 10%, rgba(134,197,255,.18), transparent 55%),
-                  var(--bg);
-      line-height:1.5;
+      background: var(--bg);
+      line-height:1.55;
     }
-    a{color:inherit}
-    .container{max-width:var(--max); margin:0 auto; padding:0 20px;}
+    a{color:inherit; text-decoration:none}
+    .container{max-width:var(--max); margin:0 auto; padding:0 18px;}
+
+    /* Header */
     header{
       position:sticky; top:0; z-index:50;
-      background: rgba(247,250,255,.72);
+      background: rgba(247,250,255,.86);
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--border);
     }
-    .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0;}
-    .brand{display:flex; align-items:center; gap:12px; text-decoration:none;}
-    .brand-mark{
-      width:38px; height:38px; border-radius:12px;
-      background: linear-gradient(135deg, rgba(77,163,255,.22), rgba(134,197,255,.10));
-      border:1px solid var(--border);
-      display:grid; place-items:center;
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:14px; padding:12px 0;
     }
-    .brand-mark svg{width:22px; height:22px}
-    .brand-name{display:flex; flex-direction:column; line-height:1.1;}
-    .brand-name strong{letter-spacing:.02em}
-    .brand-name span{font-size:12px; color:var(--gray)}
-    nav ul{list-style:none; margin:0; padding:0; display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:flex-end;}
-    nav a{
-      text-decoration:none; font-weight:700;
-      color:rgba(11,31,59,.88);
-      padding:10px 10px; border-radius:12px;
+    .brand{
+      display:flex; align-items:center; gap:12px;
+      min-width:180px;
     }
-    nav a:hover{background:rgba(77,163,255,.10)}
-    nav a.active{background:rgba(77,163,255,.14); border:1px solid rgba(77,163,255,.22)}
+    .brand img{height:34px; width:auto; display:block}
+    .tagline{
+      display:none;
+      font-size:12px; color:var(--gray); font-weight:800;
+    }
+
+    nav{display:flex; align-items:center; gap:10px;}
+    .navlinks{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .navlinks a{
+      padding:10px 10px;
+      border-radius:12px;
+      font-weight:900;
+      color:rgba(11,31,59,.86);
+    }
+    .navlinks a:hover{background:rgba(77,163,255,.10)}
+    .navlinks a.active{background:rgba(77,163,255,.14); border:1px solid rgba(77,163,255,.22)}
+
     .btn{
       display:inline-flex; align-items:center; justify-content:center;
-      padding:10px 14px; border-radius:14px;
+      padding:10px 12px;
+      border-radius:14px;
       border:1px solid var(--border);
-      background:#fff; text-decoration:none; font-weight:800;
-      box-shadow: 0 6px 18px rgba(11,31,59,.08);
+      background:#fff;
+      font-weight:900;
+      box-shadow: 0 6px 16px rgba(11,31,59,.06);
       white-space:nowrap;
     }
-    .btn.primary{background: linear-gradient(135deg, rgba(77,163,255,.22), rgba(134,197,255,.10));}
-    .btn:hover{transform:translateY(-1px)}
-    .btn:active{transform:translateY(0)}
+    .btn.primary{
+      background: rgba(77,163,255,.14);
+      border-color: rgba(77,163,255,.22);
+    }
+
+    /* Mobile menu */
+    .menu-btn{
+      display:none;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:#fff;
+      font-weight:900;
+    }
+    .menu-panel{
+      display:none;
+      border-top:1px solid var(--border);
+      padding:10px 0 14px;
+    }
+    .menu-panel a{
+      display:block;
+      padding:12px 10px;
+      border-radius:12px;
+      font-weight:900;
+      color:rgba(11,31,59,.86);
+    }
+    .menu-panel a:hover{background:rgba(77,163,255,.10)}
+    .menu-panel .row{
+      display:flex; gap:10px; flex-wrap:wrap; padding:10px 10px 0;
+    }
 
     /* Page */
-    main{padding:28px 0 34px}
-    .page-hero{
-      background: rgba(255,255,255,.86);
+    main{padding:26px 0 34px}
+
+    .hero{
+      background: var(--card);
       border:1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding:22px;
-      position:relative;
-      overflow:hidden;
-    }
-    .page-hero:before{
-      content:"";
-      position:absolute; inset:-90px -90px auto auto;
-      width:240px; height:240px;
-      background: radial-gradient(circle at 30% 30%, rgba(77,163,255,.35), transparent 62%);
-      transform:rotate(25deg);
+      padding:20px;
     }
     .kicker{
       display:inline-flex; align-items:center; gap:10px;
       font-weight:900; font-size:12px;
-      letter-spacing:.12em; text-transform:uppercase;
+      letter-spacing:.10em; text-transform:uppercase;
       color:rgba(11,31,59,.70);
-      background:rgba(77,163,255,.10);
-      border:1px solid rgba(77,163,255,.18);
-      padding:8px 12px; border-radius:999px;
     }
-    h1{margin:12px 0 8px; font-size: clamp(26px, 3.4vw, 40px); line-height:1.12; letter-spacing:-.02em;}
-    .lead{margin:0; color:rgba(11,31,59,.76); max-width:70ch;}
-    .hero-actions{display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;}
-    .filters{
-      display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;
-      padding-top:16px; border-top:1px dashed rgba(11,31,59,.16);
-      color:rgba(11,31,59,.72);
+    .kicker .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+    h1{
+      margin:12px 0 8px;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+    .lead{
+      margin:0;
+      color:rgba(11,31,59,.75);
+      max-width:78ch;
+      font-size:15.5px;
+    }
+
+    .hero-actions{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    .chips{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:14px;
+      padding-top:14px;
+      border-top:1px dashed rgba(11,31,59,.16);
     }
     .chip{
       display:inline-flex; align-items:center;
-      padding:8px 10px; border-radius:999px;
+      padding:8px 10px;
+      border-radius:999px;
       border:1px solid rgba(11,31,59,.14);
       background: rgba(11,31,59,.04);
-      text-decoration:none; font-weight:800; font-size:12px;
+      font-weight:900;
+      font-size:12px;
     }
     .chip:hover{background:rgba(77,163,255,.10); border-color:rgba(77,163,255,.25)}
-    .chip strong{font-weight:900}
 
-    /* Sections */
-    section{padding:22px 0}
-    .section-title{
-      display:flex; align-items:flex-end; justify-content:space-between; gap:14px;
+    section{padding:18px 0}
+    .section-head{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
       margin:0 0 12px;
     }
-    .section-title h2{margin:0; font-size:20px; letter-spacing:-.01em;}
-    .section-title p{margin:0; color:rgba(11,31,59,.70); font-size:13px;}
+    .section-head h2{margin:0; font-size:18px; letter-spacing:-.01em;}
+    .section-head p{margin:0; font-size:13px; color:rgba(11,31,59,.70);}
+
     .grid{
       display:grid;
       grid-template-columns: repeat(3, 1fr);
-      gap:14px;
+      gap:12px;
     }
     .card{
-      background:rgba(255,255,255,.88);
+      background: var(--card);
       border:1px solid var(--border);
       border-radius: var(--radius);
-      box-shadow: 0 14px 28px rgba(11,31,59,.07);
+      box-shadow: var(--shadow);
       padding:16px;
-      text-decoration:none;
-      display:flex; flex-direction:column; gap:10px;
-      min-height:140px;
+      display:flex; flex-direction:column;
+      gap:8px;
+      min-height:120px;
     }
     .card:hover{transform:translateY(-2px)}
     .pill{
@@ -144,23 +189,30 @@
       color:rgba(11,31,59,.72);
     }
     .pill span{
-      width:8px; height:8px; border-radius:999px; background:rgba(77,163,255,.78);
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(77,163,255,.85);
       box-shadow:0 0 0 6px rgba(77,163,255,.12);
     }
-    .card h3{margin:0; font-size:16px; letter-spacing:-.01em;}
-    .card p{margin:0; color:rgba(11,31,59,.72); font-size:14px;}
-    .meta{margin-top:auto; color:rgba(11,31,59,.62); font-size:12px; font-weight:800;}
+    .card h3{margin:0; font-size:15px; letter-spacing:-.01em;}
+    .card p{margin:0; color:rgba(11,31,59,.70); font-size:14px;}
+    .meta{margin-top:auto; color:rgba(11,31,59,.62); font-size:12px; font-weight:900;}
 
-    /* Footer */
     footer{
-      padding:22px 0 34px;
+      margin-top:18px;
       border-top:1px solid var(--border);
-      color:rgba(11,31,59,.74);
+      padding:18px 0 28px;
+      color:rgba(11,31,59,.68);
+      font-size:12px;
     }
-    .fine{margin-top:10px; font-size:12px; color:rgba(11,31,59,.60)}
 
-    @media (max-width: 940px){
+    @media (max-width: 900px){
       .grid{grid-template-columns:1fr}
+      .navlinks{display:none}
+      .menu-btn{display:inline-flex; align-items:center; gap:8px;}
+      .tagline{display:none}
+    }
+    @media (min-width: 901px){
+      .tagline{display:block;}
     }
   </style>
 </head>
@@ -170,65 +222,68 @@
     <div class="container">
       <div class="topbar">
         <a class="brand" href="/" aria-label="SIX43 Home">
-          <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M12 2l9 10-9 10L3 12 12 2Z" stroke="rgba(11,31,59,.85)" stroke-width="1.8"/>
-              <path d="M12 6.5l5.2 5.5L12 17.5 6.8 12 12 6.5Z" stroke="rgba(77,163,255,.95)" stroke-width="1.6"/>
-            </svg>
-          </div>
-          <div class="brand-name">
-            <strong>SIX43</strong>
-            <span>Baseball IQ • Coaching Tools • Analytics</span>
-          </div>
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
         </a>
 
-        <nav aria-label="Primary">
-          <ul>
-            <li><a class="active" href="/learn.html">Learn</a></li>
-            <li><a href="/baseball-iq.html">Baseball IQ</a></li>
-            <li><a href="/blog.html">Blog</a></li>
-            <li><a href="/tools.html">Tools</a></li>
-            <li><a href="/about.html">About</a></li>
-          </ul>
-        </nav>
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a class="active" href="/learn.html">Learn</a>
+            <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+            <a href="/blog.html">Blog</a>
+            <a href="/tools.html">Tools</a>
+            <a href="/about.html">About</a>
+          </div>
 
-        <a class="btn primary" href="/baseball-iq.html">Start Here</a>
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">
+            ☰ Menu
+          </button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+        <a href="/blog.html">Blog</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured Article</a>
+        </div>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <div class="page-hero">
-      <div class="kicker">
-        <span style="width:8px;height:8px;border-radius:999px;background:rgba(77,163,255,.85);box-shadow:0 0 0 6px rgba(77,163,255,.12)"></span>
-        Learn Hub
-      </div>
+    <div class="hero">
+      <div class="kicker"><span class="dot"></span> Learn Hub</div>
       <h1>Learn baseball the Six43 way.</h1>
       <p class="lead">
-        This page is your table of contents. Pick a category, then grab one idea at a time.
+        This is your table of contents. Pick a category, grab one idea, and build repeatable habits.
         Six43 is built around <strong>decision-making</strong> — the plays that prevent chaos runs and win innings.
       </p>
 
       <div class="hero-actions">
-        <a class="btn primary" href="/baseball-iq.html">Baseball IQ Foundation</a>
-        <a class="btn" href="#situational">Situational Baseball</a>
+        <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Baseball IQ Foundation</a>
+        <a class="btn" href="#situational">Situational</a>
         <a class="btn" href="#defense">Defense</a>
         <a class="btn" href="#baserunning">Baserunning</a>
         <a class="btn" href="#coaching">Coaching</a>
       </div>
 
-      <div class="filters" aria-label="Quick links">
-        <a class="chip" href="/when-not-to-turn-two--smart-double-play-decisions-in-youth-baseball--coach-guide-.html">
-          <strong>Featured:</strong>&nbsp;When NOT to Turn Two
-        </a>
-        <a class="chip" href="/how-to-turn-6-4-3-double-play-youth-9-13.html">How to Turn a 6-4-3</a>
-        <a class="chip" href="/why-youth-teams-fail-to-turn-double-plays---and-how-to-fix-it.html">Why DPs Fail</a>
+      <div class="chips" aria-label="Quick links">
+        <a class="chip" href="/articles/when-not-to-turn-two.html">Featured: When NOT to Turn Two</a>
+        <a class="chip" href="#defense">Defense</a>
+        <a class="chip" href="#situational">Situational</a>
       </div>
     </div>
 
     <!-- BASEBALL IQ -->
     <section id="baseball-iq" aria-labelledby="bq">
-      <div class="section-title">
+      <div class="section-head">
         <div>
           <h2 id="bq">Baseball IQ</h2>
           <p>Pre-pitch thinking. Reliable outs. Calm decisions under pressure.</p>
@@ -236,14 +291,13 @@
       </div>
 
       <div class="grid">
-        <a class="card" href="/baseball-iq-in-youth-baseball--youth---why-decision-making-beats-tools-at-8-14.html">
+        <a class="card" href="/articles/why-decision-making-beats-tools.html">
           <div class="pill"><span></span> Anchor</div>
-          <h3>Baseball IQ in Youth Baseball: Why Decision-Making Beats Tools (8–14)</h3>
-          <p>The definition, the habits, and the cues that show up on Saturdays.</p>
+          <h3>Why Decision-Making Beats Tools (8–14)</h3>
+          <p>The habits and cues that show up on Saturdays.</p>
           <div class="meta">Start here →</div>
         </a>
 
-        <!-- Placeholder cards (swap links/titles as you publish more) -->
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
           <h3>The Pre-Pitch Plan: 3 Questions Great Players Answer Every Pitch</h3>
@@ -262,32 +316,32 @@
 
     <!-- SITUATIONAL -->
     <section id="situational" aria-labelledby="sit">
-      <div class="section-title">
+      <div class="section-head">
         <div>
           <h2 id="sit">Situational Baseball</h2>
-          <p>What’s the right play with runners on? Stop guessing. Start planning.</p>
+          <p>Stop guessing. Know the highest-percentage play.</p>
         </div>
       </div>
 
       <div class="grid">
-        <a class="card" href="/when-not-to-turn-two--smart-double-play-decisions-in-youth-baseball--coach-guide-.html">
+        <a class="card" href="/articles/when-not-to-turn-two.html">
           <div class="pill"><span></span> Must-read</div>
           <h3>When NOT to Turn Two</h3>
-          <p>Smart double-play decisions that prevent big innings at 8–14.</p>
-          <div class="meta">Read →</div>
-        </a>
-
-        <a class="card" href="/why-youth-teams-fail-to-turn-double-plays---and-how-to-fix-it.html">
-          <div class="pill"><span></span> Coaching</div>
-          <h3>Why Youth Teams Fail to Turn Double Plays — and How to Fix It</h3>
-          <p>Habits, communication, positioning, and a system you can teach this week.</p>
+          <p>Smart decisions that prevent big innings at 8–14.</p>
           <div class="meta">Read →</div>
         </a>
 
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
-          <h3>What’s the Right Play With Bases Loaded and &lt;2 Outs?</h3>
-          <p>A simple decision tree coaches can teach without over-coaching.</p>
+          <h3>Bases Loaded, &lt;2 Outs: The Right Play (Simple Decision Tree)</h3>
+          <p>A system coaches can teach without over-coaching.</p>
+          <div class="meta">Add later</div>
+        </a>
+
+        <a class="card" href="/blog.html">
+          <div class="pill"><span></span> Coming soon</div>
+          <h3>One-Out vs Two-Out Defense: Why Your “Sure Out” Changes</h3>
+          <p>When to take the easy out and when to be aggressive.</p>
           <div class="meta">Add later</div>
         </a>
       </div>
@@ -295,32 +349,32 @@
 
     <!-- DEFENSE -->
     <section id="defense" aria-labelledby="def">
-      <div class="section-title">
+      <div class="section-head">
         <div>
           <h2 id="def">Defense</h2>
-          <p>Positioning, footwork, communication, and turning chaos into outs.</p>
+          <p>Positioning, footwork, and turning chaos into outs.</p>
         </div>
       </div>
 
       <div class="grid">
-        <a class="card" href="/how-to-turn-6-4-3-double-play-youth-9-13.html">
-          <div class="pill"><span></span> How-To</div>
-          <h3>How to Turn a 6-4-3 Double Play (Ages 9–13)</h3>
-          <p>Roles, positioning, footwork at second, cues, and a drill progression.</p>
-          <div class="meta">Read →</div>
-        </a>
-
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
-          <h3>Cuts & Relays for Youth Baseball (The Simple Version That Works)</h3>
-          <p>Stop overthrows, control the inning, and teach one clear system.</p>
+          <h3>Cutoffs & Relays for Youth Baseball (The Simple Version That Works)</h3>
+          <p>Stop overthrows and control the inning with one clear system.</p>
           <div class="meta">Add later</div>
         </a>
 
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
-          <h3>Backups Win Games: The Most Underrated Defensive Skill at 9–12U</h3>
+          <h3>Backups Win Games: The Most Underrated Defensive Skill</h3>
           <p>Turn “two bases” into “stay put” with one habit.</p>
+          <div class="meta">Add later</div>
+        </a>
+
+        <a class="card" href="/blog.html">
+          <div class="pill"><span></span> Coming soon</div>
+          <h3>Infield Positioning 101 (9–12U): Where to Stand and Why</h3>
+          <p>Small shifts that create big outs.</p>
           <div class="meta">Add later</div>
         </a>
       </div>
@@ -328,10 +382,10 @@
 
     <!-- BASERUNNING -->
     <section id="baserunning" aria-labelledby="base">
-      <div class="section-title">
+      <div class="section-head">
         <div>
           <h2 id="base">Baserunning</h2>
-          <p>Free bases without being fast: reads, outs, and smart aggression.</p>
+          <p>Free bases without being fast: reads, outs, smart aggression.</p>
         </div>
       </div>
 
@@ -345,7 +399,7 @@
 
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
-          <h3>When to Take the Extra Base (Youth Baseball Reads)</h3>
+          <h3>When to Take the Extra Base (Youth Reads)</h3>
           <p>Teach reads, not slogans. Avoid the first out at third.</p>
           <div class="meta">Add later</div>
         </a>
@@ -353,7 +407,7 @@
         <a class="card" href="/blog.html">
           <div class="pill"><span></span> Coming soon</div>
           <h3>Two-Out Baserunning: The One Habit That Creates Runs</h3>
-          <p>Move on contact, eliminate hesitation, and score without steals.</p>
+          <p>Move on contact and eliminate hesitation.</p>
           <div class="meta">Add later</div>
         </a>
       </div>
@@ -361,7 +415,7 @@
 
     <!-- COACHING -->
     <section id="coaching" aria-labelledby="coach">
-      <div class="section-title">
+      <div class="section-head">
         <div>
           <h2 id="coach">Coaching & Communication</h2>
           <p>Simple language, repeatable habits, and practice plans that don’t drag.</p>
@@ -395,9 +449,16 @@
 
   <footer>
     <div class="container">
-      <div class="fine">© <span id="year"></span> SIX43 • Built for youth baseball (8–14)</div>
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
     </div>
-    <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
   </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
