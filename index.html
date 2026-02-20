@@ -6,308 +6,272 @@
   <meta name="description" content="SIX43 — Baseball IQ, coaching tools, and practical youth baseball strategy (ages 8–14)." />
   <title>SIX43 | Baseball IQ & Coaching Tools</title>
 
-  <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/site.css">
 
-  <!-- Page-specific styles only (keep this short) -->
   <style>
-    /* HERO LAYOUT */
-    .hero{padding:22px 0 8px;}
-    .hero-grid{
-      display:grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap:14px;
-      align-items:stretch;
-    }
+  /* ---------- Homepage Only Styles ---------- */
 
-    .hero-card{
-      padding:22px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
+  .hero{
+    padding: 28px 0 12px;
+  }
 
-    .hero-media{
-      background: var(--card);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-      min-height: 260px;
-    }
-    .hero-media img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
+  .hero-grid{
+    display:grid;
+    grid-template-columns: 1.1fr .9fr;
+    gap:18px;
+    align-items:stretch;
+  }
 
-    .kicker{
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      font-weight:900;
-      font-size:12px;
-      letter-spacing:.10em;
-      text-transform:uppercase;
-      color:rgba(11,31,59,.70);
-    }
-    .kicker .dot{
-      width:9px;
-      height:9px;
-      border-radius:999px;
-      background:rgba(77,163,255,.85);
-      box-shadow:0 0 0 6px rgba(77,163,255,.12);
-    }
+  .hero-card{
+    padding:22px;
+  }
 
-    h1{
-      margin:2px 0 4px;
-      font-size: clamp(28px, 4vw, 44px);
-      line-height:1.12;
-      letter-spacing:-.02em;
-    }
-    .lead{
-      margin:0;
-      color:rgba(11,31,59,.75);
-      max-width:62ch;
-      font-size:16px;
-    }
-    .hero-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:6px;
-    }
+  .hero-media{
+    border-radius: var(--radius);
+    overflow:hidden;
+    border:1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
 
-    /* SECTIONS */
-    section{padding:14px 0;}
-    .section-head{
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap:10px;
-      margin:0 0 12px;
-    }
-    .section-head h2{
-      margin:0;
-      font-size:18px;
-      letter-spacing:-.01em;
-    }
-    .section-head a{
-      font-weight:900;
-      color:rgba(11,31,59,.72);
-      padding:10px 12px;
-      border-radius:12px;
-      text-decoration:none;
-    }
-    .section-head a:hover{background:rgba(77,163,255,.10);}
+  .hero-media img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
 
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap:12px;
-    }
+  .kicker{
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:rgba(11,31,59,.60);
+  }
 
-    /* Use your shared .card; add padding/layout here */
-    .card.pad{
-      padding:16px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      min-height:120px;
-      text-decoration:none;
-    }
-    .card.pad:hover{transform:translateY(-2px);}
+  h1{
+    margin:10px 0 10px;
+    font-size: clamp(30px,4vw,46px);
+    line-height:1.1;
+    letter-spacing:-.02em;
+  }
 
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      font-size:12px;
-      font-weight:900;
-      color:rgba(11,31,59,.72);
-    }
-    .pill span{
-      width:8px;
-      height:8px;
-      border-radius:999px;
-      background:rgba(77,163,255,.85);
-      box-shadow:0 0 0 6px rgba(77,163,255,.12);
-    }
+  .lead{
+    font-size:17px;
+    color:rgba(11,31,59,.72);
+  }
 
-    .card h3{
-      margin:0;
-      font-size:15px;
-      letter-spacing:-.01em;
-    }
-    .card p{
-      margin:0;
-      color:rgba(11,31,59,.70);
-      font-size:14px;
-    }
+  .hero-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:18px;
+  }
 
-    /* Make the featured cards tighter */
-    .tight p{max-width:40ch;}
+  section{padding:24px 0}
 
-    /* Responsive */
-    @media (max-width: 900px){
-      .hero-grid{grid-template-columns:1fr;}
-      .hero-media{min-height:200px;}
-      .grid{grid-template-columns:1fr;}
+  .section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
 
-      /* Homepage featured thumbs: consistent ratio */
-.card.pad .thumb{
-  height: auto;
-  aspect-ratio: 16 / 9;
-}
+  .section-head h2{
+    font-size:18px;
+    margin:0;
+  }
 
-@media (max-width: 900px){
-  .card.pad .thumb{ aspect-ratio: 4 / 3; }
-}
-    }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+  }
+
+  .card.pad{
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  /* FIX: thumbnails not massive on desktop */
+  .card.pad .thumb{
+    aspect-ratio: 16/9;
+    height:auto;
+  }
+
+  .pill{
+    font-size:12px;
+    font-weight:900;
+    color:rgba(11,31,59,.70);
+  }
+
+  .card h3{
+    margin:0;
+    font-size:16px;
+  }
+
+  .card p{
+    margin:0;
+    font-size:14px;
+    color:rgba(11,31,59,.70);
+  }
+
+  @media(max-width:900px){
+    .hero-grid{grid-template-columns:1fr}
+    .grid{grid-template-columns:1fr}
+  }
+
   </style>
 </head>
 
 <body>
-  <header>
-    <div class="container">
-      <div class="topbar">
-        <a class="brand" href="/" aria-label="SIX43 Home">
-          <img src="/assets/logo.png" alt="SIX43" />
-          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
-        </a>
 
-        <nav aria-label="Primary navigation">
-          <div class="navlinks">
-            <a href="/learn.html">Learn</a>
-            <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
-            <a href="/blog.html">Blog</a>
-            <a href="/tools.html">Tools</a>
-            <a href="/about.html">About</a>
-          </div>
+<header>
+  <div class="container">
+    <div class="topbar">
+      <a class="brand" href="/" aria-label="SIX43 Home">
+        <img src="/assets/logo.png" alt="SIX43" />
+        <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
+      </a>
 
-          <a class="btn primary" href="/learn.html">Start Here</a>
-
-          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">
-            ☰ Menu
-          </button>
-        </nav>
-      </div>
-
-      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
-        <a href="/learn.html">Learn</a>
-        <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
-        <a href="/blog.html">Blog</a>
-        <a href="/tools.html">Tools</a>
-        <a href="/about.html">About</a>
-        <div class="row">
-          <a class="btn primary" href="/learn.html">Start Here</a>
-          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured Article</a>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <main class="container">
-    <!-- HERO -->
-    <div class="hero">
-      <div class="hero-grid">
-        <div class="card hero-card">
-          <div class="kicker"><span class="dot"></span> Youth baseball (8–14)</div>
-          <h1>Baseball IQ that wins innings.</h1>
-          <p class="lead">Decision-making, drills, and coaching tools — simple and game-ready.</p>
-
-          <div class="hero-actions">
-            <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
-            <a class="btn" href="/learn.html">Learn Hub</a>
-            <a class="btn" href="/blog.html">All Articles</a>
-          </div>
+      <nav aria-label="Primary navigation">
+        <div class="navlinks">
+          <a href="/learn.html">Learn</a>
+          <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+          <a href="/blog.html">Blog</a>
+          <a href="/tools.html">Tools</a>
+          <a href="/about.html">About</a>
         </div>
 
-        <div class="hero-media" aria-label="Hero image">
-          <img src="/assets/images/hero-field.png" alt="Empty youth baseball field at dusk" loading="lazy" />
+        <a class="btn primary" href="/learn.html">Start Here</a>
+
+        <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
+      </nav>
+    </div>
+
+    <div id="menuPanel" class="menu-panel">
+      <a href="/learn.html">Learn</a>
+      <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+      <a href="/blog.html">Blog</a>
+      <a href="/tools.html">Tools</a>
+      <a href="/about.html">About</a>
+      <div class="row">
+        <a class="btn primary" href="/learn.html">Start Here</a>
+        <a class="btn" href="/articles/when-not-to-turn-two.html">Featured Article</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-grid">
+
+      <div class="card hero-card">
+        <div class="kicker">Youth Baseball (8–14)</div>
+        <h1>Baseball IQ that wins innings.</h1>
+        <p class="lead">Simple decisions. Cleaner defense. Fewer chaotic innings.</p>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+          <a class="btn" href="/learn.html">Learn Hub</a>
+          <a class="btn" href="/blog.html">All Articles</a>
         </div>
       </div>
+
+      <div class="hero-media">
+        <img src="/assets/images/hero-field.png" alt="Baseball field at dusk">
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- START WITH -->
+  <section>
+    <div class="section-head">
+      <h2>Start here</h2>
+      <a href="/learn.html">See all →</a>
     </div>
 
-    <!-- FEATURED -->
-    <section aria-labelledby="featured">
-      <div class="section-head">
-        <h2 id="featured">Featured reads</h2>
-        <a href="/blog.html">Browse all →</a>
-      </div>
+    <div class="grid">
 
-      <div class="grid">
-        <a class="card pad tight" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">
-          <div class="thumb">
-            <img src="/assets/images/thumbs/think.jpg" alt="Pre-pitch checklist concept" loading="lazy" />
-          </div>
-          <div class="pill"><span></span> Baseball IQ</div>
-          <h3>Think Before Every Pitch</h3>
-          <p>3 questions that stop hesitation.</p>
-        </a>
+      <a class="card pad" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">
+        <div class="thumb">
+          <img src="/assets/images/thumbs/think.jpg" alt="Pre pitch thinking">
+        </div>
+        <div class="pill">Baseball IQ</div>
+        <h3>Think Before Every Pitch</h3>
+        <p>3 questions that eliminate hesitation.</p>
+      </a>
 
-        <a class="card pad tight" href="/articles/when-not-to-turn-two.html">
-          <div class="thumb">
-            <img src="/assets/images/thumbs/when-not.jpg" alt="Double play decision concept" loading="lazy" />
-          </div>
-          <div class="pill"><span></span> Situational</div>
-          <h3>When NOT to Turn Two</h3>
-          <p>Take the sure out. Prevent big innings.</p>
-        </a>
+      <a class="card pad" href="/articles/when-not-to-turn-two.html">
+        <div class="thumb">
+          <img src="/assets/images/thumbs/when-not.jpg" alt="Double play decision">
+        </div>
+        <div class="pill">Situational</div>
+        <h3>When NOT to Turn Two</h3>
+        <p>Take the sure out. Stop big innings.</p>
+      </a>
 
-        <a class="card pad tight" href="/articles/why-decision-making-beats-tools.html">
-          <div class="thumb">
-            <img src="/assets/images/thumbs/iq.jpg" alt="Baseball IQ concept" loading="lazy" />
-          </div>
-          <div class="pill"><span></span> Foundation</div>
-          <h3>Decision-Making Beats Tools</h3>
-          <p>The habits that win Saturdays.</p>
-        </a>
-      </div>
-    </section>
+      <a class="card pad" href="/articles/why-decision-making-beats-tools.html">
+        <div class="thumb">
+          <img src="/assets/images/thumbs/iq.jpg" alt="Baseball IQ">
+        </div>
+        <div class="pill">Foundation</div>
+        <h3>Decision-Making Beats Tools</h3>
+        <p>The habits that win Saturdays.</p>
+      </a>
 
-    <!-- QUICK START -->
-    <section aria-labelledby="quickstart">
-      <div class="section-head">
-        <h2 id="quickstart">Quick start</h2>
-        <a href="/learn.html">See topics →</a>
-      </div>
-
-      <div class="grid">
-        <a class="card pad" href="/learn.html#baseball-iq">
-          <div class="pill"><span></span> Foundation</div>
-          <h3>Baseball IQ</h3>
-          <p>Pre-pitch plan, sure outs, calm decisions.</p>
-        </a>
-
-        <a class="card pad" href="/learn.html#situational">
-          <div class="pill"><span></span> Game management</div>
-          <h3>Situational</h3>
-          <p>The highest-percentage play, every time.</p>
-        </a>
-
-        <a class="card pad" href="/learn.html#defense">
-          <div class="pill"><span></span> Run prevention</div>
-          <h3>Defense</h3>
-          <p>Positioning, footwork, cutoffs, backups.</p>
-        </a>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="container">
-      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
     </div>
-  </footer>
+  </section>
 
-  <script>
-    function toggleMenu(){
-      const el = document.getElementById("menuPanel");
-      el.style.display = (el.style.display === "block") ? "none" : "block";
-    }
-    document.getElementById("year").textContent = new Date().getFullYear();
-  </script>
+
+  <!-- LATEST -->
+  <section>
+    <div class="section-head">
+      <h2>Latest reads</h2>
+      <a href="/blog.html">Browse all →</a>
+    </div>
+
+    <div class="grid">
+
+      <a class="card pad" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">
+        <h3>Think Before Every Pitch</h3>
+        <p>Build pre-pitch habits players actually use in games.</p>
+      </a>
+
+      <a class="card pad" href="/articles/when-not-to-turn-two.html">
+        <h3>When NOT to Turn Two</h3>
+        <p>Prevent chaos innings with smarter outs.</p>
+      </a>
+
+      <a class="card pad" href="/articles/why-decision-making-beats-tools.html">
+        <h3>Why Decision-Making Beats Tools</h3>
+        <p>How calm teams win more innings.</p>
+      </a>
+
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container">
+    © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+  </div>
+</footer>
+
+<script>
+function toggleMenu(){
+  const el=document.getElementById("menuPanel");
+  el.style.display=(el.style.display==="block")?"none":"block";
+}
+document.getElementById("year").textContent=new Date().getFullYear();
+</script>
+
 </body>
 </html>
-
