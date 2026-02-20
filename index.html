@@ -33,7 +33,7 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow:hidden;
-  min-height: 220px;
+  min-height: 240px;
 }
 
 .hero-media img{
@@ -44,8 +44,24 @@
 }
 
 @media (max-width: 900px){
-  .hero-grid{ grid-template-columns: 1fr; }
-  .hero-media{ min-height: 200px; }
+  .hero-grid{ grid-template-columns:1fr; }
+  .hero-media{ min-height:200px; }
+}
+
+/* Card thumbnails */
+.card-media{
+  width:100%;
+  height:140px;
+  border-radius: 12px;
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+
+.card-media img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
 }
 
 /* Card thumbnail */
@@ -439,6 +455,7 @@
   </script>
 </body>
 </html>
+
 
 
 
