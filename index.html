@@ -226,6 +226,39 @@
     @media (min-width: 901px){
       .brand .tagline{display:block;}
     }
+    /* HEADER LOGO SIZE */
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  text-decoration:none;
+}
+
+.brand img{
+  height:42px;
+  width:auto;
+  display:block;
+}
+
+.tagline{
+  font-size:12px;
+  color:#6B7280;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+/* Bigger on desktop */
+@media (min-width: 900px){
+  .brand img{
+    height:56px;
+  }
+}
+
+/* subtle polish */
+.brand:hover img{
+  opacity:.85;
+  transition:opacity .18s ease;
+}
   </style>
 </head>
 
@@ -358,3 +391,4 @@
   </script>
 </body>
 </html>
+
