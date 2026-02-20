@@ -3,570 +3,358 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Six43 — Baseball IQ, coaching tools, and practical youth baseball strategy." />
+  <meta name="description" content="SIX43 — Baseball IQ, coaching tools, and practical youth baseball strategy (ages 8–14)." />
   <title>SIX43 | Baseball IQ & Coaching Tools</title>
 
   <style>
     :root{
       --navy:#0B1F3B;
       --blue:#4DA3FF;
-      --blue2:#86C5FF;
       --gray:#6B7280;
       --bg:#F7FAFF;
       --card:#FFFFFF;
       --border:rgba(11,31,59,.12);
-      --shadow:0 10px 30px rgba(11,31,59,.10);
-      --radius:18px;
-      --max:1120px;
+      --shadow:0 10px 24px rgba(11,31,59,.08);
+      --radius:16px;
+      --max:1040px;
     }
 
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
       margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color:var(--navy);
-      background: radial-gradient(1200px 600px at 20% -10%, rgba(77,163,255,.20), transparent 60%),
-                  radial-gradient(900px 500px at 90% 10%, rgba(134,197,255,.18), transparent 55%),
-                  var(--bg);
-      line-height:1.5;
+      background: var(--bg);
+      line-height:1.55;
     }
 
-    a{color:inherit}
-    .container{max-width:var(--max); margin:0 auto; padding:0 20px;}
-    .skip{
-      position:absolute; left:-999px; top:auto; width:1px; height:1px; overflow:hidden;
-    }
-    .skip:focus{
-      left:16px; top:16px; width:auto; height:auto; padding:10px 12px;
-      background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
-      z-index:9999;
-    }
+    a{color:inherit; text-decoration:none}
+    .container{max-width:var(--max); margin:0 auto; padding:0 18px;}
 
     /* Header */
     header{
       position:sticky; top:0; z-index:50;
-      background: rgba(247,250,255,.72);
+      background: rgba(247,250,255,.86);
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--border);
     }
     .topbar{
       display:flex; align-items:center; justify-content:space-between;
-      gap:16px; padding:14px 0;
+      gap:14px; padding:12px 0;
     }
     .brand{
-      display:flex; align-items:center; gap:12px; text-decoration:none;
+      display:flex; align-items:center; gap:12px;
+      min-width: 180px;
     }
-    .brand-mark{
-      width:38px; height:38px; border-radius:12px;
-      background: linear-gradient(135deg, rgba(77,163,255,.22), rgba(134,197,255,.10));
-      border:1px solid var(--border);
-      display:grid; place-items:center;
+    .brand img{
+      height:34px;
+      width:auto;
+      display:block;
     }
-    .brand-mark svg{width:22px; height:22px}
-    .brand-name{
-      display:flex; flex-direction:column; line-height:1.1;
+    .brand .tagline{
+      display:none;
+      font-size:12px;
+      color:var(--gray);
+      font-weight:700;
     }
-    .brand-name strong{letter-spacing:.02em}
-    .brand-name span{font-size:12px; color:var(--gray)}
-    nav ul{
-      list-style:none; margin:0; padding:0;
-      display:flex; align-items:center; gap:14px;
-    }
-    nav a{
-      text-decoration:none;
-      font-weight:600;
-      color:rgba(11,31,59,.88);
-      padding:10px 10px;
-      border-radius:12px;
-    }
-    nav a:hover{background:rgba(77,163,255,.10)}
-    .cta{
+
+    nav{
       display:flex; align-items:center; gap:10px;
     }
+    .navlinks{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .navlinks a{
+      padding:10px 10px;
+      border-radius:12px;
+      font-weight:800;
+      color:rgba(11,31,59,.86);
+    }
+    .navlinks a:hover{background:rgba(77,163,255,.10)}
     .btn{
       display:inline-flex; align-items:center; justify-content:center;
-      gap:10px;
-      padding:10px 14px;
+      padding:10px 12px;
       border-radius:14px;
       border:1px solid var(--border);
       background:#fff;
-      text-decoration:none;
-      font-weight:700;
-      box-shadow: 0 6px 18px rgba(11,31,59,.08);
+      font-weight:900;
+      box-shadow: 0 6px 16px rgba(11,31,59,.06);
       white-space:nowrap;
     }
     .btn.primary{
-      background: linear-gradient(135deg, rgba(77,163,255,.22), rgba(134,197,255,.10));
+      background: rgba(77,163,255,.14);
+      border-color: rgba(77,163,255,.22);
     }
-    .btn:hover{transform:translateY(-1px)}
-    .btn:active{transform:translateY(0)}
-    .icon{
-      width:18px; height:18px; display:inline-block;
+
+    /* Mobile menu */
+    .menu-btn{
+      display:none;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:#fff;
+      font-weight:900;
+    }
+    .menu-panel{
+      display:none;
+      border-top:1px solid var(--border);
+      padding:10px 0 14px;
+    }
+    .menu-panel a{
+      display:block;
+      padding:12px 10px;
+      border-radius:12px;
+      font-weight:900;
+      color:rgba(11,31,59,.86);
+    }
+    .menu-panel a:hover{background:rgba(77,163,255,.10)}
+    .menu-panel .row{
+      display:flex; gap:10px; flex-wrap:wrap; padding:10px 10px 0;
     }
 
     /* Hero */
     .hero{
-      padding:54px 0 20px;
-    }
-    .hero-grid{
-      display:grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap:22px;
-      align-items:stretch;
+      padding:34px 0 10px;
     }
     .hero-card{
-      background: rgba(255,255,255,.86);
+      background: var(--card);
       border:1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding:26px;
-      overflow:hidden;
-      position:relative;
-    }
-    .hero-card:before{
-      content:"";
-      position:absolute; inset:-80px -80px auto auto;
-      width:220px; height:220px;
-      background: radial-gradient(circle at 30% 30%, rgba(77,163,255,.35), transparent 62%);
-      transform:rotate(25deg);
+      padding:22px;
     }
     .kicker{
       display:inline-flex; align-items:center; gap:10px;
-      font-weight:800; font-size:12px;
-      letter-spacing:.12em; text-transform:uppercase;
+      font-weight:900; font-size:12px;
+      letter-spacing:.10em; text-transform:uppercase;
       color:rgba(11,31,59,.70);
-      background:rgba(77,163,255,.10);
-      border:1px solid rgba(77,163,255,.18);
-      padding:8px 12px;
-      border-radius:999px;
+    }
+    .kicker .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
     }
     h1{
-      margin:14px 0 10px;
-      font-size: clamp(30px, 4vw, 48px);
-      line-height:1.1;
+      margin:12px 0 10px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height:1.12;
       letter-spacing:-.02em;
     }
     .lead{
-      margin:0 0 18px;
-      color:rgba(11,31,59,.76);
+      margin:0;
+      color:rgba(11,31,59,.75);
+      max-width:70ch;
       font-size:16px;
-      max-width:60ch;
     }
     .hero-actions{
-      display:flex; flex-wrap:wrap; gap:12px;
-      margin-top:14px;
-    }
-    .mini{
-      display:flex; gap:10px; align-items:flex-start;
-      margin-top:18px;
-      padding-top:18px;
-      border-top:1px dashed rgba(11,31,59,.16);
-      color:rgba(11,31,59,.78);
-      font-size:14px;
-    }
-    .mini b{color:var(--navy)}
-    .mini .dot{
-      width:10px; height:10px; margin-top:6px;
-      border-radius:999px;
-      background:rgba(77,163,255,.75);
-      box-shadow: 0 0 0 6px rgba(77,163,255,.12);
-      flex:0 0 auto;
-    }
-
-    /* Side panel */
-    .side{
-      display:flex; flex-direction:column; gap:14px;
-    }
-    .panel{
-      background: rgba(255,255,255,.82);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: 0 14px 28px rgba(11,31,59,.08);
-      padding:18px;
-    }
-    .panel h2{
-      margin:0 0 10px;
-      font-size:18px;
-      letter-spacing:-.01em;
-    }
-    .search{
-      display:flex; gap:10px;
-    }
-    .search input{
-      width:100%;
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid rgba(11,31,59,.18);
-      outline:none;
-      background:#fff;
-      font-size:14px;
-    }
-    .search input:focus{border-color:rgba(77,163,255,.7); box-shadow:0 0 0 5px rgba(77,163,255,.18)}
-    .tags{
-      display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;
-    }
-    .tag{
-      display:inline-flex;
-      padding:8px 10px;
-      border-radius:999px;
-      border:1px solid rgba(11,31,59,.14);
-      background: rgba(11,31,59,.04);
-      text-decoration:none;
-      font-weight:700;
-      font-size:12px;
-      color:rgba(11,31,59,.80);
-    }
-    .tag:hover{background:rgba(77,163,255,.10); border-color:rgba(77,163,255,.25)}
-    .note{
-      font-size:13px;
-      color:rgba(11,31,59,.72);
-      margin:10px 0 0;
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:16px;
     }
 
     /* Sections */
-    section{padding:26px 0}
-    .section-title{
-      display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
-      margin:0 0 14px;
+    section{padding:20px 0}
+    .section-head{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
+      margin:0 0 12px;
     }
-    .section-title h2{
+    .section-head h2{
       margin:0;
-      font-size:22px;
+      font-size:18px;
       letter-spacing:-.01em;
     }
-    .section-title a{
-      text-decoration:none;
-      font-weight:800;
-      color:rgba(11,31,59,.76);
+    .section-head a{
+      font-weight:900;
+      color:rgba(11,31,59,.72);
       padding:10px 12px;
       border-radius:12px;
-      border:1px solid transparent;
     }
-    .section-title a:hover{
-      background:rgba(77,163,255,.10);
-      border-color:rgba(77,163,255,.20);
-    }
+    .section-head a:hover{background:rgba(77,163,255,.10)}
 
-    .grid3{
+    .grid{
       display:grid;
       grid-template-columns: repeat(3, 1fr);
-      gap:14px;
+      gap:12px;
     }
     .card{
-      background:rgba(255,255,255,.86);
+      background: var(--card);
       border:1px solid var(--border);
       border-radius: var(--radius);
-      box-shadow: 0 14px 28px rgba(11,31,59,.07);
+      box-shadow: var(--shadow);
       padding:16px;
-      text-decoration:none;
-      display:flex; flex-direction:column; gap:10px;
-      min-height:140px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-height: 120px;
     }
     .card:hover{transform:translateY(-2px)}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:900;
+      color:rgba(11,31,59,.72);
+    }
+    .pill span{
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
     .card h3{
       margin:0;
-      font-size:16px;
+      font-size:15px;
       letter-spacing:-.01em;
     }
     .card p{
       margin:0;
-      color:rgba(11,31,59,.72);
+      color:rgba(11,31,59,.70);
       font-size:14px;
     }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      font-size:12px; font-weight:800;
-      color:rgba(11,31,59,.72);
-    }
-    .pill span{
-      width:8px; height:8px; border-radius:999px; background:rgba(77,163,255,.75);
-      box-shadow:0 0 0 6px rgba(77,163,255,.12);
-    }
 
-    /* Newsletter */
-    .newsletter{
-      background: linear-gradient(135deg, rgba(77,163,255,.16), rgba(134,197,255,.08));
-      border:1px solid rgba(77,163,255,.20);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding:18px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:14px;
-    }
-    .newsletter h3{margin:0 0 6px; font-size:18px}
-    .newsletter p{margin:0; color:rgba(11,31,59,.75); font-size:14px}
-    .newsletter form{
-      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
-      min-width:320px;
-    }
-    .newsletter input{
-      flex:1 1 220px;
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid rgba(11,31,59,.18);
-      background:#fff;
-      outline:none;
-      font-size:14px;
-    }
-    .newsletter input:focus{border-color:rgba(77,163,255,.7); box-shadow:0 0 0 5px rgba(77,163,255,.18)}
-
-    /* Footer */
     footer{
-      padding:26px 0 34px;
-      border-top:1px solid var(--border);
       margin-top:18px;
-      color:rgba(11,31,59,.74);
+      border-top:1px solid var(--border);
+      padding:18px 0 28px;
+      color:rgba(11,31,59,.68);
+      font-size:12px;
     }
-    .footer-grid{
-      display:grid;
-      grid-template-columns: 1.2fr .8fr .8fr;
-      gap:16px;
-      align-items:start;
-    }
-    .footer-grid h4{margin:0 0 10px}
-    .footer-grid a{display:block; text-decoration:none; padding:6px 0; color:rgba(11,31,59,.74); font-weight:650}
-    .footer-grid a:hover{color:var(--navy)}
-    .fine{margin-top:10px; font-size:12px; color:rgba(11,31,59,.60)}
-    .muted{color:rgba(11,31,59,.70)}
 
-    /* Mobile */
-    .menu-toggle{display:none}
-    @media (max-width: 940px){
-      .hero-grid{grid-template-columns:1fr; }
-      .newsletter{flex-direction:column; align-items:stretch}
-      .newsletter form{min-width:unset; justify-content:stretch}
-      .grid3{grid-template-columns:1fr}
-      .footer-grid{grid-template-columns:1fr}
-      nav ul{gap:8px; flex-wrap:wrap; justify-content:flex-end}
+    /* Responsive */
+    @media (max-width: 900px){
+      .grid{grid-template-columns:1fr}
+      .navlinks{display:none;}
+      .menu-btn{display:inline-flex; align-items:center; gap:8px;}
+      .brand .tagline{display:none;}
+    }
+    @media (min-width: 901px){
+      .brand .tagline{display:block;}
     }
   </style>
 </head>
 
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-
   <header>
     <div class="container">
       <div class="topbar">
         <a class="brand" href="/" aria-label="SIX43 Home">
-          <div class="brand-mark" aria-hidden="true">
-            <!-- Simple diamond icon (placeholder). Swap with your real mark later -->
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M12 2l9 10-9 10L3 12 12 2Z" stroke="rgba(11,31,59,.85)" stroke-width="1.8"/>
-              <path d="M12 6.5l5.2 5.5L12 17.5 6.8 12 12 6.5Z" stroke="rgba(77,163,255,.95)" stroke-width="1.6"/>
-            </svg>
-          </div>
-          <div class="brand-name">
-            <strong>SIX43</strong>
-            <span>Baseball IQ • Coaching Tools • Analytics</span>
-          </div>
+          <!-- Put your file at /assets/logo.png -->
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
         </a>
 
-        <nav aria-label="Primary">
-          <ul>
-            <li><a href="/learn.html">Learn</a></li>
-            <li><a href="/baseball-iq.html">Baseball IQ</a></li>
-            <li><a href="/blog.html">Blog</a></li>
-            <li><a href="/tools.html">Tools</a></li>
-            <li><a href="/about.html">About</a></li>
-          </ul>
-        </nav>
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a href="/learn.html">Learn</a>
+            <a href="/why-decision-making-beats-tools.html">Baseball IQ</a>
+            <a href="/blog.html">Blog</a>
+            <a href="/tools.html">Tools</a>
+            <a href="/about.html">About</a>
+          </div>
 
-        <div class="cta">
-          <a class="btn" href="/blog.html" aria-label="Browse articles">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 7h12M6 12h12M6 17h9" stroke="rgba(11,31,59,.85)" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Articles
-          </a>
-          <a class="btn primary" href="#newsletter" aria-label="Subscribe to updates">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 6h16v12H4V6Z" stroke="rgba(11,31,59,.85)" stroke-width="2" />
-              <path d="M4 7l8 6 8-6" stroke="rgba(77,163,255,.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Subscribe
-          </a>
+          <a class="btn primary" href="/learn.html">Start Here</a>
+
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">
+            ☰ Menu
+          </button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/why-decision-making-beats-tools.html">Baseball IQ</a>
+        <a href="/blog.html">Blog</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/learn.html">Start Here</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured Article</a>
         </div>
       </div>
     </div>
   </header>
 
-  <main id="main" class="container">
-    <!-- HERO -->
+  <main class="container">
     <div class="hero">
-      <div class="hero-grid">
-        <div class="hero-card">
-          <div class="kicker">
-            <span style="width:8px;height:8px;border-radius:999px;background:rgba(77,163,255,.85);box-shadow:0 0 0 6px rgba(77,163,255,.12)"></span>
-            Built for youth baseball (8–14)
-          </div>
+      <div class="hero-card">
+        <div class="kicker"><span class="dot"></span> Built for youth baseball (8–14)</div>
+        <h1>Play smarter. Coach clearer.</h1>
+        <p class="lead">
+          Six43 is a baseball reference site focused on <strong>Baseball IQ</strong> — the decisions that prevent chaos runs
+          and turn “almost” plays into reliable outs.
+        </p>
 
-          <h1>Play smarter. Coach clearer. Win innings.</h1>
-          <p class="lead">
-            Six43 is a baseball reference site focused on <b>Baseball IQ</b> — the decisions that prevent chaos runs
-            and turn “almost” plays into reliable outs.
-          </p>
-
-          <div class="hero-actions">
-            <a class="btn primary" href="/baseball-iq.html">Start with Baseball IQ</a>
-            <a class="btn" href="/learn.html">Browse Topics</a>
-            <a class="btn" href="/tools.html">Coaching Tools</a>
-          </div>
-
-          <div class="mini">
-            <div class="dot" aria-hidden="true"></div>
-            <div>
-              <b>Six43 principle:</b> “One clean out ends rallies.”
-              <div class="muted" style="margin-top:4px">We teach decisions first, mechanics second.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="side">
-          <div class="panel">
-            <h2>Find what you need fast</h2>
-            <div class="search" role="search">
-              <input id="q" type="search" placeholder="Search topics (ex: double play, baserunning, cutoff…)" aria-label="Search (placeholder only)" />
-              <a class="btn" href="/learn.html" aria-label="Go to learning hub">Go</a>
-            </div>
-            <p class="note">
-              (Optional) You can wire this input to your real search later. For now it’s a clean placeholder.
-            </p>
-            <div class="tags" aria-label="Quick topics">
-              <a class="tag" href="/baseball-iq.html">Baseball IQ</a>
-              <a class="tag" href="/blog.html#defense">Defense</a>
-              <a class="tag" href="/blog.html#situational">Situational</a>
-              <a class="tag" href="/blog.html#baserunning">Baserunning</a>
-              <a class="tag" href="/blog.html#coaching">Coaching</a>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h2>Featured read</h2>
-            <a class="card" href="/articles/when-not-to-turn-two.html" style="min-height:auto;">
-              <div class="pill"><span></span> Situational Baseball</div>
-              <h3>When NOT to Turn Two</h3>
-              <p>Stop forcing double plays and start stacking reliable outs.</p>
-            </a>
-          </div>
+        <div class="hero-actions">
+          <a class="btn primary" href="/why-decision-making-beats-tools.html">Baseball IQ Foundation</a>
+          <a class="btn" href="/learn.html">Browse Topics</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">When NOT to Turn Two</a>
         </div>
       </div>
     </div>
 
-    <!-- TOPICS -->
     <section aria-labelledby="topics">
-      <div class="section-title">
-        <h2 id="topics">Learn by category</h2>
-        <a href="/learn.html">See all topics →</a>
+      <div class="section-head">
+        <h2 id="topics">Start with a category</h2>
+        <a href="/learn.html">See all →</a>
       </div>
 
-      <div class="grid3">
+      <div class="grid">
         <a class="card" href="/learn.html#baseball-iq">
           <div class="pill"><span></span> Foundation</div>
           <h3>Baseball IQ</h3>
           <p>Pre-pitch plan, sure outs, and decision-making that shows up on Saturdays.</p>
         </a>
+
         <a class="card" href="/learn.html#defense">
-          <div class="pill"><span></span> Run Prevention</div>
+          <div class="pill"><span></span> Run prevention</div>
           <h3>Defense</h3>
           <p>Positioning, footwork, relays, and turning chaos into outs.</p>
         </a>
+
         <a class="card" href="/learn.html#situational">
-          <div class="pill"><span></span> Game Management</div>
-          <h3>Situational Baseball</h3>
-          <p>What’s the right play with runners on? Stop guessing. Start planning.</p>
+          <div class="pill"><span></span> Game management</div>
+          <h3>Situational baseball</h3>
+          <p>Stop guessing. Know the highest-percentage play.</p>
         </a>
       </div>
     </section>
 
-    <!-- LATEST -->
     <section aria-labelledby="latest">
-      <div class="section-title">
-        <h2 id="latest">Latest articles</h2>
+      <div class="section-head">
+        <h2 id="latest">Latest reads</h2>
         <a href="/blog.html">Browse all →</a>
       </div>
 
-      <div class="grid3">
-        <a class="card" href="/how-to-turn-6-4-3-double-play-youth-9-13.html">
-          <div class="pill"><span></span> How-To</div>
-          <h3>How to Turn a 6-4-3 Double Play (Ages 9–13)</h3>
-          <p>Positioning, footwork at second, coaching cues, and drills you can run today.</p>
-        </a>
-
-        <a class="card" href="/why-youth-teams-fail-double-plays.html">
-          <div class="pill"><span></span> Coaching</div>
-          <h3>Why Youth Teams Fail to Turn Double Plays</h3>
-          <p>The real breakdowns: communication, habits, and slow exchanges — plus fixes.</p>
-        </a>
-
+      <div class="grid">
         <a class="card" href="/articles/when-not-to-turn-two.html">
           <div class="pill"><span></span> Situational</div>
           <h3>When NOT to Turn Two</h3>
-          <p>Smart decisions that prevent big innings (and save you from “snowball baseball”).</p>
+          <p>Smart double-play decisions that prevent big innings.</p>
         </a>
-      </div>
-    </section>
 
-    <!-- NEWSLETTER -->
-    <section id="newsletter" aria-labelledby="subscribe">
-      <div class="newsletter">
-        <div>
-          <h3 id="subscribe">Get new Six43 posts (no spam)</h3>
-          <p>Short, useful coaching reads. Decision-making, positioning, and practical drills.</p>
-        </div>
+        <a class="card" href="/articles/why-decision-making-beats-tools.html">
+          <div class="pill"><span></span> Baseball IQ</div>
+          <h3>Why Decision-Making Beats Tools (8–14)</h3>
+          <p>The habits that separate calm teams from chaos innings.</p>
+        </a>
 
-        <!-- Replace action with your email platform later -->
-        <form action="#" method="post">
-          <label class="skip" for="email">Email</label>
-          <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" />
-          <button class="btn primary" type="submit">Subscribe</button>
-        </form>
+        <a class="card" href="/learn.html">
+          <div class="pill"><span></span> Next</div>
+          <h3>Learn Hub</h3>
+          <p>Your table of contents for everything you publish.</p>
+        </a>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="container">
-      <div class="footer-grid">
-        <div>
-          <div class="brand-name" style="margin-bottom:10px">
-            <strong>SIX43</strong>
-            <span>Baseball IQ • Coaching Tools • Analytics</span>
-          </div>
-          <div class="fine">
-            Built for coaches, players, and parents who want fewer “chaos runs” and more reliable outs.
-          </div>
-        </div>
-
-        <div>
-          <h4>Explore</h4>
-          <a href="/learn.html">Learn Hub</a>
-          <a href="/baseball-iq.html">Baseball IQ</a>
-          <a href="/blog.html">Blog</a>
-          <a href="/tools.html">Tools</a>
-        </div>
-
-        <div>
-          <h4>Company</h4>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-        </div>
-      </div>
-
-      <div class="fine" style="margin-top:18px">
-        © <span id="year"></span> SIX43. All rights reserved.
-      </div>
+      © <span id="year"></span> SIX43. All rights reserved.
     </div>
-
-    <script>
-      // Tiny nicety: auto-updates the year.
-      document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
   </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
-
