@@ -153,6 +153,16 @@
       .hero-grid{grid-template-columns:1fr;}
       .hero-media{min-height:200px;}
       .grid{grid-template-columns:1fr;}
+
+      /* Homepage featured thumbs: consistent ratio */
+.card.pad .thumb{
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+@media (max-width: 900px){
+  .card.pad .thumb{ aspect-ratio: 4 / 3; }
+}
     }
   </style>
 </head>
@@ -300,3 +310,4 @@
   </script>
 </body>
 </html>
+
