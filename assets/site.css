@@ -22,18 +22,17 @@ body{
 
 .container{max-width:var(--max); margin:0 auto; padding:0 18px;}
 
-/* --- Logo prominence --- */
+/* Bigger logo (mobile-first) */
 .brand img{
-  height:64px;              /* bigger by default */
+  height:64px;
   width:auto;
   display:block;
 }
 
 @media (min-width: 900px){
-  .brand img{ height:76px; } /* bigger on desktop too */
+  .brand img{ height:76px; }
 }
 
-/* optional: keep header height reasonable on tiny phones */
 @media (max-width: 360px){
   .brand img{ height:58px; }
 }
