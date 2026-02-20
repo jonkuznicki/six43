@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="description" content="SIX43 — Baseball IQ, coaching tools, and practical youth baseball strategy (ages 8–14)." />
   <title>SIX43 | Baseball IQ & Coaching Tools</title>
-<link rel="stylesheet" href="/assets/site.css">
+
+  <link rel="stylesheet" href="/assets/site.css">
+
   <style>
     :root{
       --navy:#0B1F3B;
@@ -38,39 +40,56 @@
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--border);
     }
+
     .topbar{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:14px; padding:12px 0;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 0;
     }
+
     .brand{
-      display:flex; align-items:center; gap:12px;
-      min-width: 180px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      text-decoration:none;
+      min-width:0;
     }
+
+    /* LOGO SIZE (mobile first) */
     .brand img{
-      height:34px;
+      height:54px;
       width:auto;
       display:block;
     }
-    .brand .tagline{
+
+    .tagline{
       display:none;
       font-size:12px;
       color:var(--gray);
-      font-weight:700;
+      font-weight:800;
     }
 
     nav{
-      display:flex; align-items:center; gap:10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
     }
     .navlinks{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
     }
     .navlinks a{
       padding:10px 10px;
       border-radius:12px;
-      font-weight:800;
+      font-weight:900;
       color:rgba(11,31,59,.86);
     }
     .navlinks a:hover{background:rgba(77,163,255,.10)}
+
     .btn{
       display:inline-flex; align-items:center; justify-content:center;
       padding:10px 12px;
@@ -112,10 +131,18 @@
       display:flex; gap:10px; flex-wrap:wrap; padding:10px 10px 0;
     }
 
-    /* Hero */
-    .hero{
-      padding:34px 0 10px;
+    /* Hide tagline on phones so logo can breathe */
+    @media (max-width: 640px){
+      .tagline{display:none;}
     }
+    /* Desktop size */
+    @media (min-width: 900px){
+      .brand img{height:64px;}
+      .tagline{display:block;}
+    }
+
+    /* Hero */
+    .hero{padding:34px 0 10px;}
     .hero-card{
       background: var(--card);
       border:1px solid var(--border);
@@ -221,55 +248,7 @@
       .grid{grid-template-columns:1fr}
       .navlinks{display:none;}
       .menu-btn{display:inline-flex; align-items:center; gap:8px;}
-      .brand .tagline{display:none;}
     }
-    @media (min-width: 901px){
-      .brand .tagline{display:block;}
-    }
-/* HEADER LAYOUT */
-.topbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:10px 0;
-}
-
-/* Brand */
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  text-decoration:none;
-  min-width:0;
-}
-
-/* LOGO SIZE (mobile first) */
-.brand img{
-  height:54px;
-  width:auto;
-  display:block;
-}
-
-/* Hide tagline on phones so logo can breathe */
-@media (max-width: 640px){
-  .tagline{
-    display:none;
-  }
-}
-
-/* Desktop size */
-@media (min-width: 900px){
-  .brand img{
-    height:64px;
-  }
-}
-
-/* subtle polish */
-.brand:hover img{
-  opacity:.85;
-  transition:opacity .18s ease;
-}
   </style>
 </head>
 
@@ -278,7 +257,6 @@
     <div class="container">
       <div class="topbar">
         <a class="brand" href="/" aria-label="SIX43 Home">
-          <!-- Put your file at /assets/logo.png -->
           <img src="/assets/logo.png" alt="SIX43" />
           <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
         </a>
@@ -286,7 +264,7 @@
         <nav aria-label="Primary navigation">
           <div class="navlinks">
             <a href="/learn.html">Learn</a>
-            <a href="/why-decision-making-beats-tools.html">Baseball IQ</a>
+            <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
             <a href="/blog.html">Blog</a>
             <a href="/tools.html">Tools</a>
             <a href="/about.html">About</a>
@@ -302,7 +280,7 @@
 
       <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
         <a href="/learn.html">Learn</a>
-        <a href="/why-decision-making-beats-tools.html">Baseball IQ</a>
+        <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
         <a href="/blog.html">Blog</a>
         <a href="/tools.html">Tools</a>
         <a href="/about.html">About</a>
@@ -325,7 +303,7 @@
         </p>
 
         <div class="hero-actions">
-          <a class="btn primary" href="/why-decision-making-beats-tools.html">Baseball IQ Foundation</a>
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Baseball IQ Foundation</a>
           <a class="btn" href="/learn.html">Browse Topics</a>
           <a class="btn" href="/articles/when-not-to-turn-two.html">When NOT to Turn Two</a>
         </div>
@@ -366,6 +344,12 @@
       </div>
 
       <div class="grid">
+        <a class="card" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">
+          <div class="pill"><span></span> Baseball IQ</div>
+          <h3>Think Before Every Pitch: 3-Question Checklist</h3>
+          <p>The fastest way to reduce hesitation and clean up youth defense.</p>
+        </a>
+
         <a class="card" href="/articles/when-not-to-turn-two.html">
           <div class="pill"><span></span> Situational</div>
           <h3>When NOT to Turn Two</h3>
@@ -376,12 +360,6 @@
           <div class="pill"><span></span> Baseball IQ</div>
           <h3>Why Decision-Making Beats Tools (8–14)</h3>
           <p>The habits that separate calm teams from chaos innings.</p>
-        </a>
-
-        <a class="card" href="/learn.html">
-          <div class="pill"><span></span> Next</div>
-          <h3>Learn Hub</h3>
-          <p>Your table of contents for everything you publish.</p>
         </a>
       </div>
     </section>
@@ -402,6 +380,3 @@
   </script>
 </body>
 </html>
-
-
-
