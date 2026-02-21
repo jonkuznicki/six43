@@ -107,7 +107,7 @@ nav{display:flex; align-items:center; gap:10px;}
   border:1px solid rgba(77,163,255,.22);
 }
 
-.navlinks a[href="/articles/why-decision-making-beats-tools.html"]{
+.navlinks a.cta-link{
   background: rgba(77,163,255,.14);
   border:1px solid rgba(77,163,255,.25);
 }
