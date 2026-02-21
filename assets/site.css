@@ -96,6 +96,36 @@ header{
   .brand img{height:76px;}
 }
 
+/* Recommended Listening */
+.listen { padding: 18px 0; }
+
+.section-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 12px;
+}
+
+.section-head h2{ margin:0; font-size:18px; letter-spacing:-.01em; }
+.section-head p{ margin:0; font-size:13px; color:rgba(11,31,59,.70); }
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:12px;
+}
+@media (max-width: 900px){
+  .grid{ grid-template-columns: 1fr; }
+}
+
+.meta{
+  margin-top:auto;
+  color:rgba(11,31,59,.62);
+  font-size:12px;
+  font-weight:900;
+}
+
 /* Blog / card images */
 .card .thumb{
   width:100%;
