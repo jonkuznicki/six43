@@ -22,6 +22,16 @@
     align-items:stretch;
   }
 
+.hero-media{
+  aspect-ratio: 4 / 3;     /* controls desktop size */
+  max-height: 420px;       /* prevents giant screens */
+}
+
+.hero-media img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
   .hero-card{
     padding:22px;
   }
@@ -121,7 +131,12 @@
     .hero-grid{grid-template-columns:1fr}
     .grid{grid-template-columns:1fr}
   }
-
+@media (max-width: 900px){
+  .hero-media{
+    aspect-ratio: 16 / 10;
+    max-height:none;
+  }
+}
   </style>
 </head>
 
@@ -275,3 +290,4 @@ document.getElementById("year").textContent=new Date().getFullYear();
 
 </body>
 </html>
+
