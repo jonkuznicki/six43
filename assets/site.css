@@ -31,6 +31,11 @@ body{
   line-height:1.6;
 }
 
+.card{
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(2px);
+}
+
 a{color:inherit}
 .container{max-width:var(--max); margin:0 auto; padding:0 18px;}
 
@@ -39,11 +44,22 @@ a{color:inherit}
 ----------------------------------------- */
 header{
   position:sticky; top:0; z-index:50;
-  background: rgba(8,18,34,.85);
-  backdrop-filter: blur(10px);
-  border-bottom:1px solid var(--border);
+  background: rgba(11,31,59,.85);
+  backdrop-filter: blur(12px);
+  border-bottom:1px solid rgba(255,255,255,.08);
 }
 
+.navlinks a{
+  color:rgba(255,255,255,.85);
+}
+
+.navlinks a:hover{
+  background:rgba(255,255,255,.08);
+}
+
+.hero-media img{
+  filter: brightness(.75) contrast(1.05);
+}
 .topbar{
   display:flex;
   align-items:center;
