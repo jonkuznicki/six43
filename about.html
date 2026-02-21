@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="About SIX43 — Baseball IQ, simple coaching tools, and practical youth baseball decision-making (ages 8–14)." />
+  <title>About | SIX43</title>
+
+  <link rel="stylesheet" href="/assets/site.css" />
+
+  <style>
+    /* About-page specific styles (keeps site.css as the source of truth) */
+
+    .hero{
+      padding: 10px 0 18px;
+    }
+
+    .hero-card{
+      padding: 18px;
+    }
+
+    .kicker{
+      display:inline-flex; align-items:center; gap:10px;
+      font-weight:900; font-size:12px;
+      letter-spacing:.10em; text-transform:uppercase;
+      color:rgba(11,31,59,.70);
+    }
+    .kicker .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+
+    .hero h1{
+      margin:10px 0 8px;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+    .hero .lead{
+      margin:0;
+      color:rgba(11,31,59,.75);
+      max-width:70ch;
+      font-size:15.5px;
+    }
+
+    .two-col{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 12px;
+      align-items: start;
+      margin-top: 16px;
+    }
+
+    .panel{
+      padding: 16px;
+    }
+
+    .panel h2{
+      margin: 0 0 10px;
+      font-size: 16px;
+      letter-spacing: -.01em;
+    }
+
+    .panel p{
+      margin: 10px 0;
+      color: rgba(11,31,59,.78);
+      font-size: 14.5px;
+      line-height: 1.65;
+    }
+
+    .bullets{
+      margin: 10px 0 0 18px;
+      color: rgba(11,31,59,.78);
+      font-size: 14.5px;
+      line-height: 1.65;
+    }
+    .bullets li{ margin: 8px 0; }
+
+    .callout{
+      border: 1px dashed rgba(11,31,59,.20);
+      background: rgba(255,255,255,.65);
+    }
+
+    @media (max-width: 900px){
+      .two-col{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Header (same structure as your other pages) -->
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <a class="brand" href="/" aria-label="SIX43 Home">
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
+        </a>
+
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a href="/learn.html">Learn</a>
+            <a href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+            <a href="/blog.html">Articles</a>
+            <a href="/tools.html">Tools</a>
+            <a class="active" href="/about.html">About</a>
+          </div>
+
+          <a class="btn primary" href="/learn.html">Start Here</a>
+
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+        <a href="/blog.html">Articles</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/learn.html">Start Here</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="card hero-card">
+        <div class="kicker"><span class="dot"></span> About</div>
+        <h1>SIX43 is built for youth baseball decisions.</h1>
+        <p class="lead">
+          Not more “tips.” Not more yelling. Just a clear way to teach players (8–14) what to do
+          <strong>before</strong> the ball is hit — so innings don’t snowball.
+        </p>
+
+        <div class="hero-actions" style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+          <a class="btn primary" href="/learn.html">Start the Learn Path</a>
+          <a class="btn" href="/blog.html">Browse Articles</a>
+          <a class="btn" href="/tools.html">Coaching Tools</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Content -->
+    <section class="two-col" aria-label="About content">
+      <div class="card panel">
+        <h2>What we focus on</h2>
+        <p>
+          Most youth games aren’t decided by exit velo. They’re decided by:
+          hesitation, wrong throws, missed covers, and extra bases.
+        </p>
+        <p>
+          SIX43 is a simple framework for teaching <strong>Baseball IQ</strong> —
+          the small decisions that create calm outs and stop chaos innings.
+        </p>
+
+        <ul class="bullets">
+          <li><strong>Pre-pitch thinking</strong> (who has what? where’s the play?)</li>
+          <li><strong>Sure outs</strong> (take the out, don’t force the hero play)</li>
+          <li><strong>Communication</strong> (short words, same meaning, every time)</li>
+          <li><strong>Game-speed reps</strong> (habits that hold up on Saturdays)</li>
+        </ul>
+      </div>
+
+      <div class="card panel callout">
+        <h2>Who this is for</h2>
+        <p>
+          Coaches and parents working with players from 8U to 14U —
+          especially teams that want to play cleaner defense and stop giving away runs.
+        </p>
+
+        <h2 style="margin-top:14px;">How to use the site</h2>
+        <ul class="bullets">
+          <li>Start with the <a href="/learn.html">Learn Path</a></li>
+          <li>Pick one idea for the week</li>
+          <li>Teach it with one cue + one drill</li>
+          <li>Measure it in games: fewer freebies, faster outs</li>
+        </ul>
+
+        <p style="margin-top:12px;">
+          Want the simplest starting point? Read:
+          <a href="/articles/why-decision-making-beats-tools.html">Why Decision-Making Beats Tools</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+    </div>
+  </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
