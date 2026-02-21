@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="SIX43 Tools — 90-minute practice plans and coaching tools for youth baseball (8–14), built around Baseball IQ." />
+  <title>Tools | SIX43</title>
+
+  <link rel="stylesheet" href="/assets/site.css">
+
+  <style>
+    /* Tools page only (keep the rest in site.css) */
+    .hero{
+      padding:18px 0 10px;
+    }
+    .hero-card{
+      padding:18px;
+    }
+    .kicker{
+      display:inline-flex; align-items:center; gap:10px;
+      font-weight:900; font-size:12px;
+      letter-spacing:.10em; text-transform:uppercase;
+      color:rgba(11,31,59,.70);
+    }
+    .kicker .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+    h1{
+      margin:10px 0 8px;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+    .lead{
+      margin:0;
+      color:rgba(11,31,59,.75);
+      max-width:78ch;
+      font-size:15.5px;
+    }
+
+    .hero-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;}
+
+    /* Progression */
+    .path{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    .level{
+      padding:16px;
+    }
+    .level-head{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      margin-bottom:10px;
+    }
+    .level-title{
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .badge{
+      display:inline-flex; align-items:center; gap:10px;
+      font-weight:900; font-size:12px; letter-spacing:.10em;
+      text-transform:uppercase;
+      color:rgba(11,31,59,.72);
+    }
+    .badge .num{
+      width:28px; height:28px; border-radius:999px;
+      display:grid; place-items:center;
+      border:1px solid rgba(77,163,255,.28);
+      background: rgba(77,163,255,.14);
+      font-weight:950;
+      letter-spacing:0;
+    }
+    .level h2{
+      margin:0;
+      font-size:18px;
+      letter-spacing:-.01em;
+    }
+    .level p{
+      margin:0;
+      color:rgba(11,31,59,.70);
+      font-size:13px;
+      max-width:72ch;
+    }
+
+    .tool-grid{
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap:12px;
+      margin-top:10px;
+    }
+    @media (max-width: 900px){
+      .tool-grid{grid-template-columns:1fr;}
+    }
+
+    .tool{
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-height: 140px;
+    }
+    .tool .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:900;
+      color:rgba(11,31,59,.72);
+    }
+    .tool .pill span{
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+    .tool h3{
+      margin:0;
+      font-size:15px;
+      letter-spacing:-.01em;
+    }
+    .tool p{
+      margin:0;
+      color:rgba(11,31,59,.70);
+      font-size:14px;
+      max-width:70ch;
+    }
+    .tool .meta{
+      margin-top:auto;
+      color:rgba(11,31,59,.62);
+      font-size:12px;
+      font-weight:900;
+    }
+
+    /* Template block */
+    .template{
+      margin-top:14px;
+      padding:16px;
+    }
+    .template h2{margin:0 0 10px; font-size:18px; letter-spacing:-.01em;}
+    .template .rows{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    @media (max-width: 900px){
+      .template .rows{grid-template-columns:1fr;}
+    }
+    .row{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background: rgba(11,31,59,.02);
+    }
+    .row strong{display:block; margin-bottom:6px;}
+    .row span{color:rgba(11,31,59,.72); font-size:14px;}
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <a class="brand" href="/" aria-label="SIX43 Home">
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
+        </a>
+
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a href="/learn.html">Learn</a>
+            <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+            <a href="/blog.html">Blog</a>
+            <a class="active" href="/tools.html">Tools</a>
+            <a href="/about.html">About</a>
+          </div>
+
+          <a class="btn primary" href="/learn.html">Start Here</a>
+
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/articles/why-decision-making-beats-tools.html">Baseball IQ</a>
+        <a href="/blog.html">Blog</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/learn.html">Start Here</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured Article</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <div class="card hero-card">
+        <div class="kicker"><span class="dot"></span> Tools</div>
+        <h1>90-minute practices — built in order.</h1>
+        <p class="lead">
+          This is the “do this next” section of SIX43. Everything is written for <strong>11–12U</strong> by default,
+          and scales across <strong>8–14</strong> with small tweaks.
+          Every practice includes: <strong>dynamic warmup</strong> → <strong>throwing progression</strong> → <strong>game-speed reps</strong> → <strong>fun finish</strong>.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="#level1">Start: Winter / Indoor</a>
+          <a class="btn" href="#template">The SIX43 90-Min Template</a>
+          <a class="btn" href="/blog.html">Latest Reads</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progression path -->
+    <section class="path" aria-label="Progression path">
+
+      <!-- LEVEL 1 -->
+      <div id="level1" class="card level">
+        <div class="level-head">
+          <div class="level-title">
+            <div class="badge"><span class="num">1</span> Level 1</div>
+            <h2>Winter / Indoor</h2>
+            <p>Keep kids moving, protect arms, build clean habits in tight spaces.</p>
+          </div>
+          <a class="btn" href="/learn.html">Learn Hub →</a>
+        </div>
+
+        <div class="tool-grid">
+          <a class="card tool" href="/tools/indoor-practice-plan-90-min-11-12u.html">
+            <div class="pill"><span></span> Practice plan</div>
+            <h3>90-Min Indoor Practice Plan (11–12U)</h3>
+            <p>High-rep structure for gyms/turf: warmup, throwing, infield reps, competitions.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+
+          <a class="card tool" href="/tools/pre-pitch-checklist-dugout-card.html">
+            <div class="pill"><span></span> Coaching card</div>
+            <h3>Pre-Pitch Checklist (Dugout Card)</h3>
+            <p>The 3-question routine that cuts hesitation and cleans up defense fast.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- LEVEL 2 -->
+      <div id="level2" class="card level">
+        <div class="level-head">
+          <div class="level-title">
+            <div class="badge"><span class="num">2</span> Level 2</div>
+            <h2>Outdoor / Preseason</h2>
+            <p>Turn throwing + footwork into team defense: angles, cutoffs, communication.</p>
+          </div>
+        </div>
+
+        <div class="tool-grid">
+          <a class="card tool" href="/tools/outdoor-practice-plan-90-min-11-12u.html">
+            <div class="pill"><span></span> Practice plan</div>
+            <h3>90-Min Outdoor Practice Plan (11–12U)</h3>
+            <p>Game-speed reps: infield rhythm, outfield reads, and team defense blocks.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+
+          <a class="card tool" href="/tools/cutoffs-relays-backups-system.html">
+            <div class="pill"><span></span> Team defense</div>
+            <h3>Cutoffs + Relays + Backups (Simple System)</h3>
+            <p>One clean system you can teach in 15 minutes and run all season.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- LEVEL 3 -->
+      <div id="level3" class="card level">
+        <div class="level-head">
+          <div class="level-title">
+            <div class="badge"><span class="num">3</span> Level 3</div>
+            <h2>In-Season</h2>
+            <p>Stay sharp, reduce errors, and keep practices fast + fun during busy weeks.</p>
+          </div>
+        </div>
+
+        <div class="tool-grid">
+          <a class="card tool" href="/tools/in-season-practice-plan-90-min-11-12u.html">
+            <div class="pill"><span></span> Practice plan</div>
+            <h3>90-Min In-Season Practice Plan (11–12U)</h3>
+            <p>Short lines, high intensity, situations, and a competitive finisher kids love.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+
+          <a class="card tool" href="/tools/fun-finishers-12-ideas.html">
+            <div class="pill"><span></span> Fun finish</div>
+            <h3>Fun Finishers (12 Ideas)</h3>
+            <p>Quick competitions that reinforce habits and keep kids coming back.</p>
+            <div class="meta">Open tool →</div>
+          </a>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 90-min template -->
+    <section id="template" aria-labelledby="tplt">
+      <div class="card template">
+        <h2 id="tplt">The SIX43 90-minute practice template</h2>
+        <div class="rows">
+          <div class="row">
+            <strong>0–10 min — Dynamic warmup</strong>
+            <span>Movement + footwork + sprint mechanics. Simple cues. Fast pace.</span>
+          </div>
+          <div class="row">
+            <strong>10–25 min — Throwing progression</strong>
+            <span>Partner throws → quick feet → long toss (if space). Protect arms first.</span>
+          </div>
+          <div class="row">
+            <strong>25–55 min — Defensive reps</strong>
+            <span>High-rep infield/outfield blocks. Short lines. Clear jobs.</span>
+          </div>
+          <div class="row">
+            <strong>55–75 min — Team defense / situations</strong>
+            <span>Cutoffs, relays, bunt D, rundowns. Build calm decisions.</span>
+          </div>
+          <div class="row">
+            <strong>75–90 min — Fun finisher</strong>
+            <span>Competitive game that reinforces today’s focus (and ends on energy).</span>
+          </div>
+          <div class="row">
+            <strong>11–12U default (scales 8–14)</strong>
+            <span>Same structure, adjust language + distance + speed based on age.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+    </div>
+  </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
