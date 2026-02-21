@@ -1,17 +1,13 @@
 :root{
-  --navy:#0A172C;          /* deep field navy */
-  --navy-2:#0F2747;        /* panel navy */
-  --blue:#4DA3FF;          /* accent */
-  --blue-soft:rgba(77,163,255,.18);
-  --text:#E6EDF7;          /* main text on dark */
-  --text-soft:#A9B7CC;
-  --bg:#081222;            /* SITE BACKGROUND (big change) */
-  --card:#0F1F36;          /* cards now dark panels */
-  --card-light:#132845;    /* hover panels */
-  --border:rgba(255,255,255,.08);
-  --shadow:0 14px 34px rgba(0,0,0,.35);
-  --radius:16px;
-  --max:1040px;
+  --navy:#0B1F3B;
+  --blue:#4DA3FF;
+  --gray:#6B7280;
+
+  /* NEW balanced palette */
+  --bg:#F3F6FB;          /* softer than white */
+  --card:#FFFFFF;        /* reading surfaces */
+  --border:rgba(11,31,59,.10);
+  --shadow:0 10px 24px rgba(11,31,59,.06);
 }
 
 .article p{color:#D5DEEA;}
@@ -44,9 +40,9 @@ a{color:inherit}
 ----------------------------------------- */
 header{
   position:sticky; top:0; z-index:50;
-  background: rgba(11,31,59,.85);
+  background: #0B1F3B;
   backdrop-filter: blur(12px);
-  border-bottom:1px solid rgba(255,255,255,.08);
+  border-bottom:none;
 }
 
 .navlinks a{
@@ -54,8 +50,9 @@ header{
 }
 
 .navlinks a:hover{
-  background:rgba(255,255,255,.08);
+  background: rgba(255,255,255,.12);
 }
+
 
 .hero-media img{
   filter: brightness(.75) contrast(1.05);
@@ -191,9 +188,9 @@ nav{display:flex; align-items:center; gap:10px;}
 }
 
 .btn.primary{
-  background:linear-gradient(180deg,#4DA3FF,#2D7BE6);
-  color:white;
+  background:#4DA3FF;
   border:none;
+  color:white;
 }
 
 .menu-btn{
