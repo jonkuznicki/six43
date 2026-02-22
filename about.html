@@ -9,15 +9,10 @@
   <link rel="stylesheet" href="/assets/site.css" />
 
   <style>
-    /* About-page specific styles (keeps site.css as the source of truth) */
+    /* About-page specific styles (site.css is the source of truth) */
 
-    .hero{
-      padding: 10px 0 18px;
-    }
-
-    .hero-card{
-      padding: 18px;
-    }
+    .hero{ padding: 10px 0 18px; }
+    .hero-card{ padding: 18px; }
 
     .kicker{
       display:inline-flex; align-items:center; gap:10px;
@@ -44,6 +39,13 @@
       font-size:15.5px;
     }
 
+    .hero-actions{
+      margin-top:14px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
     .two-col{
       display:grid;
       grid-template-columns: 1.1fr .9fr;
@@ -52,9 +54,7 @@
       margin-top: 16px;
     }
 
-    .panel{
-      padding: 16px;
-    }
+    .panel{ padding: 16px; }
 
     .panel h2{
       margin: 0 0 10px;
@@ -82,6 +82,42 @@
       background: rgba(255,255,255,.65);
     }
 
+    .podcast{
+      margin-top: 12px;
+      padding: 16px;
+    }
+
+    .label{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-weight:900;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color: rgba(11,31,59,.62);
+    }
+    .label .dot{
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+
+    .podcast h3{
+      margin: 10px 0 6px;
+      font-size: 15px;
+      letter-spacing: -.01em;
+    }
+
+    .podcast a{
+      font-weight: 900;
+      text-decoration: underline;
+      text-decoration-color: rgba(77,163,255,.55);
+    }
+    .podcast a:hover{
+      text-decoration-color: rgba(77,163,255,.90);
+    }
+
     @media (max-width: 900px){
       .two-col{ grid-template-columns: 1fr; }
     }
@@ -89,7 +125,6 @@
 </head>
 
 <body>
-  <!-- Header (same structure as your other pages) -->
   <header>
     <div class="container">
       <div class="topbar">
@@ -101,26 +136,23 @@
         <nav aria-label="Primary navigation">
           <div class="navlinks">
             <a href="/learn.html">Learn</a>
-            <a href="/articles/why-decision-making-beats-tools.html">Start Here</a>
             <a href="/blog.html">Articles</a>
             <a href="/tools.html">Tools</a>
             <a class="active" href="/about.html">About</a>
           </div>
 
-          <a class="btn primary" href="/learn.html">Start Here</a>
-
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
           <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
         </nav>
       </div>
 
       <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
         <a href="/learn.html">Learn</a>
-        <a href="/articles/why-decision-making-beats-tools.html">Start Here</a>
         <a href="/blog.html">Articles</a>
         <a href="/tools.html">Tools</a>
         <a href="/about.html">About</a>
         <div class="row">
-          <a class="btn primary" href="/learn.html">Start Here</a>
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
           <a class="btn" href="/articles/when-not-to-turn-two.html">Featured</a>
         </div>
       </div>
@@ -128,7 +160,6 @@
   </header>
 
   <main class="container">
-    <!-- Hero -->
     <section class="hero">
       <div class="card hero-card">
         <div class="kicker"><span class="dot"></span> About</div>
@@ -138,7 +169,7 @@
           <strong>before</strong> the ball is hit — so innings don’t snowball.
         </p>
 
-        <div class="hero-actions" style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+        <div class="hero-actions">
           <a class="btn primary" href="/learn.html">Start the Learn Path</a>
           <a class="btn" href="/blog.html">Browse Articles</a>
           <a class="btn" href="/tools.html">Coaching Tools</a>
@@ -146,7 +177,6 @@
       </div>
     </section>
 
-    <!-- Content -->
     <section class="two-col" aria-label="About content">
       <div class="card panel">
         <h2>What we focus on</h2>
@@ -183,29 +213,26 @@
         </ul>
 
         <p style="margin-top:12px;">
-          Want the simplest starting point? Read:
+          Simplest starting point:
           <a href="/articles/why-decision-making-beats-tools.html">Why Decision-Making Beats Tools</a>.
         </p>
       </div>
     </section>
 
-    <section class="listen" aria-labelledby="listen">
-  <div class="section-head">
-    <div>
-      <h2 id="listen">Recommended Listening</h2>
-      <p>Short, practical coaching perspectives worth your time.</p>
-    </div>
-  </div>
-
-  <div class="grid">
-    <a class="card" href="https://podcasts.apple.com/us/podcast/youth-inc-with-greg-olsen/id1610647237" target="_blank" rel="noopener">
-      <div class="pill"><span></span> Podcast</div>
-      <h3>Youth Inc. (Greg Olsen)</h3>
-      <p>Youth coaching + player development. Great for team culture and practice ideas.</p>
-      <div class="meta">Open on Apple Podcasts →</div>
-    </a>
-  </div>
-</section>
+    <section aria-label="Recommended listening" style="margin-top:12px;">
+      <div class="card podcast">
+        <div class="label"><span class="dot"></span> Recommended listening</div>
+        <h3>Youth Inc. with Greg Olsen</h3>
+        <p style="margin:0; color: rgba(11,31,59,.72); font-size:14.5px; line-height:1.65;">
+          Youth coaching + player development. Solid for culture, communication, and practice structure.
+        </p>
+        <p style="margin:10px 0 0; font-size:14.5px;">
+          <a href="https://podcasts.apple.com/us/podcast/youth-inc-with-greg-olsen/id1610647237" target="_blank" rel="noopener">
+            Open on Apple Podcasts →
+          </a>
+        </p>
+      </div>
+    </section>
   </main>
 
   <footer>
