@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Listen — recommended youth baseball podcasts and videos to sharpen Baseball IQ and coaching." />
+  <title>Listen | SIX43</title>
+
+  <link rel="stylesheet" href="/assets/site.css" />
+
+  <style>
+    /* Listen page: lightweight, uses site.css components */
+
+    .hero { padding: 10px 0 14px; }
+    .hero-card { padding: 18px; }
+
+    .hero h1{
+      margin:10px 0 8px;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+
+    .hero .lead{
+      margin:0;
+      color:rgba(11,31,59,.74);
+      max-width:70ch;
+      font-size:15.5px;
+    }
+
+    .hero-actions{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    .featured{
+      margin-top: 12px;
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:12px;
+      align-items: stretch;
+    }
+
+    .tile{
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height: 160px;
+    }
+
+    .label{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-weight:900;
+      font-size:12px;
+      letter-spacing:.10em;
+      text-transform:uppercase;
+      color: rgba(11,31,59,.62);
+    }
+    .label .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.95);
+      box-shadow:0 0 0 6px rgba(77,163,255,.14);
+    }
+
+    .tile h3{
+      margin:0;
+      font-size:16px;
+      letter-spacing:-.01em;
+    }
+
+    .tile p{
+      margin:0;
+      color:rgba(11,31,59,.72);
+      font-size:14.5px;
+      line-height:1.65;
+      max-width: 80ch;
+    }
+
+    .meta{
+      margin-top:auto;
+      color:rgba(11,31,59,.60);
+      font-size:12px;
+      font-weight:900;
+    }
+
+    .link{
+      text-decoration:none;
+    }
+
+    .pillrow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top: 2px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(11,31,59,.14);
+      background: rgba(11,31,59,.04);
+      font-weight:900;
+      font-size:12px;
+      text-decoration:none;
+    }
+    .pill:hover{
+      background: rgba(77,163,255,.10);
+      border-color: rgba(77,163,255,.25);
+    }
+
+    /* Card layout inside grid */
+    .listen-card{
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height: 170px;
+    }
+
+    @media (max-width: 900px){
+      .featured{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <a class="brand" href="/" aria-label="SIX43 Home">
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
+        </a>
+
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a href="/learn.html">Learn</a>
+            <a href="/blog.html">Articles</a>
+            <a href="/tools.html">Tools</a>
+            <a class="active" href="/listen.html">Listen</a>
+            <a href="/about.html">About</a>
+          </div>
+
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/blog.html">Articles</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/listen.html">Listen</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/articles/why-decision-making-beats-tools.html">Start Here</a>
+          <a class="btn" href="/articles/when-not-to-turn-two.html">Featured</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="card hero-card">
+        <div class="kicker"><span class="dot"></span> Listen</div>
+        <h1>Good coaches keep learning.</h1>
+        <p class="lead">
+          A short list of podcasts and videos that consistently deliver practical youth coaching ideas.
+          (Standardized to Apple Podcasts or YouTube.)
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="#podcasts">Podcasts</a>
+          <a class="btn" href="#youtube">YouTube</a>
+          <a class="btn" href="/learn.html">Follow the Learn Path</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURED -->
+    <section aria-label="Featured listening">
+      <div class="featured">
+
+        <a class="card link" href="https://podcasts.apple.com/us/podcast/youth-inc-with-greg-olsen/id1610647237" target="_blank" rel="noopener">
+          <div class="tile">
+            <div class="label"><span class="dot"></span> Featured podcast</div>
+            <h3>Youth Inc. with Greg Olsen</h3>
+            <p>
+              Youth coaching + player development. Great for culture, communication, and practice structure.
+            </p>
+            <div class="pillrow">
+              <span class="pill" aria-hidden="true">Culture</span>
+              <span class="pill" aria-hidden="true">Practice design</span>
+              <span class="pill" aria-hidden="true">Leadership</span>
+            </div>
+            <div class="meta">Open on Apple Podcasts →</div>
+          </div>
+        </a>
+
+        <div class="card">
+          <div class="tile">
+            <div class="label"><span class="dot"></span> How to use this page</div>
+            <h3>Pick one theme for the week</h3>
+            <p>
+              Listen for one concept you can teach with one cue + one drill. Keep it simple. Repeat it all week.
+            </p>
+            <div class="pillrow">
+              <a class="pill" href="/tools.html">Practice plans →</a>
+              <a class="pill" href="/blog.html">Articles →</a>
+              <a class="pill" href="/learn.html">Learn Path →</a>
+            </div>
+            <div class="meta">Keep it practical.</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PODCASTS -->
+    <section id="podcasts" aria-labelledby="podcasts-h" style="padding-top:18px;">
+      <div class="section-head">
+        <div>
+          <h2 id="podcasts-h">Podcasts</h2>
+          <p>Apple Podcasts links only (clean + consistent).</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <a class="card link" href="https://podcasts.apple.com/us/podcast/youth-inc-with-greg-olsen/id1610647237" target="_blank" rel="noopener">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> Podcast</div>
+            <h3>Youth Inc. (Greg Olsen)</h3>
+            <p>Youth coaching, player development, culture, and practical practice concepts.</p>
+            <div class="meta">Open on Apple Podcasts →</div>
+          </div>
+        </a>
+
+        <!-- DUPLICATE THIS CARD for more podcasts -->
+        <div class="card">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> Add next</div>
+            <h3>Podcast spot #2</h3>
+            <p>Paste an Apple Podcasts link here when you’re ready.</p>
+            <div class="meta">Coming soon</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> Add next</div>
+            <h3>Podcast spot #3</h3>
+            <p>Keep this list short: only what you’d actually recommend to another coach.</p>
+            <div class="meta">Coming soon</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- YOUTUBE -->
+    <section id="youtube" aria-labelledby="youtube-h" style="padding-top:18px;">
+      <div class="section-head">
+        <div>
+          <h2 id="youtube-h">YouTube</h2>
+          <p>Curated channels / playlists (add as you go).</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- Placeholder cards -->
+        <div class="card">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> YouTube</div>
+            <h3>Channel spot #1</h3>
+            <p>Paste a YouTube channel or playlist link here.</p>
+            <div class="meta">Coming soon</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> YouTube</div>
+            <h3>Channel spot #2</h3>
+            <p>Keep it aligned to SIX43: decision-making, defense, practice design.</p>
+            <div class="meta">Coming soon</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="listen-card">
+            <div class="label"><span class="dot"></span> YouTube</div>
+            <h3>Channel spot #3</h3>
+            <p>When you add a link, replace this card with a real recommendation.</p>
+            <div class="meta">Coming soon</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+    </div>
+  </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
