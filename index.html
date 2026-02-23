@@ -6,14 +6,16 @@
   <meta name="description" content="SIX43 — Baseball IQ, coaching tools, and practical youth baseball strategy (ages 8–14)." />
   <title>SIX43 | Baseball IQ & Coaching Tools</title>
 
-  <link rel="stylesheet" href="/assets/site.css" />
+  <!-- Use RELATIVE paths (works on GitHub Pages project sites) -->
+  <link rel="stylesheet" href="./assets/site.css" />
+
+  <!-- Nav injection -->
+  <script src="./nav.js" defer></script>
 
   <style>
-    /* Index-only layout (site.css stays the source of truth) */
+    /* Index-only styles (site.css remains the source of truth) */
 
-    .hero{
-      padding: 18px 0 12px;
-    }
+    .hero { padding: 18px 0 12px; }
 
     .hero-grid{
       display:grid;
@@ -50,24 +52,172 @@
       margin-top:14px;
     }
 
-    /* Hero image controlled on desktop */
+    /* Keeps hero image from being huge on desktop */
     .hero-media{
       overflow:hidden;
       border-radius: var(--radius);
       border:1px solid var(--border);
       box-shadow: var(--shadow);
       background: rgba(11,31,59,.04);
-
-      max-height: 300px;        /* keeps it from getting huge */
+      max-height: 280px;
     }
 
     .hero-media img{
       width:100%;
-      height:300px;
+      height:280px;
       object-fit:cover;
       display:block;
     }
 
-    .substrip{
-      margin-top:12px;
-      padding:14px 16
+    .section { padding: 12px 0 4px; }
+
+    .section-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:10px;
+      margin:0 0 12px;
+    }
+    .section-head h2{ margin:0; font-size:18px; letter-spacing:-.01em; }
+    .section-head a{
+      font-weight:900;
+      color:rgba(11,31,59,.72);
+      padding:10px 12px;
+      border-radius:12px;
+      text-decoration:none;
+    }
+    .section-head a:hover{ background:rgba(77,163,255,.10); }
+
+    /* Cleaner “Start with these” cards (no photos) */
+    .start-grid{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:12px;
+    }
+
+    .mini{
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-height: 150px;
+    }
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:900;
+      color:rgba(11,31,59,.72);
+    }
+    .pill span{
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(77,163,255,.95);
+      box-shadow:0 0 0 6px rgba(77,163,255,.14);
+    }
+
+    .mini h3{ margin:0; font-size:16px; letter-spacing:-.01em; }
+    .mini p{ margin:0; color:rgba(11,31,59,.70); font-size:14px; }
+
+    .meta{
+      margin-top:auto;
+      font-size:12px;
+      font-weight:900;
+      color:rgba(11,31,59,.62);
+    }
+
+    /* Optional subtle “accent” line on cards */
+    .mini{
+      position:relative;
+    }
+    .mini:before{
+      content:"";
+      position:absolute;
+      top:0; left:0; right:0;
+      height:3px;
+      border-radius:16px 16px 0 0;
+      background: rgba(77,163,255,.35);
+    }
+
+    @media (max-width: 900px){
+      .hero-grid{ grid-template-columns:1fr; }
+      .hero-media{ max-height:220px; }
+      .hero-media img{ height:220px; }
+      .start-grid{ grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- nav.js will inject the header HTML here -->
+  <header data-nav data-active="home"></header>
+
+  <main class="container">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="card hero-card">
+          <div class="kicker"><span class="dot"></span> Youth baseball (8–14)</div>
+          <h1>Baseball IQ that wins innings.</h1>
+          <p class="lead">Clear decisions. Simple drills. Fewer chaos runs.</p>
+
+          <div class="hero-actions">
+            <a class="btn primary" href="./learn.html">Follow the Learn Path</a>
+            <a class="btn" href="./tools.html">Practice Plans</a>
+            <a class="btn" href="./blog.html">Articles</a>
+          </div>
+        </div>
+
+        <div class="hero-media">
+          <img src="./assets/images/hero-field.png" alt="Empty youth baseball field at dusk" loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <!-- START WITH THESE -->
+    <section class="section" aria-labelledby="featured">
+      <div class="section-head">
+        <h2 id="featured">Start with these</h2>
+        <a href="./blog.html">Browse all →</a>
+      </div>
+
+      <div class="start-grid">
+        <a class="card mini" href="./articles/why-decision-making-beats-tools.html">
+          <div class="pill"><span></span> Foundation</div>
+          <h3>Decision-Making Beats Tools</h3>
+          <p>The foundation for everything on SIX43.</p>
+          <div class="meta">Read →</div>
+        </a>
+
+        <a class="card mini" href="./articles/think-before-every-pitch-3-question-checklist-youth.html">
+          <div class="pill"><span></span> Baseball IQ</div>
+          <h3>Think Before Every Pitch</h3>
+          <p>3 questions that stop hesitation.</p>
+          <div class="meta">Read →</div>
+        </a>
+
+        <a class="card mini" href="./articles/when-not-to-turn-two.html">
+          <div class="pill"><span></span> Situational</div>
+          <h3>When NOT to Turn Two</h3>
+          <p>Take the sure out. Prevent big innings.</p>
+          <div class="meta">Read →</div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+    </div>
+  </footer>
+
+  <script>
+    // Needed because nav.js uses onclick="toggleMenu()"
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      if (!el) return;
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
