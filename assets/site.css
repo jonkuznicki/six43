@@ -53,14 +53,17 @@ header{
 }
 
 .brand img{
-  height:64px;
+  height:82px;      /* was 64px */
   width:auto;
   display:block;
-  filter:none !important;
-  opacity:1 !important;
-  mix-blend-mode:normal !important;
 }
 
+@media (min-width: 900px){
+  .brand img{
+    height:92px;    /* bigger on desktop */
+  }
+}
+}
 .tagline{
   font-size:12px;
   color: rgba(255,255,255,.80);
