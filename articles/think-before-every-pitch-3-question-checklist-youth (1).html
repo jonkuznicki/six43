@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Think Before Every Pitch: A 3-Question Checklist for Youth Defenders | SIX43</title>
+  <meta name="description" content="Teach youth players what to think before every pitch using a simple 3-question checklist that reduces hesitation and errors." />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy:    #0d1b2a;
+      --navy2:   #162033;
+      --navy3:   #1e2d42;
+      --cblue:   #4b9cd3;
+      --cblue2:  #6cb8f0;
+      --gray:    #7a8a99;
+      --gray2:   #a8b8c8;
+      --white:   #f4f7fa;
+      --offwhite:#dde6ef;
+      --rule:    rgba(75,156,211,0.18);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Lora', Georgia, serif;
+      line-height: 1.75;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,27,42,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--rule);
+      padding: 0 clamp(20px, 5vw, 60px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+    }
+
+    .nav-logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 24px;
+      letter-spacing: 3px;
+      color: var(--white);
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .nav-logo span { color: var(--cblue); }
+
+    .nav-links { display: flex; gap: 32px; list-style: none; }
+    .nav-links a {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gray2);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--cblue2); }
+
+    /* ── ARTICLE HEADER ── */
+    .article-header {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: clamp(52px, 8vw, 88px) clamp(20px, 5vw, 40px) 0;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .article-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--cblue);
+      margin-bottom: 18px;
+      display: inline-block;
+    }
+
+    .article-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: clamp(36px, 6vw, 58px);
+      line-height: 1.0;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--white);
+      margin-bottom: 20px;
+    }
+
+    .article-byline {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--gray);
+      text-transform: uppercase;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 40px;
+    }
+
+    .article-byline span { color: var(--cblue); }
+
+    /* ── ARTICLE BODY ── */
+    .article-body {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 clamp(20px, 5vw, 40px) clamp(60px, 8vw, 100px);
+    }
+
+    .article-body h2 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: clamp(22px, 3vw, 28px);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--white);
+      margin: 48px 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .article-body h3 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: clamp(18px, 2.5vw, 22px);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cblue2);
+      margin: 32px 0 10px;
+    }
+
+    .article-body p {
+      font-size: clamp(15px, 1.8vw, 17px);
+      color: var(--offwhite);
+      margin-bottom: 20px;
+      line-height: 1.8;
+    }
+
+    .article-body ol,
+    .article-body ul {
+      margin: 0 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .article-body li {
+      font-size: clamp(15px, 1.8vw, 16px);
+      color: var(--offwhite);
+      line-height: 1.7;
+      padding-left: 6px;
+    }
+
+    .article-body li strong {
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .article-body a {
+      color: var(--cblue);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(75,156,211,0.3);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .article-body a:hover { color: var(--cblue2); border-color: var(--cblue2); }
+
+    /* Callout / checklist box */
+    .callout {
+      background: var(--navy2);
+      border-left: 3px solid var(--cblue);
+      border-radius: 2px;
+      padding: 24px 28px;
+      margin: 32px 0;
+    }
+
+    .callout-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--cblue);
+      margin-bottom: 14px;
+    }
+
+    .callout ol {
+      margin-left: 16px;
+    }
+
+    .callout li {
+      font-size: 15px;
+      color: var(--white);
+      padding: 6px 0;
+      line-height: 1.6;
+    }
+
+    .callout li strong { color: var(--cblue2); }
+
+    /* Story pull quote */
+    .pullquote {
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      margin: 40px 0;
+      padding: 28px 0;
+      font-family: 'Lora', serif;
+      font-style: italic;
+      font-size: clamp(17px, 2.5vw, 21px);
+      color: var(--gray2);
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .pullquote span {
+      color: var(--cblue2);
+      font-style: normal;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+      margin-top: 12px;
+    }
+
+    /* Age table */
+    .age-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 24px 0 32px;
+    }
+
+    .age-card {
+      background: var(--navy2);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 18px 20px;
+    }
+
+    .age-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cblue);
+      margin-bottom: 8px;
+    }
+
+    .age-card p {
+      font-size: 13px !important;
+      color: var(--gray2) !important;
+      margin-bottom: 0 !important;
+      line-height: 1.5 !important;
+    }
+
+    /* Related articles */
+    .related {
+      margin-top: 56px;
+      padding-top: 32px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .related-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--cblue);
+      margin-bottom: 20px;
+    }
+
+    .related-links {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .related-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--navy2);
+      text-decoration: none;
+      color: var(--white);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: background 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .related-link:hover {
+      background: var(--navy3);
+      border-left-color: var(--cblue);
+    }
+
+    .related-link-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--gray);
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 32px clamp(20px, 5vw, 60px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: 3px;
+      color: var(--gray);
+      text-transform: uppercase;
+    }
+    .footer-logo span { color: var(--cblue); }
+
+    .footer-note {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--gray);
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="nav-logo">SIX<span>43</span></a>
+    <ul class="nav-links">
+      <li><a href="/coaching">Coaching</a></li>
+      <li><a href="/gear">Gear</a></li>
+      <li><a href="/resources">Resources</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+
+  <!-- ARTICLE HEADER -->
+  <div class="article-header">
+    <div class="article-tag">Mental Game</div>
+    <h1 class="article-title">Think Before Every Pitch: A 3-Question Checklist for Youth Defenders</h1>
+    <div class="article-byline">
+      <span>Coach Guide</span>
+      <span>·</span>
+      <span>Ages 8–14</span>
+    </div>
+  </div>
+
+  <!-- ARTICLE BODY -->
+  <div class="article-body">
+
+    <h2>One idea that changes defense</h2>
+    <p>
+      If you want fewer blown plays and calmer dugouts, teach players to Think Before Every Pitch. At the youth level (ages 8–14),
+      most defensive breakdowns come from hesitation and wrong decisions after contact — not from perfect throwing mechanics.
+      A short, repeatable pre-pitch routine builds baseball IQ, removes doubt, and gets players moving sooner.
+    </p>
+    <p>
+      This piece gives a simple 3-question checklist, realistic infield and outfield scenarios (including common wrong decisions),
+      a short practice session you can run tomorrow, and practical coaching cues you'll actually use in games.
+    </p>
+
+    <h2>Why most defensive mistakes happen before the pitch</h2>
+    <p>
+      Watch youth games and you'll see it: players are often out of position or frozen when the ball is hit. Those mistakes look worse
+      because they create awkward angles and rushed throws. At this stage the defensive responsibilities are straightforward: handle the
+      <strong>BALL</strong> (field it), cover a <strong>BASE</strong> (take a bag), or <strong>BACK-UP</strong> a throw. Those duties don't end until the play is over.
+    </p>
+    <p>
+      Positioning matters. The middle spots — pitcher, second base, shortstop, center — typically see the most action and benefit
+      from steady decision-makers. Rotate players through those roles in practice so they all learn them.
+    </p>
+
+    <h2>The 3-question pre-pitch checklist</h2>
+    <p>Before every pitch, every defender says (or thinks) these three quick questions. Say them out loud in early reps until they become automatic:</p>
+
+    <div class="callout">
+      <div class="callout-label">The Checklist</div>
+      <ol>
+        <li><strong>Where's the play?</strong> — What's the most likely out (force at 2B, play at home, runner advancing)?</li>
+        <li><strong>What's my job?</strong> — Ball (field), Base (cover), or Back-up (support the throw)?</li>
+        <li><strong>Am I ready?</strong> — Feet, posture, angle — can I execute my job immediately?</li>
+      </ol>
+    </div>
+
+    <p>
+      This takes five seconds and removes the "what do I do?" pause that costs extra bases.
+    </p>
+
+    <h2>How the checklist changes decisions</h2>
+    <p>
+      When players pre-commit, they move earlier and with purpose. That pre-commitment is what converts a close play into a routine one.
+      Below are realistic infield and outfield scenarios — plus common wrong choices and short coaching fixes.
+    </p>
+
+    <h3>Infield scenario — Runner on 1st, fewer than two outs</h3>
+    <ul>
+      <li><strong>Where's the play?</strong> Most likely: force at 2B or throw to 1B on a routine grounder.</li>
+      <li><strong>Correct job (shortstop):</strong> Cover 2B on a right-side grounder; become the cutoff if the ball goes to 2B.</li>
+      <li><strong>Common wrong decision:</strong> Hesitating between fielding and covering 2B — no one ends up on the bag.</li>
+      <li><strong>Fix with checklist:</strong> If the shortstop says "force at 2B — I cover," they step toward the bag pre-pitch. The second baseman knows their role. Clear roles remove hesitation.</li>
+    </ul>
+    <p><strong>Coaching cue:</strong> "Short — you're 2B on right-side grounders. Say it before the pitch."</p>
+
+    <h3>Outfield scenario — Runner on 2nd, 0 outs</h3>
+    <ul>
+      <li><strong>Where's the play?</strong> Most likely: play at the plate on a deep hit; hold at third on a shallow hit.</li>
+      <li><strong>Correct job (center field):</strong> Play a touch shallower than normal. Be ready to back up the cutoff man if the throw goes home.</li>
+      <li><strong>Common wrong decision:</strong> CF drifts too deep pre-pitch — can't charge a short fly, cutoff loses their backup.</li>
+      <li><strong>Fix with checklist:</strong> CF says, "Play shallow — back up plate." That phrase adjusts depth and clarifies roles.</li>
+    </ul>
+    <p><strong>Coaching cue:</strong> "CF — say your job and set depth."</p>
+
+    <div class="pullquote">
+      "He took a better angle, cut the throw off, and our cutoff made a clean feed to the catcher for the out. Clarity begets cleaner execution."
+      <span>From the field — 11U Tournament</span>
+    </div>
+
+    <h2>A short practice session (run it tomorrow)</h2>
+    <p>You don't need a long lesson. Here's a 20-minute block that builds the habit fast:</p>
+    <ul>
+      <li><strong>Warm-up (3 min):</strong> Every player taps the glove once and says the first question: "Where's the play?"</li>
+      <li><strong>Demo and explain (2 min):</strong> Show the three questions with one short example per position.</li>
+      <li><strong>Situation reps (10 min):</strong> Live infield/outfield with a coach hitting or rolling. Before every pitch, each player says the three questions out loud. Rotate positions every 2–3 reps.</li>
+      <li><strong>Wrap and reflection (5 min):</strong> Two quick coach questions — "Who had 2B? Who backed up home?" Praise commitment, not perfection.</li>
+    </ul>
+
+    <h2>Short drills that reinforce the checklist</h2>
+    <ul>
+      <li><strong>60-Second Pre-Pitch Drill:</strong> All players in position. Before each pitch, players say the three questions quietly or out loud. Coach awards points for clear calls.</li>
+      <li><strong>Rapid Situations:</strong> Coach calls scenarios fast — "R1, 0 outs," "R2, 1 out" — then hits or rolls balls. Defense must call and act immediately.</li>
+      <li><strong>Middle-Infield Urgency:</strong> Roll grounders to both sides with a runner on first to force quick covers and communication.</li>
+      <li><strong>Cutoff & Back-Up Relay:</strong> Simulate outfield throws to plate or 3B. Reward correct pre-pitch positioning and angles.</li>
+    </ul>
+
+    <h2>Adapting for different ages</h2>
+    <div class="age-grid">
+      <div class="age-card">
+        <div class="age-label">Ages 8–9</div>
+        <p>Use a two-word call: "Play? — Ball/Base." Make a physical cue obvious: glove tap = think.</p>
+      </div>
+      <div class="age-card">
+        <div class="age-label">Ages 10–12</div>
+        <p>Use the full three-question checklist. Say it out loud in early practices and early innings.</p>
+      </div>
+      <div class="age-card">
+        <div class="age-label">Ages 13–14</div>
+        <p>Move the checks inside (quiet). Add situational wrinkles — bunts, delayed steals, etc.</p>
+      </div>
+    </div>
+
+    <h2>Common implementation mistakes</h2>
+    <ul>
+      <li><strong>Players mumble or don't commit:</strong> Make the first week loud. Have players call their job out loud for the first innings of scrimmages.</li>
+      <li><strong>Over-coaching mid-play:</strong> Keep cues short from the dugout ("Think your three"). Save corrections for between innings.</li>
+      <li><strong>Thinking becomes mechanical:</strong> Vary situations so players adapt rather than just recite.</li>
+      <li><strong>Younger players get overwhelmed:</strong> Prioritize repetition over explanation.</li>
+    </ul>
+
+    <h2>Using the checklist in games</h2>
+    <p>
+      Game coaching is about nudges, not lectures. Short, calm cues work: "Think your three," "Where's the play?" or a single-word prompt like "Job?"
+      These force players to make choices rather than panic. As the habit forms, players move to quiet mental checks.
+    </p>
+
+    <h2>Conclusion</h2>
+    <p>
+      Think Before Every Pitch is a small habit that yields cleaner positioning, faster reads, and fewer hesitation plays.
+      Teach the three questions, run short reps, and help players translate the mental call into a physical step.
+      Try the 20-minute session at your next practice and watch the tone of your defense change.
+    </p>
+
+    <!-- Related Articles -->
+    <div class="related">
+      <div class="related-label">Related Articles</div>
+      <div class="related-links">
+        <a href="/articles/when-not-to-turn-two.html" class="related-link">
+          When NOT to Turn Two
+          <span class="related-link-tag">Situational Defense</span>
+        </a>
+        <a href="/articles/why-decision-making-beats-tools.html" class="related-link">
+          Why Decision-Making Beats Tools
+          <span class="related-link-tag">Baseball IQ</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">SIX<span>43</span></div>
+    <div class="footer-note">Infield coaching for travel ball · © 2025 six43.com</div>
+  </footer>
+
+</body>
+</html>
