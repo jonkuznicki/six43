@@ -361,17 +361,127 @@ strong{color:#ffffff;font-weight:600;}
 
 <!-- 01 OVERVIEW -->
 <div class="sec" id="overview">
-  <div class="sec-hdr"><span class="sec-num">01</span><h2 class="sec-title">Overview &amp; Goals</h2></div>
-  <div class="g2" style="margin-bottom:20px;">
+  <div class="sec-hdr"><span class="sec-num">01</span><h2 class="sec-title">Overview, Why &amp; Goals</h2></div>
+
+  <!-- THE MARKET PROBLEM -->
+  <div style="margin-bottom:24px;">
+    <p style="margin-bottom:12px;"><strong>The market is crowded — but broken in the same ways everywhere.</strong> SportsEngine, TeamSnap, and LeagueApps collectively hold ~45% of the youth sports software market, yet their review pages read like a shared complaint department: coaches who hate the interface, admins who spend hours on tasks that should take minutes, parents who receive ads inside a product they paid for, and support teams that respond to urgent game-day issues with a bot. The incumbents have optimized for feature count and investor metrics — not for the volunteer running a 10-team baseball org on a Tuesday night.</p>
+    <p>PrizumSports starts from a different premise: <strong>the user is a volunteer, not a software operator.</strong> Every design decision flows from that.</p>
+  </div>
+
+  <!-- WHY PRIZUM — COMPETITOR CONTRAST -->
+  <div style="margin-bottom:24px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#00e676;letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#00e676;"></span>Why PrizumSports — competitive differentiation</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">🎯</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">Volunteer-first design</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#0d2a18;color:#00e676;border:1px solid #00b85a;padding:2px 6px;border-radius:20px;">Core moat</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">Every platform pitches features. Nobody pitches simplicity as a core value. Admins report spending <em>hours</em> on TeamSnap trying to complete tasks that should take minutes. SportsEngine's own coaches "hate, hate, hate" uploading schedules.</p>
+          <div style="background:#071a0e;border-left:2px solid #00e676;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#7de8a8;font-family:'JetBrains Mono',monospace;">PrizumSports: every common task completable in &lt;3 min, no documentation required.</div>
+        </div>
+      </div>
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">⚾</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">GameChanger-native architecture</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#071428;color:#7ab8ff;border:1px solid rgba(30,144,255,.3);padding:2px 6px;border-radius:20px;">Unique positioning</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">GameChanger serves over 1M teams across 7M contests. Every competitor treats it as a rival. PrizumSports treats it as infrastructure — coaches stay in the app they already love, and iCal aggregation creates the org-level master calendar no off-the-shelf tool handles.</p>
+          <div style="background:#071428;border-left:2px solid #1e90ff;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#7ab8ff;font-family:'JetBrains Mono',monospace;">The only platform that says "keep using GameChanger" instead of "replace it."</div>
+        </div>
+      </div>
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">🏢</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">Multi-org backbone</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#1f2d40;color:#9bafc4;border:1px solid #2a3d52;padding:2px 6px;border-radius:20px;">Market gap</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">Every competitor sells to individual clubs. A county-level baseball association with 12 member clubs is an entirely different and underserved buyer. PrizumSports is designed so Prizum serves as the shared member and payment backbone — orgs share infrastructure without sharing data.</p>
+          <div style="background:#1f2d40;border-left:2px solid #9bafc4;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#9bafc4;font-family:'JetBrains Mono',monospace;">Add new orgs without code changes. Prizum provisions, iCal connects, dashboard activates.</div>
+        </div>
+      </div>
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">💰</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">Transparent pricing — no penalty model</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#1a1200;color:#ffb300;border:1px solid rgba(255,179,0,.3);padding:2px 6px;border-radius:20px;">Trust differentiator</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">SportsEngine charges customers <em>more</em> for not using certain features. TeamSnap shows ads to paying users. As both platforms focus on monetizing their base more aggressively, the opening for a clean, flat-fee alternative is real and widening.</p>
+          <div style="background:#1a1200;border-left:2px solid #ffb300;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#ffcc55;font-family:'JetBrains Mono',monospace;">No ads. No penalty charges. No upsell pressure. One price covers everything.</div>
+        </div>
+      </div>
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">🧑‍💼</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">Real human support at volunteer hours</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#0d2a18;color:#00e676;border:1px solid #00b85a;padding:2px 6px;border-radius:20px;">Retention driver</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">Competitor support desks are closed when volunteer admins have their crises — weeknights and weekends. "One phone call would resolve this, but instead they email back and forth for 2 days" is a real review of both SportsEngine and TeamSnap.</p>
+          <div style="background:#071a0e;border-left:2px solid #00e676;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#7de8a8;font-family:'JetBrains Mono',monospace;">Human support available evenings and weekends — when the org actually needs it.</div>
+        </div>
+      </div>
+
+      <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:8px;overflow:hidden;">
+        <div style="background:#111820;padding:10px 14px;border-bottom:1px solid #2a3d52;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">🏟️</span>
+          <span style="font-size:12px;font-weight:600;color:#ffffff;">Umpire scheduling — future wedge</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;background:#12082a;color:#c084fc;border:1px solid rgba(192,132,252,.3);padding:2px 6px;border-radius:20px;">Phase 4 moat</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <p style="font-size:12px;margin-bottom:8px;">No major platform handles umpire scheduling in an integrated way — it's spreadsheets, separate apps, or phone calls. Once umpires are in the system, a network effect emerges: umpires available to multiple orgs on the same platform creates a moat that compounds over time.</p>
+          <div style="background:#12082a;border-left:2px solid #c084fc;padding:7px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#c084fc;font-family:'JetBrains Mono',monospace;">Phase 4 capability — no competitor does this integrated with facility + game calendar.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ONE-SENTENCE POSITION + GOALS -->
+  <div style="background:#0d2a18;border:1px solid #00b85a;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#00b85a;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;">Positioning statement</div>
+    <div style="font-size:15px;color:#ffffff;line-height:1.5;">Most platforms are built for the <em style="color:#9bafc4;">software buyer</em>. PrizumSports is built for the <strong style="color:#00e676;">volunteer who runs a baseball org in their spare time</strong> — and scales to serve every org in the county on the same backbone.</div>
+  </div>
+
+  <!-- MARKET CONTEXT + GOALS SIDE BY SIDE -->
+  <div class="g2">
     <div>
-      <p><strong>The problem.</strong> SportsEngine bundles registration, scheduling, communication, and team management into a single expensive platform that does most things adequately and nothing exceptionally — creating friction for volunteer admins, coaches, and parents alike.</p>
-      <p><strong>The approach.</strong> Replace SportsEngine with PrizumSports as the organizational backbone. GameChanger stays as the anchor for all game activity, managed by Head Coaches. A custom calendar layer merges every team's GC iCal feed into one master org calendar. Built from day one to scale across multiple organizations using Prizum as shared infrastructure.</p>
-      <div class="co co-g" style="margin-top:14px;"><strong>Design principle:</strong> Head Coaches never leave GameChanger. Org Admins never leave the PrizumSports dashboard. Parents register once and follow their team in GC.</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9bafc4;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">Market context</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:6px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;color:#00e676;font-weight:700;line-height:1;flex-shrink:0;">$1.36B</span>
+          <span style="font-size:12px;color:#9bafc4;">Youth sports software market in 2025, growing at 12.5% CAGR — demand is structural, not cyclical.</span>
+        </div>
+        <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:6px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;color:#ffb300;font-weight:700;line-height:1;flex-shrink:0;">45%</span>
+          <span style="font-size:12px;color:#9bafc4;">Market held by top 5 incumbents — all building the same product, all receiving the same complaints.</span>
+        </div>
+        <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:6px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;color:#1e90ff;font-weight:700;line-height:1;flex-shrink:0;">1M+</span>
+          <span style="font-size:12px;color:#9bafc4;">Teams actively using GameChanger — the integration moat competitors aren't building toward.</span>
+        </div>
+        <div style="background:#1a2535;border:1px solid #2a3d52;border-radius:6px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;color:#c084fc;font-weight:700;line-height:1;flex-shrink:0;">46%</span>
+          <span style="font-size:12px;color:#9bafc4;">Increase in spend per child on youth sports since 2019 — families are investing more, expecting more.</span>
+        </div>
+      </div>
     </div>
     <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9bafc4;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">Goal priorities</div>
       <div class="card">
-        <div class="card-hd">Goal priorities <span class="card-hd-acc">ranked by impact</span></div>
-        <div class="card-bd" style="display:flex;flex-direction:column;gap:5px;">
+        <div class="card-bd" style="display:flex;flex-direction:column;gap:5px;padding:12px;">
           <div class="gi pri"><span class="gi-num">01</span><span class="gi-txt">Reduce admin complexity — fewer tools, one hub</span></div>
           <div class="gi sec"><span class="gi-num">02</span><span class="gi-txt">Improve parent registration + communication</span></div>
           <div class="gi sec"><span class="gi-num">03</span><span class="gi-txt">Head Coaches own their teams in GameChanger</span></div>
@@ -379,8 +489,10 @@ strong{color:#ffffff;font-weight:600;}
           <div class="gi sec"><span class="gi-num">05</span><span class="gi-txt">Minimize custom dev — build only what SaaS can't</span></div>
         </div>
       </div>
+      <div class="co co-g" style="margin-top:10px;font-size:12px;"><strong>Design principle:</strong> Head Coaches never leave GameChanger. Org Admins never leave the PrizumSports dashboard. Parents register once and follow their team in GC.</div>
     </div>
   </div>
+
 </div>
 
 <!-- 02 REQUIREMENTS -->
