@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Youth Baseball Platform — Product Spec & Wireframes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --navy-mid: #1a2e42;
+    --navy-soft: #243a52;
+    --steel: #2e5077;
+    --sky: #4a9fd8;
+    --sky-light: #a8d4f0;
+    --sky-pale: #e8f4fb;
+    --grass: #2d7a4f;
+    --grass-light: #a3d4b8;
+    --grass-pale: #e8f5ee;
+    --amber: #c8762a;
+    --amber-light: #f0c98a;
+    --amber-pale: #fdf3e3;
+    --red: #c0392b;
+    --red-pale: #fdeaea;
+    --chalk: #f5f3ee;
+    --white: #ffffff;
+    --text: #1a2332;
+    --text-mid: #3d5166;
+    --text-soft: #6b7f93;
+    --border: #d8e4ec;
+    --border-soft: #eaf0f5;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'Instrument Sans', system-ui, sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--chalk);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  /* ── COVER ── */
+  .cover {
+    background: var(--navy);
+    color: var(--white);
+    padding: 80px 60px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -60px;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: var(--steel);
+    opacity: 0.25;
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: 30%;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: var(--sky);
+    opacity: 0.12;
+  }
+  .cover-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--sky-light);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    max-width: 640px;
+  }
+  .cover h1 em {
+    color: var(--sky-light);
+    font-style: italic;
+  }
+  .cover-desc {
+    font-size: 16px;
+    color: rgba(255,255,255,0.65);
+    max-width: 560px;
+    margin-bottom: 36px;
+    line-height: 1.6;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--sky-light);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .cover-meta-item span {
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+  }
+
+  /* ── NAV ── */
+  .doc-nav {
+    background: var(--white);
+    border-bottom: 1.5px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    overflow-x: auto;
+  }
+  .doc-nav a {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-soft);
+    text-decoration: none;
+    padding: 14px 18px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .doc-nav a:hover { color: var(--text); }
+  .doc-nav a.active { color: var(--sky); border-bottom-color: var(--sky); }
+  .nav-num {
+    background: var(--border-soft);
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* ── LAYOUT ── */
+  .doc-body { max-width: 980px; margin: 0 auto; padding: 0 32px 80px; }
+
+  /* ── SECTIONS ── */
+  .section {
+    padding: 56px 0 0;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--sky);
+    background: var(--sky-pale);
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--navy);
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-head {
+    background: var(--navy);
+    color: var(--white);
+    padding: 12px 18px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-head-label {
+    color: var(--sky-light);
+    font-size: 10px;
+    font-weight: 400;
+  }
+  .card-body { padding: 20px; }
+
+  /* ── GRIDS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  /* ── REQUIREMENT BLOCKS ── */
+  .req-block {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .req-head {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .req-head:hover { background: var(--sky-pale); }
+  .req-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .req-title { font-size: 13px; font-weight: 600; flex: 1; }
+  .req-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+  .badge-gc { background: #e8f0f8; color: #1a4a7a; }
+  .badge-buy { background: var(--grass-pale); color: var(--grass); }
+  .badge-build { background: var(--amber-pale); color: var(--amber); }
+  .badge-hybrid { background: #f0e8f8; color: #6a3a8a; }
+  .req-chevron {
+    color: var(--text-soft);
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+  .req-chevron.open { transform: rotate(90deg); }
+  .req-body {
+    border-top: 1px solid var(--border-soft);
+    padding: 16px;
+    display: none;
+  }
+  .req-body.open { display: block; }
+  .req-row { display: flex; gap: 20px; }
+  .req-col { flex: 1; }
+  .req-col h4 { font-size: 11px; font-family: var(--font-mono); color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .req-col ul { list-style: none; }
+  .req-col ul li {
+    font-size: 12px;
+    color: var(--text-mid);
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .req-col ul li::before { content: '—'; color: var(--border); flex-shrink: 0; margin-top: 1px; }
+  .tool-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--chalk);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-mid);
+    margin: 2px;
+  }
+  .tool-pill.primary { background: var(--sky-pale); border-color: var(--sky-light); color: var(--steel); }
+
+  /* ── ARCH DIAGRAM ── */
+  .arch-diagram {
+    background: var(--navy);
+    border-radius: 10px;
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  .arch-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: center;
+    justify-content: center;
+  }
+  .arch-box {
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: center;
+    flex: 1;
+    max-width: 180px;
+  }
+  .arch-box-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .arch-box-sub { font-size: 10px; opacity: 0.75; font-family: var(--font-mono); }
+  .ab-blue { background: rgba(74,159,216,0.2); border: 1px solid rgba(74,159,216,0.4); color: var(--sky-light); }
+  .ab-green { background: rgba(45,122,79,0.2); border: 1px solid rgba(45,122,79,0.4); color: var(--grass-light); }
+  .ab-amber { background: rgba(200,118,42,0.2); border: 1px solid rgba(200,118,42,0.4); color: var(--amber-light); }
+  .ab-gray { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.65); }
+  .ab-anchor { background: rgba(74,159,216,0.35); border: 2px solid var(--sky); color: var(--white); }
+  .arch-arrow {
+    color: rgba(255,255,255,0.25);
+    font-size: 18px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .arch-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin: 6px 0;
+  }
+  .arch-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .arch-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+
+  /* ── DATA FLOW ── */
+  .flow-steps {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .flow-step {
+    flex-shrink: 0;
+    width: 160px;
+    text-align: center;
+    position: relative;
+  }
+  .flow-step::after {
+    content: '→';
+    position: absolute;
+    right: -12px;
+    top: 28px;
+    color: var(--text-soft);
+    font-size: 16px;
+  }
+  .flow-step:last-child::after { display: none; }
+  .flow-box {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 10px;
+    margin-bottom: 8px;
+  }
+  .flow-num {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-soft);
+    margin-bottom: 4px;
+  }
+  .flow-action { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .flow-system {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .fs-gc { background: #e8f0f8; color: #1a4a7a; }
+  .fs-reg { background: var(--grass-pale); color: var(--grass); }
+  .fs-admin { background: var(--amber-pale); color: var(--amber); }
+  .fs-cal { background: #f0e8f8; color: #6a3a8a; }
+  .flow-note { font-size: 10px; color: var(--text-soft); line-height: 1.4; }
+
+  /* ── INTEGRATION TABLE ── */
+  .int-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .int-table th {
+    background: var(--chalk);
+    padding: 8px 12px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .int-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  .int-table tr:last-child td { border-bottom: none; }
+  .int-table tr:hover td { background: var(--sky-pale); }
+  .risk-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .risk-high { background: var(--red); }
+  .risk-med { background: var(--amber); }
+  .risk-low { background: var(--grass); }
+
+  /* ── WIREFRAMES ── */
+  .wf-container {
+    background: #f0f4f7;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .wf-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .wf-shell {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    min-height: 480px;
+  }
+  .wf-sidebar {
+    width: 180px;
+    flex-shrink: 0;
+    background: var(--navy);
+    display: flex;
+    flex-direction: column;
+  }
+  .wf-logo {
+    padding: 16px 14px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .wf-logo-name { font-size: 12px; font-weight: 600; color: var(--white); }
+  .wf-logo-sub { font-size: 10px; color: rgba(255,255,255,0.4); font-family: var(--font-mono); margin-top: 1px; }
+  .wf-nav { padding: 10px 8px; flex: 1; }
+  .wf-nav-section { font-size: 9px; font-family: var(--font-mono); color: rgba(255,255,255,0.3); letter-spacing: 0.8px; text-transform: uppercase; padding: 8px 6px 4px; }
+  .wf-nav-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 8px; border-radius: 5px;
+    font-size: 12px; color: rgba(255,255,255,0.55);
+    cursor: pointer; margin-bottom: 1px; transition: all 0.12s;
+  }
+  .wf-nav-item:hover { background: rgba(255,255,255,0.08); color: var(--white); }
+  .wf-nav-item.active { background: rgba(74,159,216,0.2); color: var(--sky-light); }
+  .wf-nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .wf-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .wf-topbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .wf-topbar-title { font-size: 14px; font-weight: 600; color: var(--navy); }
+  .wf-btn { font-size: 11px; padding: 5px 11px; border-radius: 5px; border: 1px solid var(--border); background: var(--white); color: var(--text-mid); cursor: pointer; font-family: var(--font-body); }
+  .wf-btn-primary { background: var(--navy); color: var(--white); border-color: var(--navy); }
+  .wf-btn:hover { border-color: var(--sky); color: var(--sky); }
+  .wf-btn-primary:hover { background: var(--steel); border-color: var(--steel); color: var(--white); }
+  .wf-tabs { display: flex; background: var(--white); border-bottom: 1px solid var(--border-soft); flex-shrink: 0; padding: 0 16px; }
+  .wf-tab { font-size: 12px; padding: 9px 12px; color: var(--text-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.12s; }
+  .wf-tab:hover { color: var(--text); }
+  .wf-tab.active { color: var(--sky); border-bottom-color: var(--sky); font-weight: 600; }
+  .wf-content { flex: 1; overflow-y: auto; padding: 16px; background: #f7f9fb; }
+  .wf-alert { background: #fff8e8; border: 1px solid #f0d080; border-radius: 6px; padding: 9px 13px; font-size: 11px; color: #7a5500; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .wf-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .wf-metric { background: var(--white); border: 1px solid var(--border-soft); border-radius: 7px; padding: 10px 12px; }
+  .wf-metric-label { font-size: 10px; color: var(--text-soft); margin-bottom: 3px; }
+  .wf-metric-val { font-size: 20px; font-weight: 600; color: var(--navy); }
+  .wf-metric-sub { font-size: 10px; color: var(--text-soft); margin-top: 1px; }
+  .wf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .wf-panel { background: var(--white); border: 1px solid var(--border-soft); border-radius: 7px; overflow: hidden; }
+  .wf-panel-head { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; }
+  .wf-panel-title { font-size: 12px; font-weight: 600; color: var(--navy); }
+  .wf-panel-link { font-size: 11px; color: var(--sky); cursor: pointer; text-decoration: underline; }
+  .pipe-row { display: flex; gap: 8px; padding: 12px 14px; overflow-x: auto; }
+  .pipe-col-wf { flex-shrink: 0; width: 120px; }
+  .pipe-col-head { font-size: 9px; font-family: var(--font-mono); color: var(--text-soft); margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .pipe-card-wf { background: var(--chalk); border: 1px solid var(--border-soft); border-radius: 5px; padding: 6px 8px; margin-bottom: 4px; }
+  .pipe-card-name { font-size: 11px; font-weight: 600; color: var(--navy); }
+  .pipe-card-meta { font-size: 9px; color: var(--text-soft); margin-top: 1px; }
+  .badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 10px; margin-top: 3px; font-family: var(--font-mono); }
+  .b-blue { background: #ddeeff; color: #1a4a7a; }
+  .b-amber { background: #fff0cc; color: #7a5500; }
+  .b-green { background: #ddf5e8; color: #1a5a35; }
+  .b-red { background: #fde8e8; color: #8a2020; }
+  .sched-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--border-soft); }
+  .sched-row:last-child { border-bottom: none; }
+  .sched-date { width: 38px; flex-shrink: 0; text-align: center; }
+  .sched-dow { font-size: 9px; color: var(--text-soft); font-family: var(--font-mono); }
+  .sched-num { font-size: 17px; font-weight: 600; color: var(--navy); line-height: 1.1; }
+  .sched-events { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .ev { font-size: 11px; padding: 4px 8px; border-radius: 4px; border-left: 3px solid; display: flex; align-items: center; justify-content: space-between; }
+  .ev-blue { background: #eaf3fb; border-left-color: var(--sky); color: #1a4a7a; }
+  .ev-green { background: var(--grass-pale); border-left-color: var(--grass); color: #1a5a35; }
+  .ev-amber { background: var(--amber-pale); border-left-color: var(--amber); color: #7a5500; }
+  .ev-red { background: var(--red-pale); border-left-color: var(--red); color: #8a2020; }
+  .ev-time { font-size: 9px; font-family: var(--font-mono); opacity: 0.7; }
+  .conflict-tag { font-size: 9px; background: var(--red-pale); color: var(--red); padding: 1px 5px; border-radius: 3px; font-family: var(--font-mono); }
+  .reg-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .reg-table th { background: var(--chalk); padding: 7px 10px; text-align: left; font-size: 10px; font-family: var(--font-mono); color: var(--text-soft); border-bottom: 1.5px solid var(--border); text-transform: uppercase; letter-spacing: 0.4px; }
+  .reg-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  .reg-table tr:hover td { background: var(--sky-pale); }
+  .td-name { font-weight: 600; color: var(--navy); }
+  .empty-note { font-size: 11px; color: var(--text-soft); font-style: italic; padding: 5px 0; }
+
+  /* Reg form wireframe */
+  .form-wf { background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-width: 580px; }
+  .form-wf-header { background: var(--navy); padding: 20px 24px; }
+  .form-wf-title { font-family: var(--font-display); font-size: 22px; color: var(--white); margin-bottom: 4px; }
+  .form-wf-sub { font-size: 12px; color: rgba(255,255,255,0.5); }
+  .form-progress { height: 3px; background: rgba(255,255,255,0.15); margin-top: 16px; border-radius: 2px; overflow: hidden; }
+  .form-progress-fill { height: 100%; background: var(--sky); border-radius: 2px; transition: width 0.4s; }
+  .form-steps { display: flex; gap: 0; }
+  .form-step-label { flex: 1; text-align: center; font-size: 10px; color: rgba(255,255,255,0.35); padding-top: 6px; font-family: var(--font-mono); }
+  .form-step-label.done { color: var(--sky-light); }
+  .form-step-label.active { color: var(--white); font-weight: 600; }
+  .form-body { padding: 24px; }
+  .form-field { margin-bottom: 16px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--text-mid); margin-bottom: 5px; display: block; font-family: var(--font-mono); letter-spacing: 0.3px; }
+  .form-input {
+    width: 100%; padding: 8px 11px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; font-family: var(--font-body);
+    color: var(--text); background: var(--white); outline: none;
+    transition: border-color 0.12s;
+  }
+  .form-input:focus { border-color: var(--sky); box-shadow: 0 0 0 3px rgba(74,159,216,0.1); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-footer { padding: 16px 24px; border-top: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; background: var(--chalk); }
+  .form-note { font-size: 10px; color: var(--text-soft); }
+
+  /* ── PERSONA CARDS ── */
+  .persona-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .persona-head {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .persona-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  .pa-admin { background: #ddeeff; }
+  .pa-coach { background: var(--grass-pale); }
+  .pa-parent { background: var(--amber-pale); }
+  .persona-name { font-size: 14px; font-weight: 600; color: var(--navy); }
+  .persona-role { font-size: 11px; color: var(--text-soft); font-family: var(--font-mono); }
+  .persona-body { padding: 14px 18px; }
+  .persona-section { margin-bottom: 12px; }
+  .persona-section h4 { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-soft); margin-bottom: 6px; }
+  .persona-section ul { list-style: none; }
+  .persona-section ul li { font-size: 12px; color: var(--text-mid); padding: 2px 0; display: flex; gap: 6px; }
+  .persona-section ul li::before { content: '→'; color: var(--sky); flex-shrink: 0; }
+
+  /* ── PHASE ROADMAP ── */
+  .phase-block {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .phase-head {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .phase-head:hover { opacity: 0.9; }
+  .ph-1 { background: var(--sky-pale); border-bottom: 1px solid var(--sky-light); }
+  .ph-2 { background: var(--grass-pale); border-bottom: 1px solid var(--grass-light); }
+  .ph-3 { background: var(--amber-pale); border-bottom: 1px solid var(--amber-light); }
+  .phase-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1;
+    width: 36px;
+    flex-shrink: 0;
+  }
+  .pn-1 { color: var(--sky); }
+  .pn-2 { color: var(--grass); }
+  .pn-3 { color: var(--amber); }
+  .phase-info { flex: 1; }
+  .phase-title { font-size: 14px; font-weight: 600; color: var(--navy); }
+  .phase-sub { font-size: 11px; color: var(--text-soft); font-family: var(--font-mono); margin-top: 1px; }
+  .phase-body { background: var(--white); padding: 18px; display: none; }
+  .phase-body.open { display: block; }
+  .phase-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .phase-item {
+    background: var(--chalk);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .phase-item-check {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .phase-item-text { font-size: 12px; color: var(--text-mid); line-height: 1.4; }
+  .phase-item-tag { font-size: 10px; font-family: var(--font-mono); color: var(--text-soft); margin-top: 2px; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 16px 0;
+  }
+  .callout-info { background: var(--sky-pale); border-left: 3px solid var(--sky); color: var(--steel); }
+  .callout-warn { background: var(--amber-pale); border-left: 3px solid var(--amber); color: #7a5500; }
+  .callout-success { background: var(--grass-pale); border-left: 3px solid var(--grass); color: #1a5a35; }
+
+  /* ── RISK TABLE ── */
+  .risk-row { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; }
+  .risk-severity { flex-shrink: 0; text-align: center; width: 50px; }
+  .risk-dot-lg { width: 12px; height: 12px; border-radius: 50%; margin: 0 auto 3px; }
+  .risk-sev-label { font-size: 9px; font-family: var(--font-mono); color: var(--text-soft); }
+  .risk-content h4 { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .risk-content p { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+  .risk-content .mitigation { margin-top: 6px; font-size: 11px; color: var(--grass); font-style: italic; }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    background: var(--navy);
+    color: rgba(255,255,255,0.4);
+    padding: 32px 60px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 60px;
+  }
+
+  /* Utilities */
+  p { margin-bottom: 10px; color: var(--text-mid); font-size: 14px; line-height: 1.65; }
+  p:last-child { margin-bottom: 0; }
+  strong { color: var(--text); font-weight: 600; }
+  .mt-16 { margin-top: 16px; }
+  .mt-20 { margin-top: 20px; }
+  .mb-16 { margin-bottom: 16px; }
+
+  /* responsive */
+  @media(max-width:700px) {
+    .cover { padding: 48px 24px 40px; }
+    .cover h1 { font-size: 28px; }
+    .doc-body { padding: 0 16px 60px; }
+    .grid-2, .grid-3, .grid-4, .wf-cols, .phase-items, .form-row { grid-template-columns: 1fr; }
+    .wf-metrics { grid-template-columns: repeat(2, 1fr); }
+    .wf-sidebar { width: 140px; }
+    .flow-steps { flex-wrap: wrap; }
+    .flow-step { width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-label">Product Specification · v1.0 · Draft</div>
+  <h1>Youth Baseball Platform<br><em>Spec & Wireframes</em></h1>
+  <p class="cover-desc">A stakeholder document defining the hybrid system architecture to replace SportsEngine, consolidate admin operations, and integrate GameChanger as the anchor for game-day activities.</p>
+  <div class="cover-meta">
+    <div class="cover-meta-item"><label>Organization</label><span>Northside Youth Baseball</span></div>
+    <div class="cover-meta-item"><label>Prepared for</label><span>Board, Coaches & Technical Leads</span></div>
+    <div class="cover-meta-item"><label>Status</label><span>Stakeholder Review</span></div>
+    <div class="cover-meta-item"><label>Phases</label><span>3 · ~12 months</span></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="doc-nav" id="docNav">
+  <a href="#overview" class="active">Overview</a>
+  <a href="#arch">Architecture</a>
+  <a href="#requirements">Requirements</a>
+  <a href="#wireframes">Wireframes</a>
+  <a href="#integrations">Integrations</a>
+  <a href="#personas">Who Uses It</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#risks">Risks</a>
+</nav>
+
+<div class="doc-body">
+
+<!-- 1. OVERVIEW -->
+<div class="section" id="overview">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2 class="section-title">Overview & Goals</h2>
+  </div>
+  <div class="grid-2">
+    <div>
+      <p><strong>The problem.</strong> SportsEngine bundles registration, scheduling, communication, and team management into a single expensive platform that does most things adequately and nothing exceptionally. As the organization grows, it creates friction for volunteer admins who manage too many disconnected workflows, and for parents who receive communication from too many places.</p>
+      <p><strong>The approach.</strong> Replace SportsEngine with a purpose-built stack: Prizum Sports as the organization backbone (registrations, member directory, payments, facilities), GameChanger as the anchor for all game-related activity managed by Head Coaches, and a custom admin layer that aggregates GC team calendars into a single master org calendar. The solution is designed from day one to scale across multiple organizations using Prizum as the shared member and payment infrastructure.</p>
+      <div class="callout callout-info">
+        <strong>Design principle:</strong> An admin should never need to open a second tab to understand the status of a player, event, or team. Every action that requires attention is surfaced with a clear next step — not just a status indicator.
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-head">Goal priorities <span class="card-head-label">ranked by impact</span></div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--sky-pale);border-radius:6px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--sky);font-weight:600;">01</span>
+              <span style="font-size:13px;font-weight:600;color:var(--navy);">Reduce admin complexity</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chalk);border-radius:6px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-soft);">02</span>
+              <span style="font-size:13px;color:var(--text-mid);">Improve parent experience</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chalk);border-radius:6px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-soft);">03</span>
+              <span style="font-size:13px;color:var(--text-mid);">Minimize custom dev investment</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chalk);border-radius:6px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-soft);">04</span>
+              <span style="font-size:13px;color:var(--text-mid);">Use GameChanger as game SoR</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chalk);border-radius:6px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-soft);">05</span>
+              <span style="font-size:13px;color:var(--text-mid);">Scale to multi-org with Prizum as shared backbone</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. ARCHITECTURE -->
+<div class="section" id="arch">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2 class="section-title">System Architecture</h2>
+  </div>
+
+  <p>The recommended architecture is a <strong>Prizum-anchored hybrid stack</strong> designed for single-org deployment today and multi-org scale tomorrow. Prizum Sports owns the member directory, payments, and facility data across all organizations. Head Coaches manage their teams entirely within GameChanger. The Org Admin uses a custom layer to collect each team's GC iCal feed and merge them into a single master org calendar — the critical aggregation step that no off-the-shelf tool handles for this use case. Umpire scheduling is a planned future capability.</p>
+
+  <div class="arch-diagram">
+    <div class="arch-label">public layer</div>
+    <div class="arch-row">
+      <div class="arch-box ab-gray">
+        <div class="arch-box-title">TBD</div>
+        <div class="arch-box-sub">Public website</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box ab-gray">
+        <div class="arch-box-title">Prizum Sports</div>
+        <div class="arch-box-sub">Registration forms</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box ab-gray">
+        <div class="arch-box-title">Stripe</div>
+        <div class="arch-box-sub">Payment processing</div>
+      </div>
+    </div>
+    <div style="text-align:center;color:rgba(255,255,255,0.2);font-size:20px;margin:2px 0;">↓</div>
+    <div class="arch-label">core data layer</div>
+    <div class="arch-row">
+      <div class="arch-box ab-blue" style="max-width:260px;">
+        <div class="arch-box-title">Admin Dashboard</div>
+        <div class="arch-box-sub">React app · unified operations hub</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:40px;color:rgba(255,255,255,0.2);font-size:16px;margin:4px 0;">
+      <span>↙</span><span>↓</span><span>↘</span>
+    </div>
+    <div class="arch-label">operational layer</div>
+    <div class="arch-row">
+      <div class="arch-box ab-green" style="max-width:220px;">
+        <div class="arch-box-title">Prizum Sports</div>
+        <div class="arch-box-sub">Reg · members · payments · facilities</div>
+      </div>
+      <div class="arch-box ab-amber" style="max-width:220px;">
+        <div class="arch-box-title">GC iCal → Custom Calendar</div>
+        <div class="arch-box-sub">Coach feeds → Org Admin aggregates → Master calendar</div>
+      </div>
+    </div>
+    <div style="text-align:center;color:rgba(255,255,255,0.2);font-size:20px;margin:2px 0;">↓</div>
+    <div class="arch-label">game layer (anchor)</div>
+    <div class="arch-row">
+      <div class="arch-box ab-anchor" style="max-width:260px;">
+        <div class="arch-box-title">⚾ GameChanger</div>
+        <div class="arch-box-sub">Games · stats · video · team chat</div>
+      </div>
+    </div>
+    <div class="arch-legend">
+      <div class="arch-legend-item"><span class="legend-dot" style="background:var(--sky);"></span>Custom-built layer</div>
+      <div class="arch-legend-item"><span class="legend-dot" style="background:var(--grass-light);"></span>Off-the-shelf SaaS</div>
+      <div class="arch-legend-item"><span class="legend-dot" style="background:rgba(255,255,255,0.3);"></span>Third-party (no customization)</div>
+      <div class="arch-legend-item"><span class="legend-dot" style="background:var(--sky-light);"></span>GameChanger (anchor, read-only integration)</div>
+    </div>
+  </div>
+
+  <div class="card mt-20">
+    <div class="card-head">Data flow: Registration → Roster → GameChanger</div>
+    <div class="card-body">
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-box">
+            <div class="flow-num">Step 01</div>
+            <div class="flow-action">Parent registers</div>
+            <div><span class="flow-system fs-reg">Prizum Sports</span></div>
+          </div>
+          <div class="flow-note">Collects player info, payment, and e-signature waiver</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-box">
+            <div class="flow-num">Step 02</div>
+            <div class="flow-action">Org Admin places on team</div>
+            <div><span class="flow-system fs-admin">Admin Dashboard</span></div>
+          </div>
+          <div class="flow-note">Assigns player to team; exports GC-formatted CSV roster</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-box">
+            <div class="flow-num">Step 03</div>
+            <div class="flow-action">Head Coach manages in GC</div>
+            <div><span class="flow-system fs-gc">GameChanger</span></div>
+          </div>
+          <div class="flow-note">Coach owns roster, schedule, lineup, stats, and team chat in GC</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-box">
+            <div class="flow-num">Step 04</div>
+            <div class="flow-action">Org Admin adds iCal feed</div>
+            <div><span class="flow-system fs-admin">Admin Dashboard</span></div>
+          </div>
+          <div class="flow-note">Admin pastes GC team iCal URL; system subscribes automatically</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-box">
+            <div class="flow-num">Step 05</div>
+            <div class="flow-action">Master calendar built</div>
+            <div><span class="flow-system fs-cal">Custom Calendar</span></div>
+          </div>
+          <div class="flow-note">All team feeds merge into org-wide master calendar with conflict detection</div>
+        </div>
+      </div>
+      <div class="callout callout-warn" style="margin-top:16px;">
+        <strong>GC API limitation:</strong> GameChanger has no public API. All data flow to/from GC is via CSV import and iCal export. Head Coaches manage everything inside GC; the Org Admin only needs the team's iCal URL to connect it to the master calendar.
+      </div>
+      <div class="callout callout-success" style="margin-top:10px;">
+        <strong>Multi-org scale model:</strong> Prizum Sports serves as the shared backbone across organizations — each org has its own member directory, payment processing, and facility management within Prizum. The custom admin layer and calendar aggregation logic are org-agnostic. Adding a new organization means provisioning a Prizum org, onboarding their GC teams, and connecting their iCal feeds — no code changes required.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. REQUIREMENTS -->
+<div class="section" id="requirements">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2 class="section-title">Functional Requirements</h2>
+  </div>
+  <p style="margin-bottom:16px;">Each requirement area below shows what it covers, which tool owns it, and what must be built vs. bought. Click any row to expand details.</p>
+
+  <!-- Registrations -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#ddeeff;">📋</div>
+      <div class="req-title">Registrations</div>
+      <span class="req-badge badge-buy">Prizum Sports</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Tryout, season, clinic, fall ball form types</li>
+            <li>E-signature waivers</li>
+            <li>Payment collection with discounts & plans</li>
+            <li>Player and parent data collection</li>
+            <li>Coach background check workflow</li>
+            <li>Financial reporting (collections, AR)</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">Prizum Sports</span>
+          <span class="tool-pill">Stripe (via Prizum Sports)</span>
+          <span class="tool-pill">JDP / Sterling Volunteers (BG checks)</span>
+          <h4 style="margin-top:12px;">What to build</h4>
+          <ul>
+            <li>GC roster export script from Prizum Sports data</li>
+            <li>Registration status dashboard widget</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scheduling -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#ddf5e8;">📅</div>
+      <div class="req-title">Scheduling & Calendar</div>
+      <span class="req-badge badge-build">GC + Custom Build</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Head Coaches manage team schedules entirely in GameChanger</li>
+            <li>Org Admin collects each team's GC iCal URL and registers it in the system</li>
+            <li>Custom calendar aggregates all team iCal feeds into one master org calendar</li>
+            <li>Organization-wide events layered on top (tryouts, clinics, field crew)</li>
+            <li>Conflict detection across fields and teams</li>
+            <li>Umpire scheduling — future roadmap item (Phase 4)</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">GameChanger (per-team, coach-managed)</span>
+          <span class="tool-pill primary">Custom calendar aggregator (Org Admin tool)</span>
+          <span class="tool-pill">GC iCal feeds (one per team, read-only)</span>
+          <h4 style="margin-top:12px;">How it works</h4>
+          <ul>
+            <li>Each Head Coach manages their team schedule in GC — no change to their workflow</li>
+            <li>Org Admin opens "Manage Calendars" in the admin dashboard and pastes each team's GC iCal URL</li>
+            <li>System subscribes, polls, and merges all feeds into the master org calendar</li>
+            <li>Org-level events (tryouts, facility bookings from Prizum) layer on top</li>
+            <li>Umpire scheduling to be added in a future phase once core system is stable</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member Management -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#fff0cc;">👥</div>
+      <div class="req-title">Member Management</div>
+      <span class="req-badge badge-buy">Prizum Sports</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Player / parent directory</li>
+            <li>Group segmentation (teams, board, programs)</li>
+            <li>Mass communication (email, SMS alerts)</li>
+            <li>Newsletters</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">Prizum Sports (directory)</span>
+          <span class="tool-pill primary">Prizum Sports (newsletters + mass email)</span>
+          <span class="tool-pill">Prizum Sports SMS alerts</span>
+          <h4 style="margin-top:12px;">What to build</h4>
+          <ul>
+            <li>Prizum Sports handles segmentation and audience management natively</li>
+            <li>Admin dashboard member search + export via Prizum Sports API</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Management -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#ddf5e8;">⚾</div>
+      <div class="req-title">Team Management</div>
+      <span class="req-badge badge-gc">GameChanger + Admin</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Rosters (exportable)</li>
+            <li>Parent contact info per team</li>
+            <li>Attendance / RSVP (practices and games)</li>
+            <li>Team communication / chat</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">GameChanger (team chat, game RSVP)</span>
+          <span class="tool-pill primary">Admin Dashboard (roster management)</span>
+          <span class="tool-pill">Prizum Sports (contact source of truth)</span>
+          <h4 style="margin-top:12px;">Decision note</h4>
+          <ul>
+            <li>Use GC team chat — parents are already in the app</li>
+            <li>Practice RSVP: GC handles game day; build simple RSVP for practices</li>
+            <li>Roster export from admin dashboard, not GC</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Management -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#e8f0f8;">🏆</div>
+      <div class="req-title">Game Management</div>
+      <span class="req-badge badge-gc">GameChanger only</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Live scoring and scorekeeping</li>
+            <li>Stats tracking and season history</li>
+            <li>Video streaming and highlights</li>
+            <li>Game-day lineup management</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Decision</h4>
+          <div class="callout callout-success" style="margin:0;">GC handles all of this better than any alternative. Do not attempt to replicate game management. Invest in GC adoption by coaches and parents instead of building alternatives.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Website -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#f0e8f8;">🌐</div>
+      <div class="req-title">Website & Public Presence</div>
+      <span class="req-badge badge-build">TBD</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Public communications and announcements</li>
+            <li>Registration entry points (links to Prizum Sports)</li>
+            <li>Event pages (tournaments, tryouts)</li>
+            <li>Document publishing (handbooks, forms)</li>
+            <li>Contact forms</li>
+            <li>Roster publishing (optional, limited)</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">TBD (CMS + hosting)</span>
+          <span class="tool-pill">Prizum Sports (embedded reg widgets)</span>
+          <h4 style="margin-top:12px;">Key requirements</h4>
+          <ul>
+            <li>Non-developer admins must be able to edit pages</li>
+            <li>SEO must be manageable without dev help</li>
+            <li>Registration links from Prizum Sports must be embeddable or linked cleanly</li>
+            <li>Platform decision pending — evaluate Webflow, Squarespace, or custom</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Facility -->
+  <div class="req-block">
+    <div class="req-head" onclick="toggleReq(this)">
+      <div class="req-icon" style="background:#fde8e8;">🏟️</div>
+      <div class="req-title">Facility Management</div>
+      <span class="req-badge badge-buy">Prizum Sports</span>
+      <span class="req-chevron">▶</span>
+    </div>
+    <div class="req-body">
+      <div class="req-row">
+        <div class="req-col">
+          <h4>What's needed</h4>
+          <ul>
+            <li>Open field slot booking for teams / public</li>
+            <li>Conflict detection across teams, fields, times</li>
+            <li>Umpire and field crew scheduling</li>
+            <li>Integration with master calendar</li>
+          </ul>
+        </div>
+        <div class="req-col">
+          <h4>Recommended tools</h4>
+          <span class="tool-pill primary">Prizum Sports</span>
+          <span class="tool-pill">GC + Custom calendar (conflict view)</span>
+          <h4 style="margin-top:12px;">Phase note</h4>
+          <ul>
+            <li>Prizum Sports handles slot booking, conflict detection, and facility management</li>
+            <li>Integrate with custom scheduling layer for master conflict view across GC games + facilities</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. WIREFRAMES -->
+<div class="section" id="wireframes">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <h2 class="section-title">Wireframes</h2>
+  </div>
+  <p style="margin-bottom:20px;">These wireframes represent the interactive admin dashboard — the single hub for volunteer admins. Use the tabs within each wireframe to explore views. The registration form shows the parent-facing flow.</p>
+
+  <!-- Dashboard Wireframe -->
+  <div class="wf-container">
+    <div class="wf-label">Admin dashboard · main views</div>
+    <div class="wf-shell">
+      <div class="wf-sidebar">
+        <div class="wf-logo">
+          <div class="wf-logo-name">Northside Baseball</div>
+          <div class="wf-logo-sub">Admin Portal</div>
+        </div>
+        <div class="wf-nav">
+          <div class="wf-nav-section">Overview</div>
+          <div class="wf-nav-item active" onclick="switchView('dashboard', this)"><span class="wf-nav-dot" style="background:#4a9fd8;"></span>Dashboard</div>
+          <div class="wf-nav-section">Programs</div>
+          <div class="wf-nav-item" onclick="switchView('registrations', this)"><span class="wf-nav-dot" style="background:#2d7a4f;"></span>Registrations</div>
+          <div class="wf-nav-item" onclick="switchView('scheduling', this)"><span class="wf-nav-dot" style="background:#c8762a;"></span>Scheduling</div>
+          <div class="wf-nav-item" onclick="switchView('rosters', this)"><span class="wf-nav-dot" style="background:#4a9fd8;"></span>Rosters</div>
+          <div class="wf-nav-section">Operations</div>
+          <div class="wf-nav-item" onclick="switchView('facilities', this)"><span class="wf-nav-dot" style="background:#888;"></span>Facilities</div>
+          <div class="wf-nav-item" onclick="switchView('comms', this)"><span class="wf-nav-dot" style="background:#888;"></span>Communications</div>
+        </div>
+      </div>
+      <div class="wf-main">
+        <!-- DASHBOARD VIEW -->
+        <div id="view-dashboard">
+          <div class="wf-topbar">
+            <div class="wf-topbar-title">Dashboard</div>
+            <div style="display:flex;gap:8px;"><button class="wf-btn" onclick="switchView('scheduling', document.querySelector('.wf-nav-item:nth-child(5))'))">+ Add Event</button><button class="wf-btn wf-btn-primary">Open Registration</button></div>
+          </div>
+          <div class="wf-tabs"><div class="wf-tab active">Overview</div><div class="wf-tab">Alerts (3)</div><div class="wf-tab">Activity</div></div>
+          <div class="wf-content">
+            <div class="wf-alert">⚠ <strong>3 items need attention:</strong> 2 background checks pending · Field 2 conflict Saturday · 5 unpaid registrations</div>
+            <div class="wf-metrics">
+              <div class="wf-metric"><div class="wf-metric-label">Registered</div><div class="wf-metric-val">147</div><div class="wf-metric-sub">of ~180 expected</div></div>
+              <div class="wf-metric"><div class="wf-metric-label">Collected</div><div class="wf-metric-val">$28.4k</div><div class="wf-metric-sub">$3.2k outstanding</div></div>
+              <div class="wf-metric"><div class="wf-metric-label">Teams</div><div class="wf-metric-val">8/10</div><div class="wf-metric-sub">2 need rosters</div></div>
+              <div class="wf-metric"><div class="wf-metric-label">BG Checks</div><div class="wf-metric-val" style="color:#c8762a;">11/13</div><div class="wf-metric-sub">2 pending</div></div>
+            </div>
+            <div class="wf-cols">
+              <div class="wf-panel">
+                <div class="wf-panel-head"><span class="wf-panel-title">Registration pipeline</span><span class="wf-panel-link" onclick="switchView('registrations', null)">View all →</span></div>
+                <div class="pipe-row">
+                  <div class="pipe-col-wf"><div class="pipe-col-head">Applied <span style="background:#f0f4f7;padding:1px 5px;border-radius:3px;font-size:9px;">12</span></div><div class="pipe-card-wf"><div class="pipe-card-name">L. Torres</div><div class="pipe-card-meta">12U · Apr 2</div><span class="badge b-amber">Awaiting payment</span></div><div class="pipe-card-wf"><div class="pipe-card-name">N. Chen</div><div class="pipe-card-meta">10U · Apr 2</div><span class="badge b-blue">New</span></div></div>
+                  <div class="pipe-col-wf"><div class="pipe-col-head">Paid <span style="background:#f0f4f7;padding:1px 5px;border-radius:3px;font-size:9px;">8</span></div><div class="pipe-card-wf"><div class="pipe-card-name">M. Webb</div><div class="pipe-card-meta">14U · Mar 30</div><span class="badge b-amber">Waiver needed</span></div></div>
+                  <div class="pipe-col-wf"><div class="pipe-col-head">Complete <span style="background:#f0f4f7;padding:1px 5px;border-radius:3px;font-size:9px;">5</span></div><div class="pipe-card-wf"><div class="pipe-card-name">C. Murray</div><div class="pipe-card-meta">10U · Ready</div><span class="badge b-green">Place on team</span></div></div>
+                  <div class="pipe-col-wf"><div class="pipe-col-head">Placed <span style="background:#f0f4f7;padding:1px 5px;border-radius:3px;font-size:9px;">122</span></div><div class="pipe-card-wf"><div class="pipe-card-name">J. Ross</div><div class="pipe-card-meta">10U Cubs</div><span class="badge b-red">GC sync needed</span></div></div>
+                </div>
+              </div>
+              <div class="wf-panel">
+                <div class="wf-panel-head"><span class="wf-panel-title">This week</span><span class="wf-panel-link" onclick="switchView('scheduling', null)">Full calendar →</span></div>
+                <div class="sched-row"><div class="sched-date"><div class="sched-dow">MON</div><div class="sched-num">31</div></div><div class="sched-events"><div class="ev ev-green">10U Practice · Field 3 <span class="ev-time">5:30–7pm</span></div><div class="ev ev-green">12U Practice · Field 1 <span class="ev-time">6–8pm</span></div></div></div>
+                <div class="sched-row"><div class="sched-date"><div class="sched-dow">WED</div><div class="sched-num">2</div></div><div class="sched-events"><div class="ev ev-amber">14U Practice · Field 2 <span class="ev-time">5:30–7pm</span></div></div></div>
+                <div class="sched-row" style="background:#f0f8ff;"><div class="sched-date"><div class="sched-dow" style="color:var(--sky);">SAT</div><div class="sched-num" style="color:var(--sky);">5</div></div><div class="sched-events"><div class="ev ev-blue">10U vs. Westlake · Field 1 <span class="ev-time">9am</span></div><div class="ev ev-red">12U Field 2 <span class="conflict-tag">⚠ conflict</span></div><div class="ev ev-amber">14U Tryouts · Field 3 <span class="ev-time">1pm</span></div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- REGISTRATIONS VIEW -->
+        <div id="view-registrations" style="display:none;flex:1;flex-direction:column;">
+          <div class="wf-topbar"><div class="wf-topbar-title">Registrations</div><div style="display:flex;gap:8px;"><button class="wf-btn">Export CSV</button><button class="wf-btn wf-btn-primary">Bulk Assign Teams</button></div></div>
+          <div class="wf-tabs"><div class="wf-tab active">Spring 2026</div><div class="wf-tab">Tryouts</div><div class="wf-tab">Fall Ball</div><div class="wf-tab" style="color:var(--sky);">+ New Form</div></div>
+          <div class="wf-content">
+            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+              <input type="text" placeholder="Search players..." style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:var(--font-body);width:180px;color:var(--text);" />
+              <select style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:var(--font-body);color:var(--text-mid);background:var(--white);"><option>All age groups</option><option>8U</option><option>10U</option><option>12U</option><option>14U</option></select>
+              <select style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:var(--font-body);color:var(--text-mid);background:var(--white);"><option>All statuses</option><option>Applied</option><option>Paid</option><option>Complete</option><option>Placed</option></select>
+            </div>
+            <div class="wf-panel" style="overflow:auto;">
+              <table class="reg-table">
+                <thead><tr><th>Player</th><th>Age</th><th>Guardian</th><th>Payment</th><th>Waiver</th><th>Team</th><th>GC Sync</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="td-name">Caleb Murray</td><td>10U</td><td>Dana Murray</td><td><span class="badge b-green">Paid</span></td><td><span class="badge b-green">Signed</span></td><td><span style="color:var(--text-soft);font-size:11px;">— unassigned</span></td><td>—</td><td><button class="wf-btn" style="font-size:10px;padding:3px 7px;">Assign team</button></td></tr>
+                  <tr><td class="td-name">Marcus Webb</td><td>14U</td><td>Tina Webb</td><td><span class="badge b-green">Paid</span></td><td><span class="badge b-amber">Pending</span></td><td><span style="color:var(--text-soft);font-size:11px;">— unassigned</span></td><td>—</td><td><button class="wf-btn" style="font-size:10px;padding:3px 7px;">Send reminder</button></td></tr>
+                  <tr><td class="td-name">Jaylen Ross</td><td>10U</td><td>Mark Ross</td><td><span class="badge b-green">Paid</span></td><td><span class="badge b-green">Signed</span></td><td><span class="badge b-blue">10U Cubs</span></td><td><span class="badge b-red">Not synced</span></td><td><button class="wf-btn" style="font-size:10px;padding:3px 7px;">Export to GC</button></td></tr>
+                  <tr><td class="td-name">Alex Kim</td><td>14U</td><td>Sarah Kim</td><td><span class="badge b-green">Paid</span></td><td><span class="badge b-green">Signed</span></td><td><span class="badge b-blue">14U Cardinals</span></td><td><span class="badge b-green">Synced</span></td><td><button class="wf-btn" style="font-size:10px;padding:3px 7px;color:var(--text-soft);">View</button></td></tr>
+                  <tr><td class="td-name">Liam Torres</td><td>12U</td><td>Diego Torres</td><td><span class="badge b-amber">Plan 2/3</span></td><td><span class="badge b-green">Signed</span></td><td><span style="color:var(--text-soft);font-size:11px;">— unassigned</span></td><td>—</td><td><button class="wf-btn" style="font-size:10px;padding:3px 7px;">Assign team</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top:14px;padding:12px 14px;background:var(--sky-pale);border-radius:6px;font-size:12px;color:var(--steel);">
+              <strong>Integration note:</strong> Registration data lives in Prizum Sports. This view is a read-through from the Prizum Sports API + your team assignment layer. "Export to GC" generates a GC-formatted CSV for that player's team.
+            </div>
+          </div>
+        </div>
+
+        <!-- SCHEDULING VIEW -->
+        <div id="view-scheduling" style="display:none;flex:1;flex-direction:column;">
+          <div class="wf-topbar"><div class="wf-topbar-title">Master Schedule</div><div style="display:flex;gap:8px;"><button class="wf-btn">← Apr</button><span style="font-size:13px;font-weight:600;color:var(--navy);padding:5px 10px;">May 2026</span><button class="wf-btn">Jun →</button><button class="wf-btn wf-btn-primary">+ Add Event</button></div></div>
+          <div class="wf-tabs"><div class="wf-tab active">Calendar</div><div class="wf-tab">By Field</div><div class="wf-tab">By Team</div><div class="wf-tab" style="color:var(--red);">Conflicts (1)</div></div>
+          <div class="wf-content">
+            <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <span style="font-size:11px;color:var(--text-soft);font-family:var(--font-mono);margin-right:4px;">Legend:</span>
+              <span class="badge b-blue" style="font-size:10px;padding:3px 8px;">Games (GC — read only)</span>
+              <span class="badge b-green" style="font-size:10px;padding:3px 8px;">Practices</span>
+              <span class="badge b-amber" style="font-size:10px;padding:3px 8px;">Events / Tryouts</span>
+              <span class="badge b-red" style="font-size:10px;padding:3px 8px;">⚠ Conflict</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px;">
+              <div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);" >SUN</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">MON</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">TUE</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">WED</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">THU</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">FRI</div><div style="font-size:10px;color:var(--text-soft);text-align:center;padding:3px;font-family:var(--font-mono);">SAT</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;">
+              <div style="padding:2px;"></div><div style="padding:2px;"></div><div style="padding:2px;"></div><div style="padding:2px;"></div><div style="padding:2px;"></div><div style="padding:2px;"></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">3</div><div style="font-size:9px;background:#ddeeff;color:#1a4a7a;padding:2px 4px;border-radius:2px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">10U Game</div><div style="font-size:9px;background:#fde8e8;color:#8a2020;padding:2px 4px;border-radius:2px;">⚠ Conflict</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">4</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">5</div><div style="font-size:9px;background:#ddf5e8;color:#1a5a35;padding:2px 4px;border-radius:2px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">10U Practice</div><div style="font-size:9px;background:#ddf5e8;color:#1a5a35;padding:2px 4px;border-radius:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">12U Practice</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">6</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">7</div><div style="font-size:9px;background:#fff0cc;color:#7a5500;padding:2px 4px;border-radius:2px;">14U Practice</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">8</div></div>
+              <div style="background:#eaf3fb;border:1px solid #a8d4f0;border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;color:var(--sky);">9</div><div style="font-size:9px;background:#b5d4f4;color:#042c53;padding:2px 4px;border-radius:2px;margin-bottom:2px;">3 Games</div><div style="font-size:9px;background:#fff0cc;color:#7a5500;padding:2px 4px;border-radius:2px;">Tryouts</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">10</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">11</div><div style="font-size:9px;background:#ddf5e8;color:#1a5a35;padding:2px 4px;border-radius:2px;">10U Practice</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">12</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">13</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">14</div></div>
+              <div style="background:var(--white);border:1px solid var(--border-soft);border-radius:5px;padding:5px;min-height:60px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">15</div></div>
+            </div>
+            <div style="margin-top:14px;background:#fde8e8;border:1px solid #f0a0a0;border-radius:6px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div style="font-size:12px;color:#8a2020;"><strong>Field 2 conflict Sat May 3:</strong> 12U game (GC, 10am) overlaps 10U tryouts (9:30am). Move tryouts to Field 4 or adjust start time.</div>
+              <button class="wf-btn" style="background:#8a2020;color:#fff;border-color:#8a2020;flex-shrink:0;">Resolve conflict</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROSTERS VIEW -->
+        <div id="view-rosters" style="display:none;flex:1;flex-direction:column;">
+          <div class="wf-topbar"><div class="wf-topbar-title">Rosters</div><div style="display:flex;gap:8px;"><button class="wf-btn">Export All to GC</button><button class="wf-btn wf-btn-primary">Export Team CSV</button></div></div>
+          <div class="wf-tabs"><div class="wf-tab active">All Teams</div><div class="wf-tab">8U</div><div class="wf-tab">10U</div><div class="wf-tab">12U</div><div class="wf-tab">14U</div></div>
+          <div class="wf-content">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+              <div class="wf-panel"><div class="wf-panel-head"><span class="wf-panel-title">10U Cubs</span><span class="badge b-green">GC Synced</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text-mid);">14 players · Coach: Mike Torres · <span style="color:var(--sky);cursor:pointer;">View roster →</span></div></div>
+              <div class="wf-panel"><div class="wf-panel-head"><span class="wf-panel-title">12U Cardinals</span><span class="badge b-amber">Sync needed</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text-mid);">13 players · Coach: Sarah Chen · <span style="color:var(--sky);cursor:pointer;">Export CSV →</span></div></div>
+              <div class="wf-panel"><div class="wf-panel-head"><span class="wf-panel-title">14U Braves</span><span class="badge b-green">GC Synced</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text-mid);">15 players · Coach: Dave Kim · <span style="color:var(--sky);cursor:pointer;">View roster →</span></div></div>
+              <div class="wf-panel"><div class="wf-panel-head"><span class="wf-panel-title">8U Red Sox</span><span class="badge b-red">Not imported</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text-mid);">10 players · No coach assigned · <span style="color:var(--red);cursor:pointer;">Action needed →</span></div></div>
+            </div>
+            <div style="margin-top:14px;padding:12px 14px;background:var(--amber-pale);border-radius:6px;font-size:12px;color:#7a5500;">
+              <strong>GC sync process:</strong> Select a team → Export CSV → import into GameChanger team. GC has no API — this is a manual 5-minute step per team. Run at season start and after any roster change.
+            </div>
+          </div>
+        </div>
+
+        <!-- FACILITIES VIEW -->
+        <div id="view-facilities" style="display:none;flex:1;flex-direction:column;">
+          <div class="wf-topbar"><div class="wf-topbar-title">Facility Booking</div><button class="wf-btn wf-btn-primary">+ Book a Field</button></div>
+          <div class="wf-tabs"><div class="wf-tab active">Field Calendar</div><div class="wf-tab">Open Slots</div><div class="wf-tab">Conflicts</div></div>
+          <div class="wf-content">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+              <div class="wf-metric"><div class="wf-metric-label">Fields available</div><div class="wf-metric-val">4</div><div class="wf-metric-sub">Field 1–4</div></div>
+              <div class="wf-metric"><div class="wf-metric-label">Booked this week</div><div class="wf-metric-val">18</div><div class="wf-metric-sub">slots</div></div>
+              <div class="wf-metric" style="border-color:#f0a0a0;"><div class="wf-metric-label">Conflicts</div><div class="wf-metric-val" style="color:#c0392b;">1</div><div class="wf-metric-sub" style="color:var(--red);">Saturday</div></div>
+            </div>
+            <div class="callout callout-info">Facility booking managed via <strong>Prizum Sports</strong>. This view is a read-through of the Prizum Sports API. Open field slots are also embeddable on the public website for parent self-booking.</div>
+            <div class="wf-panel" style="margin-top:12px;"><div class="wf-panel-head"><span class="wf-panel-title">Field 2 — upcoming bookings</span></div>
+              <table class="reg-table"><thead><tr><th>Date/Time</th><th>Team</th><th>Type</th><th>Status</th></tr></thead><tbody>
+                <tr><td>Sat May 3 · 9:30am</td><td>10U Tryouts</td><td>Tryout</td><td><span class="badge b-amber">Conflict</span></td></tr>
+                <tr><td>Sat May 3 · 10:00am</td><td>12U Cubs (GC)</td><td>Game</td><td><span class="badge b-blue">GC game</span></td></tr>
+                <tr><td>Mon May 5 · 6pm</td><td>12U Practice</td><td>Practice</td><td><span class="badge b-green">Confirmed</span></td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMMS VIEW -->
+        <div id="view-comms" style="display:none;flex:1;flex-direction:column;">
+          <div class="wf-topbar"><div class="wf-topbar-title">Communications</div><button class="wf-btn wf-btn-primary">+ New Message</button></div>
+          <div class="wf-tabs"><div class="wf-tab active">Drafts</div><div class="wf-tab">Sent</div><div class="wf-tab">Automations</div></div>
+          <div class="wf-content">
+            <div class="callout callout-info" style="margin-bottom:14px;">Mass communication managed via <strong>Prizum Sports</strong>. Audience segments are managed natively within Prizum Sports (by team, age group, program type). This view shows draft status and recent sends.</div>
+            <div class="wf-panel"><div class="wf-panel-head"><span class="wf-panel-title">Active automations</span></div>
+              <table class="reg-table"><thead><tr><th>Trigger</th><th>Audience</th><th>Message</th><th>Status</th></tr></thead><tbody>
+                <tr><td>Registration complete</td><td>New registrant</td><td>Welcome + next steps</td><td><span class="badge b-green">Active</span></td></tr>
+                <tr><td>Payment plan due</td><td>Payment plan families</td><td>Payment reminder</td><td><span class="badge b-green">Active</span></td></tr>
+                <tr><td>Waiver not signed (3 days)</td><td>Unsigned waivers</td><td>Waiver reminder</td><td><span class="badge b-green">Active</span></td></tr>
+                <tr><td>Season start (7 days out)</td><td>All families</td><td>Season kickoff email</td><td><span class="badge b-amber">Draft</span></td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Registration Form Wireframe -->
+  <div class="wf-container">
+    <div class="wf-label">Parent-facing registration form · mobile-first flow</div>
+    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+      <div class="form-wf" id="regForm">
+        <div class="form-wf-header">
+          <div class="form-wf-title">Spring 2026 Registration</div>
+          <div class="form-wf-sub">Northside Youth Baseball · Powered by Prizum Sports</div>
+          <div class="form-progress"><div class="form-progress-fill" id="formProgress" style="width:33%;"></div></div>
+          <div class="form-steps">
+            <div class="form-step-label done" id="step-label-1">Player info</div>
+            <div class="form-step-label active" id="step-label-2">Guardian</div>
+            <div class="form-step-label" id="step-label-3">Payment</div>
+            <div class="form-step-label" id="step-label-4">Waiver</div>
+          </div>
+        </div>
+        <div class="form-body" id="formBody">
+          <!-- Step 1 -->
+          <div id="formStep1">
+            <div class="form-row">
+              <div class="form-field"><label class="form-label">First name</label><input class="form-input" type="text" placeholder="Player's first name" /></div>
+              <div class="form-field"><label class="form-label">Last name</label><input class="form-input" type="text" placeholder="Last name" /></div>
+            </div>
+            <div class="form-field"><label class="form-label">Date of birth</label><input class="form-input" type="date" /></div>
+            <div class="form-field"><label class="form-label">Age group</label><select class="form-input"><option value="">Select age group...</option><option>8U</option><option>10U</option><option>12U</option><option>14U</option></select></div>
+            <div class="form-field"><label class="form-label">T-shirt size</label><select class="form-input"><option>Youth S</option><option>Youth M</option><option>Youth L</option><option>Youth XL</option></select></div>
+          </div>
+          <!-- Step 2 (hidden) -->
+          <div id="formStep2" style="display:none;">
+            <div class="form-row"><div class="form-field"><label class="form-label">Guardian first name</label><input class="form-input" type="text" /></div><div class="form-field"><label class="form-label">Guardian last name</label><input class="form-input" type="text" /></div></div>
+            <div class="form-field"><label class="form-label">Email address</label><input class="form-input" type="email" placeholder="your@email.com" /></div>
+            <div class="form-field"><label class="form-label">Mobile phone</label><input class="form-input" type="tel" placeholder="(555) 000-0000" /></div>
+            <div class="form-field"><label class="form-label">Emergency contact name</label><input class="form-input" type="text" /></div>
+          </div>
+          <!-- Step 3 (hidden) -->
+          <div id="formStep3" style="display:none;">
+            <div style="background:var(--sky-pale);border-radius:6px;padding:12px 14px;margin-bottom:16px;">
+              <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px;">Spring 2026 Season Fee</div>
+              <div style="font-size:24px;font-weight:600;color:var(--sky);">$225.00</div>
+              <div style="font-size:11px;color:var(--text-soft);margin-top:2px;">Includes uniform, equipment, and field fees</div>
+            </div>
+            <div class="form-field"><label class="form-label">Payment option</label><select class="form-input"><option>Pay in full · $225</option><option>Payment plan · 3× $75</option></select></div>
+            <div class="form-field"><label class="form-label">Discount code (optional)</label><input class="form-input" type="text" placeholder="Enter code..." /></div>
+            <div style="font-size:11px;color:var(--text-soft);margin-top:4px;">Payments processed securely via Stripe.</div>
+          </div>
+          <!-- Step 4 (hidden) -->
+          <div id="formStep4" style="display:none;">
+            <div style="background:var(--chalk);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:16px;max-height:120px;overflow-y:auto;">
+              <div style="font-size:11px;font-family:var(--font-mono);color:var(--text-soft);margin-bottom:6px;">PARTICIPANT WAIVER & RELEASE</div>
+              <div style="font-size:12px;color:var(--text-mid);line-height:1.6;">By signing below, I acknowledge that participation in youth baseball activities involves inherent risks... I hereby release Northside Youth Baseball, its officers, directors, coaches and volunteers from any and all liability... I confirm that my child is in good health and physically able to participate in the activities described...</div>
+            </div>
+            <div class="form-field"><label class="form-label">Electronic signature</label><input class="form-input" type="text" placeholder="Type your full name to sign" /></div>
+            <div class="form-field"><label class="form-label">Date</label><input class="form-input" type="date" /></div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;"><input type="checkbox" id="agreeCheck" style="margin-top:2px;" /><label for="agreeCheck" style="font-size:12px;color:var(--text-mid);">I have read and agree to the terms of the participant waiver and release of liability.</label></div>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="wf-btn" id="formBack" onclick="formNav(-1)" style="display:none;">← Back</button>
+          <div class="form-note" id="formStepNote">Step 1 of 4 — Player information</div>
+          <button class="wf-btn wf-btn-primary" id="formNext" onclick="formNav(1)">Continue →</button>
+        </div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div class="callout callout-info" style="margin-bottom:12px;"><strong>Form design notes:</strong> Target &lt;5 min completion on mobile. Progress bar shows position. No dead ends — incomplete forms can be resumed.</div>
+        <div class="card">
+          <div class="card-head">Data captured per registration</div>
+          <div class="card-body" style="font-size:12px;">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;gap:8px;"><span class="badge b-blue">Player</span><span style="color:var(--text-mid);">Name, DOB, age group, size</span></div>
+              <div style="display:flex;gap:8px;"><span class="badge b-green">Guardian</span><span style="color:var(--text-mid);">Name, email, phone, emergency contact</span></div>
+              <div style="display:flex;gap:8px;"><span class="badge b-amber">Payment</span><span style="color:var(--text-mid);">Plan type, discount, Stripe token</span></div>
+              <div style="display:flex;gap:8px;"><span class="badge b-blue">Waiver</span><span style="color:var(--text-mid);">E-signature, timestamp, IP</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. INTEGRATIONS -->
+<div class="section" id="integrations">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <h2 class="section-title">Integration Strategy</h2>
+  </div>
+
+  <div class="callout callout-warn" style="margin-bottom:20px;">
+    <strong>Critical constraint:</strong> GameChanger has no public API. All integrations to/from GC are via CSV import and iCal export. Every design decision must account for this.
+  </div>
+
+  <div class="card mb-16">
+    <div class="card-head">Integration map — all system connections</div>
+    <div class="card-body" style="overflow-x:auto;">
+      <table class="int-table">
+        <thead>
+          <tr><th>From</th><th>To</th><th>Method</th><th>Frequency</th><th>Risk</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Prizum Sports</strong></td><td>Admin Dashboard</td><td>REST API / webhooks</td><td>Real-time</td><td><span class="risk-dot risk-low"></span>Low</td><td>Prizum Sports API used for player, payment, registration, member, and facility data</td></tr>
+          <tr><td><strong>Admin Dashboard</strong></td><td>GameChanger</td><td>CSV export → manual import</td><td>Season start + roster changes</td><td><span class="risk-dot risk-med"></span>Medium</td><td>GC has no API. Export is a ~10 min admin task. Document process clearly.</td></tr>
+          <tr><td><strong>GameChanger</strong></td><td>Custom Calendar</td><td>iCal feed subscription</td><td>Automatic (iCal updates)</td><td><span class="risk-dot risk-low"></span>Low</td><td>GC publishes iCal per team. Subscribe all team feeds into the custom master calendar module.</td></tr>
+          <tr><td><strong>Prizum Sports</strong></td><td>Custom Calendar</td><td>REST API</td><td>Real-time or daily sync</td><td><span class="risk-dot risk-low"></span>Low</td><td>Prizum Sports facility bookings feed into the custom calendar module for full conflict visibility</td></tr>
+          <tr><td><strong>Prizum Sports</strong></td><td>Prizum Sports (comms)</td><td>Native (same platform)</td><td>Real-time</td><td><span class="risk-dot risk-low"></span>Low</td><td>Member segmentation and mass communication handled natively within Prizum Sports — no sync needed</td></tr>
+          <tr><td><strong>Prizum Sports</strong></td><td>Background check vendor</td><td>Webhook → JDP/Sterling API</td><td>On coach registration</td><td><span class="risk-dot risk-low"></span>Low</td><td>Trigger BG check automatically when a coach completes registration in Prizum Sports</td></tr>
+          <tr><td><strong>TBD Website</strong></td><td>Prizum Sports</td><td>Embedded widget / deep link</td><td>On page load</td><td><span class="risk-dot risk-med"></span>Med</td><td>Embed Prizum Sports registration forms or link to them from public site. Platform TBD — confirm embed support.</td></tr>
+          <tr><td><strong>GameChanger (per team)</strong></td><td>Custom Calendar</td><td>iCal URL subscription (one per team)</td><td>Automatic / polled</td><td><span class="risk-dot risk-low"></span>Low</td><td>Org Admin pastes each team's GC iCal URL into the admin dashboard. System subscribes and merges all feeds into the master org calendar. Head Coaches need no action — their GC schedule is automatically reflected.</td></tr>
+          <tr><td><strong>Stripe</strong></td><td>Admin Dashboard</td><td>Stripe API (via Prizum Sports)</td><td>Real-time</td><td><span class="risk-dot risk-low"></span>Low</td><td>Financial reporting pulls payment data via Prizum Sports, which handles Stripe integration</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="callout callout-success">
+      <strong>What works well:</strong> The iCal integration from GC to the custom calendar is reliable and automatic. Prizum Sports consolidates registrations, member management, and facility booking into one platform — eliminating 3 separate tool integrations. Communication segmentation is native, removing the need for a separate email tool.
+    </div>
+    <div class="callout callout-warn">
+      <strong>What to watch:</strong> GC CSV format can change without notice. Always maintain your own database as the master record — GC is a consumer, not a source of truth. Run weekly CSV exports as backup.
+    </div>
+  </div>
+</div>
+
+<!-- 6. WHO USES IT -->
+<div class="section" id="personas">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <h2 class="section-title">Who Uses It & How</h2>
+  </div>
+  <div class="grid-3">
+    <div class="persona-card">
+      <div class="persona-head">
+        <div class="persona-avatar pa-admin">🗂️</div>
+        <div class="persona-name">Volunteer Admin</div>
+        <div class="persona-role">Board member · 5–10 hrs/week</div>
+      </div>
+      <div class="persona-body">
+        <div class="persona-section">
+          <h4>Primary tools</h4>
+          <ul><li>Admin Dashboard (daily)</li><li>Prizum Sports (registrations, members, facilities)</li><li>GC + Custom (scheduling)</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Core tasks</h4>
+          <ul><li>Monitor registration pipeline in Prizum Sports</li><li>Assign players to teams; export CSV roster to GC</li><li>Add each team's GC iCal URL to build the master calendar</li><li>Resolve scheduling conflicts across fields and teams</li><li>Send mass communications via Prizum Sports</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Key UX need</h4>
+          <ul><li>Single view of "what needs attention today"</li><li>Bulk actions (assign 20 players at once)</li><li>Never requires 4 tabs to complete 1 task</li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="persona-card">
+      <div class="persona-head">
+        <div class="persona-avatar pa-coach">⚾</div>
+        <div class="persona-name">Head Coach</div>
+        <div class="persona-role">Volunteer coach · game days + practices</div>
+      </div>
+      <div class="persona-body">
+        <div class="persona-section">
+          <h4>Primary tools</h4>
+          <ul><li>GameChanger (game day)</li><li>Admin Dashboard (roster PDF)</li><li>GC + Custom calendar (practice schedule)</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Core tasks</h4>
+          <ul><li>Own team roster, schedule, and lineup entirely in GC</li><li>Score games and track stats in GC</li><li>Communicate with parents via GC team chat</li><li>Access parent contact info (from Prizum-sourced roster)</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Key UX need</h4>
+          <ul><li>GC is their only app — do not ask them to use another tool</li><li>Roster is pre-loaded by Org Admin at season start; coach manages from there</li><li>Exportable roster PDF for game day binder</li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="persona-card">
+      <div class="persona-head">
+        <div class="persona-avatar pa-parent">👨‍👧</div>
+        <div class="persona-name">Parent / Guardian</div>
+        <div class="persona-role">Mobile-first · time-constrained</div>
+      </div>
+      <div class="persona-body">
+        <div class="persona-section">
+          <h4>Primary tools</h4>
+          <ul><li>GameChanger app (game day)</li><li>Prizum Sports (registration)</li><li>TBD website (info lookup)</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Core tasks</h4>
+          <ul><li>Register child for season</li><li>Watch live scoring in GC</li><li>RSVP to games and practices</li><li>Find schedule and field location</li><li>Receive org announcements</li></ul>
+        </div>
+        <div class="persona-section">
+          <h4>Key UX need</h4>
+          <ul><li>Registration under 5 min on mobile</li><li>One communication channel (not 3)</li><li>GC app for game-day engagement</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. ROADMAP -->
+<div class="section" id="roadmap">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <h2 class="section-title">MVP Roadmap</h2>
+  </div>
+
+  <div class="phase-block">
+    <div class="phase-head ph-1" onclick="togglePhase(this)">
+      <div class="phase-num pn-1">1</div>
+      <div class="phase-info">
+        <div class="phase-title">Quick Wins</div>
+        <div class="phase-sub">Weeks 1–8 · No custom code · Replace the worst SportsEngine pain points</div>
+      </div>
+      <span style="font-size:12px;color:var(--sky);">▶</span>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Stand up public website (TBD platform) with registration links and public calendar</div><div class="phase-item-tag">TBD · 1–2 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Configure Prizum Sports for first registration type (tryouts)</div><div class="phase-item-tag">Prizum Sports · 1 week</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Build iCal aggregator: Org Admin pastes GC team iCal URLs; system merges all feeds into master org calendar</div><div class="phase-item-tag">Custom dev · 1–2 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Configure Prizum Sports member management and communication segments</div><div class="phase-item-tag">Prizum Sports · 3–5 days</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Document GC roster import SOP and train admins on process</div><div class="phase-item-tag">Process · 1 day</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Configure Prizum Sports facility booking; link from public website</div><div class="phase-item-tag">Prizum Sports · 2–3 days</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-block">
+    <div class="phase-head ph-2" onclick="togglePhase(this)">
+      <div class="phase-num pn-2">2</div>
+      <div class="phase-info">
+        <div class="phase-title">Core Consolidation</div>
+        <div class="phase-sub">Months 2–5 · Moderate build · Admin dashboard + full registration migration</div>
+      </div>
+      <span style="font-size:12px;color:var(--grass);">▶</span>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Migrate all programs into Prizum Sports (seasons, clinics, fall ball)</div><div class="phase-item-tag">Prizum Sports · 2 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Integrate background check vendor into Prizum Sports coach workflow</div><div class="phase-item-tag">JDP/Sterling · 1 week</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Build GC roster export automation from Prizum Sports — one CSV per team</div><div class="phase-item-tag">Custom dev · 1 week</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Build admin dashboard MVP: registration pipeline + roster management + GC sync status</div><div class="phase-item-tag">Custom dev · 4–6 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Connect Prizum Sports API to admin dashboard for unified data view</div><div class="phase-item-tag">Custom dev · 3–5 days</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Financial reporting dashboard from Prizum Sports payment data</div><div class="phase-item-tag">Custom dev · 1 week</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-block">
+    <div class="phase-head ph-3" onclick="togglePhase(this)">
+      <div class="phase-num pn-3">3</div>
+      <div class="phase-info">
+        <div class="phase-title">Advanced Features & Scale</div>
+        <div class="phase-sub">Months 6–12 · Heavier build · Automation + potential multi-org product</div>
+      </div>
+      <span style="font-size:12px;color:var(--amber);">▶</span>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Multi-org onboarding: provision new orgs in Prizum Sports, connect their GC team iCal feeds, activate admin dashboard for each org</div><div class="phase-item-tag">Product infra · 2–3 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Automated communication sequences (reg confirmation, payment reminders, season kickoff)</div><div class="phase-item-tag">Prizum Sports automations · 1 week</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Practice RSVP / attendance tracking module in admin dashboard</div><div class="phase-item-tag">Custom dev · 2 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Parent self-service portal (schedule, contacts, documents)</div><div class="phase-item-tag">Custom dev · 3 weeks</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Multi-org admin: super-admin view across all orgs sharing Prizum as member + payment backbone</div><div class="phase-item-tag">Product strategy · ongoing</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Advanced analytics: registration trends, payment AR aging, field utilization</div><div class="phase-item-tag">Custom dev · 2 weeks</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-block">
+    <div class="phase-head" style="background:#f3e8f8;border-bottom:1px solid #d4b0e8;" onclick="togglePhase(this)">
+      <div class="phase-num" style="color:#7a3aaa;font-family:var(--font-display);font-size:28px;line-height:1;width:36px;flex-shrink:0;">4</div>
+      <div class="phase-info">
+        <div class="phase-title">Umpire Scheduling & Advanced Operations</div>
+        <div class="phase-sub" style="font-family:var(--font-mono);font-size:11px;color:var(--text-soft);">Future · timeline TBD · requires stable core platform first</div>
+      </div>
+      <span style="font-size:12px;color:#7a3aaa;">▶</span>
+    </div>
+    <div class="phase-body">
+      <div class="callout callout-warn" style="margin-bottom:14px;">This phase is intentionally deferred. Umpire scheduling has its own complexity (availability, certification, assignments, pay) and should only be built once the core platform is proven stable and adopted.</div>
+      <div class="phase-items">
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Umpire directory: profiles, certifications, availability, and contact info</div><div class="phase-item-tag">Custom dev · TBD</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Game assignment engine: auto-assign available umpires to games from master calendar</div><div class="phase-item-tag">Custom dev · TBD</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Umpire confirmation + notification flow (email/SMS)</div><div class="phase-item-tag">Custom dev · TBD</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Umpire pay tracking and reporting</div><div class="phase-item-tag">Custom dev + Prizum payments · TBD</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Multi-org umpire pool: share umpires across organizations using the same platform</div><div class="phase-item-tag">Product strategy · TBD</div></div></div>
+        <div class="phase-item"><div class="phase-item-check"></div><div><div class="phase-item-text">Field crew scheduling alongside umpires from unified operations view</div><div class="phase-item-tag">Custom dev · TBD</div></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 8. RISKS -->
+<div class="section" id="risks">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <h2 class="section-title">Risks & Mitigations</h2>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-high"></div><div class="risk-sev-label">HIGH</div></div>
+    <div class="risk-content">
+      <h4>GameChanger CSV format changes or access restrictions</h4>
+      <p>GC has no contractual obligation to maintain CSV export formats. If they change the format, your roster sync breaks. If they restrict exports, the process breaks entirely.</p>
+      <p class="mitigation">→ Mitigation: Always maintain your own database as the master record. Never rely on GC as a source of truth for player data. Run automated weekly exports to a backup store. GC is downstream-only.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-high"></div><div class="risk-sev-label">HIGH</div></div>
+    <div class="risk-content">
+      <h4>Volunteer adoption failure — too many new tools at once</h4>
+      <p>Volunteer admins have limited time and low tolerance for learning new systems. Introducing 4 new platforms simultaneously will cause adoption collapse and reversion to spreadsheets.</p>
+      <p class="mitigation">→ Mitigation: Phase 1 should introduce exactly two new things admins must learn. Sequence carefully. Provide recorded walkthroughs (Loom), not manuals. Designate one "system owner" per tool.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-med"></div><div class="risk-sev-label">MED</div></div>
+    <div class="risk-content">
+      <h4>Admin dashboard scope creep in custom development</h4>
+      <p>The admin dashboard is the highest-risk custom build. Teams often try to replicate functionality already provided by the SaaS tools, resulting in a bloated, fragile codebase.</p>
+      <p class="mitigation">→ Mitigation: Define dashboard scope tightly — it must aggregate and link, not rebuild. If a tool has a good UI, link to it; don't rebuild it. Dashboard = status + navigation, not feature replacement.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-med"></div><div class="risk-sev-label">MED</div></div>
+    <div class="risk-content">
+      <h4>Data drift between systems mid-season</h4>
+      <p>With 5+ systems, player data can drift: a roster change in your DB doesn't automatically update GC, and a parent contact update in GC doesn't sync back. Admins end up with 3 versions of "the truth."</p>
+      <p class="mitigation">→ Mitigation: Assign one person as "data owner" responsible for sync checkpoints. Establish clear SoR policies (Prizum Sports owns player/contact/facility data; GC owns game data). Run sync audits monthly.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-med"></div><div class="risk-sev-label">MED</div></div>
+    <div class="risk-content">
+      <h4>Prizum Sports vendor dependency</h4>
+      <p>Consolidating registrations, member management, and facility management into Prizum Sports creates a meaningful single-vendor dependency. If Prizum Sports raises prices, changes API access, or sunsets features, three functional areas are impacted at once.</p>
+      <p class="mitigation">→ Mitigation: Maintain your own data layer with full export capability from Prizum Sports. Confirm API access terms in contract. Never store data exclusively in their platform — keep regular exports. The flip side: consolidation also reduces integration points and operational risk.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-low"></div><div class="risk-sev-label">LOW</div></div>
+    <div class="risk-content">
+      <h4>iCal feed management as org scales</h4>
+      <p>As team count grows (or across multiple orgs), maintaining a growing list of manually-added GC iCal URLs becomes an admin burden. A missed or expired URL means a team's games disappear from the master calendar silently.</p>
+      <p class="mitigation">→ Mitigation: Build iCal URL management as a first-class admin feature — with status indicators showing last successful sync, stale feed warnings, and a simple "add team feed" flow. Consider automated staleness alerts.</p>
+    </div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-severity"><div class="risk-dot-lg risk-low"></div><div class="risk-sev-label">LOW</div></div>
+    <div class="risk-content">
+      <h4>Parent communication fragmentation</h4>
+      <p>Parents currently receive messages from SportsEngine, GC, email, and text. The new system could replicate this fragmentation if communication channels aren't rationalized.</p>
+      <p class="mitigation">→ Mitigation: Establish clear channel policies on day one: GC for game-day and team chat; Prizum Sports for org-wide announcements and registration-related messages. Communicate the policy to parents at season start.</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- end doc-body -->
+
+<div class="doc-footer">
+  <span>Northside Youth Baseball · Platform Specification v1.0</span>
+  <span>For internal stakeholder review · Not for public distribution</span>
+</div>
+
+<script>
+  // Accordion toggles
+  function toggleReq(el) {
+    const body = el.nextElementSibling;
+    const chevron = el.querySelector('.req-chevron');
+    body.classList.toggle('open');
+    chevron.classList.toggle('open');
+  }
+  function togglePhase(el) {
+    const body = el.nextElementSibling;
+    body.classList.toggle('open');
+  }
+
+  // Wireframe view switcher
+  function switchView(view, navEl) {
+    const views = ['dashboard','registrations','scheduling','rosters','facilities','comms'];
+    views.forEach(v => {
+      const el = document.getElementById('view-' + v);
+      if (el) el.style.display = 'none';
+    });
+    const target = document.getElementById('view-' + view);
+    if (target) target.style.display = view === 'dashboard' ? 'block' : 'flex';
+    document.querySelectorAll('.wf-nav-item').forEach(n => n.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+    else {
+      const viewMap = {dashboard:0, registrations:1, scheduling:2, rosters:3, facilities:4, comms:5};
+      const navItems = document.querySelectorAll('.wf-nav-item');
+      if (navItems[viewMap[view]]) navItems[viewMap[view]].classList.add('active');
+    }
+  }
+
+  // Registration form stepper
+  let currentStep = 1;
+  const totalSteps = 4;
+  const stepNotes = ['Step 1 of 4 — Player information','Step 2 of 4 — Guardian details','Step 3 of 4 — Payment','Step 4 of 4 — Waiver & signature'];
+  function formNav(dir) {
+    const prev = currentStep;
+    currentStep = Math.max(1, Math.min(totalSteps, currentStep + dir));
+    if (prev === currentStep) return;
+    document.getElementById('formStep' + prev).style.display = 'none';
+    document.getElementById('formStep' + currentStep).style.display = 'block';
+    document.getElementById('formStepNote').textContent = stepNotes[currentStep - 1];
+    document.getElementById('formBack').style.display = currentStep > 1 ? 'inline-block' : 'none';
+    document.getElementById('formNext').textContent = currentStep === totalSteps ? 'Submit & Pay →' : 'Continue →';
+    const pct = ((currentStep - 1) / (totalSteps - 1)) * 100;
+    document.getElementById('formProgress').style.width = pct + '%';
+    for (let i = 1; i <= totalSteps; i++) {
+      const lbl = document.getElementById('step-label-' + i);
+      if (!lbl) continue;
+      lbl.className = 'form-step-label';
+      if (i < currentStep) lbl.classList.add('done');
+      else if (i === currentStep) lbl.classList.add('active');
+    }
+  }
+
+  // Nav scroll spy
+  const sections = document.querySelectorAll('.section');
+  const navLinks = document.querySelectorAll('.doc-nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector('.doc-nav a[href="#' + entry.target.id + '"]');
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.2 });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
