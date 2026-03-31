@@ -16,7 +16,7 @@
 -- Replace this with your actual user UUID from Supabase Auth
 do $$
 declare
-  v_user_id    uuid := 'YOUR-USER-UUID-HERE';
+  v_user_id    uuid := '55d32882-9dee-4f34-af32-e866a14b01af';
   v_team_id    uuid;
   v_season_id  uuid;
   v_game1_id   uuid;
