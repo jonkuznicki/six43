@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Official SIX43 Gear — High-quality baseball lifestyle and performance apparel." />
+  <title>Shop | SIX43 Official Merchandise</title>
+
+  <link rel="stylesheet" href="/assets/site.css">
+
+  <style>
+    /* Shop-specific layout overrides */
+    .shop-hero {
+      padding: 40px 0;
+      text-align: center;
+      background: var(--navy);
+      color: white;
+      border-radius: var(--radius);
+      margin-bottom: 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .shop-hero h1 { color: white; margin: 0; }
+    .shop-hero p { color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 13px; }
+
+    /* Product Grid Styling */
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 60px;
+    }
+
+    .product-card {
+      text-decoration: none;
+      transition: transform 0.2s ease;
+    }
+
+    .product-card:hover {
+      transform: translateY(-4px);
+    }
+
+    /* Match your existing .thumb style but optimized for apparel */
+    .product-thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .product-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-details {
+      padding: 0 4px;
+    }
+
+    .product-category {
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+
+    .product-name {
+      font-size: 18px;
+      font-weight: 800;
+      margin: 0 0 4px 0;
+      color: var(--navy);
+    }
+
+    .product-price {
+      font-weight: 700;
+      color: var(--gray);
+    }
+
+    @media (max-width: 640px) {
+      .product-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <a class="brand" href="/" aria-label="SIX43 Home">
+          <img src="/assets/logo.png" alt="SIX43" />
+          <span class="tagline">Baseball IQ • Coaching Tools • Analytics</span>
+        </a>
+
+        <nav aria-label="Primary navigation">
+          <div class="navlinks">
+            <a href="/learn.html">Learn</a>
+            <a href="/blog.html">Articles</a>
+            <a href="/tools.html">Tools</a>
+            <a href="/shop.html" class="active">Shop</a> <a href="/about.html">About</a>
+          </div>
+
+          <a class="btn primary" href="/learn.html">Start Here</a>
+          <button class="menu-btn" type="button" aria-label="Open menu" onclick="toggleMenu()">☰ Menu</button>
+        </nav>
+      </div>
+
+      <div id="menuPanel" class="menu-panel" aria-label="Mobile menu">
+        <a href="/learn.html">Learn</a>
+        <a href="/blog.html">Articles</a>
+        <a href="/tools.html">Tools</a>
+        <a href="/shop.html">Shop</a>
+        <a href="/about.html">About</a>
+        <div class="row">
+          <a class="btn primary" href="/learn.html">Start Here</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+<section class="shop-hero">
+  <div class="container" style="max-width: 700px; margin: 0 auto;">
+    <p>The SIX43 Collection</p>
+    <h1>Premium Gear for the Diamond</h1>
+    <p style="text-transform: none; color: rgba(255,255,255,0.85); font-weight: 400; font-size: 16px; margin-top: 12px; letter-spacing: normal;">
+      SIX43 gear is built for the thinkers, the grinders, and the students of the game. 
+      Represent the high-IQ side of baseball.
+    </p>
+  </div>
+</section>
+
+    <div class="product-grid">
+
+      <a href="#" class="product-card">
+        <div class="product-thumb">
+          <img src="/assets/images/shop/six43-hat.png" alt="SIX43 Team Snapback" />
+        </div>
+        <div class="product-details">
+          <div class="product-category">Headwear</div>
+          <h3 class="product-name">Team Snapback</h3>
+          <div class="product-price">$30.00</div>
+        </div>
+      </a>
+
+      <a href="#" class="product-card">
+        <div class="product-thumb">
+          <img src="/assets/images/shop/ss-hoodie.png" alt="Short Sleeve Hoodie" />
+        </div>
+        <div class="product-details">
+          <div class="product-category">Apparel</div>
+          <h3 class="product-name">Warm-Up SS Hoodie</h3>
+          <div class="product-price">$45.00</div>
+        </div>
+      </a>
+
+      <a href="#" class="product-card">
+        <div class="product-thumb">
+          <img src="/assets/images/shop/performance-tee.png" alt="Performance Tee" />
+        </div>
+        <div class="product-details">
+          <div class="product-category">Apparel</div>
+          <h3 class="product-name">"Art of the 6-4-3" Tee</h3>
+          <div

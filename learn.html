@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="SIX43 Learn Hub — a step-by-step path to better baseball decisions for youth (8–14)." />
+  <title>Learn | SIX43</title>
+
+  <link rel="stylesheet" href="/assets/site.css" />
+
+  <style>
+    /* Learn-page specific styles (site.css stays the source of truth) */
+
+    .hero{ padding: 14px 0 18px; }
+
+    .hero-grid{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap:12px;
+      align-items:stretch;
+    }
+
+    .hero-card{ padding: 18px; }
+
+    .kicker{
+      display:inline-flex; align-items:center; gap:10px;
+      font-weight:900; font-size:12px;
+      letter-spacing:.10em; text-transform:uppercase;
+      color:rgba(11,31,59,.70);
+    }
+    .kicker .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:rgba(77,163,255,.85);
+      box-shadow:0 0 0 6px rgba(77,163,255,.12);
+    }
+
+    .hero h1{
+      margin:10px 0 8px;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+    .hero .lead{
+      margin:0;
+      color:rgba(11,31,59,.75);
+      max-width:62ch;
+      font-size:15.5px;
+    }
+
+    .hero-actions{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    .hero-media{
+      overflow:hidden;
+      border-radius: var(--radius);
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      background: rgba(11,31,59,.04);
+      aspect-ratio: 16 / 10;
+      max-height: 280px;
+    }
+    .hero-media img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .hint{
+      margin: 14px 0 0;
+      padding: 12px 14px;
+      border: 1px dashed rgba(11,31,59,.20);
+      border-radius: var(--radius);
+      color: rgba(11,31,59,.70);
+      background: rgba(255,255,255,.65);
+      font-size: 13px;
+    }
+
+    /* Level path */
+    .path{
+      margin-top: 6px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding-bottom: 10px;
+    }
+
+    .level{
+      padding: 16px;
+      display:grid;
+      grid-template-columns: 140px 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .badge{
+      border:1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(77,163,255,.10);
+    }
+    .badge .lvl{
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      color: rgba(11,31,59,.72);
+      margin: 0 0 6px;
+    }
+    .badge .name{
+      font-weight: 900;
+      font-size: 14px;
+      margin: 0;
+      color: rgba(11,31,59,.92);
+    }
+    .badge .icon{
+      margin-top: 10px;
+      font-size: 18px;
+      opacity: .9;
+    }
+
+    .level h2{
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -.01em;
+    }
+    .level p{
+      margin: 6px 0 10px;
+      color: rgba(11,31,59,.72);
+      font-size: 14px;
+      max-width: 80ch;
+    }
+
+    .skills{
+      margin: 0 0 10px 18px;
+      color: rgba(11,31,59,.72);
+      font-size: 13px;
+    }
+    .skills li{ margin: 6px 0; }
+
+    .links{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .link-pill{
+      display:inline-flex;
+      align-items:center;
+      padding:8px 10px;
+      border-radius: 999px;
+      border:1px solid rgba(11,31,59,.14);
+      background: rgba(11,31,59,.04);
+      font-weight: 900;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .link-pill:hover{
+      background: rgba(77,163,255,.10);
+      border-color: rgba(77,163,255,.25);
+    }
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      font-weight:900;
+      color: rgba(11,31,59,.62);
+      margin-top: 2px;
+    }
+
+    @media (max-width: 900px){
+      .hero-grid{ grid-template-columns: 1fr; }
+      .hero-media{ aspect-ratio: 16 / 9; max-height: 220px; }
+    }
+
+    @media (max-width: 640px){
+      .level{ grid-template-columns: 1fr; }
+      .badge{ display:flex; align-items:center; justify-content:space-between; }
+      .badge .icon{ margin-top:0; }
+      .skills{ margin-left: 18px; }
+    }
+  </style>
+</head>
+
+<body>
+<header data-nav data-active="learn"></header>
+<script src="/assets/nav.js"></script>
+  <main class="container">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="card hero-card">
+          <div class="kicker"><span class="dot"></span> Learn Path • Level System</div>
+          <h1>Go level-by-level. Build calm, repeatable outs.</h1>
+          <p class="lead">
+            Start at Level 1. Don’t “level up” until you can do it at game speed without coach yelling.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn primary" href="#level-1">Start at Level 1</a>
+            <a class="btn" href="/tools.html">Practice plans</a>
+            <a class="btn" href="/blog.html">Browse articles</a>
+          </div>
+
+          <div class="hint">
+            If you coach 11–12U: nail Levels 1–2 early. That’s where most chaos runs are created (or prevented).
+          </div>
+        </div>
+
+        <div class="hero-media">
+          <!-- Optional: use your hero-field image, or swap to any Learn image you like -->
+          <img src="/assets/images/hero-field.png" alt="Youth baseball field" loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <!-- LEVELS -->
+    <section class="path" aria-label="Learning levels">
+
+      <!-- LEVEL 1 -->
+      <div id="level-1" class="card level">
+        <div class="badge">
+          <div>
+            <p class="lvl">Level 1</p>
+            <p class="name">Pre-Pitch IQ</p>
+            <div class="status">✅ Start here</div>
+          </div>
+          <div class="icon">🧠</div>
+        </div>
+        <div>
+          <h2>Know the play before the pitch.</h2>
+          <p>Goal: fewer freezes. Everyone has a job before contact.</p>
+          <ul class="skills">
+            <li>3-question pre-pitch routine</li>
+            <li>Ball / Base / Back-up clarity</li>
+            <li>“Sure out” mindset (no hero throws)</li>
+          </ul>
+          <div class="links">
+            <a class="link-pill" href="/articles/why-decision-making-beats-tools.html">Start Here: Decision-Making Beats Tools</a>
+            <a class="link-pill" href="/articles/think-before-every-pitch-3-question-checklist-youth.html">Think Before Every Pitch (3 Questions)</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL 2 -->
+      <div id="level-2" class="card level">
+        <div class="badge">
+          <div>
+            <p class="lvl">Level 2</p>
+            <p class="name">Sure Outs</p>
+            <div class="status">⭐ Wins innings</div>
+          </div>
+          <div class="icon">✅</div>
+        </div>
+        <div>
+          <h2>Get one clean out. End rallies.</h2>
+          <p>Goal: stop chaos runs by taking the highest-percentage out.</p>
+          <ul class="skills">
+            <li>When to take the easy out</li>
+            <li>Force vs tag reads</li>
+            <li>Smart throws (stop extra bases)</li>
+          </ul>
+          <div class="links">
+            <a class="link-pill" href="/articles/when-not-to-turn-two.html">When NOT to Turn Two</a>
+            <a class="link-pill" href="/blog.html">More coming soon</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL 3 -->
+      <div id="level-3" class="card level">
+        <div class="badge">
+          <div>
+            <p class="lvl">Level 3</p>
+            <p class="name">Infield</p>
+            <div class="status">🧤 Build consistency</div>
+          </div>
+          <div class="icon">🧤</div>
+        </div>
+        <div>
+          <h2>Feet + hands that hold up under pressure.</h2>
+          <p>Goal: cleaner throws because the exchange + footwork are automatic.</p>
+          <ul class="skills">
+            <li>Approach angles + tempo</li>
+            <li>Quick exchange fundamentals</li>
+            <li>Backups as a habit</li>
+          </ul>
+          <div class="links">
+            <a class="link-pill" href="/blog.html">Infield positioning (coming)</a>
+            <a class="link-pill" href="/blog.html">Backups win games (coming)</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL 4 -->
+      <div id="level-4" class="card level">
+        <div class="badge">
+          <div>
+            <p class="lvl">Level 4</p>
+            <p class="name">Outfield</p>
+            <div class="status">🎯 Stop extra bases</div>
+          </div>
+          <div class="icon">🎯</div>
+        </div>
+        <div>
+          <h2>Angles, cutoffs, relays.</h2>
+          <p>Goal: eliminate extra bases and stop the inning from snowballing.</p>
+          <ul class="skills">
+            <li>First step + angle to the ball</li>
+            <li>Cutoff positioning</li>
+            <li>Throw decisions (don’t air-mail)</li>
+          </ul>
+          <div class="links">
+            <a class="link-pill" href="/blog.html">Cuts & relays (coming)</a>
+            <a class="link-pill" href="/blog.html">Outfield reads (coming)</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL 5 -->
+      <div id="level-5" class="card level">
+        <div class="badge">
+          <div>
+            <p class="lvl">Level 5</p>
+            <p class="name">Situations</p>
+            <div class="status">🏁 Coach-proof</div>
+          </div>
+          <div class="icon">🏁</div>
+        </div>
+        <div>
+          <h2>Runner/out decisions that win the inning.</h2>
+          <p>Goal: your team makes the right play without waiting for the coach.</p>
+          <ul class="skills">
+            <li>Runner on 3rd, &lt;2 outs decisions</li>
+            <li>Cutoff priorities</li>
+            <li>Two-out adjustments</li>
+          </ul>
+          <div class="links">
+            <a class="link-pill" href="/articles/when-not-to-turn-two.html">Situational foundation: Turn Two decisions</a>
+            <a class="link-pill" href="/blog.html">Bases loaded tree (coming)</a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © <span id="year"></span> SIX43 • Built for youth baseball (8–14)
+    </div>
+  </footer>
+
+  <script>
+    function toggleMenu(){
+      const el = document.getElementById("menuPanel");
+      el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
