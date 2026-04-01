@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import ThemeProvider from './ThemeProvider'
+import BottomNav from './BottomNav'
 
 export const metadata: Metadata = {
   title: 'Six43',
@@ -13,7 +15,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/* Anti-FOUC: apply stored theme before first paint */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            var t = localStorage.getItem('six43-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+          } catch(e) {}
+        `}} />
+      </head>
+      <body style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
+        <ThemeProvider>
+          {children}
+          <BottomNav />
+        </ThemeProvider>
+      </body>
     </html>
   )
-} 
+}

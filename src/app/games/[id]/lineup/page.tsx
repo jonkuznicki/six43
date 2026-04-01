@@ -1,0 +1,816 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '../../../../lib/supabase'
+import Link from 'next/link'
+import PrintLineupCard from '../PrintLineupCard'
+
+const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
+  P:     { bg: 'rgba(232,160,32,0.25)',   color: '#E8C060' },
+  C:     { bg: 'rgba(192,80,120,0.25)',   color: '#E090B0' },
+  '1B':  { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
+  '2B':  { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
+  SS:    { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
+  '3B':  { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
+  LF:    { bg: 'rgba(45,106,53,0.25)',    color: '#6DB875' },
+  CF:    { bg: 'rgba(45,106,53,0.25)',    color: '#6DB875' },
+  LC:    { bg: 'rgba(45,106,53,0.25)',    color: '#6DB875' },
+  RC:    { bg: 'rgba(45,106,53,0.25)',    color: '#6DB875' },
+  RF:    { bg: 'rgba(45,106,53,0.25)',    color: '#6DB875' },
+  Bench: { bg: 'rgba(100,100,100,0.15)', color: `rgba(var(--fg-rgb), 0.4)` },
+}
+
+export default function LineupBuilder({ params }: { params: { id: string } }) {
+  const supabase = createClient()
+  const [game, setGame] = useState<any>(null)
+  const [slots, setSlots] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editorMode, setEditorMode] = useState<'paint' | 'pick'>('paint')
+  const [activePosition, setActivePosition] = useState<string>('P')
+  const [pickTarget, setPickTarget] = useState<{ slotId: string; inningIndex: number } | null>(null)
+  const [reorderMode, setReorderMode] = useState(false)
+  const [dragSlotId, setDragSlotId] = useState<string | null>(null)
+  const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [showCopyPicker, setShowCopyPicker] = useState(false)
+  const [copyGames, setCopyGames] = useState<any[]>([])
+  const [copyGameId, setCopyGameId] = useState<string>('')
+  const [copyMode, setCopyMode] = useState<'full' | 'order'>('full')
+  const [copying, setCopying] = useState(false)
+  const [teamName, setTeamName] = useState<string | undefined>(undefined)
+  const [teamPositions, setTeamPositions] = useState<string[]>(
+    ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
+  )
+
+  useEffect(() => { loadData() }, [])
+
+  async function loadData() {
+    const { data: gameData } = await supabase
+      .from('games')
+      .select('*, season:seasons(team:teams(name, positions))')
+      .eq('id', params.id).single()
+    setGame(gameData)
+    const team = (gameData as any)?.season?.team
+    if (team?.name) setTeamName(team.name)
+    if (team?.positions?.length) {
+      setTeamPositions(team.positions)
+      setActivePosition(team.positions[0] ?? 'P')
+    }
+
+    const { data: slotData } = await supabase
+      .from('lineup_slots')
+      .select('*, player:players(first_name, last_name, jersey_number)')
+      .eq('game_id', params.id)
+      .order('batting_order', { ascending: true, nullsFirst: false })
+    setSlots(slotData ?? [])
+    setLoading(false)
+  }
+
+  // ── BATTING ORDER ──────────────────────────────────────────
+  async function moveBattingOrder(slotId: string, direction: 'up' | 'down') {
+    const active = slots.filter(s => s.availability !== 'absent')
+    const idx = active.findIndex(s => s.id === slotId)
+    if (direction === 'up' && idx === 0) return
+    if (direction === 'down' && idx === active.length - 1) return
+
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    const reordered = [...active]
+    ;[reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]]
+
+    const updatedActive = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
+    setSlots(prev => [...updatedActive, ...prev.filter(s => s.availability === 'absent')])
+
+    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[swapIdx].id)
+    await supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[idx].id)
+  }
+
+  // ── DRAG & DROP ────────────────────────────────────────────
+  async function handleDrop(e: React.DragEvent, targetSlotId: string) {
+    e.preventDefault()
+    setDragOverSlotId(null)
+    if (!dragSlotId || dragSlotId === targetSlotId) { setDragSlotId(null); return }
+    const activeSlots = slots.filter(s => s.availability !== 'absent')
+    const fromIdx = activeSlots.findIndex(s => s.id === dragSlotId)
+    const toIdx = activeSlots.findIndex(s => s.id === targetSlotId)
+    if (fromIdx === -1 || toIdx === -1) { setDragSlotId(null); return }
+    const reordered = [...activeSlots]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
+    setSlots(prev => [...updated, ...prev.filter(s => s.availability === 'absent')])
+    setDragSlotId(null)
+    for (const s of updated) {
+      await supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id)
+    }
+  }
+
+  // ── AVAILABILITY ───────────────────────────────────────────
+  async function toggleAvailability(slotId: string) {
+    const slot = slots.find(s => s.id === slotId)
+    if (!slot) return
+    const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
+    const newPositions = newAvail === 'absent' ? [null,null,null,null,null,null,null,null,null] : slot.inning_positions
+    setSlots(prev => prev.map(s =>
+      s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPositions } : s
+    ))
+    await supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPositions }).eq('id', slotId)
+  }
+
+  // ── INNINGS COUNT ──────────────────────────────────────────
+  async function changeInnings(delta: number) {
+    const current = game?.innings_played ?? 6
+    const next = Math.min(9, Math.max(6, current + delta))
+    if (next === current) return
+    setGame((g: any) => ({ ...g, innings_played: next }))
+    await supabase.from('games').update({ innings_played: next }).eq('id', params.id)
+  }
+
+  // ── CLEAR LINEUP ───────────────────────────────────────────
+  async function clearGame() {
+    setClearing(true)
+    const blank = [null,null,null,null,null,null,null,null,null]
+    setSlots(prev => prev.map(s => ({ ...s, inning_positions: blank })))
+    for (const slot of slots) {
+      await supabase.from('lineup_slots').update({ inning_positions: blank }).eq('id', slot.id)
+    }
+    setShowClearConfirm(false)
+    setClearing(false)
+  }
+
+  // ── COPY FROM PREVIOUS GAME ───────────────────────────────
+  async function openCopyPicker() {
+    if (!game?.season_id) return
+    const { data } = await supabase
+      .from('games')
+      .select('id, opponent, game_date')
+      .eq('season_id', game.season_id)
+      .neq('id', params.id)
+      .order('game_date', { ascending: false })
+    const games = data ?? []
+    setCopyGames(games)
+    setCopyGameId(games[0]?.id ?? '')
+    setCopyMode('full')
+    setShowCopyPicker(true)
+  }
+
+  async function doCopy() {
+    if (!copyGameId) return
+    setCopying(true)
+
+    const { data: sourceSlots } = await supabase
+      .from('lineup_slots')
+      .select('player_id, batting_order, inning_positions, availability')
+      .eq('game_id', copyGameId)
+
+    if (!sourceSlots || sourceSlots.length === 0) { setCopying(false); return }
+
+    const sourceByPlayer = new Map(sourceSlots.map((s: any) => [s.player_id, s]))
+    const blank = [null,null,null,null,null,null,null,null,null]
+
+    // Build updated slots — only touch players present in both games
+    const updates = slots
+      .filter(s => s.availability !== 'absent' && sourceByPlayer.has(s.player_id))
+      .map(s => {
+        const src = sourceByPlayer.get(s.player_id)
+        return {
+          id: s.id,
+          batting_order: src.batting_order,
+          inning_positions: copyMode === 'full' ? src.inning_positions : blank,
+        }
+      })
+
+    // Optimistic update
+    setSlots(prev => {
+      const updateMap = new Map(updates.map(u => [u.id, u]))
+      const updated = prev.map(s => updateMap.has(s.id)
+        ? { ...s, ...updateMap.get(s.id) }
+        : s
+      )
+      // Re-sort active slots by new batting_order
+      const active = updated
+        .filter(s => s.availability !== 'absent')
+        .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
+      return [...active, ...updated.filter(s => s.availability === 'absent')]
+    })
+
+    // Persist
+    await Promise.all(updates.map(u =>
+      supabase.from('lineup_slots').update({
+        batting_order: u.batting_order,
+        inning_positions: u.inning_positions,
+      }).eq('id', u.id)
+    ))
+
+    setCopying(false)
+    setShowCopyPicker(false)
+  }
+
+  // ── ASSIGN POSITION (shared by both modes) ─────────────────
+  async function assignPosition(slotId: string, inningIndex: number, newPos: string | null) {
+    const slot = slots.find(s => s.id === slotId)
+    if (!slot) return
+
+    setSlots(prev => {
+      const next = prev.map(s => ({ ...s, inning_positions: [...s.inning_positions] }))
+      if (newPos && newPos !== 'Bench') {
+        const holder = next.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
+        if (holder) holder.inning_positions[inningIndex] = 'Bench'
+      }
+      const me = next.find(s => s.id === slotId)
+      if (me) me.inning_positions[inningIndex] = newPos
+      return next
+    })
+
+    const updatedPositions = [...slot.inning_positions]
+    updatedPositions[inningIndex] = newPos
+    await supabase.from('lineup_slots').update({ inning_positions: updatedPositions }).eq('id', slotId)
+
+    if (newPos && newPos !== 'Bench') {
+      const holder = slots.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
+      if (holder) {
+        const holderUpdated = [...holder.inning_positions]
+        holderUpdated[inningIndex] = 'Bench'
+        await supabase.from('lineup_slots').update({ inning_positions: holderUpdated }).eq('id', holder.id)
+      }
+    }
+  }
+
+  // ── PAINT CELL (paint mode: toggle active position) ────────
+  function paintCell(slotId: string, inningIndex: number) {
+    const slot = slots.find(s => s.id === slotId)
+    if (!slot) return
+    const currentPos = slot.inning_positions[inningIndex]
+    const newPos: string | null = currentPos === activePosition ? null : activePosition
+    return assignPosition(slotId, inningIndex, newPos)
+  }
+
+  function getInningCounts(inningIndex: number) {
+    const counts: Record<string, number> = {}
+    for (const slot of slots) {
+      if (slot.availability === 'absent') continue
+      const pos = slot.inning_positions[inningIndex]
+      if (pos) counts[pos] = (counts[pos] || 0) + 1
+    }
+    return counts
+  }
+
+  function isInningValid(inningIndex: number) {
+    const counts = getInningCounts(inningIndex)
+    return teamPositions.filter(p => p !== 'Bench').every(p => counts[p] === 1)
+  }
+
+  if (loading) return (
+    <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
+      fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      Loading...
+    </main>
+  )
+
+  const activeSlots = slots.filter(s => s.availability !== 'absent')
+  const absentSlots = slots.filter(s => s.availability === 'absent')
+  const inningCount = game?.innings_played ?? 6
+  const innings = Array.from({ length: inningCount }, (_, i) => i)
+
+  function isPositionComplete(pos: string) {
+    if (pos === 'Bench') return false
+    return innings.every(i => activeSlots.some(s => s.inning_positions[i] === pos))
+  }
+  const COL_NUM = 28
+  const COL_NAME = 104
+  const COL_INN = 40
+  const COL_STATUS = 24
+  const reorderWidth = reorderMode ? 56 : 0
+
+  return (
+    <>
+      <style>{`
+        .print-sheet { display: none; }
+        @media print {
+          .screen-only { display: none !important; }
+          .print-sheet { display: block !important; }
+          @page { size: letter portrait; margin: 0.3in 0.35in; }
+          body { background: white !important; }
+        }
+      `}</style>
+
+      {/* Print sheet */}
+      <div className="print-sheet">
+        <PrintLineupCard
+          game={game}
+          activeSlots={activeSlots}
+          innings={innings}
+          teamName={teamName}
+        />
+      </div>
+
+      <main className="screen-only" style={{
+        minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
+        fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto', paddingBottom: '6rem',
+      }}>
+
+        {/* ── HEADER ── */}
+        <div style={{ padding: '1rem 1rem 0' }}>
+          <Link href={`/games/${params.id}`} style={{
+            fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+            textDecoration: 'none', display: 'block', marginBottom: '0.75rem',
+          }}>
+            ‹ vs {game?.opponent}
+          </Link>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Lineup builder</h1>
+            <Link href={`/games/${params.id}`} style={{
+              padding: '8px 16px', borderRadius: '6px',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              fontSize: '13px', fontWeight: 700, textDecoration: 'none',
+            }}>
+              Done
+            </Link>
+          </div>
+
+          {/* Toolbar */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', border: '0.5px solid var(--border-strong)',
+              borderRadius: '4px', overflow: 'hidden' }}>
+              {(['paint', 'pick'] as const).map(mode => (
+                <button key={mode} onClick={() => setEditorMode(mode)} style={{
+                  fontSize: '11px', padding: '5px 11px', border: 'none', cursor: 'pointer',
+                  background: editorMode === mode ? 'rgba(59,109,177,0.2)' : 'transparent',
+                  color: editorMode === mode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.5)`,
+                  fontWeight: editorMode === mode ? 700 : 500,
+                }}>
+                  {mode === 'paint' ? '🖌 Paint' : '☝ Pick'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setReorderMode(m => !m) }}
+              style={{
+                fontSize: '11px', padding: '5px 10px', borderRadius: '4px',
+                border: '0.5px solid var(--border-strong)',
+                background: reorderMode ? 'rgba(59,109,177,0.2)' : 'transparent',
+                color: reorderMode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.5)`,
+                cursor: 'pointer',
+              }}>
+              {reorderMode ? '✓ Done reordering' : '↕ Batting order'}
+            </button>
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              style={{
+                fontSize: '11px', padding: '5px 10px', borderRadius: '4px',
+                border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
+                color: 'rgba(232,100,80,0.7)', cursor: 'pointer',
+              }}>
+              Clear
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center',
+              border: '0.5px solid var(--border-strong)', borderRadius: '4px', overflow: 'hidden' }}>
+              <button onClick={() => changeInnings(-1)} disabled={(game?.innings_played ?? 6) <= 6}
+                style={{ fontSize: '13px', padding: '4px 8px', border: 'none',
+                  background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+                  opacity: (game?.innings_played ?? 6) <= 6 ? 0.3 : 1 }}>−</button>
+              <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.6)`,
+                padding: '0 4px', userSelect: 'none' }}>{inningCount} inn</span>
+              <button onClick={() => changeInnings(1)} disabled={(game?.innings_played ?? 6) >= 9}
+                style={{ fontSize: '13px', padding: '4px 8px', border: 'none',
+                  background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+                  opacity: (game?.innings_played ?? 6) >= 9 ? 0.3 : 1 }}>+</button>
+            </div>
+            <button
+              onClick={openCopyPicker}
+              style={{
+                fontSize: '11px', padding: '5px 10px', borderRadius: '4px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+              }}>
+              ⎘ Copy previous
+            </button>
+            <button
+              onClick={() => window.print()}
+              style={{
+                fontSize: '11px', padding: '5px 10px', borderRadius: '4px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+              }}>
+              🖨 Print
+            </button>
+          </div>
+        </div>
+
+        {/* ── POSITION PALETTE (sticky, paint mode only) ── */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 20,
+          display: editorMode === 'paint' ? 'flex' : 'none',
+          background: 'var(--bg)',
+          borderBottom: '0.5px solid var(--border-subtle)',
+          padding: '8px 1rem 10px',
+          display: 'flex', gap: '6px', overflowX: 'auto',
+        }}>
+          {teamPositions.map(pos => {
+            const c = POSITION_COLORS[pos] ?? POSITION_COLORS.Bench
+            const isActive = activePosition === pos
+            const complete = isPositionComplete(pos)
+            return (
+              <button key={pos} onClick={() => setActivePosition(pos)} style={{
+                flexShrink: 0,
+                padding: '5px 9px', borderRadius: '6px', cursor: 'pointer',
+                background: isActive ? c.bg : complete ? 'transparent' : `${c.bg.replace('0.25', '0.12')}`,
+                border: isActive
+                  ? `1.5px solid ${c.color}`
+                  : complete
+                    ? '0.5px solid var(--border-subtle)'
+                    : `0.5px solid ${c.color}88`,
+                color: isActive ? c.color : complete ? `rgba(var(--fg-rgb), 0.3)` : c.color,
+                fontSize: '11px', fontWeight: isActive ? 700 : 600,
+                transition: 'all 0.1s',
+                gap: '3px', display: 'flex', alignItems: 'center',
+              }}>
+                {pos === 'Bench' ? 'Bench' : pos}
+                {complete && (
+                  <span style={{ fontSize: '9px', color: isActive ? c.color : '#6DB875' }}>✓</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── GRID ── */}
+        <div style={{ padding: '8px 1rem 1.5rem', overflowX: 'auto' }}>
+
+          {/* Column headers */}
+          <div style={{
+            display: 'flex', alignItems: 'center', marginBottom: '4px',
+            minWidth: `${reorderWidth + COL_NUM + COL_NAME + COL_INN * inningCount + COL_STATUS}px`,
+          }}>
+            {reorderMode && <div style={{ width: reorderWidth, flexShrink: 0 }} />}
+            <div style={{ width: COL_NUM, flexShrink: 0 }} />
+            <div style={{ width: COL_NAME, flexShrink: 0, fontSize: '10px',
+              color: `rgba(var(--fg-rgb), 0.35)`, paddingLeft: '4px' }}>Player</div>
+            {innings.map(i => (
+              <div key={i} style={{ width: COL_INN, flexShrink: 0, textAlign: 'center',
+                fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)` }}>
+                {i + 1}
+              </div>
+            ))}
+            <div style={{ width: COL_STATUS, flexShrink: 0 }} />
+          </div>
+
+          {/* Player rows */}
+          {activeSlots.map((slot, rowIdx) => {
+            const player = slot.player as any
+            const isDragging = dragSlotId === slot.id
+            const isDragOver = dragOverSlotId === slot.id
+            return (
+              <div
+                key={slot.id}
+                draggable={reorderMode}
+                onDragStart={() => setDragSlotId(slot.id)}
+                onDragOver={e => { e.preventDefault(); setDragOverSlotId(slot.id) }}
+                onDrop={e => handleDrop(e, slot.id)}
+                onDragEnd={() => { setDragSlotId(null); setDragOverSlotId(null) }}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  minWidth: `${reorderWidth + COL_NUM + COL_NAME + COL_INN * inningCount + COL_STATUS}px`,
+                  background: isDragOver ? 'rgba(232,160,32,0.12)'
+                    : rowIdx % 2 === 0 ? 'var(--bg-card-alt)' : 'transparent',
+                  borderRadius: '4px', marginBottom: '2px',
+                  opacity: isDragging ? 0.4 : 1,
+                  border: isDragOver ? '0.5px solid rgba(232,160,32,0.4)' : 'none',
+                  cursor: reorderMode ? 'grab' : 'default',
+                }}>
+
+                {/* Reorder controls */}
+                {reorderMode && (
+                  <div style={{ width: reorderWidth, flexShrink: 0, display: 'flex',
+                    alignItems: 'center', gap: '2px', paddingLeft: '4px' }}>
+                    <button onClick={() => moveBattingOrder(slot.id, 'up')}
+                      style={{ width: '22px', height: '22px', borderRadius: '3px',
+                        border: '0.5px solid var(--border-md)', background: 'transparent',
+                        color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↑</button>
+                    <button onClick={() => moveBattingOrder(slot.id, 'down')}
+                      style={{ width: '22px', height: '22px', borderRadius: '3px',
+                        border: '0.5px solid var(--border-md)', background: 'transparent',
+                        color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↓</button>
+                  </div>
+                )}
+
+                <div style={{ width: COL_NUM, flexShrink: 0, fontSize: '11px',
+                  color: `rgba(var(--fg-rgb), 0.3)`, paddingLeft: '4px' }}>
+                  {player?.jersey_number}
+                </div>
+
+                {/* Player name + absent button */}
+                <div style={{ width: COL_NAME, flexShrink: 0, display: 'flex',
+                  alignItems: 'center', gap: '4px', paddingLeft: '4px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--fg)', whiteSpace: 'nowrap', flex: 1 }}>
+                    {player?.first_name[0]}. {player?.last_name}
+                  </span>
+                  <button
+                    onClick={() => toggleAvailability(slot.id)}
+                    title="Remove from lineup"
+                    style={{
+                      width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                      border: '0.5px solid var(--border-strong)', background: 'transparent',
+                      color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '9px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>–</button>
+                </div>
+
+                {/* Inning cells */}
+                {innings.map(i => {
+                  const pos = slot.inning_positions[i]
+                  const c = pos ? (POSITION_COLORS[pos] ?? POSITION_COLORS.Bench) : null
+                  const isActivePosHere = editorMode === 'paint' && pos === activePosition
+                  const isPickSelected = editorMode === 'pick'
+                    && pickTarget?.slotId === slot.id && pickTarget?.inningIndex === i
+                  return (
+                    <div key={i} style={{ width: COL_INN, flexShrink: 0,
+                      display: 'flex', justifyContent: 'center', padding: '3px 0' }}>
+                      <button
+                        onClick={() => {
+                          if (editorMode === 'pick') {
+                            setPickTarget({ slotId: slot.id, inningIndex: i })
+                          } else {
+                            paintCell(slot.id, i)
+                          }
+                        }}
+                        style={{
+                          width: '34px', height: '26px', borderRadius: '4px',
+                          border: isPickSelected
+                            ? '1.5px solid #80B0E8'
+                            : isActivePosHere
+                              ? `1.5px solid ${c!.color}`
+                              : pos ? `0.5px solid ${c!.color}55` : '0.5px dashed var(--border-md)',
+                          background: isPickSelected ? 'rgba(59,109,177,0.2)' : pos ? c!.bg : 'transparent',
+                          color: isPickSelected ? '#80B0E8' : pos ? c!.color : `rgba(var(--fg-rgb), 0.15)`,
+                          fontSize: '10px', fontWeight: 700,
+                          cursor: 'pointer', padding: 0,
+                          transition: 'all 0.08s',
+                        }}>
+                        {pos === 'Bench' ? 'B' : (pos ?? '·')}
+                      </button>
+                    </div>
+                  )
+                })}
+
+                {/* Per-player status */}
+                {(() => {
+                  const allFilled = innings.every(i => slot.inning_positions[i] != null)
+                  return (
+                    <div style={{ width: COL_STATUS, flexShrink: 0, textAlign: 'center',
+                      fontSize: '13px', color: allFilled ? '#6DB875' : 'transparent',
+                      userSelect: 'none' }}>
+                      ✓
+                    </div>
+                  )
+                })()}
+              </div>
+            )
+          })}
+
+          {/* Absent players */}
+          {absentSlots.length > 0 && (
+            <div style={{ marginTop: '16px', borderTop: '0.5px solid var(--border-subtle)', paddingTop: '10px' }}>
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginBottom: '6px',
+                paddingLeft: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Out of lineup
+              </div>
+              {absentSlots.map(slot => {
+                const player = slot.player as any
+                return (
+                  <div key={slot.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '5px 8px',
+                    background: 'rgba(192,57,43,0.06)',
+                    border: '0.5px solid rgba(192,57,43,0.15)',
+                    borderRadius: '4px', marginBottom: '2px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.25)`, width: COL_NUM }}>
+                        {player?.jersey_number}
+                      </span>
+                      <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`,
+                        textDecoration: 'line-through' }}>
+                        {player?.first_name[0]}. {player?.last_name}
+                      </span>
+                    </div>
+                    <button onClick={() => toggleAvailability(slot.id)}
+                      style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '3px',
+                        border: '0.5px solid var(--border-md)', background: 'transparent',
+                        color: `rgba(var(--fg-rgb), 0.4)`, cursor: 'pointer' }}>
+                      restore
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Validation row */}
+          <div style={{
+            display: 'flex', alignItems: 'center', marginTop: '8px',
+            minWidth: `${reorderWidth + COL_NUM + COL_NAME + COL_INN * inningCount + COL_STATUS}px`,
+            borderTop: '0.5px solid var(--border-subtle)', paddingTop: '6px',
+          }}>
+            {reorderMode && <div style={{ width: reorderWidth, flexShrink: 0 }} />}
+            <div style={{ width: COL_NUM, flexShrink: 0 }} />
+            <div style={{ width: COL_NAME, flexShrink: 0, fontSize: '10px',
+              color: `rgba(var(--fg-rgb), 0.3)`, paddingLeft: '4px' }}></div>
+            {innings.map(i => (
+              <div key={i} style={{ width: COL_INN, flexShrink: 0, textAlign: 'center',
+                fontSize: '13px', color: isInningValid(i) ? '#6DB875' : `rgba(var(--fg-rgb), 0.2)` }}>
+                {isInningValid(i) ? '✓' : '·'}
+              </div>
+            ))}
+            <div style={{ width: COL_STATUS, flexShrink: 0 }} />
+          </div>
+        </div>
+
+        {/* ── COPY PREVIOUS GAME ── */}
+        {showCopyPicker && (
+          <div onClick={() => setShowCopyPicker(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+              padding: '1.25rem 1rem 2rem', width: '100%', maxWidth: '480px',
+              border: '0.5px solid var(--border)', maxHeight: '90vh', overflowY: 'auto',
+            }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>Copy previous game</div>
+              <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.25rem' }}>
+                Players not on the current roster will be skipped.
+              </div>
+
+              {copyGames.length === 0 ? (
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.25rem' }}>
+                  No previous games found for this season.
+                </div>
+              ) : (
+                <>
+                  {/* Game picker */}
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>Game</div>
+                  <select
+                    value={copyGameId}
+                    onChange={e => setCopyGameId(e.target.value)}
+                    style={{
+                      width: '100%', padding: '9px 10px', borderRadius: '6px',
+                      border: '0.5px solid var(--border-md)',
+                      background: 'var(--bg-input)', color: 'var(--fg)',
+                      fontSize: '14px', marginBottom: '1.25rem',
+                    }}
+                  >
+                    {copyGames.map(g => {
+                      const date = new Date(g.game_date + 'T12:00:00').toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric',
+                      })
+                      return (
+                        <option key={g.id} value={g.id}>vs {g.opponent} · {date}</option>
+                      )
+                    })}
+                  </select>
+
+                  {/* Copy mode */}
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '8px' }}>What to copy</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
+                    {([
+                      { value: 'full',  label: 'Full lineup',    desc: 'Batting order + all position assignments' },
+                      { value: 'order', label: 'Batting order only', desc: 'Keep the same batting order, clear all positions' },
+                    ] as const).map(opt => (
+                      <button key={opt.value} onClick={() => setCopyMode(opt.value)} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '10px',
+                        padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
+                        border: copyMode === opt.value ? '1.5px solid var(--accent)' : '0.5px solid var(--border-md)',
+                        background: copyMode === opt.value ? 'rgba(59,109,177,0.1)' : 'transparent',
+                      }}>
+                        <div style={{
+                          width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, marginTop: '1px',
+                          border: copyMode === opt.value ? '4px solid var(--accent)' : '1.5px solid var(--border-strong)',
+                          background: 'transparent',
+                        }} />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }}>{opt.label}</div>
+                          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginTop: '2px' }}>{opt.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowCopyPicker(false)} style={{
+                  flex: 1, padding: '11px', borderRadius: '6px',
+                  border: '0.5px solid var(--border-strong)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.6)`, fontSize: '13px', cursor: 'pointer',
+                }}>Cancel</button>
+                {copyGames.length > 0 && (
+                  <button onClick={doCopy} disabled={copying} style={{
+                    flex: 2, padding: '11px', borderRadius: '6px', border: 'none',
+                    background: 'var(--accent)', color: 'var(--accent-text)',
+                    fontSize: '13px', fontWeight: 700,
+                    cursor: copying ? 'not-allowed' : 'pointer', opacity: copying ? 0.7 : 1,
+                  }}>{copying ? 'Copying…' : 'Apply'}</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── POSITION PICKER (pick mode) ── */}
+        {pickTarget && (
+          <div onClick={() => setPickTarget(null)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+              padding: '1.25rem 1rem 2rem', width: '100%', maxWidth: '480px',
+              border: '0.5px solid var(--border)',
+            }}>
+              <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '14px' }}>
+                Pick position
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                {teamPositions.filter(p => p !== 'Bench').map(pos => {
+                  const c = POSITION_COLORS[pos] ?? POSITION_COLORS.Bench
+                  const currentPos = slots.find(s => s.id === pickTarget.slotId)?.inning_positions[pickTarget.inningIndex]
+                  const isCurrent = currentPos === pos
+                  return (
+                    <button key={pos} onClick={() => {
+                      assignPosition(pickTarget.slotId, pickTarget.inningIndex, isCurrent ? null : pos)
+                      setPickTarget(null)
+                    }} style={{
+                      padding: '9px 16px', borderRadius: '8px', cursor: 'pointer',
+                      border: isCurrent ? `1.5px solid ${c.color}` : `0.5px solid ${c.color}55`,
+                      background: isCurrent ? c.bg : 'transparent',
+                      color: c.color, fontSize: '14px', fontWeight: 700,
+                    }}>
+                      {pos}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => {
+                  assignPosition(pickTarget.slotId, pickTarget.inningIndex, 'Bench')
+                  setPickTarget(null)
+                }} style={{
+                  flex: 1, padding: '10px', borderRadius: '6px', cursor: 'pointer',
+                  border: '0.5px solid var(--border-md)', background: POSITION_COLORS.Bench.bg,
+                  color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '13px',
+                }}>
+                  Bench
+                </button>
+                <button onClick={() => {
+                  assignPosition(pickTarget.slotId, pickTarget.inningIndex, null)
+                  setPickTarget(null)
+                }} style={{
+                  flex: 1, padding: '10px', borderRadius: '6px', cursor: 'pointer',
+                  border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
+                  color: 'rgba(232,100,80,0.7)', fontSize: '13px',
+                }}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CLEAR CONFIRM ── */}
+        {showClearConfirm && (
+          <div onClick={() => setShowClearConfirm(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: 'var(--bg2)', borderRadius: '12px', padding: '1.5rem',
+              width: '280px', border: '0.5px solid rgba(192,57,43,0.3)',
+            }}>
+              <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Clear lineup?</div>
+              <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '1.5rem' }}>
+                All position assignments will be removed.
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowClearConfirm(false)} style={{
+                  flex: 1, padding: '10px', borderRadius: '6px',
+                  border: '0.5px solid var(--border-strong)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.6)`, fontSize: '13px', cursor: 'pointer',
+                }}>Cancel</button>
+                <button onClick={clearGame} disabled={clearing} style={{
+                  flex: 1, padding: '10px', borderRadius: '6px', border: 'none',
+                  background: '#C0392B', color: 'white', fontSize: '13px', fontWeight: 600,
+                  cursor: clearing ? 'not-allowed' : 'pointer', opacity: clearing ? 0.7 : 1,
+                }}>{clearing ? 'Clearing…' : 'Clear'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </>
+  )
+}
