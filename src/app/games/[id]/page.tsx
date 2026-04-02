@@ -194,6 +194,15 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </div>
           </Link>
 
+          {game.status === 'lineup_ready' && (
+            <div style={{
+              background: 'rgba(59,109,177,0.12)', border: '0.5px solid rgba(59,109,177,0.3)',
+              color: '#80B0E8', borderRadius: '8px', padding: '12px 16px',
+              textAlign: 'center', fontSize: '13px',
+            }}>
+              Lineup Ready
+            </div>
+          )}
           {game.status === 'final' && (
             <div style={{
               background: 'rgba(45,106,53,0.15)', border: '0.5px solid rgba(45,106,53,0.3)',

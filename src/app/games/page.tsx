@@ -47,7 +47,7 @@ export default async function GamesPage({
     .eq('status', 'active') : { count: 0 }
 
   const upcoming = (games ?? []).filter(g =>
-    g.status === 'scheduled' || g.status === 'in_progress'
+    g.status === 'scheduled' || g.status === 'lineup_ready' || g.status === 'in_progress'
   )
   const recent = (games ?? []).filter(g => g.status === 'final')
   const teamName = selectedTeam?.name ?? 'Us'

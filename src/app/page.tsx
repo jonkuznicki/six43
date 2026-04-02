@@ -2,19 +2,24 @@ import Link from 'next/link'
 
 const FEATURES = [
   {
-    icon: '⚾',
-    title: 'Inning-by-inning lineup builder',
-    body: 'Assign every player a position for every inning in a single view. Use paint mode to fill the lineup fast, reorder the batting lineup with a drag, and print a clean card to bring to the field.',
+    icon: '⚡',
+    title: 'Build a lineup in minutes',
+    body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper — just tap a position, tap the cells, and your lineup is done.',
   },
   {
-    icon: '📊',
-    title: "Playing time that's actually fair",
-    body: 'Track bench percentage, infield innings, catcher time, and total innings for every player across the season. Set per-player targets and get alerts before a kid sits too many innings in a row.',
+    icon: '📋',
+    title: 'Everything in one place',
+    body: 'Roster, schedule, lineup, score, and notes — all connected. Create a game, mark attendance, build the lineup, and print a card to bring to the field.',
   },
   {
     icon: '🔗',
-    title: 'Share with parents. Coach with your staff.',
-    body: 'Generate a read-only link so parents can follow the lineup without logging in. Invite assistant coaches so your whole staff is working from the same page.',
+    title: 'Share instantly with parents',
+    body: "Generate a read-only link after you set the lineup. Parents can see where their kid is playing each inning — no app download, no login required.",
+  },
+  {
+    icon: '📊',
+    title: 'Playing time that adds up fairly',
+    body: 'See bench %, innings by position, and season totals for every player. Set targets and get a heads-up before a kid has been sitting too long.',
   },
 ]
 
@@ -75,18 +80,18 @@ export default function HomePage() {
           letterSpacing: '-0.02em',
           marginBottom: '1.25rem',
         }}>
-          Build fair lineups.<br />
-          <span style={{ color: 'var(--accent)' }}>Every game.</span>
+          Lineups done before<br />
+          <span style={{ color: 'var(--accent)' }}>you leave the car.</span>
         </h1>
 
         <p style={{
           fontSize: '17px',
           lineHeight: 1.6,
           color: `rgba(var(--fg-rgb), 0.6)`,
-          maxWidth: '480px',
+          maxWidth: '460px',
           margin: '0 auto 2.5rem',
         }}>
-          Six43 gives youth baseball coaches a smarter way to manage lineups and track playing time — so every kid on your roster gets their fair share of innings.
+          Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and share with parents — all from your phone.
         </p>
 
         <Link href="/login" style={{
@@ -117,7 +122,7 @@ export default function HomePage() {
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.3)`,
           marginBottom: '4px', textAlign: 'center',
         }}>
-          Everything you need on game day
+          Built for game day
         </div>
 
         {FEATURES.map(f => (
@@ -248,7 +253,7 @@ export default function HomePage() {
           padding: '2.5rem 1.5rem',
         }}>
           <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px' }}>
-            Ready to run a tighter bench?
+            Ready to simplify game day?
           </div>
           <div style={{
             fontSize: '14px', color: `rgba(var(--fg-rgb), 0.55)`,
