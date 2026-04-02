@@ -52,6 +52,9 @@ export default function RosterPage() {
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [reorderMode, setReorderMode] = useState(false)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => { loadRoster() }, [])
 
@@ -109,7 +112,7 @@ export default function RosterPage() {
         .from('players')
         .select('*')
         .eq('season_id', resolvedSeasonId)
-        .order('jersey_number', { ascending: true })
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
       setPlayers(data ?? [])
     }
     setLoading(false)
@@ -193,6 +196,25 @@ export default function RosterPage() {
     setDeleting(false)
   }
 
+  async function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); return }
+    const active = players.filter(p => p.status === 'active')
+    const fromIdx = active.findIndex(p => p.id === dragId)
+    const toIdx = active.findIndex(p => p.id === targetId)
+    if (fromIdx < 0 || toIdx < 0) { setDragId(null); return }
+    const reordered = [...active]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    const updated = reordered.map((p, i) => ({ ...p, batting_pref_order: i + 1 }))
+    const inactive = players.filter(p => p.status !== 'active')
+    setPlayers([...updated, ...inactive])
+    setDragId(null)
+    setDragOverId(null)
+    await Promise.all(updated.map((p, i) =>
+      supabase.from('players').update({ batting_pref_order: i + 1 }).eq('id', p.id)
+    ))
+  }
+
   const active = players.filter(p => p.status === 'active')
   const inactive = players.filter(p => p.status !== 'active')
 
@@ -223,11 +245,21 @@ export default function RosterPage() {
             </div>
           )}
         </div>
-        <button onClick={openAdd} disabled={!seasonId} style={{
-          fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
-          border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',
-          color: seasonId ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
-        }}>+ Add player</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {active.length > 1 && (
+            <button onClick={() => setReorderMode(m => !m)} style={{
+              fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
+              border: '0.5px solid var(--border-md)',
+              background: reorderMode ? 'rgba(59,109,177,0.15)' : 'var(--bg-card)',
+              color: reorderMode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.6)`, cursor: 'pointer',
+            }}>{reorderMode ? '✓ Done' : '↕ Order'}</button>
+          )}
+          <button onClick={openAdd} disabled={!seasonId} style={{
+            fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
+            border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',
+            color: seasonId ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
+          }}>+ Add player</button>
+        </div>
       </div>
 
       {!seasonId && (
@@ -242,10 +274,32 @@ export default function RosterPage() {
         <section style={{ marginBottom: '2rem' }}>
           <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
             letterSpacing: '0.08em', marginBottom: '8px' }}>
-            Active · {active.length}
+            {reorderMode ? 'Drag to set batting order' : `Active · ${active.length}`}
           </div>
-          {active.map(player => (
-            <PlayerRow key={player.id} player={player} onEdit={openEdit} onDelete={setDeleteConfirm} />
+          {active.map((player, idx) => (
+            <div
+              key={player.id}
+              draggable={reorderMode}
+              onDragStart={() => setDragId(player.id)}
+              onDragOver={e => { e.preventDefault(); setDragOverId(player.id) }}
+              onDrop={() => handleDrop(player.id)}
+              onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+              style={{
+                opacity: dragId === player.id ? 0.4 : 1,
+                outline: dragOverId === player.id && dragId !== player.id
+                  ? '2px solid var(--accent)' : 'none',
+                borderRadius: '8px',
+                cursor: reorderMode ? 'grab' : 'default',
+              }}
+            >
+              <PlayerRow
+                player={player}
+                onEdit={reorderMode ? () => {} : openEdit}
+                onDelete={setDeleteConfirm}
+                reorderMode={reorderMode}
+                order={idx + 1}
+              />
+            </div>
           ))}
         </section>
       )}
@@ -385,10 +439,12 @@ export default function RosterPage() {
   )
 }
 
-function PlayerRow({ player, onEdit, onDelete }: {
+function PlayerRow({ player, onEdit, onDelete, reorderMode, order }: {
   player: any
   onEdit: (p: any) => void
   onDelete: (id: string) => void
+  reorderMode?: boolean
+  order?: number
 }) {
   const statusStyle = STATUS_STYLES[player.status] ?? STATUS_STYLES.inactive
   return (
@@ -400,27 +456,40 @@ function PlayerRow({ player, onEdit, onDelete }: {
       borderRadius: '8px', marginBottom: '4px',
       opacity: player.status === 'inactive' ? 0.6 : 1,
     }}>
-      <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, width: '24px',
-        textAlign: 'center', flexShrink: 0 }}>
-        {player.jersey_number}
-      </span>
+      {reorderMode ? (
+        <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, width: '24px',
+          textAlign: 'center', flexShrink: 0, userSelect: 'none' }}>
+          {order}
+        </span>
+      ) : (
+        <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, width: '24px',
+          textAlign: 'center', flexShrink: 0 }}>
+          {player.jersey_number}
+        </span>
+      )}
       <span style={{ fontSize: '14px', fontWeight: 500, flex: 1 }}>
         {player.first_name} {player.last_name}
       </span>
-      <PosChip pos={player.primary_position} />
-      {player.innings_target != null && (
+      {!reorderMode && <PosChip pos={player.primary_position} />}
+      {!reorderMode && player.innings_target != null && (
         <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)`, flexShrink: 0 }}>
           {player.innings_target} inn min
         </span>
       )}
-      <span style={{ fontSize: '11px', color: statusStyle.color, flexShrink: 0 }}>
-        {player.status !== 'active' ? statusStyle.label : ''}
-      </span>
-      <button onClick={() => onEdit(player)} style={{
-        fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
-        border: '0.5px solid var(--border-md)', background: 'transparent',
-        color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', flexShrink: 0,
-      }}>Edit</button>
+      {!reorderMode && (
+        <span style={{ fontSize: '11px', color: statusStyle.color, flexShrink: 0 }}>
+          {player.status !== 'active' ? statusStyle.label : ''}
+        </span>
+      )}
+      {reorderMode ? (
+        <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.2)`, flexShrink: 0 }}>⠿</span>
+      ) : (
+        <button onClick={() => onEdit(player)} style={{
+          fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+          border: '0.5px solid var(--border-md)', background: 'transparent',
+          color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', flexShrink: 0,
+        }}>Edit</button>
+      )}
     </div>
   )
 }

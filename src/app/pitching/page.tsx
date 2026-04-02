@@ -17,6 +17,17 @@ function shortName(player: any) {
   return `${player.first_name[0]}. ${player.last_name}`
 }
 
+function daysRest(gameDate: string | undefined): string {
+  if (!gameDate) return ''
+  const last = new Date(gameDate + 'T12:00:00')
+  const today = new Date()
+  today.setHours(12, 0, 0, 0)
+  const days = Math.round((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+  if (days === 0) return ' · today'
+  if (days === 1) return ' · 1d rest'
+  return ` · ${days}d rest`
+}
+
 const GRID = '140px repeat(4, 1fr)'
 const HEADER_STYLE: React.CSSProperties = {
   fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
@@ -40,6 +51,7 @@ export default function PitchingPage() {
   const [finalized, setFinalized] = useState<any[]>([])
   const [plans, setPlans] = useState<Record<string, Record<number, PlanSlot>>>({})
   const [actualPitching, setActualPitching] = useState<Record<string, { player: any; innings: number }[]>>({})
+  const [lastPitched, setLastPitched] = useState<Record<string, string>>({}) // player_id → game_date
   const [saving, setSaving] = useState<string | null>(null)
 
   useEffect(() => { init() }, [])
@@ -108,6 +120,7 @@ export default function PitchingPage() {
         .select('game_id, player_id, inning_positions, availability, player:players(first_name, last_name, jersey_number)')
         .in('game_id', finalizedIds)
       const actualMap: Record<string, { player: any; innings: number }[]> = {}
+      const lastPitchedMap: Record<string, string> = {}
       for (const slot of slotRows ?? []) {
         if (slot.availability === 'absent') continue
         const game = finalizedGames.find((g: any) => g.id === slot.game_id)
@@ -118,12 +131,17 @@ export default function PitchingPage() {
         if (innings > 0) {
           if (!actualMap[slot.game_id]) actualMap[slot.game_id] = []
           actualMap[slot.game_id].push({ player: slot.player, innings })
+          // Track most recent game date pitched per player
+          if (!lastPitchedMap[slot.player_id] || game.game_date > lastPitchedMap[slot.player_id]) {
+            lastPitchedMap[slot.player_id] = game.game_date
+          }
         }
       }
       for (const id of Object.keys(actualMap)) {
         actualMap[id].sort((a, b) => b.innings - a.innings)
       }
       setActualPitching(actualMap)
+      setLastPitched(lastPitchedMap)
     }
     setLoading(false)
   }
@@ -269,7 +287,7 @@ export default function PitchingPage() {
                             <option value="">—</option>
                             {players.map(p => (
                               <option key={p.id} value={p.id}>
-                                #{p.jersey_number} {p.last_name}
+                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id])}
                               </option>
                             ))}
                           </select>
