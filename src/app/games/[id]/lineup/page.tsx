@@ -31,6 +31,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [reorderMode, setReorderMode] = useState(false)
   const [dragSlotId, setDragSlotId] = useState<string | null>(null)
   const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
+  const [showHelp, setShowHelp] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [showCopyPicker, setShowCopyPicker] = useState(false)
@@ -319,7 +320,16 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
           </Link>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Lineup builder</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Lineup builder</h1>
+              <button onClick={() => setShowHelp(true)} style={{
+                width: '22px', height: '22px', borderRadius: '50%',
+                border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
+                color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', fontWeight: 700,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>?</button>
+            </div>
             <Link href={`/games/${params.id}`} style={{
               padding: '8px 16px', borderRadius: '6px',
               background: 'var(--accent)', color: 'var(--accent-text)',
@@ -835,6 +845,64 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                   cursor: clearing ? 'not-allowed' : 'pointer', opacity: clearing ? 0.7 : 1,
                 }}>{clearing ? 'Clearing…' : 'Clear'}</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── HELP SHEET ── */}
+        {showHelp && (
+          <div onClick={() => setShowHelp(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+              padding: '1.5rem 1.25rem 2.5rem', width: '100%', maxWidth: '480px',
+              border: '0.5px solid var(--border)',
+            }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '1.25rem' }}>
+                How the lineup builder works
+              </div>
+
+              {[
+                {
+                  title: 'Paint mode',
+                  body: 'Select a position from the palette at the bottom, then tap any cell in the grid to assign it. Tap the same cell again to clear it. This is the fastest way to fill a lineup.',
+                },
+                {
+                  title: 'Pick mode',
+                  body: 'Tap any cell to open a position picker. More precise than paint mode — useful when you need to see all options at once.',
+                },
+                {
+                  title: 'Batting order',
+                  body: 'Tap "Reorder" in the toolbar to rearrange players up and down the batting lineup. On desktop you can also drag and drop rows.',
+                },
+                {
+                  title: 'Marking a player absent',
+                  body: 'Tap a player\'s name in the lineup to toggle them absent. Absent players are moved out of the lineup and won\'t count toward playing time.',
+                },
+                {
+                  title: 'Inning validity',
+                  body: 'A green ✓ appears above an inning when every position is filled with exactly one player. Red means a position is missing or doubled up.',
+                },
+              ].map(item => (
+                <div key={item.title} style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '3px', color: 'var(--accent)' }}>
+                    {item.title}
+                  </div>
+                  <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.6)`, lineHeight: 1.5 }}>
+                    {item.body}
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={() => setShowHelp(false)} style={{
+                width: '100%', marginTop: '4px', padding: '12px', borderRadius: '8px', border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+              }}>
+                Got it
+              </button>
             </div>
           </div>
         )}
