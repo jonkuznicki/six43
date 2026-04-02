@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: 'Six43 — Youth Baseball Lineup Manager',
   description: 'Build fair lineups and track playing time for every kid on your roster. Six43 is the lineup management app built for youth baseball coaches.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/icons/icon-192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
