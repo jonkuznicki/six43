@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase'
 
 const STATUS_CONFIG: Record<string, { bg: string; color: string; label: string; next: string }> = {
@@ -12,6 +13,7 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; label: string; 
 
 export default function GameStatusToggle({ gameId, initialStatus }: { gameId: string; initialStatus: string }) {
   const supabase = createClient()
+  const router = useRouter()
   const [status, setStatus] = useState(initialStatus)
   const [saving, setSaving] = useState(false)
 
@@ -24,6 +26,7 @@ export default function GameStatusToggle({ gameId, initialStatus }: { gameId: st
     setStatus(next)
     await supabase.from('games').update({ status: next }).eq('id', gameId)
     setSaving(false)
+    router.refresh()
   }
 
   return (
