@@ -4,8 +4,8 @@ import ThemeProvider from './ThemeProvider'
 import BottomNav from './BottomNav'
 
 export const metadata: Metadata = {
-  title: 'Six43',
-  description: 'Baseball lineup manager',
+  title: 'Six43 — Youth Baseball Lineup Manager',
+  description: 'Build fair lineups and track playing time for every kid on your roster. Six43 is the lineup management app built for youth baseball coaches.',
 }
 
 export default function RootLayout({
