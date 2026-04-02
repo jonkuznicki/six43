@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { createClient } from '../../lib/supabase'
-import { useRouter } from 'next/navigation'
 import { formatTime } from '../../lib/formatTime'
 
 function parseScore(notes: string | null): { us: number; them: number } | null {
@@ -35,24 +34,14 @@ const STATUS: Record<string, { bg: string; color: string; label: string }> = {
   final:       { bg: 'rgba(45,106,53,0.2)',     color: '#6DB875',                  label: 'Final' },
 }
 
-const DELETE_WIDTH = 80
-const SWIPE_THRESHOLD = 40
-
 export default function GameCard({ game, teamName }: { game: any; teamName: string }) {
   const supabase = createClient()
-  const router = useRouter()
   const [notes, setNotes]         = useState<string | null>(game.notes)
   const [status, setStatus]       = useState<string>(game.status)
   const [showSheet, setShowSheet] = useState(false)
   const [usScore, setUsScore]     = useState('')
   const [themScore, setThemScore] = useState('')
   const [saving, setSaving]       = useState(false)
-  const [deleting, setDeleting]   = useState(false)
-  const [swipeOffset, setSwipeOffset] = useState(0)
-
-  const touchStartX = useRef(0)
-  const isTouching  = useRef(false)
-  const isOpen      = swipeOffset <= -DELETE_WIDTH + 4
 
   const score = parseScore(notes)
   const sc = STATUS[status] ?? STATUS.scheduled
@@ -60,34 +49,7 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
   const date = new Date(game.game_date + 'T12:00:00')
   const formatted = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX
-    isTouching.current = true
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    const dx = e.touches[0].clientX - touchStartX.current
-    // Only handle left swipes; clamp between -DELETE_WIDTH and 0
-    if (dx < 0) {
-      setSwipeOffset(Math.max(dx, -DELETE_WIDTH))
-    } else if (isOpen) {
-      // Allow swiping back right
-      setSwipeOffset(Math.min(0, -DELETE_WIDTH + dx))
-    }
-  }
-
-  function handleTouchEnd() {
-    isTouching.current = false
-    const dx = swipeOffset
-    if (dx < -SWIPE_THRESHOLD) {
-      setSwipeOffset(-DELETE_WIDTH) // snap open
-    } else {
-      setSwipeOffset(0) // snap closed
-    }
-  }
-
   function openSheet() {
-    if (isOpen) { setSwipeOffset(0); return }
     setUsScore(score != null ? String(score.us) : '')
     setThemScore(score != null ? String(score.them) : '')
     setShowSheet(true)
@@ -105,109 +67,59 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
     setShowSheet(false)
   }
 
-  async function handleDelete() {
-    setDeleting(true)
-    await supabase.from('games').delete().eq('id', game.id)
-    router.refresh()
-  }
-
   return (
     <>
-      {/* Swipe container */}
-      <div style={{ position: 'relative', marginBottom: '8px', borderRadius: '10px', overflow: 'hidden' }}>
-
-        {/* Delete zone (revealed behind card on swipe) */}
-        <div style={{
-          position: 'absolute', right: 0, top: 0, bottom: 0, width: `${DELETE_WIDTH}px`,
-          background: '#C0392B', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius: '0 10px 10px 0',
-        }}>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            style={{
-              background: 'none', border: 'none', color: 'white',
-              fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer',
-              opacity: deleting ? 0.6 : 1, padding: '12px',
-            }}
-          >
-            {deleting ? '…' : 'Delete'}
-          </button>
-        </div>
-
-        {/* Card (slides left on swipe) */}
-        <div
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{
-            transform: `translateX(${swipeOffset}px)`,
-            transition: isTouching.current ? 'none' : 'transform 0.2s ease',
-            background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-            borderRadius: '10px', display: 'flex', overflow: 'hidden',
-          }}
-        >
-          {/* Tap-to-close overlay when swiped open */}
-          {isOpen && (
-            <div
-              onClick={() => setSwipeOffset(0)}
-              style={{ position: 'absolute', inset: 0, zIndex: 1 }}
-            />
-          )}
-
-          {/* Main card — navigates to detail */}
-          <Link
-            href={`/games/${game.id}`}
-            style={{ textDecoration: 'none', flex: 1, padding: '14px 16px', position: 'relative', zIndex: isOpen ? 0 : 'auto' }}
-            onClick={e => { if (isOpen) { e.preventDefault(); setSwipeOffset(0) } }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--fg)', marginBottom: '4px' }}>
-                  vs {game.opponent}
-                </div>
-                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>
-                  {formatted}{game.location ? ` · ${game.location}` : ''}
-                  {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
-                </div>
+      <div style={{
+        background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+        borderRadius: '10px', marginBottom: '8px', display: 'flex', overflow: 'hidden',
+      }}>
+        {/* Main card — navigates to detail */}
+        <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--fg)', marginBottom: '4px' }}>
+                vs {game.opponent}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 500, padding: '2px 8px',
-                  borderRadius: '4px', background: sc.bg, color: sc.color }}>
-                  {sc.label}
-                </span>
-                <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '16px' }}>›</span>
+              <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+                {formatted}{game.location ? ` · ${game.location}` : ''}
+                {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
               </div>
             </div>
-          </Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 500, padding: '2px 8px',
+                borderRadius: '4px', background: sc.bg, color: sc.color }}>
+                {sc.label}
+              </span>
+              <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '16px' }}>›</span>
+            </div>
+          </div>
+        </Link>
 
-          {/* Score tap zone */}
-          <button onClick={openSheet} style={{
-            flexShrink: 0, width: '72px',
-            border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
-            background: score != null ? 'rgba(45,106,53,0.06)' : 'transparent',
-            cursor: 'pointer', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: '2px', padding: 0,
-            position: 'relative', zIndex: isOpen ? 0 : 'auto',
-          }}>
-            {score != null ? (
-              <>
-                <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--fg)', lineHeight: 1 }}>
-                  {score.us}–{score.them}
-                </div>
-                <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`,
-                  textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  score
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`,
-                textAlign: 'center', lineHeight: 1.4, padding: '0 8px' }}>
-                Add<br />score
+        {/* Score tap zone */}
+        <button onClick={openSheet} style={{
+          flexShrink: 0, width: '72px',
+          border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
+          background: score != null ? 'rgba(45,106,53,0.06)' : 'transparent',
+          cursor: 'pointer', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '2px', padding: 0,
+        }}>
+          {score != null ? (
+            <>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--fg)', lineHeight: 1 }}>
+                {score.us}–{score.them}
               </div>
-            )}
-          </button>
-        </div>
+              <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`,
+                textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                score
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`,
+              textAlign: 'center', lineHeight: 1.4, padding: '0 8px' }}>
+              Add<br />score
+            </div>
+          )}
+        </button>
       </div>
 
       {/* Quick score sheet */}
