@@ -12,6 +12,8 @@ export default function GameEditButton({ game }: { game: any }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({
     opponent:      game.opponent ?? '',
     game_date:     game.game_date ?? '',
@@ -38,6 +40,12 @@ export default function GameEditButton({ game }: { game: any }) {
     setSaving(false)
     setOpen(false)
     router.refresh()
+  }
+
+  async function deleteGame() {
+    setDeleting(true)
+    await supabase.from('games').delete().eq('id', game.id)
+    router.push('/games')
   }
 
   if (!open) return (
@@ -107,6 +115,41 @@ export default function GameEditButton({ game }: { game: any }) {
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
           }}>{saving ? 'Saving…' : 'Save changes'}</button>
         </div>
+
+        {/* Delete */}
+        {!confirmDelete ? (
+          <button onClick={() => setConfirmDelete(true)} style={{
+            width: '100%', marginTop: '12px', padding: '10px',
+            background: 'transparent', border: 'none',
+            color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '12px',
+            cursor: 'pointer', textAlign: 'center',
+          }}>
+            Delete game
+          </button>
+        ) : (
+          <div style={{
+            marginTop: '12px', padding: '12px',
+            background: 'rgba(192,57,43,0.08)',
+            border: '0.5px solid rgba(192,57,43,0.25)',
+            borderRadius: '8px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '13px', color: '#E87060', marginBottom: '10px' }}>
+              Delete this game? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setConfirmDelete(false)} style={{
+                flex: 1, padding: '9px', borderRadius: '6px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.6)`, fontSize: '12px', cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={deleteGame} disabled={deleting} style={{
+                flex: 1, padding: '9px', borderRadius: '6px', border: 'none',
+                background: '#C0392B', color: 'white', fontSize: '12px', fontWeight: 700,
+                cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1,
+              }}>{deleting ? 'Deleting…' : 'Yes, delete'}</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
