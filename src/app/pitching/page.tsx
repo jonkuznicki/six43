@@ -132,7 +132,7 @@ export default function PitchingPage() {
           if (!actualMap[slot.game_id]) actualMap[slot.game_id] = []
           actualMap[slot.game_id].push({ player: slot.player, innings })
           // Track most recent game date pitched per player
-          if (!lastPitchedMap[slot.player_id] || game.game_date > lastPitchedMap[slot.player_id]) {
+          if (game && (!lastPitchedMap[slot.player_id] || game.game_date > lastPitchedMap[slot.player_id])) {
             lastPitchedMap[slot.player_id] = game.game_date
           }
         }
