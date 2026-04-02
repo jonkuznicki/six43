@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { createServerClient } from '../lib/supabase-server'
 import { redirect } from 'next/navigation'
 
@@ -111,6 +112,92 @@ export default async function HomePage() {
         }}>
           Get started free
         </Link>
+      </section>
+
+      {/* Phone mockup */}
+      <section style={{ maxWidth: '680px', margin: '0 auto', padding: '0 1.5rem 4rem', textAlign: 'center' }}>
+        {/* Phone frame */}
+        <div style={{
+          display: 'inline-block',
+          position: 'relative',
+          background: '#0a0a0a',
+          borderRadius: '44px',
+          padding: '14px',
+          boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 32px 64px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.3)',
+          maxWidth: '280px',
+          width: '100%',
+        }}>
+          {/* Camera pill */}
+          <div style={{
+            position: 'absolute', top: '22px', left: '50%', transform: 'translateX(-50%)',
+            width: '80px', height: '10px', background: '#1a1a1a',
+            borderRadius: '6px', zIndex: 2,
+          }} />
+          {/* Screen */}
+          <div style={{
+            borderRadius: '32px', overflow: 'hidden',
+            background: '#0B1F3A',
+            aspectRatio: '9/19.5',
+            position: 'relative',
+          }}>
+            {/* Screenshot — swap src once you have the file */}
+            <Image
+              src="/screenshot-lineup.png"
+              alt="Six43 lineup builder"
+              fill
+              style={{ objectFit: 'cover', objectPosition: 'top' }}
+              onError={() => {}}
+            />
+          </div>
+        </div>
+        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '1.25rem' }}>
+          The lineup builder — tap to assign positions across every inning
+        </div>
+      </section>
+
+      {/* Divider */}
+      <div style={{ borderTop: '0.5px solid var(--border-subtle)', maxWidth: '680px', margin: '0 auto' }} />
+
+      {/* How it works */}
+      <section style={{ maxWidth: '680px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <div style={{
+          fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.3)`,
+          marginBottom: '4px', textAlign: 'center',
+        }}>
+          How it works
+        </div>
+        <h2 style={{ fontSize: '24px', fontWeight: 800, textAlign: 'center', marginBottom: '2rem' }}>
+          Game-ready in three steps
+        </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          {[
+            { n: '1', title: 'Add your roster', body: 'Enter your players once. Jersey numbers, positions, and batting preferences — all saved for the season.' },
+            { n: '2', title: 'Mark attendance', body: "On game day, tap who's there. Absent players are automatically pulled from the lineup." },
+            { n: '3', title: 'Build the lineup', body: 'Pick a position, paint the innings. The whole lineup grid fills in as you go. Done in minutes.' },
+          ].map((step, i, arr) => (
+            <div key={step.n} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', position: 'relative' }}>
+              {/* Line connector */}
+              {i < arr.length - 1 && (
+                <div style={{
+                  position: 'absolute', left: '19px', top: '40px',
+                  width: '2px', height: 'calc(100% - 16px)',
+                  background: 'rgba(232,160,32,0.15)',
+                }} />
+              )}
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(232,160,32,0.12)', border: '0.5px solid rgba(232,160,32,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '15px', fontWeight: 800, color: 'var(--accent)',
+              }}>{step.n}</div>
+              <div style={{ paddingBottom: i < arr.length - 1 ? '2rem' : 0 }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px', marginTop: '8px' }}>{step.title}</div>
+                <div style={{ fontSize: '13px', lineHeight: 1.6, color: `rgba(var(--fg-rgb), 0.55)` }}>{step.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Divider */}
