@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { createServerClient } from '../lib/supabase-server'
+import { redirect } from 'next/navigation'
 
 const FEATURES = [
   {
@@ -23,7 +25,10 @@ const FEATURES = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) redirect('/games')
   return (
     <main style={{
       minHeight: '100vh',

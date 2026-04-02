@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import ThemeProvider from './ThemeProvider'
 import BottomNav from './BottomNav'
+import AppHeader from './AppHeader'
 
 export const metadata: Metadata = {
   title: 'Six43 — Youth Baseball Lineup Manager',
@@ -26,6 +27,7 @@ export default function RootLayout({
       </head>
       <body style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
         <ThemeProvider>
+          <AppHeader />
           {children}
           <BottomNav />
         </ThemeProvider>

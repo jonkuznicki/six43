@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useTheme } from '../ThemeProvider'
 
 const FIELD_CONFIGS = [
   {
@@ -33,7 +32,6 @@ function suggestNextSeasonName(current: string): string {
 export default function SettingsPage() {
   const supabase = createClient()
   const router = useRouter()
-  const { theme, toggle } = useTheme()
   const [teams, setTeams] = useState<any[]>([])
   const [userEmail, setUserEmail] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
@@ -297,27 +295,7 @@ export default function SettingsPage() {
       fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto',
       padding: '1.5rem 1rem 6rem',
     }}>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
-        <Link href="/dashboard" style={{
-          fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
-        }}>‹ Dashboard</Link>
-        <Link href="/games" style={{
-          fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
-        }}>Games</Link>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Settings</h1>
-        <button onClick={toggle} style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          padding: '6px 12px', borderRadius: '20px',
-          border: '0.5px solid var(--border-md)', background: 'var(--bg-card)',
-          color: 'var(--fg)', fontSize: '13px', cursor: 'pointer',
-        }}>
-          <span style={{ fontSize: '15px' }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
-          <span>{theme === 'dark' ? 'Light' : 'Dark'} mode</span>
-        </button>
-      </div>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '1.5rem' }}>Settings</h1>
 
       {/* Teams & Seasons section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
