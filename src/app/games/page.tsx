@@ -94,9 +94,11 @@ export default async function GamesPage({
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700 }}>
-          Six<span style={{ color: 'var(--accent)' }}>43</span>
-        </h1>
+        <Link href="/" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700 }}>
+            Six<span style={{ color: 'var(--accent)' }}>43</span>
+          </h1>
+        </Link>
         {season && (
           <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)` }}>
             {season.name}

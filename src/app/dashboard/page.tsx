@@ -78,9 +78,11 @@ export default async function Dashboard() {
 
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 900, letterSpacing: '-1px', marginBottom: '4px' }}>
-          Six<span style={{ color: 'var(--accent)' }}>43</span>
-        </h1>
+        <Link href="/" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 900, letterSpacing: '-1px', marginBottom: '4px' }}>
+            Six<span style={{ color: 'var(--accent)' }}>43</span>
+          </h1>
+        </Link>
         {team ? (
           <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)` }}>
             {team.name} · {season?.name}
