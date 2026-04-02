@@ -17,13 +17,12 @@ function shortName(player: any) {
   return `${player.first_name[0]}. ${player.last_name}`
 }
 
-function daysRest(gameDate: string | undefined): string {
-  if (!gameDate) return ''
-  const last = new Date(gameDate + 'T12:00:00')
-  const today = new Date()
-  today.setHours(12, 0, 0, 0)
-  const days = Math.round((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
-  if (days === 0) return ' · today'
+function daysRest(lastPitchedDate: string | undefined, gameDate: string): string {
+  if (!lastPitchedDate) return ''
+  const last = new Date(lastPitchedDate + 'T12:00:00')
+  const scheduled = new Date(gameDate + 'T12:00:00')
+  const days = Math.round((scheduled.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+  if (days <= 0) return ' · same day'
   if (days === 1) return ' · 1d rest'
   return ` · ${days}d rest`
 }
@@ -287,7 +286,7 @@ export default function PitchingPage() {
                             <option value="">—</option>
                             {players.map(p => (
                               <option key={p.id} value={p.id}>
-                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id])}
+                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
                               </option>
                             ))}
                           </select>
