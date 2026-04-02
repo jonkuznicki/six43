@@ -96,31 +96,47 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
           </div>
         </Link>
 
-        {/* Score tap zone */}
-        <button onClick={openSheet} style={{
-          flexShrink: 0, width: '72px',
-          border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
-          background: score != null ? 'rgba(45,106,53,0.06)' : 'transparent',
-          cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '2px', padding: 0,
-        }}>
-          {score != null ? (
-            <>
-              <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--fg)', lineHeight: 1 }}>
-                {score.us}–{score.them}
+        {/* Right action zone */}
+        {status === 'final' || status === 'in_progress' ? (
+          <button onClick={openSheet} style={{
+            flexShrink: 0, width: '72px',
+            border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
+            background: score != null ? 'rgba(45,106,53,0.06)' : 'transparent',
+            cursor: 'pointer', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: '2px', padding: 0,
+          }}>
+            {score != null ? (
+              <>
+                <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--fg)', lineHeight: 1 }}>
+                  {score.us}–{score.them}
+                </div>
+                <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`,
+                  textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  score
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`,
+                textAlign: 'center', lineHeight: 1.4, padding: '0 8px' }}>
+                Add<br />score
               </div>
-              <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`,
-                textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                score
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`,
-              textAlign: 'center', lineHeight: 1.4, padding: '0 8px' }}>
-              Add<br />score
+            )}
+          </button>
+        ) : (
+          <Link href={`/games/${game.id}/attendance`} style={{
+            flexShrink: 0, width: '72px', textDecoration: 'none',
+            borderLeft: '0.5px solid var(--border-subtle)',
+            background: 'transparent',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: '3px', padding: 0,
+          }}>
+            <div style={{ fontSize: '18px', lineHeight: 1 }}>📋</div>
+            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600,
+              textAlign: 'center', lineHeight: 1.3 }}>
+              Lineup
             </div>
-          )}
-        </button>
+          </Link>
+        )}
       </div>
 
       {/* Quick score sheet */}
