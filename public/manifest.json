@@ -1,0 +1,24 @@
+{
+  "name": "Six43 — Baseball Lineup Manager",
+  "short_name": "Six43",
+  "description": "Build lineups and track playing time for your youth baseball team.",
+  "start_url": "/games",
+  "display": "standalone",
+  "background_color": "#0B1F3A",
+  "theme_color": "#0B1F3A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

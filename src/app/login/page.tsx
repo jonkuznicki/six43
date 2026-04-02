@@ -25,7 +25,10 @@ export default function LoginPage() {
       if (error) { setError(error.message); setLoading(false) }
       else router.push('/games')
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({
+        email, password,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      })
       if (error) { setError(error.message); setLoading(false) }
       else setSignupDone(true)
     }
