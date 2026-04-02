@@ -13,8 +13,8 @@ const FEATURES = [
   },
   {
     icon: '🔗',
-    title: 'Share instantly with parents',
-    body: "Generate a read-only link after you set the lineup. Parents can see where their kid is playing each inning — no app download, no login required.",
+    title: 'Share with your coaching staff',
+    body: "Invite assistant coaches so everyone is working from the same lineup. Generate a read-only link for anyone who just needs to see the card — no login required.",
   },
   {
     icon: '📊',
@@ -91,7 +91,7 @@ export default function HomePage() {
           maxWidth: '460px',
           margin: '0 auto 2.5rem',
         }}>
-          Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and share with parents — all from your phone.
+          Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and coordinate with your staff — seamlessly from your phone or desktop.
         </p>
 
         <Link href="/login" style={{
@@ -185,8 +185,8 @@ export default function HomePage() {
             {[
               'Lineup builder',
               'Playing time tracking',
-              'Share with parents',
-              'Invite coaches',
+              'Share lineups instantly',
+              'Invite assistant coaches',
               'Season management',
             ].map(f => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
