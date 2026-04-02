@@ -4,6 +4,8 @@ import Link from 'next/link'
 import TeamSelect from './TeamSelect'
 import GameCard from './GameCard'
 
+export const dynamic = 'force-dynamic'
+
 export default async function GamesPage({
   searchParams,
 }: {
