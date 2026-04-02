@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { createClient } from '../../../lib/supabase'
 
 const STATUS_CONFIG: Record<string, { bg: string; color: string; label: string; next: string }> = {
-  scheduled:     { bg: 'var(--bg-card)',              color: `rgba(var(--fg-rgb), 0.5)`, label: 'Planned',       next: 'lineup_ready' },
+  scheduled:     { bg: 'var(--bg-card)',              color: `rgba(var(--fg-rgb), 0.5)`, label: 'Scheduled',     next: 'lineup_ready' },
   lineup_ready:  { bg: 'rgba(59,109,177,0.18)',       color: '#80B0E8',                  label: 'Lineup Ready',  next: 'final' },
   in_progress:   { bg: 'rgba(232,160,32,0.2)',        color: '#E8A020',                  label: 'Live',          next: 'final' },
-  final:         { bg: 'rgba(45,106,53,0.2)',         color: '#6DB875',                  label: 'Finished',      next: 'scheduled' },
+  final:         { bg: 'rgba(45,106,53,0.2)',         color: '#6DB875',                  label: 'Final',         next: 'scheduled' },
 }
 
 export default function GameStatusToggle({ gameId, initialStatus }: { gameId: string; initialStatus: string }) {

@@ -209,7 +209,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
               color: '#6DB875', borderRadius: '8px', padding: '12px 16px',
               textAlign: 'center', fontSize: '13px',
             }}>
-              Lineup Finalized
+              Final
             </div>
           )}
 
