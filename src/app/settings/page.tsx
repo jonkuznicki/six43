@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '../ThemeProvider'
 
 const FIELD_CONFIGS = [
@@ -31,8 +32,11 @@ function suggestNextSeasonName(current: string): string {
 
 export default function SettingsPage() {
   const supabase = createClient()
+  const router = useRouter()
   const { theme, toggle } = useTheme()
   const [teams, setTeams] = useState<any[]>([])
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   const [teamForm, setTeamForm] = useState<any>(null)
@@ -50,22 +54,58 @@ export default function SettingsPage() {
   const [deleteSeason, setDeleteSeason] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' })
+  const [pwError, setPwError] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwSuccess, setPwSuccess] = useState(false)
+
+  // Invite / team members
+  const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({})
+  const [generatingInvite, setGeneratingInvite] = useState<string | null>(null)
+  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null)
+
   useEffect(() => { loadData() }, [])
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  async function changePassword() {
+    if (!pwForm.newPassword) { setPwError('Password is required.'); return }
+    if (pwForm.newPassword.length < 6) { setPwError('Password must be at least 6 characters.'); return }
+    if (pwForm.newPassword !== pwForm.confirm) { setPwError('Passwords do not match.'); return }
+    setPwSaving(true); setPwError('')
+    const { error } = await supabase.auth.updateUser({ password: pwForm.newPassword })
+    if (error) { setPwError(error.message); setPwSaving(false); return }
+    setPwSaving(false)
+    setPwSuccess(true)
+    setPwForm({ newPassword: '', confirm: '' })
+    setTimeout(() => { setShowChangePassword(false); setPwSuccess(false) }, 1500)
+  }
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    setUserEmail(user.email ?? '')
+    setUserId(user.id)
 
     const { data: teamRows } = await supabase
       .from('teams').select('*').eq('user_id', user.id).order('created_at')
 
     const allTeams: any[] = []
+    const membersMap: Record<string, any[]> = {}
     for (const team of teamRows ?? []) {
       const { data: seasons } = await supabase
         .from('seasons').select('*').eq('team_id', team.id).order('created_at', { ascending: false })
+      const { data: members } = await supabase
+        .from('team_members').select('*').eq('team_id', team.id).order('created_at')
       allTeams.push({ ...team, seasons: seasons ?? [] })
+      membersMap[team.id] = members ?? []
     }
     setTeams(allTeams)
+    setTeamMembers(membersMap)
     setLoading(false)
   }
 
@@ -177,7 +217,7 @@ export default function SettingsPage() {
     if (newSeason) {
       const { data: oldPlayers } = await supabase
         .from('players')
-        .select('first_name, last_name, jersey_number, primary_position, status, team_id, batting_pref_order')
+        .select('first_name, last_name, jersey_number, primary_position, status, team_id, batting_pref_order, innings_target')
         .eq('season_id', rolloverSeason.id)
 
       if (oldPlayers && oldPlayers.length > 0) {
@@ -200,6 +240,34 @@ export default function SettingsPage() {
     ))
 
     setRollingOver(false); setRolloverSeason(null)
+  }
+
+  async function createInvite(teamId: string) {
+    setGeneratingInvite(teamId)
+    const token = crypto.randomUUID()
+    const { data } = await supabase
+      .from('team_members')
+      .insert({ team_id: teamId, invite_token: token, role: 'coach', owner_user_id: userId })
+      .select().single()
+    if (data) {
+      setTeamMembers(prev => ({ ...prev, [teamId]: [...(prev[teamId] ?? []), data] }))
+    }
+    setGeneratingInvite(null)
+  }
+
+  async function revokeInvite(teamId: string, memberId: string) {
+    await supabase.from('team_members').delete().eq('id', memberId)
+    setTeamMembers(prev => ({
+      ...prev,
+      [teamId]: (prev[teamId] ?? []).filter(m => m.id !== memberId),
+    }))
+  }
+
+  async function copyInviteLink(teamId: string, token: string) {
+    const url = `${window.location.origin}/invite/${token}`
+    await navigator.clipboard.writeText(url)
+    setCopiedTeamId(teamId)
+    setTimeout(() => setCopiedTeamId(null), 2000)
   }
 
   async function confirmDeleteSeason() {
@@ -385,6 +453,71 @@ export default function SettingsPage() {
                 color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer' }}>
               + Add season
             </button>
+
+            {/* ── COACHES / INVITES ── */}
+            <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '0.5px solid var(--border-subtle)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
+                  letterSpacing: '0.08em' }}>Coaches</div>
+                <button
+                  onClick={() => createInvite(team.id)}
+                  disabled={generatingInvite === team.id}
+                  style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+                    border: '0.5px solid var(--border-strong)', background: 'transparent',
+                    color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+                    opacity: generatingInvite === team.id ? 0.5 : 1 }}>
+                  {generatingInvite === team.id ? 'Generating…' : '+ Invite coach'}
+                </button>
+              </div>
+
+              {(teamMembers[team.id] ?? []).length === 0 && (
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, fontStyle: 'italic' }}>
+                  No coaches invited yet.
+                </div>
+              )}
+
+              {(teamMembers[team.id] ?? []).map((m: any) => (
+                <div key={m.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '7px 10px', marginBottom: '4px',
+                  background: 'var(--bg-card-alt)',
+                  border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {m.accepted_at ? (
+                      <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
+                        Coach {m.user_id?.slice(0, 8)}…
+                        <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '6px', fontWeight: 600 }}>
+                          Active
+                        </span>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)`, fontStyle: 'italic' }}>
+                        Pending invite
+                      </span>
+                    )}
+                  </div>
+                  {!m.accepted_at && (
+                    <button
+                      onClick={() => copyInviteLink(team.id, m.invite_token)}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
+                        border: 'none',
+                        background: copiedTeamId === team.id ? 'rgba(45,106,53,0.2)' : 'var(--accent)',
+                        color: copiedTeamId === team.id ? '#6DB875' : 'var(--accent-text)',
+                        cursor: 'pointer', flexShrink: 0 }}>
+                      {copiedTeamId === team.id ? 'Copied!' : 'Copy link'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => revokeInvite(team.id, m.id)}
+                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
+                      border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
+                      color: 'rgba(232,100,80,0.7)', cursor: 'pointer', flexShrink: 0 }}>
+                    {m.accepted_at ? 'Remove' : 'Revoke'}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ))}
@@ -667,6 +800,78 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── ACCOUNT ── */}
+      <div style={{ marginTop: '2rem', borderTop: '0.5px solid var(--border-subtle)', paddingTop: '1.5rem' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '12px' }}>
+          Account
+        </div>
+        <div style={{
+          background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+          borderRadius: '12px', overflow: 'hidden',
+        }}>
+          {/* Email row */}
+          <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border-subtle)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '3px' }}>
+                Signed in as
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--fg)' }}>
+                {userEmail}
+              </div>
+            </div>
+          </div>
+          {/* Change password row */}
+          <button onClick={() => { setShowChangePassword(true); setPwError(''); setPwSuccess(false) }}
+            style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none',
+              textAlign: 'left', fontSize: '13px', color: 'var(--fg)', cursor: 'pointer',
+              borderBottom: '0.5px solid var(--border-subtle)' }}>
+            Change password
+          </button>
+          {/* Sign out row */}
+          <button onClick={signOut} style={{ width: '100%', padding: '13px 16px', background: 'transparent',
+            border: 'none', textAlign: 'left', fontSize: '13px',
+            color: 'rgba(232,100,80,0.8)', cursor: 'pointer', fontWeight: 500 }}>
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      {/* ── CHANGE PASSWORD ── */}
+      {showChangePassword && (
+        <BottomSheet onClose={() => setShowChangePassword(false)}>
+          <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '1.25rem' }}>Change password</div>
+          {pwSuccess ? (
+            <div style={{ fontSize: '14px', color: '#6DB875', textAlign: 'center', padding: '1rem 0' }}>
+              ✓ Password updated
+            </div>
+          ) : (
+            <>
+              {pwError && <ErrorMsg msg={pwError} />}
+              <Field label="New password">
+                <input type="password" value={pwForm.newPassword}
+                  onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                  placeholder="Min. 6 characters" style={inputStyle} />
+              </Field>
+              <div style={{ marginTop: '10px' }}>
+                <Field label="Confirm password">
+                  <input type="password" value={pwForm.confirm}
+                    onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                    placeholder="Repeat new password" style={inputStyle} />
+                </Field>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                <button onClick={() => setShowChangePassword(false)} style={cancelBtnStyle}>Cancel</button>
+                <button onClick={changePassword} disabled={pwSaving} style={primaryBtnStyle(pwSaving)}>
+                  {pwSaving ? 'Saving…' : 'Update password'}
+                </button>
+              </div>
+            </>
+          )}
+        </BottomSheet>
       )}
     </main>
   )

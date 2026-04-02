@@ -26,6 +26,7 @@ type StatRow = {
   innings_bench: number; innings_infield: number; innings_outfield: number
   innings_total: number; innings_all: number; bench_pct: number
   innings_lc?: number; innings_rc?: number
+  innings_target?: number | null
 }
 
 function pct(val: number) {
@@ -68,7 +69,7 @@ export default function FairnessPage() {
     if (!user) return
 
     const { data: teams } = await supabase
-      .from('teams').select('id').eq('user_id', user.id).eq('is_active', true)
+      .from('teams').select('id').eq('is_active', true)
     const teamIds = (teams ?? []).map((t: any) => t.id)
     if (!teamIds.length) { setLoading(false); return }
 
@@ -103,6 +104,14 @@ export default function FairnessPage() {
     const lcMap: Record<string, number> = {}
     const rcMap: Record<string, number> = {}
 
+    // Load player targets for this season
+    const { data: playerData } = await supabase
+      .from('players')
+      .select('id, innings_target')
+      .eq('season_id', seasonId)
+    const targetMap: Record<string, number | null> = {}
+    for (const p of playerData ?? []) targetMap[p.id] = p.innings_target
+
     if (gameIds.length) {
       const { data: slots } = await supabase
         .from('lineup_slots')
@@ -124,6 +133,7 @@ export default function FairnessPage() {
       ...r,
       innings_lc: lcMap[r.player_id] ?? 0,
       innings_rc: rcMap[r.player_id] ?? 0,
+      innings_target: targetMap[r.player_id] ?? null,
     }))
 
     setStats(rows)
@@ -177,36 +187,35 @@ export default function FairnessPage() {
       }}>‹ Games</Link>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>Playing Time</h1>
-          {activeSeason && (
-            <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
-              {(activeSeason as any).team?.name} · {activeSeason.name}
-            </div>
-          )}
-        </div>
-
-        {/* Season picker */}
-        {seasons.length > 1 && (
-          <select
-            value={selectedSeasonId}
-            onChange={e => setSelectedSeasonId(e.target.value)}
-            style={{
-              fontSize: '12px', padding: '6px 10px', borderRadius: '6px',
-              border: '0.5px solid var(--border-strong)',
-              background: 'var(--bg-input)', color: 'var(--fg)',
-              cursor: 'pointer',
-            }}
-          >
-            {seasons.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.team?.name} — {s.name}{s.is_active ? ' ✓' : ''}
-              </option>
-            ))}
-          </select>
+      <div style={{ marginBottom: '0.25rem' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>Playing Time</h1>
+        {activeSeason && (
+          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
+            {(activeSeason as any).team?.name} · {activeSeason.name}
+          </div>
         )}
       </div>
+
+      {/* Season picker */}
+      {seasons.length > 1 && (
+        <select
+          value={selectedSeasonId}
+          onChange={e => setSelectedSeasonId(e.target.value)}
+          style={{
+            width: '100%', padding: '9px 12px', borderRadius: '8px',
+            border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-card)', color: 'var(--fg)',
+            fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+            marginBottom: '1.25rem', marginTop: '0.75rem',
+          }}
+        >
+          {seasons.map((s: any) => (
+            <option key={s.id} value={s.id}>
+              {s.team?.name} — {s.name}{s.is_active ? ' ✓' : ''}
+            </option>
+          ))}
+        </select>
+      )}
 
       {/* View toggle */}
       <div style={{ display: 'flex', background: 'var(--bg-input)',
@@ -272,6 +281,7 @@ export default function FairnessPage() {
 
               {sorted.map(row => {
                 const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
+                const infieldPct = row.innings_total > 0 ? Math.round(infieldInn / row.innings_total * 100) : 0
                 const benchPctVal = Math.round(row.bench_pct * 100)
                 const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
                 return (
@@ -296,22 +306,46 @@ export default function FairnessPage() {
                     {/* Bench % bar */}
                     <BenchBar pct={row.bench_pct} />
 
+                    {/* Target progress */}
+                    {(row.innings_target ?? 0) > 0 && (() => {
+                      const t = row.innings_target!
+                      const f = row.innings_total ?? 0
+                      const met = f >= t
+                      return (
+                        <div style={{ marginTop: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.4)`, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                              Target ({t} field inn)
+                            </span>
+                            <span style={{ fontSize: '9px', fontWeight: 700, color: met ? '#6DB875' : '#E8A020' }}>
+                              {f}/{t}{met ? ' ✓' : ''}
+                            </span>
+                          </div>
+                          <div style={{ height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.round(Math.min(1, f / t) * 100)}%`, height: '100%',
+                              background: met ? '#6DB875' : '#E8A020', borderRadius: '2px' }} />
+                          </div>
+                        </div>
+                      )
+                    })()}
+
                     {/* Key KPIs */}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                       {[
                         { label: 'Bench', value: `${benchPctVal}%`, color: benchColor },
                         { label: 'Pitcher', value: row.innings_p, color: '#E8C060' },
-                        { label: 'Infield', value: infieldInn, color: '#80B0E8' },
+                        { label: 'Infield %', value: `${infieldPct}%`, color: '#80B0E8' },
                         { label: 'Catcher', value: row.innings_c, color: '#E090B0' },
+                        { label: 'Total', value: row.innings_all, color: `rgba(var(--fg-rgb), 0.55)` },
                       ].map(kpi => (
                         <div key={kpi.label} style={{
                           flex: 1, background: 'var(--bg-input)', borderRadius: '6px',
-                          padding: '5px 6px', textAlign: 'center',
+                          padding: '5px 4px', textAlign: 'center',
                         }}>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: kpi.color }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: kpi.color }}>
                             {kpi.value}
                           </div>
-                          <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <div style={{ fontSize: '8px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             {kpi.label}
                           </div>
                         </div>

@@ -2,6 +2,7 @@ import { createServerClient } from '../../lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import TeamSelect from './TeamSelect'
+import GameCard from './GameCard'
 
 export default async function GamesPage({
   searchParams,
@@ -48,52 +49,7 @@ export default async function GamesPage({
   )
   const recent = (games ?? []).filter(g => g.status === 'final')
 
-  function statusChip(status: string) {
-    const styles: Record<string, { background: string; color: string; label: string }> = {
-      scheduled:   { background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.5)`, label: 'Scheduled' },
-      in_progress: { background: 'rgba(232,160,32,0.2)',   color: '#E8A020',           label: 'Live' },
-      final:       { background: 'rgba(45,106,53,0.2)',    color: '#6DB875',           label: 'Final' },
-    }
-    const s = styles[status] ?? styles.scheduled
-    return (
-      <span style={{
-        fontSize: '11px', fontWeight: 500, padding: '2px 8px',
-        borderRadius: '4px', background: s.background, color: s.color,
-      }}>
-        {s.label}
-      </span>
-    )
-  }
-
-  function GameCard({ game }: { game: any }) {
-    const date = new Date(game.game_date + 'T12:00:00')
-    const formatted = date.toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric'
-    })
-    return (
-      <Link href={`/games/${game.id}`} style={{ textDecoration: 'none' }}>
-        <div style={{
-          background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-          borderRadius: '10px', padding: '14px 16px', marginBottom: '8px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--fg)', marginBottom: '4px' }}>
-              vs {game.opponent}
-            </div>
-            <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>
-              {formatted} · {game.location ?? 'TBD'}
-              {game.game_time && ` · ${game.game_time.slice(0, 5)}`}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {statusChip(game.status)}
-            <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '16px' }}>›</span>
-          </div>
-        </div>
-      </Link>
-    )
-  }
+  const teamName = selectedTeam?.name ?? 'Us'
 
   return (
     <main style={{
@@ -178,7 +134,7 @@ export default async function GamesPage({
               }}>
                 Upcoming
               </div>
-              {upcoming.map(g => <GameCard key={g.id} game={g} />)}
+              {upcoming.map(g => <GameCard key={g.id} game={g} teamName={teamName} />)}
               <div style={{ marginBottom: '1.5rem' }} />
             </>
           )}
@@ -192,7 +148,7 @@ export default async function GamesPage({
               }}>
                 Recent
               </div>
-              {recent.map(g => <GameCard key={g.id} game={g} />)}
+              {recent.map(g => <GameCard key={g.id} game={g} teamName={teamName} />)}
             </>
           )}
 

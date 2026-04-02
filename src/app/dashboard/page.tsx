@@ -1,6 +1,7 @@
 import { createServerClient } from '../../lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatTime } from '../../lib/formatTime'
 
 function parseRecord(games: any[]): { w: number; l: number } {
   let w = 0, l = 0
@@ -109,7 +110,7 @@ export default async function Dashboard() {
             <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.55)` }}>
               {formatDate(nextGame.game_date)}
               {nextGame.location ? ` · ${nextGame.location}` : ''}
-              {nextGame.game_time ? ` · ${nextGame.game_time.slice(0, 5)}` : ''}
+              {nextGame.game_time ? ` · ${formatTime(nextGame.game_time)}` : ''}
             </div>
           </div>
         </Link>

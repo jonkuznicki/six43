@@ -60,7 +60,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
 
     const { data: slotData } = await supabase
       .from('lineup_slots')
-      .select('*, player:players(first_name, last_name, jersey_number)')
+      .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
       .eq('game_id', params.id)
       .order('batting_order', { ascending: true, nullsFirst: false })
     setSlots(slotData ?? [])
@@ -406,7 +406,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
           background: 'var(--bg)',
           borderBottom: '0.5px solid var(--border-subtle)',
           padding: '8px 1rem 10px',
-          display: 'flex', gap: '6px', overflowX: 'auto',
+          gap: '6px', overflowX: 'auto',
         }}>
           {teamPositions.map(pos => {
             const c = POSITION_COLORS[pos] ?? POSITION_COLORS.Bench
@@ -462,6 +462,26 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             const player = slot.player as any
             const isDragging = dragSlotId === slot.id
             const isDragOver = dragOverSlotId === slot.id
+
+            // Playing time indicators
+            const positions = slot.inning_positions ?? []
+            const fieldInn = innings.filter(i => positions[i] && positions[i] !== 'Bench').length
+            const benchInn = innings.filter(i => positions[i] === 'Bench').length
+            const filledInn = fieldInn + benchInn
+            const remainingInn = inningCount - filledInn
+            const target = player?.innings_target ?? 0
+
+            // Consecutive bench alert (3+ bench in a row)
+            let maxConsec = 0, cur = 0
+            for (const i of innings) {
+              if (positions[i] === 'Bench') { cur++; maxConsec = Math.max(maxConsec, cur) }
+              else if (positions[i] != null) cur = 0
+            }
+            const consecAlert = maxConsec >= 3
+
+            // Target shortfall: can't reach target even if all remaining innings are field
+            const targetAlert = target > 0 && (fieldInn + remainingInn) < target
+
             return (
               <div
                 key={slot.id}
@@ -509,6 +529,14 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                   <span style={{ fontSize: '13px', color: 'var(--fg)', whiteSpace: 'nowrap', flex: 1 }}>
                     {player?.first_name[0]}. {player?.last_name}
                   </span>
+                  {consecAlert && (
+                    <span title={`${maxConsec} bench innings in a row`}
+                      style={{ fontSize: '9px', color: '#E8A020', lineHeight: 1, flexShrink: 0 }}>●</span>
+                  )}
+                  {targetAlert && (
+                    <span title={`Will miss ${target}-inning target`}
+                      style={{ fontSize: '9px', color: '#E87060', lineHeight: 1, flexShrink: 0 }}>▲</span>
+                  )}
                   <button
                     onClick={() => toggleAvailability(slot.id)}
                     title="Remove from lineup"

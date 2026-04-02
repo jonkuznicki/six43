@@ -1,6 +1,12 @@
 // Shared print layout — used by both the lineup builder and game detail page.
 // The parent is responsible for .print-sheet / @media print visibility classes.
 
+import { formatTime } from '../../../lib/formatTime'
+
+function readUserNotes(raw: string | null): string {
+  try { return JSON.parse(raw ?? '{}')._notes ?? '' } catch { return '' }
+}
+
 const POS_STYLE: Record<string, { bg: string; color: string }> = {
   P:    { bg: '#FFF8E1', color: '#7a4800' },
   C:    { bg: '#FCE4EC', color: '#7a1040' },
@@ -29,7 +35,8 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
       })
     : ''
-  const gameTime = game?.game_time ? game.game_time.slice(0, 5) : ''
+  const gameTime = formatTime(game?.game_time)
+  const userNotes = readUserNotes(game?.notes ?? null)
   const location = game?.location ?? ''
   const metaParts = [gameDate, location, gameTime].filter(Boolean)
 
@@ -147,6 +154,28 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
           })}
         </tbody>
       </table>
+
+      {/* ── NOTES ── */}
+      {userNotes && (
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{
+            fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: '#555',
+            borderBottom: `1.5px solid ${NAVY}`, paddingBottom: '3px', marginBottom: '6px',
+          }}>
+            Notes
+          </div>
+          <div style={{
+            fontSize: '12px', color: '#333', lineHeight: 1.5,
+            padding: '8px 10px',
+            border: '1px solid #ddd', borderRadius: '4px',
+            background: '#fafafa',
+            whiteSpace: 'pre-wrap',
+          }}>
+            {userNotes}
+          </div>
+        </div>
+      )}
 
       {/* ── BOX SCORE ── */}
       <div style={{

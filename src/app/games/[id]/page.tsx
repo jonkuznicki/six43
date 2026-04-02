@@ -6,6 +6,10 @@ import GameEditButton from './GameEditButton'
 import BoxScoreInput from './BoxScoreInput'
 import GamePrintSection from './GamePrintSection'
 import PrintButton from './PrintButton'
+import GameNotes from './GameNotes'
+import ShareButton from './ShareButton'
+import DuplicateGameButton from './DuplicateGameButton'
+import { formatTime } from '../../../lib/formatTime'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
   P:     { bg: 'rgba(232,160,32,0.2)',    color: '#E8C060' },
@@ -109,7 +113,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         </div>
         <p style={{ color: `rgba(var(--fg-rgb), 0.45)`, fontSize: '13px', marginBottom: '1.5rem' }}>
           {formatted}{game.location ? ` · ${game.location}` : ''}
-          {game.game_time ? ` · ${game.game_time.slice(0, 5)}` : ''}
+          {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
         </p>
 
         {/* Box score */}
@@ -120,6 +124,9 @@ export default async function GamePage({ params }: { params: { id: string } }) {
           teamName={teamName}
           opponent={game.opponent}
         />
+
+        {/* Notes */}
+        <GameNotes gameId={game.id} notes={game.notes} />
 
         {/* Lineup */}
         <div style={{ marginTop: '1.5rem' }}>
@@ -197,7 +204,16 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </div>
           )}
 
+          <DuplicateGameButton game={{
+            id: game.id,
+            season_id: game.season_id,
+            opponent: game.opponent,
+            location: game.location ?? null,
+            innings_played: game.innings_played,
+            game_time: game.game_time ?? null,
+          }} />
           {hasLineup && <PrintButton />}
+          <ShareButton gameId={game.id} initialToken={(game as any).share_token ?? null} />
         </div>
 
       </main>

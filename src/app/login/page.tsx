@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -99,6 +100,12 @@ export default function LoginPage() {
               {error}
             </p>
           )}
+
+          <div style={{ textAlign: 'right', marginBottom: '1rem', marginTop: '-0.5rem' }}>
+            <Link href="/forgot-password" style={{ fontSize: '13px', color: '#E8A020', textDecoration: 'none' }}>
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"

@@ -36,7 +36,7 @@ function PosChip({ pos }: { pos: string | null }) {
   )
 }
 
-const BLANK = { first_name: '', last_name: '', jersey_number: '', primary_position: '', status: 'active' }
+const BLANK = { first_name: '', last_name: '', jersey_number: '', primary_position: '', status: 'active', innings_target: '' }
 
 export default function RosterPage() {
   const supabase = createClient()
@@ -84,7 +84,7 @@ export default function RosterPage() {
       // Fall back: find the active season for the given team (or first team)
       const { data: team } = teamIdParam
         ? await supabase.from('teams').select('id, name').eq('id', teamIdParam).single()
-        : await supabase.from('teams').select('id, name').eq('user_id', user.id).order('created_at').limit(1).single()
+        : await supabase.from('teams').select('id, name').order('created_at').limit(1).single()
       if (!team) { setLoading(false); return }
       resolvedTeamId = team.id
       resolvedTeamName = (team as any).name ?? ''
@@ -129,6 +129,7 @@ export default function RosterPage() {
       jersey_number: String(player.jersey_number),
       primary_position: player.primary_position ?? '',
       status: player.status,
+      innings_target: player.innings_target != null ? String(player.innings_target) : '',
     })
     setError('')
     setShowForm(true)
@@ -153,12 +154,14 @@ export default function RosterPage() {
     setSaving(true)
     setError('')
 
+    const targetNum = parseInt((form as any).innings_target)
     const payload = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       jersey_number: num,
       primary_position: form.primary_position || null,
       status: form.status,
+      innings_target: (!isNaN(targetNum) && targetNum > 0) ? targetNum : null,
     }
 
     const isEdit = 'id' in form
@@ -300,7 +303,7 @@ export default function RosterPage() {
               </Field>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
               <Field label="Jersey #">
                 <input value={form.jersey_number} onChange={e => setForm(f => ({ ...f, jersey_number: e.target.value }))}
                   placeholder="0–99" type="number" min={0} max={99} style={inputStyle} />
@@ -311,6 +314,10 @@ export default function RosterPage() {
                   <option value="">—</option>
                   {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
+              </Field>
+              <Field label="Min inn">
+                <input value={(form as any).innings_target} onChange={e => setForm(f => ({ ...f, innings_target: e.target.value.replace(/\D/g, '') }))}
+                  placeholder="—" type="text" inputMode="numeric" style={inputStyle} />
               </Field>
               <Field label="Status">
                 <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
@@ -401,6 +408,11 @@ function PlayerRow({ player, onEdit, onDelete }: {
         {player.first_name} {player.last_name}
       </span>
       <PosChip pos={player.primary_position} />
+      {player.innings_target != null && (
+        <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)`, flexShrink: 0 }}>
+          {player.innings_target} inn min
+        </span>
+      )}
       <span style={{ fontSize: '11px', color: statusStyle.color, flexShrink: 0 }}>
         {player.status !== 'active' ? statusStyle.label : ''}
       </span>
