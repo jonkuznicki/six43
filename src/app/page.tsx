@@ -8,7 +8,7 @@ const FEATURES = [
   },
   {
     icon: '📊',
-    title: 'Playing time that's actually fair',
+    title: "Playing time that's actually fair",
     body: 'Track bench percentage, infield innings, catcher time, and total innings for every player across the season. Set per-player targets and get alerts before a kid sits too many innings in a row.',
   },
   {
