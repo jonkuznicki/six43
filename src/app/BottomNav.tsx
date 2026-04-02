@@ -7,7 +7,7 @@ const TABS = [
   { href: '/games',    label: 'Games',    icon: '⚾' },
   { href: '/roster',   label: 'Roster',   icon: '👥' },
   { href: '/pitching', label: 'Pitching', icon: '🎯' },
-  { href: '/fairness', label: 'Fairness', icon: '📊' },
+  { href: '/fairness', label: 'Playing Time', icon: '📊' },
   { href: '/settings', label: 'Settings', icon: '⚙' },
 ]
 

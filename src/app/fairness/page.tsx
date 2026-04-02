@@ -60,6 +60,10 @@ export default function FairnessPage() {
   const [sortKey, setSortKey] = useState<SortKey>('batting_order' as any)
   const [sortDir, setSortDir] = useState<1 | -1>(1)
   const [view, setView] = useState<'summary' | 'positions'>('summary')
+  const [games, setGames] = useState<any[]>([])
+  const [selectedPlayer, setSelectedPlayer] = useState<StatRow | null>(null)
+  const [playerSlots, setPlayerSlots] = useState<any[]>([])
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
   useEffect(() => { init() }, [])
   useEffect(() => { if (selectedSeasonId) loadStats(selectedSeasonId) }, [selectedSeasonId])
@@ -96,9 +100,11 @@ export default function FairnessPage() {
 
     const { data: games } = await supabase
       .from('games')
-      .select('id, innings_played')
+      .select('id, innings_played, opponent, game_date')
       .eq('season_id', seasonId)
       .eq('status', 'final')
+      .order('game_date', { ascending: false })
+    setGames(games ?? [])
 
     const gameIds = (games ?? []).map((g: any) => g.id)
     const lcMap: Record<string, number> = {}
@@ -138,6 +144,21 @@ export default function FairnessPage() {
 
     setStats(rows)
     setLoading(false)
+  }
+
+  async function openPlayer(row: StatRow) {
+    setSelectedPlayer(row)
+    setPlayerSlots([])
+    if (!games.length) return
+    setLoadingDetail(true)
+    const gameIds = games.map(g => g.id)
+    const { data } = await supabase
+      .from('lineup_slots')
+      .select('game_id, inning_positions, availability')
+      .eq('player_id', row.player_id)
+      .in('game_id', gameIds)
+    setPlayerSlots(data ?? [])
+    setLoadingDetail(false)
   }
 
   function sort(key: SortKey) {
@@ -284,11 +305,16 @@ export default function FairnessPage() {
                 const infieldPct = row.innings_total > 0 ? Math.round(infieldInn / row.innings_total * 100) : 0
                 const benchPctVal = Math.round(row.bench_pct * 100)
                 const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
+                const behindTarget = (row.innings_target ?? 0) > 0 && row.innings_total < row.innings_target!
+                const alertLevel = benchPctVal > 50 ? 'red' : (benchPctVal > 33 || behindTarget) ? 'amber' : null
+                const alertBorder = alertLevel === 'red' ? '#E87060' : alertLevel === 'amber' ? '#E8A020' : 'var(--border-subtle)'
                 return (
-                  <div key={row.player_id} style={{
+                  <div key={row.player_id} onClick={() => openPlayer(row)} style={{
                     background: 'var(--bg-card)',
-                    border: '0.5px solid var(--border-subtle)',
+                    border: `0.5px solid ${alertBorder}`,
+                    borderLeft: alertLevel ? `3px solid ${alertBorder}` : `0.5px solid ${alertBorder}`,
                     borderRadius: '8px', padding: '10px 12px', marginBottom: '6px',
+                    cursor: 'pointer',
                   }}>
                     {/* Player name + totals */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -298,6 +324,18 @@ export default function FairnessPage() {
                       <span style={{ fontSize: '14px', fontWeight: 600, flex: 1 }}>
                         {row.first_name} {row.last_name}
                       </span>
+                      {benchPctVal > 50 && (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#E87060',
+                          background: 'rgba(232,112,96,0.12)', borderRadius: '4px', padding: '2px 6px' }}>
+                          Too much bench
+                        </span>
+                      )}
+                      {benchPctVal <= 50 && behindTarget && (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#E8A020',
+                          background: 'rgba(232,160,32,0.12)', borderRadius: '4px', padding: '2px 6px' }}>
+                          Below target
+                        </span>
+                      )}
                       <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>
                         {row.innings_all} inn
                       </span>
@@ -430,6 +468,107 @@ export default function FairnessPage() {
             </div>
           )}
         </>
+      )}
+      {/* ── PLAYER DETAIL SHEET ── */}
+      {selectedPlayer && (
+        <div onClick={() => setSelectedPlayer(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+            width: '100%', maxWidth: '600px',
+            border: '0.5px solid var(--border)',
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Sheet header */}
+            <div style={{ padding: '1rem 1.25rem 0.75rem', borderBottom: '0.5px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 700 }}>
+                  #{selectedPlayer.jersey_number} {selectedPlayer.first_name} {selectedPlayer.last_name}
+                </div>
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                  {selectedPlayer.innings_all} total inn · {Math.round(selectedPlayer.bench_pct * 100)}% bench
+                </div>
+              </div>
+              <button onClick={() => setSelectedPlayer(null)} style={{
+                background: 'transparent', border: 'none', fontSize: '20px',
+                color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '4px',
+              }}>✕</button>
+            </div>
+
+            {/* Game list */}
+            <div style={{ overflowY: 'auto', padding: '0.75rem 1.25rem 2rem' }}>
+              {loadingDetail && (
+                <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, padding: '2rem' }}>
+                  Loading…
+                </div>
+              )}
+              {!loadingDetail && games.map(game => {
+                const slot = playerSlots.find(s => s.game_id === game.id)
+                const absent = slot?.availability === 'absent'
+                const maxInn = game.innings_played ?? 6
+                const positions: (string | null)[] = slot?.inning_positions?.slice(0, maxInn) ?? []
+                const fieldInn = positions.filter(p => p && p !== 'Bench').length
+                const benchInn = positions.filter(p => p === 'Bench').length
+                const date = new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+                const POS_CHIP_COLORS: Record<string, string> = {
+                  P: '#E8C060', C: '#E090B0',
+                  '1B': '#80B0E8', '2B': '#80B0E8', SS: '#80B0E8', '3B': '#80B0E8',
+                  LF: '#6DB875', CF: '#6DB875', LC: '#6DB875', RC: '#6DB875', RF: '#6DB875',
+                }
+
+                return (
+                  <div key={game.id} style={{
+                    borderBottom: '0.5px solid var(--border-subtle)',
+                    padding: '10px 0',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div>
+                        <span style={{ fontSize: '13px', fontWeight: 600 }}>vs {game.opponent}</span>
+                        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginLeft: '8px' }}>{date}</span>
+                      </div>
+                      {absent ? (
+                        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)` }}>Absent</span>
+                      ) : !slot ? (
+                        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.25)` }}>—</span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+                          {fieldInn} field · {benchInn} bench
+                        </span>
+                      )}
+                    </div>
+                    {!absent && slot && (
+                      <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                        {positions.map((pos, i) => {
+                          const color = pos && pos !== 'Bench' ? POS_CHIP_COLORS[pos] : null
+                          return (
+                            <div key={i} style={{
+                              fontSize: '10px', fontWeight: 600,
+                              padding: '2px 5px', borderRadius: '3px', minWidth: '24px', textAlign: 'center',
+                              background: color ? `${color}22` : 'var(--bg-input)',
+                              color: color ?? `rgba(var(--fg-rgb), 0.25)`,
+                              border: `0.5px solid ${color ? `${color}44` : 'var(--border-subtle)'}`,
+                            }}>
+                              {pos === 'Bench' ? 'B' : (pos ?? '—')}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {!loadingDetail && games.length === 0 && (
+                <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, padding: '2rem', fontSize: '13px' }}>
+                  No finalized games yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   )
