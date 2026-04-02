@@ -40,5 +40,6 @@ html[data-theme="light"] {
 /* Hide bottom nav when printing */
 @media print {
   .bottom-nav { display: none !important; }
+  .app-header { display: none !important; }
   body { padding-bottom: 0 !important; }
 }

@@ -13,7 +13,7 @@ export default function AppHeader() {
   if (HIDDEN_PATHS.includes(pathname)) return null
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       position: 'sticky', top: 0, zIndex: 50,
       background: 'var(--nav-bg)',
       backdropFilter: 'blur(14px)',
