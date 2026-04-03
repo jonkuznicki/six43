@@ -5,11 +5,12 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from './ThemeProvider'
 
 const TABS = [
-  { href: '/games',    label: 'Games',        icon: '⚾' },
-  { href: '/roster',   label: 'Roster',       icon: '👥' },
-  { href: '/pitching', label: 'Pitching',     icon: '🎯' },
-  { href: '/fairness', label: 'Playing Time', icon: '📊' },
-  { href: '/settings', label: 'Settings',     icon: '⚙️' },
+  { href: '/games',       label: 'Games',        icon: '⚾' },
+  { href: '/roster',      label: 'Roster',       icon: '👥' },
+  { href: '/depth-chart', label: 'Depth Chart',  icon: '📋' },
+  { href: '/pitching',    label: 'Pitching',     icon: '🎯' },
+  { href: '/fairness',    label: 'Playing Time', icon: '📊' },
+  { href: '/settings',    label: 'Settings',     icon: '⚙️' },
 ]
 
 const HIDDEN_PATHS = ['/', '/login']

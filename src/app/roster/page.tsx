@@ -231,10 +231,19 @@ export default function RosterPage() {
       fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto',
       padding: '1.5rem 1rem 6rem',
     }}>
-      <Link href="/settings" style={{
-        fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
-        textDecoration: 'none', display: 'block', marginBottom: '1rem',
-      }}>‹ Settings</Link>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <Link href="/settings" style={{
+          fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+          textDecoration: 'none',
+        }}>‹ Settings</Link>
+        <Link href="/depth-chart" style={{
+          fontSize: '13px', fontWeight: 600, padding: '6px 14px', borderRadius: '6px',
+          border: '0.5px solid var(--border-md)',
+          background: 'var(--bg-card)',
+          color: `rgba(var(--fg-rgb), 0.6)`,
+          textDecoration: 'none',
+        }}>Depth Chart</Link>
+      </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
