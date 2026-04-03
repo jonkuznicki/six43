@@ -86,8 +86,8 @@ export default async function HomePage() {
           letterSpacing: '-0.02em',
           marginBottom: '1.25rem',
         }}>
-          Lineups done before<br />
-          <span style={{ color: 'var(--accent)' }}>you leave the car.</span>
+          Game day,<br />
+          <span style={{ color: 'var(--accent)' }}>handled.</span>
         </h1>
 
         <p style={{
