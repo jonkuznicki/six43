@@ -34,7 +34,7 @@ export default function DepthChartPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: teams } = await supabase.from('teams').select('id').eq('is_active', true)
+    const { data: teams } = await supabase.from('teams').select('id').eq('user_id', user.id)
     const teamIds = (teams ?? []).map((t: any) => t.id)
     if (!teamIds.length) { setLoading(false); return }
 

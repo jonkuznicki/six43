@@ -316,6 +316,37 @@ export default function SettingsPage() {
     }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '1.5rem' }}>Settings</h1>
 
+      {/* ── Roster & Lineup ── */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '10px' }}>
+          Roster & Lineup
+        </div>
+        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+          <Link href="/roster" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 16px', textDecoration: 'none', color: 'var(--fg)',
+            borderBottom: '0.5px solid var(--border-subtle)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px' }}>👥</span>
+              <span style={{ fontSize: '14px' }}>Roster</span>
+            </div>
+            <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.25)` }}>›</span>
+          </Link>
+          <Link href="/depth-chart" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 16px', textDecoration: 'none', color: 'var(--fg)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px' }}>📐</span>
+              <span style={{ fontSize: '14px' }}>Depth Chart</span>
+            </div>
+            <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.25)` }}>›</span>
+          </Link>
+        </div>
+      </div>
+
       {/* Teams & Seasons section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',

@@ -6,8 +6,6 @@ import { useTheme } from './ThemeProvider'
 
 const TABS = [
   { href: '/games',       label: 'Games',        icon: '⚾' },
-  { href: '/roster',      label: 'Roster',       icon: '👥' },
-  { href: '/depth-chart', label: 'Depth Chart',  icon: '📋' },
   { href: '/pitching',    label: 'Pitching',     icon: '🎯' },
   { href: '/fairness',    label: 'Playing Time', icon: '📊' },
   { href: '/settings',    label: 'Settings',     icon: '⚙️' },
@@ -55,8 +53,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Theme toggle */}
-      <div style={{ padding: '1rem 1.25rem', borderTop: '0.5px solid var(--border)', flexShrink: 0 }}>
+      {/* Theme toggle + back to site */}
+      <div style={{ padding: '1rem 1.25rem', borderTop: '0.5px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <button onClick={toggle} style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           background: 'transparent', border: 'none', cursor: 'pointer',
@@ -66,6 +64,14 @@ export default function Sidebar() {
           <span style={{ fontSize: '16px' }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
           <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
         </button>
+        <Link href="/" style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '12px', padding: '4px 0',
+          textDecoration: 'none',
+        }}>
+          <span style={{ fontSize: '14px' }}>←</span>
+          <span>Back to site</span>
+        </Link>
       </div>
     </aside>
   )

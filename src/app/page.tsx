@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { createServerClient } from '../lib/supabase-server'
-import { redirect } from 'next/navigation'
 
 const FEATURES = [
   { icon: '⚾', title: 'Lineup builder',        body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper.' },
@@ -51,7 +50,7 @@ function PhoneMockup({ src, alt, caption }: { src: string; alt: string; caption?
 export default async function HomePage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect('/games')
+  const loggedIn = !!user
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
@@ -65,23 +64,38 @@ export default async function HomePage() {
           Six<span style={{ color: 'var(--accent)' }}>43</span>
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link href="/login" style={{
-            fontSize: '13px', fontWeight: 600,
-            color: `rgba(var(--fg-rgb), 0.6)`,
-            textDecoration: 'none',
-          }}>
-            Log in
-          </Link>
-          <Link href="/login" style={{
-            fontSize: '13px', fontWeight: 700,
-            color: 'var(--accent-text)',
-            background: 'var(--accent)',
-            textDecoration: 'none',
-            padding: '7px 18px',
-            borderRadius: '6px',
-          }}>
-            Get started
-          </Link>
+          {loggedIn ? (
+            <Link href="/games" style={{
+              fontSize: '13px', fontWeight: 700,
+              color: 'var(--accent-text)',
+              background: 'var(--accent)',
+              textDecoration: 'none',
+              padding: '7px 18px',
+              borderRadius: '6px',
+            }}>
+              Open app →
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" style={{
+                fontSize: '13px', fontWeight: 600,
+                color: `rgba(var(--fg-rgb), 0.6)`,
+                textDecoration: 'none',
+              }}>
+                Log in
+              </Link>
+              <Link href="/login" style={{
+                fontSize: '13px', fontWeight: 700,
+                color: 'var(--accent-text)',
+                background: 'var(--accent)',
+                textDecoration: 'none',
+                padding: '7px 18px',
+                borderRadius: '6px',
+              }}>
+                Get started
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
