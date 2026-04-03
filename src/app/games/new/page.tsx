@@ -157,7 +157,7 @@ export default function NewGamePage() {
           Upgrade to Six43 Pro for unlimited games, full season history, and everything you need for a full season.
         </div>
         <div style={{ marginBottom: '8px', fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)` }}>
-          <span style={{ textDecoration: 'line-through' }}>$4.99/mo</span>
+          <span style={{ textDecoration: 'line-through' }}>$2.99/mo</span>
         </div>
         <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--accent)', marginBottom: '4px' }}>
           $1.49/mo
