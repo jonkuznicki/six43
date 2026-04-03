@@ -237,35 +237,7 @@ export default async function HomePage() {
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight reverse">
           <div className="mkt-spotlight-img">
-            {/* Replace src with /screenshot-fairness.png when available */}
-            <div style={{
-              width: '100%', maxWidth: '280px', margin: '0 auto',
-              aspectRatio: '9/16',
-              background: 'var(--bg-card)',
-              border: '0.5px solid var(--border)',
-              borderRadius: '16px',
-              display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-              gap: '12px', padding: '2rem',
-            }}>
-              <span style={{ fontSize: '48px' }}>📊</span>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Playing time view</div>
-                <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, lineHeight: 1.5 }}>Screenshot coming soon</div>
-              </div>
-              {/* Sample stat rows */}
-              {['Marcus R. · 45% bench', 'Tyler K. · 12% bench', 'Jordan L. · 33% bench'].map((row, i) => (
-                <div key={i} style={{
-                  width: '100%', padding: '8px 12px', borderRadius: '8px',
-                  background: i === 0 ? 'rgba(232,80,80,0.12)' : 'var(--bg-card-alt)',
-                  border: `0.5px solid ${i === 0 ? 'rgba(232,80,80,0.2)' : 'var(--border-subtle)'}`,
-                  fontSize: '11px', color: `rgba(var(--fg-rgb), ${i === 0 ? '0.8' : '0.5'})`,
-                  display: 'flex', justifyContent: 'space-between',
-                }}>
-                  <span>{row.split(' · ')[0]}</span>
-                  <span style={{ color: i === 0 ? '#E85050' : 'inherit' }}>{row.split(' · ')[1]}</span>
-                </div>
-              ))}
-            </div>
+            <PhoneMockup src="/screenshot-fairness.png" alt="Playing time view" />
           </div>
           <div className="mkt-spotlight-text">
             <div style={{
@@ -280,6 +252,38 @@ export default async function HomePage() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {['Bench % tracked per player per game', 'Set an innings target and track progress', 'Per-game breakdown: who played where and when'].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Spotlight 3: Pitching planner ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div className="mkt-spotlight">
+          <div className="mkt-spotlight-img">
+            <PhoneMockup src="/screenshot-pitching.png" alt="Pitching planner" />
+          </div>
+          <div className="mkt-spotlight-text">
+            <div style={{
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'var(--accent)', marginBottom: '12px',
+            }}>Pitching planner</div>
+            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
+              Know who can pitch<br />before you get to the field.
+            </h2>
+            <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
+              Log pitch counts after each game and track rest days automatically. See exactly who's eligible for your next game — no more guessing or scrambling on game day.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {['Pitch counts logged per game', 'Rest days calculated to the next scheduled game', 'Eligible pitchers highlighted at a glance'].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
