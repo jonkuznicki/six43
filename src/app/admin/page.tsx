@@ -13,6 +13,7 @@ type UserRow = {
   plan_updated_at: string | null
   plan_notes: string | null
   game_count: number
+  beta_features: boolean
 }
 
 function timeAgo(iso: string | null): string {
@@ -91,6 +92,26 @@ export default function AdminPage() {
     setSaving(null)
     setNotesFor(null)
     setNotesDraft('')
+  }
+
+  async function setBeta(userId: string, betaFeatures: boolean) {
+    setSaving(userId + '-beta')
+    setSaveError('')
+    const res = await fetch('/api/admin/set-beta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, betaFeatures }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setSaveError(body.error ?? `Save failed (${res.status}) — check that the profiles table exists in Supabase.`)
+      setSaving(null)
+      return
+    }
+    setUsers(prev => prev.map(u =>
+      u.id === userId ? { ...u, beta_features: betaFeatures } : u
+    ))
+    setSaving(null)
   }
 
   // Summary stats
@@ -230,6 +251,21 @@ export default function AdminPage() {
                       {user.plan_notes}
                     </div>
                   )}
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      onClick={() => setBeta(user.id, !user.beta_features)}
+                      disabled={saving === user.id + '-beta'}
+                      style={{
+                        fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px',
+                        background: user.beta_features ? 'rgba(109,184,255,0.15)' : 'transparent',
+                        color: user.beta_features ? '#6DB8FF' : `rgba(var(--fg-rgb), 0.35)`,
+                        border: `0.5px solid ${user.beta_features ? 'rgba(109,184,255,0.35)' : 'var(--border)'}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {saving === user.id + '-beta' ? '…' : user.beta_features ? '🔬 Beta on' : 'Beta off'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Plan badge + action */}

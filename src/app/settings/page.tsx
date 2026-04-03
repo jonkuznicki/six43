@@ -337,10 +337,21 @@ export default function SettingsPage() {
           <Link href="/depth-chart" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '14px 16px', textDecoration: 'none', color: 'var(--fg)',
+            borderBottom: '0.5px solid var(--border-subtle)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '18px' }}>📐</span>
               <span style={{ fontSize: '14px' }}>Depth Chart</span>
+            </div>
+            <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.25)` }}>›</span>
+          </Link>
+          <Link href="/schedule" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 16px', textDecoration: 'none', color: 'var(--fg)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px' }}>📅</span>
+              <span style={{ fontSize: '14px' }}>Schedule Calendar</span>
             </div>
             <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.25)` }}>›</span>
           </Link>

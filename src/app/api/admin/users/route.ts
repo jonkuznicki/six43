@@ -25,6 +25,11 @@ export async function GET() {
   const planMap: Record<string, any> = {}
   for (const p of plans ?? []) planMap[p.user_id] = p
 
+  // Fetch all profiles (beta_features)
+  const { data: profiles } = await service.from('profiles').select('user_id, beta_features')
+  const profileMap: Record<string, boolean> = {}
+  for (const p of profiles ?? []) profileMap[p.user_id] = p.beta_features ?? false
+
   // Fetch all teams → seasons → game counts in bulk
   const { data: allTeams } = await service.from('teams').select('id, user_id')
   const { data: allSeasons } = await service.from('seasons').select('id, team_id')
@@ -54,6 +59,7 @@ export async function GET() {
     plan_updated_at: planMap[u.id]?.updated_at ?? null,
     plan_notes: planMap[u.id]?.notes ?? null,
     game_count: gameCountMap[u.id] ?? 0,
+    beta_features: profileMap[u.id] ?? false,
   }))
 
   // Sort: at-limit free users first (hottest leads), then pro, then rest by join date

@@ -136,6 +136,13 @@ html[data-theme="light"] {
   .mkt-spotlight.reverse .mkt-spotlight-img  { order: 1; }
 }
 
+/* Schedule page print/screen split */
+.sched-print { display: none; }
+@media print {
+  .no-print    { display: none !important; }
+  .sched-print { display: block; }
+}
+
 /* Hide everything chrome when printing */
 @media print {
   .bottom-nav  { display: none !important; }
