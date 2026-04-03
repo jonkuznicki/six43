@@ -57,6 +57,8 @@ export default function SettingsPage() {
   const [pwError, setPwError] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwSuccess, setPwSuccess] = useState(false)
+  const [plan, setPlan] = useState<'free' | 'pro'>('free')
+  const [gameCount, setGameCount] = useState(0)
 
   // Invite / team members
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({})
@@ -88,6 +90,23 @@ export default function SettingsPage() {
     if (!user) return
     setUserEmail(user.email ?? '')
     setUserId(user.id)
+
+    // Plan
+    const { data: planRow } = await supabase.from('user_plans').select('plan').maybeSingle()
+    const userPlan: 'free' | 'pro' = planRow?.plan ?? 'free'
+    setPlan(userPlan)
+
+    // Game count (for free limit display)
+    const { data: teamIds } = await supabase.from('teams').select('id').eq('user_id', user.id)
+    if (teamIds && userPlan === 'free') {
+      const { data: seasonIds } = await supabase.from('seasons').select('id')
+        .in('team_id', teamIds.map(t => t.id))
+      if (seasonIds) {
+        const { count } = await supabase.from('games').select('id', { count: 'exact', head: true })
+          .in('season_id', seasonIds.map(s => s.id))
+        setGameCount(count ?? 0)
+      }
+    }
 
     const { data: teamRows } = await supabase
       .from('teams').select('*').eq('user_id', user.id).order('created_at')
@@ -779,6 +798,59 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* ── PLAN ── */}
+      <div style={{ marginTop: '2rem', borderTop: '0.5px solid var(--border-subtle)', paddingTop: '1.5rem' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '12px' }}>
+          Plan
+        </div>
+        <div style={{
+          background: plan === 'pro' ? 'rgba(232,160,32,0.07)' : 'var(--bg-card)',
+          border: `0.5px solid ${plan === 'pro' ? 'rgba(232,160,32,0.3)' : 'var(--border)'}`,
+          borderRadius: '12px', padding: '16px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 700 }}>
+                  {plan === 'pro' ? 'Six43 Pro' : 'Free plan'}
+                </span>
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                  background: plan === 'pro' ? 'rgba(232,160,32,0.2)' : 'rgba(255,255,255,0.06)',
+                  color: plan === 'pro' ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.4)`,
+                  border: `0.5px solid ${plan === 'pro' ? 'rgba(232,160,32,0.3)' : 'var(--border)'}`,
+                }}>
+                  {plan === 'pro' ? 'PRO' : 'FREE'}
+                </span>
+              </div>
+              {plan === 'free' && (
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                  {gameCount} of 3 games used · <span style={{ color: gameCount >= 3 ? '#E87060' : 'inherit' }}>
+                    {3 - gameCount} remaining
+                  </span>
+                </div>
+              )}
+              {plan === 'pro' && (
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                  Unlimited games · all features
+                </div>
+              )}
+            </div>
+            {plan === 'free' && (
+              <div style={{
+                fontSize: '12px', fontWeight: 700, padding: '7px 14px', borderRadius: '6px',
+                background: 'rgba(232,160,32,0.12)', color: 'var(--accent)',
+                border: '0.5px solid rgba(232,160,32,0.3)',
+                opacity: 0.7,
+              }}>
+                Upgrade · coming soon
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* ── ACCOUNT ── */}
       <div style={{ marginTop: '2rem', borderTop: '0.5px solid var(--border-subtle)', paddingTop: '1.5rem' }}>

@@ -362,7 +362,9 @@ export default async function HomePage() {
           }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Free</div>
             <div style={{ fontSize: '32px', fontWeight: 800, marginBottom: '2px' }}>$0</div>
-            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>3 games included</div>
+            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>
+              3 games · no credit card required
+            </div>
             {['All features included', 'Lineup builder', 'Playing time tracking', 'Pitching planner', 'Depth chart', 'Share & print lineups'].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ color: i === 0 ? 'var(--accent)' : '#6DB875', fontSize: '12px', fontWeight: i === 0 ? 700 : 400 }}>
@@ -393,12 +395,18 @@ export default async function HomePage() {
               fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
               background: 'var(--accent)', color: 'var(--accent-text)',
               padding: '3px 10px', borderRadius: '0 0 6px 6px',
-            }}>POPULAR</div>
+            }}>INTRO PRICE</div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Pro</div>
-            <div style={{ fontSize: '32px', fontWeight: 800, marginBottom: '2px' }}>
-              $4.99<span style={{ fontSize: '14px', fontWeight: 400, color: `rgba(var(--fg-rgb), 0.4)` }}>/mo</span>
+            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, textDecoration: 'line-through', marginBottom: '2px' }}>
+              $4.99/mo
             </div>
-            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>or $39/year · save 35%</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--accent)' }}>$1.49</span>
+              <span style={{ fontSize: '14px', fontWeight: 400, color: `rgba(var(--fg-rgb), 0.4)` }}>/mo</span>
+            </div>
+            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.5rem' }}>
+              or $12/year · introductory pricing
+            </div>
             {['Everything in Free', 'Unlimited games', 'Full season history', 'Priority support', 'Early access to new features'].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ color: i === 0 ? 'var(--accent)' : '#6DB875', fontSize: '12px', fontWeight: i === 0 ? 700 : 400 }}>

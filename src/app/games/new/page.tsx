@@ -7,6 +7,8 @@ import Link from 'next/link'
 
 const LOCATIONS = ['Home', 'Away', 'Neutral']
 
+const FREE_GAME_LIMIT = 3
+
 export default function NewGamePage() {
   const supabase = createClient()
   const router = useRouter()
@@ -15,6 +17,8 @@ export default function NewGamePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [plan, setPlan] = useState<'free' | 'pro'>('free')
+  const [gameCount, setGameCount] = useState(0)
   const [form, setForm] = useState({
     opponent: '',
     game_date: new Date().toISOString().split('T')[0],
@@ -26,7 +30,33 @@ export default function NewGamePage() {
   useEffect(() => { init() }, [])
 
   async function init() {
+    const { data: { user } } = await supabase.auth.getUser()
     const teamIdParam = new URLSearchParams(window.location.search).get('teamId')
+
+    // Check plan
+    const { data: planRow } = await supabase
+      .from('user_plans')
+      .select('plan')
+      .maybeSingle()
+    const userPlan: 'free' | 'pro' = planRow?.plan ?? 'free'
+    setPlan(userPlan)
+
+    // Count total games across all user's seasons (for free limit)
+    if (userPlan === 'free' && user) {
+      const { count } = await supabase
+        .from('games')
+        .select('id', { count: 'exact', head: true })
+        .in('season_id',
+          (await supabase
+            .from('seasons')
+            .select('id')
+            .in('team_id',
+              (await supabase.from('teams').select('id').eq('user_id', user.id)).data?.map(t => t.id) ?? []
+            )
+          ).data?.map(s => s.id) ?? []
+        )
+      setGameCount(count ?? 0)
+    }
 
     const seasonQuery = supabase
       .from('seasons')
@@ -43,15 +73,13 @@ export default function NewGamePage() {
 
     if (seasonData) {
       setForm(f => ({ ...f, innings_played: String((seasonData as any).innings_per_game ?? 6) }))
-      if (seasonData) {
-        const { data: playerData } = await supabase
-          .from('players')
-          .select('id, first_name, last_name, jersey_number, batting_pref_order')
-          .eq('season_id', seasonData.id)
-          .eq('status', 'active')
-          .order('batting_pref_order', { ascending: true, nullsFirst: false })
-        setPlayers(playerData ?? [])
-      }
+      const { data: playerData } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, jersey_number, batting_pref_order')
+        .eq('season_id', seasonData.id)
+        .eq('status', 'active')
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
+      setPlayers(playerData ?? [])
     }
     setLoading(false)
   }
@@ -104,6 +132,52 @@ export default function NewGamePage() {
     <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
       fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       Loading...
+    </main>
+  )
+
+  const atLimit = plan === 'free' && gameCount >= FREE_GAME_LIMIT
+
+  if (atLimit) return (
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
+      fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto', padding: '1.5rem 1rem 6rem' }}>
+      <Link href="/games" style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+        textDecoration: 'none', display: 'block', marginBottom: '1.5rem' }}>‹ Games</Link>
+      <div style={{
+        background: 'rgba(232,160,32,0.07)',
+        border: '0.5px solid rgba(232,160,32,0.25)',
+        borderRadius: '14px',
+        padding: '2rem 1.5rem',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚾</div>
+        <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '8px' }}>
+          You've used all {FREE_GAME_LIMIT} free games
+        </div>
+        <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.6)`, lineHeight: 1.6, marginBottom: '1.75rem' }}>
+          Upgrade to Six43 Pro for unlimited games, full season history, and everything you need for a full season.
+        </div>
+        <div style={{ marginBottom: '8px', fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)` }}>
+          <span style={{ textDecoration: 'line-through' }}>$4.99/mo</span>
+        </div>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--accent)', marginBottom: '4px' }}>
+          $1.49/mo
+        </div>
+        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.5rem' }}>
+          or $12/year · introductory pricing
+        </div>
+        <div style={{
+          display: 'inline-block',
+          padding: '13px 32px',
+          background: 'var(--accent)', color: 'var(--accent-text)',
+          borderRadius: '8px', fontSize: '14px', fontWeight: 700,
+          opacity: 0.6,
+        }}>
+          Upgrade to Pro — coming soon
+        </div>
+        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1rem' }}>
+          Paid plans launching soon. Contact us if you need access now.
+        </div>
+      </div>
     </main>
   )
 
