@@ -48,6 +48,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserRow[]>([])
   const [saving, setSaving] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState('')
   const [notesFor, setNotesFor] = useState<string | null>(null)
   const [notesDraft, setNotesDraft] = useState('')
   const [search, setSearch] = useState('')
@@ -70,11 +71,18 @@ export default function AdminPage() {
 
   async function setPlan(userId: string, plan: 'free' | 'pro', notes?: string) {
     setSaving(userId)
-    await fetch('/api/admin/set-plan', {
+    setSaveError('')
+    const res = await fetch('/api/admin/set-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, plan, notes }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setSaveError(body.error ?? `Save failed (${res.status}) — check that the user_plans table exists in Supabase.`)
+      setSaving(null)
+      return
+    }
     setUsers(prev => prev.map(u =>
       u.id === userId
         ? { ...u, plan, plan_notes: notes ?? u.plan_notes, plan_updated_at: new Date().toISOString() }
@@ -128,6 +136,19 @@ export default function AdminPage() {
         </div>
         <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Users</h1>
       </div>
+
+      {/* Error banner */}
+      {saveError && (
+        <div style={{
+          fontSize: '13px', color: '#E87060',
+          background: 'rgba(192,57,43,0.12)', border: '0.5px solid rgba(192,57,43,0.3)',
+          borderRadius: '8px', padding: '12px 14px', marginBottom: '1.25rem',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span>{saveError}</span>
+          <button onClick={() => setSaveError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E87060', fontSize: '16px', padding: '0 0 0 12px' }}>×</button>
+        </div>
+      )}
 
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
