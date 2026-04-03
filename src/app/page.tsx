@@ -481,7 +481,18 @@ export default async function HomePage() {
         fontSize: '12px',
         color: `rgba(var(--fg-rgb), 0.25)`,
       }}>
-        Six<span style={{ color: 'var(--accent)', opacity: 0.6 }}>43</span> · Built for youth baseball coaches
+        <div style={{ marginBottom: '8px' }}>
+          Six<span style={{ color: 'var(--accent)', opacity: 0.6 }}>43</span> · Built for youth baseball coaches
+        </div>
+        <div>
+          Questions or feedback?{' '}
+          <a href="mailto:jonkuznicki@gmail.com?subject=Six43 feedback" style={{
+            color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
+            borderBottom: '0.5px solid rgba(var(--fg-rgb), 0.2)',
+          }}>
+            jonkuznicki@gmail.com
+          </a>
+        </div>
       </footer>
 
     </main>

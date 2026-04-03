@@ -912,6 +912,15 @@ export default function SettingsPage() {
               borderBottom: '0.5px solid var(--border-subtle)' }}>
             Change password
           </button>
+          {/* Feedback row */}
+          <a href="mailto:jonkuznicki@gmail.com?subject=Six43 feedback" style={{
+            display: 'block', width: '100%', padding: '13px 16px', background: 'transparent',
+            borderBottom: '0.5px solid var(--border-subtle)',
+            textAlign: 'left', fontSize: '13px', color: `rgba(var(--fg-rgb), 0.6)`,
+            textDecoration: 'none', boxSizing: 'border-box',
+          }}>
+            Send feedback or feature request
+          </a>
           {/* Sign out row */}
           <button onClick={signOut} style={{ width: '100%', padding: '13px 16px', background: 'transparent',
             border: 'none', textAlign: 'left', fontSize: '13px',
