@@ -140,13 +140,12 @@ export default async function HomePage() {
             aspectRatio: '9/19.5',
             position: 'relative',
           }}>
-            {/* Screenshot — swap src once you have the file */}
+            {/* Screenshot */}
             <Image
               src="/screenshot-lineup.png"
               alt="Six43 lineup builder"
               fill
               style={{ objectFit: 'cover', objectPosition: 'top' }}
-              onError={() => {}}
             />
           </div>
         </div>
