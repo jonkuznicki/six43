@@ -5,24 +5,44 @@ import { redirect } from 'next/navigation'
 
 const FEATURES = [
   {
-    icon: '⚡',
-    title: 'Build a lineup in minutes',
-    body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper — just tap a position, tap the cells, and your lineup is done.',
+    icon: '⚾',
+    title: 'Lineup builder',
+    body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper — just pick a position and tap the cells.',
   },
   {
     icon: '📋',
-    title: 'Everything in one place',
-    body: 'Roster, schedule, lineup, score, and notes — all connected. Create a game, mark attendance, build the lineup, and print a card to bring to the field.',
-  },
-  {
-    icon: '🔗',
-    title: 'Share with your coaching staff',
-    body: "Invite assistant coaches so everyone is working from the same lineup. Generate a read-only link for anyone who just needs to see the card — no login required.",
+    title: 'Attendance tracking',
+    body: 'Mark who\'s there on game day. Absent players are automatically pulled from the lineup so you\'re never caught off guard.',
   },
   {
     icon: '📊',
-    title: 'Playing time that adds up fairly',
-    body: 'See bench %, innings by position, and season totals for every player. Set targets and get a heads-up before a kid has been sitting too long.',
+    title: 'Playing time fairness',
+    body: 'See bench %, innings by position, and season totals for every player. Get flagged before a kid sits too long.',
+  },
+  {
+    icon: '🎯',
+    title: 'Pitching planner',
+    body: 'Log pitch counts and track rest days for every pitcher. See who\'s eligible for your next game at a glance.',
+  },
+  {
+    icon: '📐',
+    title: 'Depth chart',
+    body: 'Rank players at every position and flag who can\'t play certain spots. Your depth chart lives with your roster — always current.',
+  },
+  {
+    icon: '🔗',
+    title: 'Share with your staff',
+    body: 'Invite assistant coaches to collaborate. Generate a read-only link for anyone who just needs to see the card — no login required.',
+  },
+  {
+    icon: '🖨️',
+    title: 'Print-ready lineup card',
+    body: 'One tap to print a clean lineup card to bring to the field. Works from your phone or desktop.',
+  },
+  {
+    icon: '📱',
+    title: 'Works on any device',
+    body: 'Install it on your phone like an app or use it from your laptop. The same lineup, everywhere.',
   },
 ]
 
@@ -97,7 +117,7 @@ export default async function HomePage() {
           maxWidth: '460px',
           margin: '0 auto 2.5rem',
         }}>
-          Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and coordinate with your staff — seamlessly from your phone or desktop.
+          Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and coordinate with your staff — from your phone or laptop.
         </p>
 
         <Link href="/login" style={{
@@ -110,13 +130,15 @@ export default async function HomePage() {
           textDecoration: 'none',
           letterSpacing: '0.01em',
         }}>
-          Get started free
+          Try it free
         </Link>
+        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '10px' }}>
+          3 games free · no credit card required
+        </div>
       </section>
 
       {/* Phone mockup */}
       <section style={{ maxWidth: '680px', margin: '0 auto', padding: '0 1.5rem 4rem', textAlign: 'center' }}>
-        {/* Phone frame */}
         <div style={{
           display: 'inline-block',
           position: 'relative',
@@ -140,7 +162,6 @@ export default async function HomePage() {
             aspectRatio: '9/19.5',
             position: 'relative',
           }}>
-            {/* Screenshot */}
             <Image
               src="/screenshot-lineup.png"
               alt="Six43 lineup builder"
@@ -176,7 +197,6 @@ export default async function HomePage() {
             { n: '3', title: 'Build the lineup', body: 'Pick a position, paint the innings. The whole lineup grid fills in as you go. Done in minutes.' },
           ].map((step, i, arr) => (
             <div key={step.n} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', position: 'relative' }}>
-              {/* Line connector */}
               {i < arr.length - 1 && (
                 <div style={{
                   position: 'absolute', left: '19px', top: '40px',
@@ -206,37 +226,44 @@ export default async function HomePage() {
       <section style={{
         maxWidth: '680px', margin: '0 auto',
         padding: '3rem 1.5rem 4rem',
-        display: 'flex', flexDirection: 'column', gap: '16px',
       }}>
         <div style={{
           fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.3)`,
           marginBottom: '4px', textAlign: 'center',
         }}>
-          Built for game day
+          Everything included
         </div>
+        <h2 style={{ fontSize: '24px', fontWeight: 800, textAlign: 'center', marginBottom: '0.5rem' }}>
+          Built for the whole season
+        </h2>
+        <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '2rem' }}>
+          Every feature is available on every plan — free or paid.
+        </p>
 
-        {FEATURES.map(f => (
-          <div key={f.title} style={{
-            background: 'var(--bg-card)',
-            border: '0.5px solid var(--border)',
-            borderRadius: '12px',
-            padding: '1.25rem 1.5rem',
-            display: 'flex', gap: '1rem', alignItems: 'flex-start',
-          }}>
-            <span style={{ fontSize: '28px', lineHeight: 1, flexShrink: 0, marginTop: '2px' }}>
-              {f.icon}
-            </span>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>
-                {f.title}
-              </div>
-              <div style={{ fontSize: '13px', lineHeight: 1.6, color: `rgba(var(--fg-rgb), 0.55)` }}>
-                {f.body}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          {FEATURES.map(f => (
+            <div key={f.title} style={{
+              background: 'var(--bg-card)',
+              border: '0.5px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1.25rem 1.5rem',
+              display: 'flex', gap: '1rem', alignItems: 'flex-start',
+            }}>
+              <span style={{ fontSize: '24px', lineHeight: 1, flexShrink: 0, marginTop: '2px' }}>
+                {f.icon}
+              </span>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '5px' }}>
+                  {f.title}
+                </div>
+                <div style={{ fontSize: '13px', lineHeight: 1.6, color: `rgba(var(--fg-rgb), 0.55)` }}>
+                  {f.body}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
       {/* Divider */}
@@ -255,10 +282,10 @@ export default async function HomePage() {
           Pricing
         </div>
         <h2 style={{ fontSize: '26px', fontWeight: 800, textAlign: 'center', marginBottom: '0.5rem' }}>
-          Free while we're in beta
+          Simple, honest pricing
         </h2>
         <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '2rem' }}>
-          Full access, no credit card required. Paid plans coming later.
+          Same experience on every plan. Pay when you're ready for unlimited.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -271,18 +298,21 @@ export default async function HomePage() {
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Free</div>
             <div style={{ fontSize: '28px', fontWeight: 800, marginBottom: '2px' }}>$0</div>
             <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.25rem' }}>
-              During beta
+              3 games included
             </div>
             {[
+              'All features included',
               'Lineup builder',
               'Playing time tracking',
-              'Share lineups instantly',
-              'Invite assistant coaches',
-              'Season management',
-            ].map(f => (
+              'Pitching planner',
+              'Depth chart',
+              'Share & print lineups',
+            ].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
-                <span style={{ color: '#6DB875', fontSize: '12px' }}>✓</span>
-                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.65)` }}>{f}</span>
+                <span style={{ color: i === 0 ? 'var(--accent)' : '#6DB875', fontSize: '12px', fontWeight: i === 0 ? 700 : 400 }}>
+                  {i === 0 ? '★' : '✓'}
+                </span>
+                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), ${i === 0 ? '0.85' : '0.65'})`, fontWeight: i === 0 ? 600 : 400 }}>{f}</span>
               </div>
             ))}
             <Link href="/login" style={{
@@ -291,32 +321,40 @@ export default async function HomePage() {
               borderRadius: '6px', textAlign: 'center',
               fontSize: '13px', fontWeight: 700, textDecoration: 'none',
             }}>
-              Get started
+              Get started free
             </Link>
           </div>
 
           {/* Pro tier */}
           <div style={{
             background: 'var(--bg-card)',
-            border: '0.5px solid var(--border)',
+            border: '0.5px solid rgba(232,160,32,0.3)',
             borderRadius: '12px', padding: '1.25rem',
-            opacity: 0.6,
+            position: 'relative',
           }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '4px' }}>Pro</div>
-            <div style={{ fontSize: '28px', fontWeight: 800, marginBottom: '2px' }}>TBD</div>
+            <div style={{
+              position: 'absolute', top: '-1px', right: '16px',
+              fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              padding: '3px 10px', borderRadius: '0 0 6px 6px',
+            }}>POPULAR</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Pro</div>
+            <div style={{ fontSize: '28px', fontWeight: 800, marginBottom: '2px' }}>$4.99<span style={{ fontSize: '14px', fontWeight: 400, color: `rgba(var(--fg-rgb), 0.4)` }}>/mo</span></div>
             <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.25rem' }}>
-              Coming soon
+              or $39/year · save 35%
             </div>
             {[
               'Everything in Free',
-              'Multiple teams',
-              'Advanced analytics',
+              'Unlimited games',
+              'Full season history',
               'Priority support',
-              'More coming...',
-            ].map(f => (
+              'Early access to new features',
+            ].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
-                <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '12px' }}>·</span>
-                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>{f}</span>
+                <span style={{ color: i === 0 ? 'var(--accent)' : '#6DB875', fontSize: '12px', fontWeight: i === 0 ? 700 : 400 }}>
+                  {i === 0 ? '★' : '✓'}
+                </span>
+                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), ${i === 0 ? '0.85' : '0.65'})`, fontWeight: i === 0 ? 600 : 400 }}>{f}</span>
               </div>
             ))}
             <div style={{
@@ -350,7 +388,7 @@ export default async function HomePage() {
             fontSize: '14px', color: `rgba(var(--fg-rgb), 0.55)`,
             marginBottom: '1.75rem', lineHeight: 1.6,
           }}>
-            Set up your roster in minutes. No credit card required.
+            Set up your roster in minutes. 3 games free, no credit card required.
           </div>
           <Link href="/login" style={{
             display: 'inline-block',
