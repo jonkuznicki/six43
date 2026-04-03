@@ -423,7 +423,7 @@ export default async function HomePage() {
             }}>BETA OFFER</div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Pro</div>
             <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, textDecoration: 'line-through', marginBottom: '2px' }}>
-              $2.99/mo
+              $1.49/mo
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '2px' }}>
               <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--accent)' }}>Free</span>
