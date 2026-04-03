@@ -71,6 +71,71 @@ html[data-theme="light"] {
   }
 }
 
+/* ── Marketing page responsive ── */
+.mkt-outer    { max-width: 680px; margin: 0 auto; }
+.mkt-wide     { max-width: 680px; margin: 0 auto; }
+.mkt-divider  { border-top: 0.5px solid var(--border-subtle); max-width: 680px; margin: 0 auto; }
+
+.mkt-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3.5rem 1.5rem 2rem;
+}
+.mkt-hero-phone { padding: 0 1.5rem 4rem; text-align: center; }
+
+.mkt-steps { display: flex; flex-direction: column; }
+.mkt-step-connector { display: block; }
+
+.mkt-spotlight {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  align-items: center;
+}
+.mkt-spotlight-text { order: 1; }
+.mkt-spotlight-img  { order: 0; width: 100%; max-width: 320px; }
+.mkt-spotlight.reverse .mkt-spotlight-text { order: 1; }
+.mkt-spotlight.reverse .mkt-spotlight-img  { order: 0; }
+
+@media (min-width: 900px) {
+  .mkt-outer   { max-width: 1080px; }
+  .mkt-wide    { max-width: 1080px; }
+  .mkt-divider { max-width: 1080px; }
+
+  .mkt-hero {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 4rem;
+    padding: 5rem 1.5rem 5rem;
+  }
+  .mkt-hero-text { flex: 1; }
+  .mkt-hero-text p { margin-left: 0 !important; }
+  .mkt-hero-text > div:first-child { display: inline-block; }
+  .mkt-hero-phone {
+    flex-shrink: 0;
+    width: 240px;
+    padding: 0;
+    margin-bottom: 0;
+  }
+
+  .mkt-steps { flex-direction: row; gap: 2rem; align-items: flex-start; }
+  .mkt-steps > div { flex: 1; }
+  .mkt-step-connector { display: none; }
+
+  .mkt-spotlight {
+    flex-direction: row;
+    gap: 5rem;
+    align-items: center;
+  }
+  .mkt-spotlight-text { flex: 1; order: 1; }
+  .mkt-spotlight-img  { flex-shrink: 0; order: 0; max-width: 280px; width: 280px; }
+  .mkt-spotlight.reverse .mkt-spotlight-text { order: 0; }
+  .mkt-spotlight.reverse .mkt-spotlight-img  { order: 1; }
+}
+
 /* Hide everything chrome when printing */
 @media print {
   .bottom-nav  { display: none !important; }
