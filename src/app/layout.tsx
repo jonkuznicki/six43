@@ -3,6 +3,7 @@ import './globals.css'
 import ThemeProvider from './ThemeProvider'
 import BottomNav from './BottomNav'
 import AppHeader from './AppHeader'
+import Sidebar from './Sidebar'
 import InstallPrompt from './InstallPrompt'
 
 export const metadata: Metadata = {
@@ -41,8 +42,11 @@ export default function RootLayout({
       </head>
       <body style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
         <ThemeProvider>
+          <Sidebar />
           <AppHeader />
-          {children}
+          <div className="app-content">
+            {children}
+          </div>
           <BottomNav />
           <InstallPrompt />
         </ThemeProvider>

@@ -37,9 +37,45 @@ html[data-theme="light"] {
   --nav-bg: rgba(240,237,232,0.96);
 }
 
-/* Hide bottom nav when printing */
+/* ── Sidebar (hidden on mobile, shown on desktop) ── */
+.sidebar {
+  display: none;
+}
+
+/* ── Desktop layout ── */
+@media (min-width: 768px) {
+  .app-header  { display: none !important; }
+  .bottom-nav  { display: none !important; }
+
+  .sidebar {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 220px;
+    background: var(--nav-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-right: 0.5px solid var(--border);
+    z-index: 100;
+  }
+
+  .app-content {
+    margin-left: 220px;
+  }
+
+  /* Widen page containers and remove bottom-nav padding */
+  .app-content main {
+    max-width: 800px !important;
+    padding-bottom: 3rem !important;
+  }
+}
+
+/* Hide everything chrome when printing */
 @media print {
-  .bottom-nav { display: none !important; }
-  .app-header { display: none !important; }
+  .bottom-nav  { display: none !important; }
+  .app-header  { display: none !important; }
+  .sidebar     { display: none !important; }
+  .app-content { margin-left: 0 !important; }
   body { padding-bottom: 0 !important; }
 }
