@@ -153,7 +153,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>
-              Free for beta testers · no credit card required
+              3 games free · beta testers get Pro free · no credit card
             </div>
           </div>
         </div>
@@ -361,30 +361,34 @@ export default async function HomePage() {
           Pricing
         </div>
         <h2 style={{ fontSize: '26px', fontWeight: 800, textAlign: 'center', marginBottom: '0.5rem' }}>
-          Free while we're in beta
+          Simple, honest pricing
         </h2>
-        <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '2rem' }}>
-          Full access for beta testers — no credit card, no commitment. Paid plans coming later.
+        <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '0.75rem' }}>
+          Try it free. Early beta testers get Pro free for life — limited spots.
         </p>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <span style={{
+            display: 'inline-block', fontSize: '11px', fontWeight: 700,
+            letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: 'var(--accent)', background: 'rgba(232,160,32,0.1)',
+            border: '0.5px solid rgba(232,160,32,0.25)',
+            borderRadius: '20px', padding: '4px 14px',
+          }}>
+            Beta · limited spots available
+          </span>
+        </div>
 
         <div style={{ maxWidth: '560px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {/* Beta / Free */}
+          {/* Free */}
           <div style={{
             background: 'var(--bg-card)',
-            border: '0.5px solid rgba(232,160,32,0.3)',
+            border: '0.5px solid var(--border)',
             borderRadius: '12px', padding: '1.5rem',
-            position: 'relative',
           }}>
-            <div style={{
-              position: 'absolute', top: '-1px', right: '16px',
-              fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
-              background: 'var(--accent)', color: 'var(--accent-text)',
-              padding: '3px 10px', borderRadius: '0 0 6px 6px',
-            }}>BETA</div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Beta access</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Free</div>
             <div style={{ fontSize: '32px', fontWeight: 800, marginBottom: '2px' }}>$0</div>
             <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>
-              No credit card required
+              3 games · no credit card required
             </div>
             {['All features included', 'Lineup builder', 'Playing time tracking', 'Pitching planner', 'Depth chart', 'Share & print lineups'].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -400,38 +404,49 @@ export default async function HomePage() {
               borderRadius: '6px', textAlign: 'center',
               fontSize: '13px', fontWeight: 700, textDecoration: 'none',
             }}>
-              Join the beta
+              Get started free
             </Link>
           </div>
 
           {/* Pro */}
           <div style={{
-            background: 'var(--bg-card)',
-            border: '0.5px solid var(--border)',
+            background: 'rgba(232,160,32,0.05)',
+            border: '0.5px solid rgba(232,160,32,0.3)',
             borderRadius: '12px', padding: '1.5rem',
-            opacity: 0.6,
+            position: 'relative',
           }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '4px' }}>Pro</div>
-            <div style={{ fontSize: '32px', fontWeight: 800, marginBottom: '2px' }}>
-              $1.49<span style={{ fontSize: '14px', fontWeight: 400, color: `rgba(var(--fg-rgb), 0.4)` }}>/mo</span>
+            <div style={{
+              position: 'absolute', top: '-1px', right: '16px',
+              fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              padding: '3px 10px', borderRadius: '0 0 6px 6px',
+            }}>BETA OFFER</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Pro</div>
+            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, textDecoration: 'line-through', marginBottom: '2px' }}>
+              $2.99/mo
             </div>
-            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>
-              or $12/year · coming after beta
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--accent)' }}>Free</span>
             </div>
-            {['Everything in Beta', 'Unlimited games', 'Full season history', 'Priority support', 'Early access to new features'].map((f, i) => (
+            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.5rem' }}>
+              for beta testers · limited spots
+            </div>
+            {['Everything in Free', 'Unlimited games', 'Full season history', 'Priority support', 'Early access to new features'].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '12px' }}>·</span>
-                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>{f}</span>
+                <span style={{ color: i === 0 ? 'var(--accent)' : '#6DB875', fontSize: '12px', fontWeight: i === 0 ? 700 : 400 }}>
+                  {i === 0 ? '★' : '✓'}
+                </span>
+                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), ${i === 0 ? '0.85' : '0.65'})`, fontWeight: i === 0 ? 600 : 400 }}>{f}</span>
               </div>
             ))}
-            <div style={{
+            <Link href="/login" style={{
               display: 'block', marginTop: '1.5rem', padding: '11px',
-              border: '0.5px solid var(--border-md)',
+              background: 'var(--accent)', color: 'var(--accent-text)',
               borderRadius: '6px', textAlign: 'center',
-              fontSize: '13px', color: `rgba(var(--fg-rgb), 0.3)`,
+              fontSize: '13px', fontWeight: 700, textDecoration: 'none',
             }}>
-              Coming soon
-            </div>
+              Claim beta access
+            </Link>
           </div>
         </div>
       </section>
@@ -452,7 +467,7 @@ export default async function HomePage() {
             fontSize: '15px', color: `rgba(var(--fg-rgb), 0.55)`,
             marginBottom: '2rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto 2rem',
           }}>
-            Free for beta testers. Set up your roster in minutes, no credit card required.
+            Start free. Early beta testers get Pro free for life — limited spots available.
           </div>
           <Link href="/login" style={{
             display: 'inline-block',
