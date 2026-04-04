@@ -5,10 +5,20 @@ import { createClient } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+type Status = 'available' | 'blocked' | 'tournament' | 'game_scheduled'
+
 type Entry = {
   id?: string
   date: string
+  status: Status
   note: string   // available field time, e.g. "9am–1pm"
+}
+
+const MODE_CONFIG: Record<Status, { label: string; color: string; bg: string; border: string; print: string }> = {
+  available:      { label: 'Available',    color: '#6DB875', bg: 'rgba(109,184,117,0.18)', border: 'rgba(109,184,117,0.4)',  print: '#d4edda' },
+  blocked:        { label: 'Blocked',      color: '#E85050', bg: 'rgba(232,80,80,0.18)',   border: 'rgba(232,80,80,0.4)',    print: '#f8d7da' },
+  tournament:     { label: 'Tournament',   color: '#9B59B6', bg: 'rgba(155,89,182,0.18)',  border: 'rgba(155,89,182,0.4)',   print: '#e8d5f5' },
+  game_scheduled: { label: 'Game Sched.', color: '#5B9BD5', bg: 'rgba(91,155,213,0.18)',  border: 'rgba(91,155,213,0.4)',   print: '#cce5ff' },
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -44,6 +54,7 @@ export default function SchedulePage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth())
   const [activeMonths, setActiveMonths] = useState<Record<string, boolean>>({})
+  const [mode, setMode] = useState<Status>('available')
   const [entries, setEntries] = useState<Record<string, Entry>>({})
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -84,7 +95,7 @@ export default function SchedulePage() {
         .from('schedule_entries').select('*').eq('season_id', seasonData.id)
       const entryMap: Record<string, Entry> = {}
       for (const e of entryRows ?? []) {
-        entryMap[e.date] = { id: e.id, date: e.date, note: e.note ?? '' }
+        entryMap[e.date] = { id: e.id, date: e.date, status: e.status as Status, note: e.note ?? '' }
       }
       setEntries(entryMap)
 
@@ -124,34 +135,25 @@ export default function SchedulePage() {
     else setCurrentMonth(m => m + 1)
   }
 
-  // Upsert or delete an entry based on text content
+  // Save note text for an already-marked entry; if text is empty, delete the entry
   async function commitEntry(ds: string, text: string) {
     const s = seasonRef.current
     if (!s) return
     const trimmed = text.trim()
     const existing = entries[ds]
 
-    if (!trimmed) {
-      // Empty text → delete
-      if (existing) {
-        setEntries(prev => { const n = { ...prev }; delete n[ds]; return n })
-        if (existing.id) await supabase.from('schedule_entries').delete().eq('id', existing.id)
-      }
+    if (!trimmed && !existing?.id) {
+      // Never saved — remove optimistic entry
+      setEntries(prev => { const n = { ...prev }; delete n[ds]; return n })
       return
     }
 
-    // Upsert with text
-    setEntries(prev => ({ ...prev, [ds]: { ...existing, date: ds, note: trimmed } }))
-    const { data } = await supabase.from('schedule_entries')
+    setEntries(prev => prev[ds] ? { ...prev, [ds]: { ...prev[ds], note: trimmed } } : prev)
+    await supabase.from('schedule_entries')
       .upsert(
-        { season_id: s.id, date: ds, status: 'available', note: trimmed, updated_at: new Date().toISOString() },
+        { season_id: s.id, date: ds, status: existing?.status ?? mode, note: trimmed || null, updated_at: new Date().toISOString() },
         { onConflict: 'season_id,date' }
       )
-      .select()
-      .single()
-    if (data) {
-      setEntries(prev => ({ ...prev, [ds]: { id: data.id, date: data.date, note: data.note ?? '' } }))
-    }
   }
 
   async function deleteEntry(ds: string) {
@@ -161,16 +163,36 @@ export default function SchedulePage() {
     if (existing?.id) await supabase.from('schedule_entries').delete().eq('id', existing.id)
   }
 
-  // Click a date to enter edit mode
-  function handleCellClick(ds: string) {
+  // Click a date: mark/update its status and enter edit mode for the time
+  async function handleCellClick(ds: string) {
+    if (!season) return
     if (editingDate === ds) return
-    // If another cell is being edited, blur will handle saving it
+
+    // Save any in-progress edit (blur will fire but let's be explicit)
+    if (editingDate) {
+      escapingRef.current = true  // suppress the blur save
+      await commitEntry(editingDate, editText)
+      setEditingDate(null)
+    }
+
     const existing = entries[ds]
-    setEditText(existing?.note ?? '')
+    const keepNote = existing?.note ?? ''
+
+    // Update or create the entry with the current mode
+    const optimistic: Entry = { ...existing, date: ds, status: mode, note: keepNote }
+    setEntries(prev => ({ ...prev, [ds]: optimistic }))
+    setEditText(keepNote)
     setEditingDate(ds)
+
+    const { data } = await supabase.from('schedule_entries')
+      .upsert(
+        { season_id: season.id, date: ds, status: mode, note: keepNote || null, updated_at: new Date().toISOString() },
+        { onConflict: 'season_id,date' }
+      )
+      .select().single()
+    if (data) setEntries(prev => ({ ...prev, [ds]: { id: data.id, date: data.date, status: data.status as Status, note: data.note ?? '' } }))
   }
 
-  // Tab: save current, move to next day in this month
   async function tabToNext(ds: string) {
     await commitEntry(ds, editText)
     const nextDs = nextDateStr(ds)
@@ -179,6 +201,15 @@ export default function SchedulePage() {
       const nextEntry = entries[nextDs]
       setEditText(nextEntry?.note ?? '')
       setEditingDate(nextDs)
+      if (!nextEntry) {
+        // Auto-mark next day with current mode
+        const optimistic: Entry = { date: nextDs, status: mode, note: '' }
+        setEntries(prev => ({ ...prev, [nextDs]: optimistic }))
+        const { data } = await supabase.from('schedule_entries')
+          .upsert({ season_id: season!.id, date: nextDs, status: mode, note: null, updated_at: new Date().toISOString() }, { onConflict: 'season_id,date' })
+          .select().single()
+        if (data) setEntries(prev => ({ ...prev, [nextDs]: { id: data.id, date: data.date, status: data.status as Status, note: data.note ?? '' } }))
+      }
     } else {
       setEditingDate(null)
     }
@@ -190,8 +221,8 @@ export default function SchedulePage() {
         e.preventDefault()
         await tabToNext(ds)
       } else if (e.key === 'Enter') {
-        await commitEntry(ds, editText)
         escapingRef.current = true
+        await commitEntry(ds, editText)
         setEditingDate(null)
       } else if (e.key === 'Escape') {
         escapingRef.current = true
@@ -204,19 +235,20 @@ export default function SchedulePage() {
   }
 
   function handleBlur(ds: string) {
-    if (escapingRef.current) {
-      escapingRef.current = false
-      return
-    }
+    if (escapingRef.current) { escapingRef.current = false; return }
     commitEntry(ds, editText)
     setEditingDate(null)
   }
 
   const today = new Date().toISOString().split('T')[0]
-  const totalMarked = Object.values(entries).filter(e => {
+
+  const summary = Object.values(entries).reduce((acc, e) => {
     const d = new Date(e.date + 'T12:00:00')
-    return activeMonths[monthKey(d.getFullYear(), d.getMonth())]
-  }).length
+    if (activeMonths[monthKey(d.getFullYear(), d.getMonth())]) {
+      acc[e.status] = (acc[e.status] ?? 0) + 1
+    }
+    return acc
+  }, {} as Partial<Record<Status, number>>)
 
   function renderCells(y: number, m: number, compact = false) {
     const numDays = daysInMonth(y, m)
@@ -230,24 +262,23 @@ export default function SchedulePage() {
     for (let d = 1; d <= numDays; d++) {
       const ds = toDateStr(y, m, d)
       const entry = entries[ds]
+      const cfg = entry ? MODE_CONFIG[entry.status] : null
       const isEditing = !compact && editingDate === ds
       const isToday = !compact && ds === today
-      const hasEntry = !!entry
 
       if (compact) {
         cells.push(
           <div key={ds} style={{
             borderRadius: '3px',
-            background: hasEntry ? '#d4edda' : 'transparent',
+            background: cfg ? cfg.print : 'transparent',
+            minHeight: '28px',
+            padding: '2px',
             display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'flex-start',
-            minHeight: '22px', padding: '2px',
+            justifyContent: 'space-between',
           }}>
-            <span style={{ fontSize: '8px', color: hasEntry ? '#155724' : '#bbb', lineHeight: 1, fontWeight: hasEntry ? 700 : 400 }}>{d}</span>
+            <span style={{ fontSize: '8px', color: cfg ? '#155724' : '#ccc', fontWeight: cfg ? 700 : 400, lineHeight: 1 }}>{d}</span>
             {entry?.note && (
-              <span style={{ fontSize: '6px', color: '#155724', lineHeight: 1.2, textAlign: 'center', wordBreak: 'break-all' }}>
-                {entry.note}
-              </span>
+              <span style={{ fontSize: '6px', color: '#155724', lineHeight: 1.1, wordBreak: 'break-all' }}>{entry.note}</span>
             )}
           </div>
         )
@@ -260,60 +291,66 @@ export default function SchedulePage() {
           onClick={() => handleCellClick(ds)}
           style={{
             borderRadius: '6px',
-            background: isEditing
-              ? 'rgba(109,184,117,0.22)'
-              : hasEntry
-              ? 'rgba(109,184,117,0.15)'
-              : 'transparent',
+            background: cfg ? cfg.bg : 'transparent',
             border: isEditing
-              ? '1.5px solid #6DB875'
+              ? `1.5px solid ${cfg ? cfg.color : 'rgba(var(--fg-rgb),0.5)'}`
               : isToday
               ? '1px solid rgba(var(--fg-rgb), 0.35)'
-              : hasEntry
-              ? '0.5px solid rgba(109,184,117,0.4)'
+              : cfg
+              ? `0.5px solid ${cfg.border}`
               : '0.5px solid transparent',
             cursor: 'pointer',
-            minHeight: '52px',
-            padding: '4px',
+            minHeight: '56px',
+            padding: '5px 4px 4px',
             display: 'flex',
             flexDirection: 'column',
+            justifyContent: 'space-between',
             transition: 'background 0.1s',
           }}
         >
+          {/* Day number — top */}
           <span style={{
-            fontSize: isEditing ? '9px' : '12px',
+            fontSize: '12px',
             fontWeight: isToday ? 700 : 400,
-            color: hasEntry ? '#6DB875' : `rgba(var(--fg-rgb), 0.6)`,
+            color: cfg ? cfg.color : `rgba(var(--fg-rgb), 0.6)`,
             lineHeight: 1,
           }}>
             {d}
           </span>
 
-          {isEditing ? (
-            <input
-              ref={editInputRef}
-              value={editText}
-              onChange={e => setEditText(e.target.value)}
-              onKeyDown={handleKeyDown(ds)}
-              onBlur={() => handleBlur(ds)}
-              placeholder="9am–1pm"
-              style={{
-                flex: 1, width: '100%',
-                border: 'none', background: 'transparent',
-                color: '#6DB875', fontSize: '10px',
-                outline: 'none', padding: '2px 0 0 0',
-                fontFamily: 'inherit',
-              }}
-            />
-          ) : entry?.note ? (
-            <span style={{
-              fontSize: '9px', color: '#6DB875',
-              lineHeight: 1.2, marginTop: '2px',
-              wordBreak: 'break-word', overflow: 'hidden',
-            }}>
-              {entry.note}
-            </span>
-          ) : null}
+          {/* Available time — bottom section */}
+          <div style={{ marginTop: '4px' }}>
+            {isEditing ? (
+              <input
+                ref={editInputRef}
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown(ds)}
+                onBlur={() => handleBlur(ds)}
+                placeholder="9am–1pm"
+                style={{
+                  width: '100%',
+                  border: 'none',
+                  background: 'transparent',
+                  color: cfg?.color ?? 'var(--fg)',
+                  fontSize: '9px',
+                  outline: 'none',
+                  padding: 0,
+                  fontFamily: 'inherit',
+                }}
+              />
+            ) : entry?.note ? (
+              <span style={{
+                fontSize: '9px',
+                color: cfg?.color,
+                lineHeight: 1.2,
+                display: 'block',
+                wordBreak: 'break-word',
+              }}>
+                {entry.note}
+              </span>
+            ) : null}
+          </div>
         </div>
       )
     }
@@ -384,7 +421,7 @@ export default function SchedulePage() {
         </div>
 
         {/* Month strip */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           {MONTHS.map((name, m) => {
             const active = isMonthActive(m)
             const isCurrent = m === currentMonth
@@ -421,12 +458,31 @@ export default function SchedulePage() {
           })}
         </div>
 
+        {/* Mode selector */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '6px' }}>
+            Select a type, then click dates. Type available hours in the cell. Tab = next day · Backspace on empty = remove.
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {(Object.entries(MODE_CONFIG) as [Status, typeof MODE_CONFIG[Status]][]).map(([status, cfg]) => (
+              <button key={status} onClick={() => setMode(status)} style={{
+                padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                cursor: 'pointer',
+                border: `0.5px solid ${mode === status ? cfg.color : 'var(--border)'}`,
+                background: mode === status ? cfg.bg : 'transparent',
+                color: mode === status ? cfg.color : `rgba(var(--fg-rgb), 0.5)`,
+              }}>
+                {cfg.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Calendar */}
         <div style={{
           background: 'var(--bg-card)', border: '0.5px solid var(--border)',
           borderRadius: '12px', padding: '1rem', marginBottom: '1rem',
         }}>
-          {/* Month nav */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <button onClick={prevMonth} style={{ background: 'transparent', border: 'none',
               cursor: 'pointer', color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '20px', padding: '4px 8px' }}>‹</button>
@@ -446,7 +502,6 @@ export default function SchedulePage() {
               cursor: 'pointer', color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '20px', padding: '4px 8px' }}>›</button>
           </div>
 
-          {/* Day headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '3px' }}>
             {DAYS.map(d => (
               <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700,
@@ -456,33 +511,32 @@ export default function SchedulePage() {
             ))}
           </div>
 
-          {/* Date cells */}
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px',
             opacity: isMonthActive(currentMonth) ? 1 : 0.45,
           }}>
             {renderCells(year, currentMonth)}
           </div>
-
-          <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)`, marginTop: '10px', textAlign: 'center' }}>
-            Click a date and type your available hours · Tab = next day · Backspace on empty = remove
-          </div>
         </div>
 
         {/* Summary */}
-        {totalMarked > 0 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '10px 14px', borderRadius: '8px',
-            background: 'rgba(109,184,117,0.12)',
-            border: '0.5px solid rgba(109,184,117,0.3)',
-          }}>
-            <span style={{ fontSize: '18px', fontWeight: 800, color: '#6DB875', lineHeight: 1 }}>{totalMarked}</span>
-            <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.6)` }}>
-              available date{totalMarked !== 1 ? 's' : ''} in active months
-            </span>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {(Object.entries(MODE_CONFIG) as [Status, typeof MODE_CONFIG[Status]][]).map(([status, cfg]) => {
+            const count = summary[status] ?? 0
+            if (count === 0) return null
+            return (
+              <div key={status} style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '7px 12px', borderRadius: '8px',
+                background: cfg.bg,
+                border: `0.5px solid ${cfg.border}`,
+              }}>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: cfg.color, lineHeight: 1 }}>{count}</span>
+                <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.6)` }}>{cfg.label}</span>
+              </div>
+            )
+          })}
+        </div>
 
       </div>{/* end no-print */}
 
@@ -491,9 +545,18 @@ export default function SchedulePage() {
       <div className="sched-print">
         <div style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1.5px solid #333' }}>
           <div style={{ fontSize: '18px', fontWeight: 800 }}>Field Availability — {teamName}</div>
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-            {seasonName} · {year} · {totalMarked} available date{totalMarked !== 1 ? 's' : ''}
-          </div>
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{seasonName} · {year}</div>
+        </div>
+
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {(Object.entries(MODE_CONFIG) as [Status, typeof MODE_CONFIG[Status]][]).map(([status, cfg]) => (
+            <div key={status} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: cfg.print, border: '0.5px solid #999' }} />
+              <span style={{ fontSize: '10px', color: '#333' }}>{cfg.label}</span>
+              {summary[status] ? <span style={{ fontSize: '10px', color: '#666' }}>({summary[status]})</span> : null}
+            </div>
+          ))}
         </div>
 
         {activeMonthList.length === 0 ? (
@@ -501,18 +564,17 @@ export default function SchedulePage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
             {activeMonthList.map(m => {
-              const datesInMonth = Object.values(entries).filter(e => {
-                const d = new Date(e.date + 'T12:00:00')
-                return d.getFullYear() === year && d.getMonth() === m
-              })
+              const datesInMonth = Object.values(entries)
+                .filter(e => {
+                  const d = new Date(e.date + 'T12:00:00')
+                  return d.getFullYear() === year && d.getMonth() === m
+                })
+                .sort((a, b) => a.date.localeCompare(b.date))
               return (
                 <div key={m}>
                   <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px',
                     textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {MONTHS[m]} {year}
-                    <span style={{ fontWeight: 400, color: '#666', marginLeft: '6px', fontSize: '10px' }}>
-                      ({datesInMonth.length} dates)
-                    </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px', marginBottom: '3px' }}>
                     {DAYS.map(d => (
@@ -524,19 +586,23 @@ export default function SchedulePage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px' }}>
                     {renderCells(year, m, true)}
                   </div>
-                  {/* List of dates with times below the grid */}
                   {datesInMonth.length > 0 && (
-                    <div style={{ marginTop: '8px' }}>
-                      {datesInMonth
-                        .sort((a, b) => a.date.localeCompare(b.date))
-                        .map(e => (
-                          <div key={e.date} style={{ fontSize: '9px', color: '#333', marginBottom: '3px', display: 'flex', gap: '4px' }}>
-                            <span style={{ fontWeight: 700, minWidth: '30px' }}>
+                    <div style={{ marginTop: '8px', borderTop: '0.5px solid #ddd', paddingTop: '6px' }}>
+                      {datesInMonth.map(e => {
+                        const cfg = MODE_CONFIG[e.status]
+                        return (
+                          <div key={e.date} style={{ fontSize: '9px', color: '#333', marginBottom: '3px', display: 'flex', gap: '6px', alignItems: 'baseline' }}>
+                            <span style={{ fontWeight: 700, minWidth: '28px' }}>
                               {new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
                             </span>
-                            <span>{e.note || '—'}</span>
+                            <span style={{
+                              fontSize: '8px', fontWeight: 700, padding: '1px 5px', borderRadius: '3px',
+                              background: cfg.print, color: '#333',
+                            }}>{cfg.label}</span>
+                            {e.note && <span>{e.note}</span>}
                           </div>
-                        ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
