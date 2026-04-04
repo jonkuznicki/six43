@@ -262,7 +262,7 @@ export default function SchedulePage() {
     for (let d = 1; d <= numDays; d++) {
       const ds = toDateStr(y, m, d)
       const entry = entries[ds]
-      const cfg = entry ? MODE_CONFIG[entry.status] : null
+      const cfg = entry ? (MODE_CONFIG[entry.status] ?? MODE_CONFIG['available']) : null
       const isEditing = !compact && editingDate === ds
       const isToday = !compact && ds === today
 
@@ -589,7 +589,7 @@ export default function SchedulePage() {
                   {datesInMonth.length > 0 && (
                     <div style={{ marginTop: '8px', borderTop: '0.5px solid #ddd', paddingTop: '6px' }}>
                       {datesInMonth.map(e => {
-                        const cfg = MODE_CONFIG[e.status]
+                        const cfg = MODE_CONFIG[e.status] ?? MODE_CONFIG['available']
                         return (
                           <div key={e.date} style={{ fontSize: '9px', color: '#333', marginBottom: '3px', display: 'flex', gap: '6px', alignItems: 'baseline' }}>
                             <span style={{ fontWeight: 700, minWidth: '28px' }}>
