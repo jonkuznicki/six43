@@ -7,6 +7,7 @@ const FEATURES = [
   { icon: '📋', title: 'Attendance tracking',   body: 'Mark who\'s there on game day. Absent players are automatically removed from the lineup.' },
   { icon: '📊', title: 'Playing time fairness', body: 'See bench %, innings by position, and season totals. Get flagged before a kid sits too long.' },
   { icon: '🎯', title: 'Pitching planner',      body: 'Log pitch counts and track rest days. See who\'s eligible for your next game at a glance.' },
+  { icon: '🔄', title: 'GameChanger sync',      body: 'Paste your webcal link and your full schedule imports in seconds. Keep it in sync all season.' },
   { icon: '📐', title: 'Depth chart',           body: 'Rank players at every position and flag who can\'t play certain spots. Always current.' },
   { icon: '🔗', title: 'Share with your staff', body: 'Invite assistant coaches. Generate a read-only link for anyone who just needs the card.' },
   { icon: '🖨️', title: 'Print-ready card',      body: 'One tap to print a clean lineup card to bring to the field. Works from phone or desktop.' },
@@ -298,6 +299,80 @@ export default async function HomePage() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {['Pitch counts logged per game', 'Rest days calculated to the next scheduled game', 'Eligible pitchers highlighted at a glance'].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Spotlight 4: GameChanger sync ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div className="mkt-spotlight reverse">
+          {/* Visual: styled sync flow card */}
+          <div className="mkt-spotlight-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '14px', padding: '20px', width: '100%', maxWidth: '300px',
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '18px' }}>🔄</span>
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>GameChanger → Six43</span>
+              </div>
+              {/* Fake game rows */}
+              {[
+                { opp: 'Tigers',   date: 'Apr 12 · 10:00am', color: '#6DB875' },
+                { opp: 'Cardinals', date: 'Apr 19 · 11:00am', color: '#6DB875' },
+                { opp: 'Yankees',  date: 'Apr 26 · 10:00am', color: '#6DB875' },
+                { opp: 'Red Sox',  date: 'May 3 · 9:00am',   color: '#6DB875' },
+              ].map((g, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '9px 10px', borderRadius: '8px',
+                  background: 'var(--bg-card-alt)',
+                  marginBottom: i < 3 ? '6px' : 0,
+                }}>
+                  <span style={{ fontSize: '12px', color: g.color }}>✓</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600 }}>{g.opp}</div>
+                    <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '1px' }}>{g.date}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{
+                marginTop: '14px', padding: '10px', borderRadius: '7px', textAlign: 'center',
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '12px', fontWeight: 700,
+              }}>
+                4 games imported ✓
+              </div>
+            </div>
+          </div>
+
+          <div className="mkt-spotlight-text">
+            <div style={{
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'var(--accent)', marginBottom: '12px',
+            }}>GameChanger integration</div>
+            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
+              Already on GameChanger?<br />Import your schedule in seconds.
+            </h2>
+            <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
+              Most youth leagues run on GameChanger. Just grab your team's calendar link from the mobile app, paste it in, and your full season schedule is ready — no retyping, no manual entry.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                'Import your full season schedule from GameChanger with one link',
+                'Check for updates anytime — reschedules and new games sync automatically',
+                'Only touches future games — completed lineups are never overwritten',
+              ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
