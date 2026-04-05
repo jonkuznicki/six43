@@ -31,7 +31,7 @@ export default async function GamesPage({
 
   const { data: season } = selectedTeamId ? await supabase
     .from('seasons')
-    .select('id, name, innings_per_game')
+    .select('id, name, innings_per_game, webcal_url')
     .eq('team_id', selectedTeamId)
     .eq('is_active', true)
     .maybeSingle() : { data: null }
@@ -189,25 +189,48 @@ export default async function GamesPage({
             </div>
           )}
 
-          {/* New game + Playing time buttons */}
+          {/* Buttons */}
           {season && (
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
-              <Link
-                href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`}
-                style={{ textDecoration: 'none', flex: 1 }}
-              >
+            <div style={{ marginBottom: '1.5rem' }}>
+              {/* Row 1: New game + Playing time */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <Link
+                  href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`}
+                  style={{ textDecoration: 'none', flex: 1 }}
+                >
+                  <div style={{
+                    background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: '8px',
+                    padding: '12px 16px', textAlign: 'center', fontWeight: 700, fontSize: '14px',
+                  }}>+ New game</div>
+                </Link>
+                <Link href="/fairness" style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.7)`,
+                    borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
+                    fontSize: '13px', border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
+                  }}>Playing time</div>
+                </Link>
+              </div>
+
+              {/* Row 2: Import schedule */}
+              <Link href="/games/import" style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{
-                  background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: '8px',
-                  padding: '12px 16px', textAlign: 'center', fontWeight: 700, fontSize: '14px',
-                }}>+ New game</div>
+                  borderRadius: '8px', padding: '10px 16px', textAlign: 'center',
+                  fontSize: '13px', border: '0.5px solid var(--border-md)',
+                  color: `rgba(var(--fg-rgb), 0.6)`, background: 'transparent',
+                }}>↓ Import schedule</div>
               </Link>
-              <Link href="/fairness" style={{ textDecoration: 'none' }}>
-                <div style={{
-                  background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.7)`,
-                  borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
-                  fontSize: '13px', border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
-                }}>Playing time</div>
-              </Link>
+
+              {/* Row 3: Check for updates — only if webcal_url is set */}
+              {(season as any).webcal_url && (
+                <Link href="/games/import?tab=sync" style={{ textDecoration: 'none', display: 'block', marginTop: '6px' }}>
+                  <div style={{
+                    borderRadius: '8px', padding: '8px 16px', textAlign: 'center',
+                    fontSize: '12px', border: '0.5px solid rgba(var(--fg-rgb), 0.08)',
+                    color: `rgba(var(--fg-rgb), 0.4)`, background: 'transparent',
+                  }}>↻ Check GameChanger for updates</div>
+                </Link>
+              )}
             </div>
           )}
 
