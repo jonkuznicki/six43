@@ -149,13 +149,18 @@ function ImportPageInner() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { data: seasonData } = await supabase
+    const teamId = searchParams.get('teamId')
+
+    let seasonQuery = supabase
       .from('seasons')
       .select('id, name, webcal_url, team:teams(name)')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle()
+
+    if (teamId) seasonQuery = (seasonQuery as any).eq('team_id', teamId)
+
+    const { data: seasonData } = await seasonQuery.maybeSingle()
 
     setSeason(seasonData)
 
@@ -213,33 +218,59 @@ function ImportPageInner() {
 
     const { data: existing } = await supabase
       .from('games')
-      .select('game_date, game_number')
+      .select('game_date')
       .eq('season_id', season.id)
 
     const existingDates = new Set((existing ?? []).map((g: any) => g.game_date))
-    const maxNum = Math.max(0, ...(existing ?? []).map((g: any) => g.game_number ?? 0))
-    let num = maxNum + 1
 
-    const rows = selected
+    // Try to get max game_number — may not exist if migration hasn't run
+    let num = 1
+    try {
+      const { data: maxGame } = await supabase
+        .from('games')
+        .select('game_number')
+        .eq('season_id', season.id)
+        .order('game_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      num = (maxGame?.game_number ?? 0) + 1
+    } catch { /* column may not exist yet */ }
+
+    const newGames = selected
       .filter(g => !existingDates.has(g.game_date))
       .sort((a, b) => a.game_date.localeCompare(b.game_date))
-      .map(g => ({
-        season_id:   season.id,
-        opponent:    g.opponent,
-        game_date:   g.game_date,
-        game_time:   g.game_time,
-        location:    gcLocation,
-        status:      'scheduled',
-        game_number: num++,
-      }))
 
-    const skipped = selected.length - rows.length
-    if (rows.length) {
-      const { error } = await supabase.from('games').insert(rows)
+    // Try insert with game_number; fall back without if column missing
+    const rowsWithNum = newGames.map(g => ({
+      season_id:   season.id,
+      opponent:    g.opponent,
+      game_date:   g.game_date,
+      game_time:   g.game_time,
+      location:    gcLocation,
+      status:      'scheduled',
+      game_number: num++,
+    }))
+
+    const skipped = selected.length - newGames.length
+    if (rowsWithNum.length) {
+      let { error } = await supabase.from('games').insert(rowsWithNum)
+      if (error?.message?.includes('game_number')) {
+        // Migration not run yet — insert without game_number
+        const rowsNoNum = newGames.map(g => ({
+          season_id: season.id,
+          opponent:  g.opponent,
+          game_date: g.game_date,
+          game_time: g.game_time,
+          location:  gcLocation,
+          status:    'scheduled',
+        }))
+        const res2 = await supabase.from('games').insert(rowsNoNum)
+        error = res2.error
+      }
       if (error) { setGcError(error.message); setGcImp(false); return }
     }
 
-    setGcN(rows.length)
+    setGcN(newGames.length)
     setGcDone(true)
     setGcImp(false)
     // Update nextNum for the manual tab too

@@ -213,7 +213,7 @@ export default async function GamesPage({
               </div>
 
               {/* Row 2: Import schedule */}
-              <Link href="/games/import" style={{ textDecoration: 'none', display: 'block' }}>
+              <Link href={`/games/import${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{
                   borderRadius: '8px', padding: '10px 16px', textAlign: 'center',
                   fontSize: '13px', border: '0.5px solid var(--border-md)',
@@ -223,7 +223,7 @@ export default async function GamesPage({
 
               {/* Row 3: Check for updates — only if webcal_url is set */}
               {(season as any).webcal_url && (
-                <Link href="/games/import?tab=sync" style={{ textDecoration: 'none', display: 'block', marginTop: '6px' }}>
+                <Link href={`/games/import?tab=sync${selectedTeamId ? `&teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block', marginTop: '6px' }}>
                   <div style={{
                     borderRadius: '8px', padding: '8px 16px', textAlign: 'center',
                     fontSize: '12px', border: '0.5px solid rgba(var(--fg-rgb), 0.08)',
