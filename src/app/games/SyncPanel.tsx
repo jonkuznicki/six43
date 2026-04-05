@@ -121,7 +121,7 @@ export default function SyncPanel({ seasonId, teamId }: { seasonId: string; team
           color: `rgba(var(--fg-rgb), 0.4)`, fontSize: '12px', textAlign: 'center',
         }}
       >
-        ↻ Check GameChanger for updates
+        ↻ Refresh from GameChanger
       </button>
 
       {open && (

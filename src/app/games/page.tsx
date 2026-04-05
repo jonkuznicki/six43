@@ -213,18 +213,17 @@ export default async function GamesPage({
                 </Link>
               </div>
 
-              {/* Row 2: Import schedule */}
-              <Link href={`/games/import${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block' }}>
-                <div style={{
-                  borderRadius: '8px', padding: '10px 16px', textAlign: 'center',
-                  fontSize: '13px', border: '0.5px solid var(--border-md)',
-                  color: `rgba(var(--fg-rgb), 0.6)`, background: 'transparent',
-                }}>↓ Import schedule</div>
-              </Link>
-
-              {/* Row 3: Check for updates — only if webcal_url is set */}
-              {(season as any).webcal_url && (
+              {/* Row 2: GameChanger sync (if connected) or import link */}
+              {(season as any).webcal_url ? (
                 <SyncPanel seasonId={season.id} teamId={selectedTeamId} />
+              ) : (
+                <Link href={`/games/import${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <div style={{
+                    borderRadius: '8px', padding: '10px 16px', textAlign: 'center',
+                    fontSize: '13px', border: '0.5px solid var(--border-md)',
+                    color: `rgba(var(--fg-rgb), 0.6)`, background: 'transparent',
+                  }}>↓ Import / connect GameChanger</div>
+                </Link>
               )}
             </div>
           )}
