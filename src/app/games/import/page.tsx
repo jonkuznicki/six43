@@ -194,7 +194,7 @@ function ImportPageInner() {
     const res = await fetch('/api/import-ical', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: gcUrl.trim() }),
+      body: JSON.stringify({ url: gcUrl.trim(), seasonId: season?.id ?? null }),
     })
 
     if (!res.ok) {

@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { url } = await req.json()
+  const { url, seasonId } = await req.json()
   if (!url || typeof url !== 'string') {
     return NextResponse.json({ error: 'url is required' }, { status: 400 })
   }
@@ -98,20 +98,28 @@ export async function POST(req: NextRequest) {
 
   const games = parseIcal(icalText)
 
-  // Save webcal_url to the active season
-  const { data: season } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (season) {
+  // Save webcal_url to the correct season
+  const targetSeasonId = seasonId ?? null
+  if (targetSeasonId) {
     await supabase
       .from('seasons')
       .update({ webcal_url: url.trim() })
-      .eq('id', season.id)
+      .eq('id', targetSeasonId)
+  } else {
+    // Fallback: save to most recent active season
+    const { data: season } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (season) {
+      await supabase
+        .from('seasons')
+        .update({ webcal_url: url.trim() })
+        .eq('id', season.id)
+    }
   }
 
   return NextResponse.json({ games })
