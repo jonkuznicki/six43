@@ -54,19 +54,24 @@ export type SyncChange =
   | { type: 'removed'; game_id: string; opponent: string; game_date: string }
   | { type: 'skipped'; game_id: string; opponent: string; game_date: string; reason: string }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const teamId = new URL(request.url).searchParams.get('teamId')
+
   // Get active season with webcal_url
-  const { data: season } = await supabase
+  let seasonQuery = supabase
     .from('seasons')
     .select('id, webcal_url')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
-    .maybeSingle()
+
+  if (teamId) seasonQuery = (seasonQuery as any).eq('team_id', teamId)
+
+  const { data: season } = await seasonQuery.maybeSingle()
 
   if (!season?.webcal_url) {
     return NextResponse.json({ error: 'No webcal URL saved for this season' }, { status: 404 })

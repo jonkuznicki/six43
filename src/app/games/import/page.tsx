@@ -32,13 +32,14 @@ type SyncChange =
 const LOCATIONS: Location[] = ['Home', 'Away', 'Neutral']
 
 const s = {
-  bg:       '#0B1F3A',
-  fg:       '#F5F2EB',
-  accent:   '#E8A020',
-  muted:    'rgba(245,242,235,0.5)',
-  card:     'rgba(255,255,255,0.04)',
-  border:   '0.5px solid rgba(245,242,235,0.1)',
-  borderMd: '0.5px solid rgba(245,242,235,0.18)',
+  bg:       'var(--bg)',
+  fg:       'var(--fg)',
+  accent:   'var(--accent)',
+  accentText: 'var(--accent-text)',
+  muted:    'rgba(var(--fg-rgb), 0.5)',
+  card:     'var(--bg-card)',
+  border:   '0.5px solid var(--border)',
+  borderMd: '0.5px solid var(--border-md)',
 }
 
 function fmt(dateStr: string) {
@@ -64,7 +65,7 @@ function LocationPicker({ value, onChange }: { value: Location; onChange: (v: Lo
             flex: 1, padding: '7px 4px', fontSize: '11px', fontWeight: 600,
             border: 'none', cursor: 'pointer',
             background: value === l ? s.accent : 'transparent',
-            color: value === l ? s.bg : s.muted,
+            color: value === l ? s.accentText : s.muted,
             borderRight: l !== 'Neutral' ? s.borderMd : 'none',
           }}
         >{l}</button>
@@ -76,7 +77,7 @@ function LocationPicker({ value, onChange }: { value: Location; onChange: (v: Lo
 function inp(extra?: React.CSSProperties): React.CSSProperties {
   return {
     width: '100%', padding: '10px 12px', borderRadius: '6px',
-    border: s.borderMd, background: 'rgba(255,255,255,0.06)',
+    border: s.borderMd, background: 'var(--bg-input)',
     color: s.fg, fontSize: '14px', boxSizing: 'border-box', ...extra,
   }
 }
@@ -84,7 +85,7 @@ function inp(extra?: React.CSSProperties): React.CSSProperties {
 export default function ImportPage() {
   return (
     <Suspense fallback={
-      <main style={{ background: '#0B1F3A', minHeight: '100vh', color: '#F5F2EB',
+      <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
         fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         Loading…
       </main>
@@ -396,7 +397,7 @@ function ImportPageInner() {
   // ── Render ──────────────────────────────────────
 
   if (loading) return (
-    <main style={{ background: s.bg, minHeight: '100vh', color: s.fg,
+    <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
       fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       Loading…
     </main>
@@ -408,7 +409,7 @@ function ImportPageInner() {
 
   return (
     <main style={{
-      minHeight: '100vh', background: s.bg, color: s.fg,
+      minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
       fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto',
       padding: '1.5rem 1rem 6rem',
     }}>
@@ -453,8 +454,8 @@ function ImportPageInner() {
                   How to get your schedule link
                 </div>
                 {[
-                  'Open the GameChanger app',
-                  'Tap your team name, then the gear icon (top right)',
+                  'Open the GameChanger mobile app (iOS or Android) — this isn\'t available on the web',
+                  'Tap your team, then the gear icon (top right)',
                   'Tap "Schedule Sync" → "Sync Schedule to Your Calendar"',
                   'Tap "Copy Link" instead of opening your calendar',
                   'Paste the link below',
@@ -463,7 +464,7 @@ function ImportPageInner() {
                     marginBottom: i < 4 ? '8px' : 0 }}>
                     <span style={{
                       width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-                      background: 'rgba(232,160,32,0.15)', border: '0.5px solid rgba(232,160,32,0.35)',
+                      background: 'rgba(var(--fg-rgb), 0.06)', border: '0.5px solid var(--accent)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '10px', fontWeight: 700, color: s.accent,
                     }}>{i + 1}</span>
@@ -501,7 +502,7 @@ function ImportPageInner() {
               {gcGames.length === 0 && (
                 <button onClick={handlePreview} disabled={gcPreviewing || !gcUrl.trim()} style={{
                   width: '100%', padding: '12px', borderRadius: '6px', border: 'none',
-                  background: s.accent, color: s.bg, fontSize: '14px', fontWeight: 700,
+                  background: s.accent, color: s.accentText, fontSize: '14px', fontWeight: 700,
                   cursor: gcPreviewing || !gcUrl.trim() ? 'not-allowed' : 'pointer',
                   opacity: gcPreviewing || !gcUrl.trim() ? 0.6 : 1,
                 }}>
@@ -524,7 +525,7 @@ function ImportPageInner() {
                         display: 'flex', gap: '12px', alignItems: 'center',
                         padding: '12px 14px', cursor: 'pointer',
                         borderBottom: i < gcGames.length - 1 ? s.border : 'none',
-                        background: g.selected ? 'transparent' : 'rgba(0,0,0,0.15)',
+                        background: g.selected ? 'transparent' : 'rgba(var(--fg-rgb),0.04)',
                       }}>
                         <input type="checkbox" checked={g.selected}
                           onChange={() => toggleGcGame(i)}
@@ -551,7 +552,7 @@ function ImportPageInner() {
 
                   <button onClick={handleImport} disabled={gcImporting || selectedGcCount === 0} style={{
                     width: '100%', padding: '13px', borderRadius: '6px', border: 'none',
-                    background: s.accent, color: s.bg, fontSize: '14px', fontWeight: 700,
+                    background: s.accent, color: s.accentText, fontSize: '14px', fontWeight: 700,
                     cursor: gcImporting || selectedGcCount === 0 ? 'not-allowed' : 'pointer',
                     opacity: gcImporting || selectedGcCount === 0 ? 0.6 : 1,
                   }}>
@@ -580,7 +581,7 @@ function ImportPageInner() {
               </div>
               <Link href="/games" style={{
                 display: 'inline-block', padding: '12px 28px', borderRadius: '6px',
-                background: s.accent, color: s.bg, fontWeight: 700, fontSize: '14px',
+                background: s.accent, color: s.accentText, fontWeight: 700, fontSize: '14px',
                 textDecoration: 'none',
               }}>
                 Go to games list →
@@ -654,7 +655,7 @@ function ImportPageInner() {
               <div style={{ fontSize: '11px', color: s.muted, marginBottom: '5px' }}>Game number</div>
               <div style={{
                 padding: '10px 12px', borderRadius: '6px',
-                border: s.border, background: 'rgba(255,255,255,0.02)',
+                border: s.border, background: 'var(--bg-card-alt)',
                 color: s.muted, fontSize: '14px',
               }}>
                 #{nextNum}
@@ -667,7 +668,7 @@ function ImportPageInner() {
             <button onClick={handleAdd} disabled={saving || !form.opponent.trim() || !form.game_date || !season}
               style={{
                 width: '100%', padding: '12px', borderRadius: '6px', border: 'none',
-                background: s.accent, color: s.bg, fontSize: '14px', fontWeight: 700,
+                background: s.accent, color: s.accentText, fontSize: '14px', fontWeight: 700,
                 cursor: saving || !form.opponent.trim() ? 'not-allowed' : 'pointer',
                 opacity: saving || !form.opponent.trim() ? 0.6 : 1,
               }}>
@@ -751,10 +752,10 @@ function ImportPageInner() {
                     {syncChanges.map((c, i) => {
                       const isSkipped = c.type === 'skipped'
                       const chipColors: Record<string, { bg: string; color: string; label: string }> = {
-                        new:     { bg: 'rgba(109,184,117,0.15)', color: '#6DB875', label: 'New' },
-                        changed: { bg: 'rgba(232,160,32,0.15)',  color: '#E8A020', label: 'Changed' },
-                        removed: { bg: 'rgba(232,80,80,0.15)',   color: '#E85050', label: 'Removed' },
-                        skipped: { bg: 'rgba(245,242,235,0.08)', color: s.muted,   label: 'Skipped' },
+                        new:     { bg: 'rgba(109,184,117,0.15)',       color: '#6DB875',              label: 'New' },
+                        changed: { bg: 'rgba(var(--fg-rgb),0.08)',     color: 'var(--accent)',        label: 'Changed' },
+                        removed: { bg: 'rgba(232,80,80,0.15)',         color: '#E85050',              label: 'Removed' },
+                        skipped: { bg: 'rgba(var(--fg-rgb),0.05)',     color: `rgba(var(--fg-rgb),0.4)`, label: 'Skipped' },
                       }
                       const chip = chipColors[c.type]
                       const isSelected = !isSkipped && (c as any).selected
@@ -817,7 +818,7 @@ function ImportPageInner() {
                   {selectedSyncCount > 0 && (
                     <button onClick={applyChanges} disabled={applying} style={{
                       width: '100%', padding: '13px', borderRadius: '6px', border: 'none',
-                      background: s.accent, color: s.bg, fontSize: '14px', fontWeight: 700,
+                      background: s.accent, color: s.accentText, fontSize: '14px', fontWeight: 700,
                       cursor: applying ? 'not-allowed' : 'pointer', opacity: applying ? 0.6 : 1,
                     }}>
                       {applying ? 'Applying…' : `Apply ${selectedSyncCount} change${selectedSyncCount !== 1 ? 's' : ''}`}

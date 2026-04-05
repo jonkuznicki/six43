@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import TeamSelect from './TeamSelect'
 import GameCard from './GameCard'
+import SyncPanel from './SyncPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -223,13 +224,7 @@ export default async function GamesPage({
 
               {/* Row 3: Check for updates — only if webcal_url is set */}
               {(season as any).webcal_url && (
-                <Link href={`/games/import?tab=sync${selectedTeamId ? `&teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block', marginTop: '6px' }}>
-                  <div style={{
-                    borderRadius: '8px', padding: '8px 16px', textAlign: 'center',
-                    fontSize: '12px', border: '0.5px solid rgba(var(--fg-rgb), 0.08)',
-                    color: `rgba(var(--fg-rgb), 0.4)`, background: 'transparent',
-                  }}>↻ Check GameChanger for updates</div>
-                </Link>
+                <SyncPanel seasonId={season.id} teamId={selectedTeamId} />
               )}
             </div>
           )}
