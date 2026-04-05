@@ -162,11 +162,16 @@ export default function SettingsPage() {
     if (isNaN(inn) || inn < 1 || inn > 9) { setSeasonError('Innings must be 1–9.'); return }
     setSavingSeason(true); setSeasonError('')
 
-    const payload = {
+    const payload: any = {
       name: seasonForm.name.trim(),
       start_date: seasonForm.start_date || null,
       end_date: seasonForm.end_date || null,
       innings_per_game: inn,
+    }
+    if (seasonForm.id) {
+      // Only update webcal fields when editing an existing season
+      payload.webcal_url = seasonForm.webcal_url?.trim() || null
+      if (seasonForm.timezone?.trim()) payload.timezone = seasonForm.timezone.trim()
     }
 
     if (seasonForm.id) {
@@ -470,7 +475,8 @@ export default function SettingsPage() {
                     </button>
                     <button onClick={() => { setSeasonForm({ id: season.id, teamId: team.id, name: season.name,
                       start_date: season.start_date ?? '', end_date: season.end_date ?? '',
-                      innings_per_game: String(season.innings_per_game) }); setSeasonError('') }}
+                      innings_per_game: String(season.innings_per_game),
+                      webcal_url: season.webcal_url ?? '', timezone: season.timezone ?? '' }); setSeasonError('') }}
                       style={smallBtn}>Edit</button>
                     <button onClick={() => setDeleteSeason(season.id)}
                       style={{ ...smallBtn, color: 'rgba(232,100,80,0.6)' }}>✕</button>
@@ -763,6 +769,48 @@ export default function SettingsPage() {
                 onChange={e => setSeasonForm((f: any) => ({ ...f, innings_per_game: e.target.value }))} style={inputStyle} />
             </Field>
           </div>
+          {/* GameChanger webcal — only show when editing an existing season */}
+          {seasonForm.id && (
+            <div style={{ marginTop: '10px' }}>
+              <Field label="GameChanger webcal link">
+                <input
+                  value={seasonForm.webcal_url ?? ''}
+                  onChange={e => setSeasonForm((f: any) => ({ ...f, webcal_url: e.target.value }))}
+                  placeholder="webcal://… (set via Import / connect GameChanger)"
+                  style={inputStyle}
+                />
+              </Field>
+              {seasonForm.webcal_url?.trim() && (
+                <div style={{ marginTop: '6px' }}>
+                  <Field label="Timezone">
+                    <select
+                      value={seasonForm.timezone ?? ''}
+                      onChange={e => setSeasonForm((f: any) => ({ ...f, timezone: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="">— not set —</option>
+                      <optgroup label="United States">
+                        <option value="America/New_York">Eastern (ET)</option>
+                        <option value="America/Chicago">Central (CT)</option>
+                        <option value="America/Denver">Mountain (MT)</option>
+                        <option value="America/Phoenix">Arizona (no DST)</option>
+                        <option value="America/Los_Angeles">Pacific (PT)</option>
+                        <option value="America/Anchorage">Alaska (AKT)</option>
+                        <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                      </optgroup>
+                      <optgroup label="Canada">
+                        <option value="America/Toronto">Toronto / Eastern</option>
+                        <option value="America/Winnipeg">Winnipeg / Central</option>
+                        <option value="America/Edmonton">Edmonton / Mountain</option>
+                        <option value="America/Vancouver">Vancouver / Pacific</option>
+                      </optgroup>
+                    </select>
+                  </Field>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
             <button onClick={() => setSeasonForm(null)} style={cancelBtnStyle}>Cancel</button>
             <button onClick={saveSeason} disabled={savingSeason} style={primaryBtnStyle(savingSeason)}>
