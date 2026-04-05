@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -82,6 +82,19 @@ function inp(extra?: React.CSSProperties): React.CSSProperties {
 }
 
 export default function ImportPage() {
+  return (
+    <Suspense fallback={
+      <main style={{ background: '#0B1F3A', minHeight: '100vh', color: '#F5F2EB',
+        fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading…
+      </main>
+    }>
+      <ImportPageInner />
+    </Suspense>
+  )
+}
+
+function ImportPageInner() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
