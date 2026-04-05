@@ -270,80 +270,9 @@ export default function PitchingPage() {
 
       {!loading && (
         <>
-          {/* ── UPCOMING ── */}
-          {upcoming.length > 0 && (
-            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
-              }}>
-                Upcoming
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                {/* Column headers */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: upcomingGrid,
-                  gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
-                }}>
-                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {Array.from({ length: upcomingSlotCount }, (_, i) => (
-                    <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
-                  ))}
-                </div>
-
-                {upcoming.map((game, idx) => {
-                  const gamePlans = plans[game.id] ?? {}
-                  return (
-                    <div key={game.id} style={{
-                      display: 'grid', gridTemplateColumns: upcomingGrid,
-                      gap: '6px', minWidth: upcomingMinW,
-                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
-                      borderRadius: '8px', padding: '10px',
-                      marginBottom: '4px', alignItems: 'center',
-                      border: '0.5px solid var(--border-subtle)',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
-                          vs {game.opponent}
-                        </div>
-                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-                          {formatDate(game.game_date)}
-                          {game.location ? ` · ${game.location}` : ''}
-                        </div>
-                      </div>
-
-                      {Array.from({ length: upcomingSlotCount }, (_, i) => {
-                        const slot = i + 1
-                        const plan = gamePlans[slot]
-                        const isSaving = saving === `${game.id}-${slot}`
-                        return (
-                          <select
-                            key={slot}
-                            value={plan?.player_id ?? ''}
-                            onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
-                            disabled={isSaving}
-                            style={{ ...CELL_SEL, opacity: isSaving ? 0.5 : 1 }}
-                          >
-                            <option value="">—</option>
-                            {players.map(p => (
-                              <option key={p.id} value={p.id}>
-                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
-                              </option>
-                            ))}
-                          </select>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
           {/* ── PAST GAMES ── */}
           {finalized.length > 0 && (
-            <div style={{ marginTop: upcoming.length > 0 ? '1.75rem' : '1rem' }}>
+            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
                 <div style={{
                   fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
@@ -457,6 +386,76 @@ export default function PitchingPage() {
                               </button>
                             )}
                           </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── UPCOMING ── */}
+          {upcoming.length > 0 && (
+            <div style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
+              <div style={{
+                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
+              }}>
+                Upcoming
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: upcomingGrid,
+                  gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
+                }}>
+                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
+                  {Array.from({ length: upcomingSlotCount }, (_, i) => (
+                    <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
+                  ))}
+                </div>
+
+                {upcoming.map((game, idx) => {
+                  const gamePlans = plans[game.id] ?? {}
+                  return (
+                    <div key={game.id} style={{
+                      display: 'grid', gridTemplateColumns: upcomingGrid,
+                      gap: '6px', minWidth: upcomingMinW,
+                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
+                      borderRadius: '8px', padding: '10px',
+                      marginBottom: '4px', alignItems: 'center',
+                      border: '0.5px solid var(--border-subtle)',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
+                          vs {game.opponent}
+                        </div>
+                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                          {formatDate(game.game_date)}
+                          {game.location ? ` · ${game.location}` : ''}
+                        </div>
+                      </div>
+
+                      {Array.from({ length: upcomingSlotCount }, (_, i) => {
+                        const slot = i + 1
+                        const plan = gamePlans[slot]
+                        const isSaving = saving === `${game.id}-${slot}`
+                        return (
+                          <select
+                            key={slot}
+                            value={plan?.player_id ?? ''}
+                            onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
+                            disabled={isSaving}
+                            style={{ ...CELL_SEL, opacity: isSaving ? 0.5 : 1 }}
+                          >
+                            <option value="">—</option>
+                            {players.map(p => (
+                              <option key={p.id} value={p.id}>
+                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
+                              </option>
+                            ))}
+                          </select>
                         )
                       })}
                     </div>
