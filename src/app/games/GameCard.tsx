@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
 
@@ -37,12 +38,16 @@ const STATUS: Record<string, { bg: string; color: string; label: string }> = {
 
 export default function GameCard({ game, teamName }: { game: any; teamName: string }) {
   const supabase = createClient()
-  const [notes, setNotes]         = useState<string | null>(game.notes)
-  const [status, setStatus]       = useState<string>(game.status)
-  const [showSheet, setShowSheet] = useState(false)
-  const [usScore, setUsScore]     = useState('')
-  const [themScore, setThemScore] = useState('')
-  const [saving, setSaving]       = useState(false)
+  const router = useRouter()
+  const [notes, setNotes]             = useState<string | null>(game.notes)
+  const [status, setStatus]           = useState<string>(game.status)
+  const [showScore, setShowScore]     = useState(false)
+  const [showMenu, setShowMenu]       = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]       = useState(false)
+  const [usScore, setUsScore]         = useState('')
+  const [themScore, setThemScore]     = useState('')
+  const [saving, setSaving]           = useState(false)
 
   const score = parseScore(notes)
   const sc = STATUS[status] ?? STATUS.scheduled
@@ -50,10 +55,22 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
   const date = new Date(game.game_date + 'T12:00:00')
   const formatted = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-  function openSheet() {
+  const isFinished = status === 'final' || status === 'in_progress'
+  // For lineup_ready games, go straight to the lineup; otherwise start at attendance
+  const lineupHref = status === 'lineup_ready'
+    ? `/games/${game.id}/lineup`
+    : `/games/${game.id}/attendance`
+  const lineupLabel = status === 'lineup_ready' ? 'View lineup' : 'Lineup'
+
+  function openScore() {
     setUsScore(score != null ? String(score.us) : '')
     setThemScore(score != null ? String(score.them) : '')
-    setShowSheet(true)
+    setShowScore(true)
+  }
+
+  function openMenu() {
+    setConfirmDelete(false)
+    setShowMenu(true)
   }
 
   async function saveScore() {
@@ -65,7 +82,13 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
     setNotes(newNotes)
     setStatus('final')
     setSaving(false)
-    setShowSheet(false)
+    setShowScore(false)
+  }
+
+  async function deleteGame() {
+    setDeleting(true)
+    await supabase.from('games').delete().eq('id', game.id)
+    router.refresh()
   }
 
   return (
@@ -74,7 +97,7 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
         background: 'var(--bg-card)', border: '0.5px solid var(--border)',
         borderRadius: '10px', marginBottom: '8px', display: 'flex', overflow: 'hidden',
       }}>
-        {/* Main card — navigates to detail */}
+        {/* Main card area */}
         <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -96,9 +119,21 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
           </div>
         </Link>
 
-        {/* Right action zone */}
-        {status === 'final' || status === 'in_progress' ? (
-          <button onClick={openSheet} style={{
+        {/* ⋯ menu button */}
+        <button onClick={openMenu} style={{
+          flexShrink: 0, width: '36px',
+          border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
+          background: 'transparent', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '16px', padding: 0,
+          letterSpacing: '1px',
+        }}>
+          ···
+        </button>
+
+        {/* Right action: score (finished) or lineup (upcoming) */}
+        {isFinished ? (
+          <button onClick={openScore} style={{
             flexShrink: 0, width: '72px',
             border: 'none', borderLeft: '0.5px solid var(--border-subtle)',
             background: score != null ? 'rgba(45,106,53,0.06)' : 'transparent',
@@ -123,25 +158,110 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
             )}
           </button>
         ) : (
-          <Link href={`/games/${game.id}/attendance`} style={{
+          <Link href={lineupHref} style={{
             flexShrink: 0, width: '72px', textDecoration: 'none',
             borderLeft: '0.5px solid var(--border-subtle)',
-            background: 'transparent',
+            background: status === 'lineup_ready' ? 'rgba(59,109,177,0.08)' : 'transparent',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: '3px', padding: 0,
           }}>
-            <div style={{ fontSize: '18px', lineHeight: 1 }}>📋</div>
-            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600,
-              textAlign: 'center', lineHeight: 1.3 }}>
-              Lineup
+            <div style={{ fontSize: '18px', lineHeight: 1 }}>
+              {status === 'lineup_ready' ? '✓' : '📋'}
+            </div>
+            <div style={{ fontSize: '10px',
+              color: status === 'lineup_ready' ? '#80B0E8' : 'var(--accent)',
+              fontWeight: 600, textAlign: 'center', lineHeight: 1.3 }}>
+              {lineupLabel}
             </div>
           </Link>
         )}
       </div>
 
+      {/* ⋯ action sheet */}
+      {showMenu && (
+        <div onClick={() => setShowMenu(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+            padding: '1.25rem 1rem 2.5rem', width: '100%', maxWidth: '480px',
+            border: '0.5px solid var(--border)',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '2px' }}>
+              vs {game.opponent}
+            </div>
+            <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.25rem' }}>
+              {formatted}
+            </div>
+
+            {/* Actions */}
+            <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
+              <div style={{
+                padding: '12px 14px', borderRadius: '8px',
+                border: '0.5px solid var(--border-md)', background: 'transparent',
+                fontSize: '14px', color: 'var(--fg)',
+              }}>
+                View / edit game →
+              </div>
+            </Link>
+
+            {!isFinished && (
+              <Link href={lineupHref} style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
+                <div style={{
+                  padding: '12px 14px', borderRadius: '8px',
+                  border: '0.5px solid var(--border-md)', background: 'transparent',
+                  fontSize: '14px', color: 'var(--fg)',
+                }}>
+                  {lineupLabel} →
+                </div>
+              </Link>
+            )}
+
+            {!confirmDelete ? (
+              <button onClick={() => setConfirmDelete(true)} style={{
+                width: '100%', padding: '12px 14px', borderRadius: '8px',
+                border: '0.5px solid rgba(192,57,43,0.3)', background: 'rgba(192,57,43,0.06)',
+                color: '#E87060', fontSize: '14px', cursor: 'pointer', textAlign: 'left',
+              }}>
+                Delete game
+              </button>
+            ) : (
+              <div style={{
+                padding: '12px 14px', borderRadius: '8px',
+                background: 'rgba(192,57,43,0.08)', border: '0.5px solid rgba(192,57,43,0.3)',
+              }}>
+                <div style={{ fontSize: '13px', color: '#E87060', marginBottom: '10px' }}>
+                  Delete this game? This cannot be undone.
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setConfirmDelete(false)} style={{
+                    flex: 1, padding: '9px', borderRadius: '6px',
+                    border: '0.5px solid var(--border-strong)', background: 'transparent',
+                    color: `rgba(var(--fg-rgb), 0.6)`, fontSize: '13px', cursor: 'pointer',
+                  }}>Cancel</button>
+                  <button onClick={deleteGame} disabled={deleting} style={{
+                    flex: 1, padding: '9px', borderRadius: '6px', border: 'none',
+                    background: '#C0392B', color: 'white', fontSize: '13px', fontWeight: 700,
+                    cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1,
+                  }}>{deleting ? 'Deleting…' : 'Yes, delete'}</button>
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => setShowMenu(false)} style={{
+              width: '100%', marginTop: '10px', padding: '11px',
+              border: '0.5px solid var(--border-strong)', borderRadius: '8px',
+              background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`,
+              fontSize: '13px', cursor: 'pointer',
+            }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
       {/* Quick score sheet */}
-      {showSheet && (
-        <div onClick={() => setShowSheet(false)} style={{
+      {showScore && (
+        <div onClick={() => setShowScore(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
         }}>
@@ -183,7 +303,7 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowSheet(false)} style={{
+              <button onClick={() => setShowScore(false)} style={{
                 flex: 1, padding: '12px', borderRadius: '6px',
                 border: '0.5px solid var(--border-strong)', background: 'transparent',
                 color: `rgba(var(--fg-rgb), 0.6)`, fontSize: '13px', cursor: 'pointer',
