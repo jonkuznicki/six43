@@ -108,6 +108,9 @@ function ImportPageInner() {
 
   // ── GameChanger tab ──────────────────────────────
   const [gcUrl, setGcUrl]           = useState('')
+  const [gcTimezone, setGcTimezone] = useState(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return 'America/Chicago' }
+  })
   const [gcPreviewing, setGcPrev]   = useState(false)
   const [gcGames, setGcGames]       = useState<ParsedGame[]>([])
   const [gcLocation, setGcLoc]      = useState<Location>('Home')
@@ -154,7 +157,7 @@ function ImportPageInner() {
 
     let seasonQuery = supabase
       .from('seasons')
-      .select('id, name, webcal_url, team:teams(name)')
+      .select('id, name, webcal_url, timezone, team:teams(name)')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -175,8 +178,9 @@ function ImportPageInner() {
         .maybeSingle()
       setNextNum((maxGame?.game_number ?? 0) + 1)
 
-      // Pre-fill URL if already saved
+      // Pre-fill URL and timezone if already saved
       if (seasonData.webcal_url) setGcUrl(seasonData.webcal_url)
+      if (seasonData.timezone) setGcTimezone(seasonData.timezone)
     }
 
     setLoading(false)
@@ -194,7 +198,7 @@ function ImportPageInner() {
     const res = await fetch('/api/import-ical', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: gcUrl.trim(), seasonId: season?.id ?? null }),
+      body: JSON.stringify({ url: gcUrl.trim(), seasonId: season?.id ?? null, timezone: gcTimezone }),
     })
 
     if (!res.ok) {
@@ -478,7 +482,7 @@ function ImportPageInner() {
               </div>
 
               {/* URL input */}
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ marginBottom: '10px' }}>
                 <div style={{ fontSize: '11px', color: s.muted, marginBottom: '5px' }}>
                   Webcal link
                 </div>
@@ -489,6 +493,34 @@ function ImportPageInner() {
                   style={inp()}
                   onKeyDown={e => e.key === 'Enter' && handlePreview()}
                 />
+              </div>
+
+              {/* Timezone */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '11px', color: s.muted, marginBottom: '5px' }}>
+                  Your timezone
+                </div>
+                <select
+                  value={gcTimezone}
+                  onChange={e => setGcTimezone(e.target.value)}
+                  style={{ ...inp(), appearance: 'none' as any }}
+                >
+                  <optgroup label="United States">
+                    <option value="America/New_York">Eastern (ET)</option>
+                    <option value="America/Chicago">Central (CT)</option>
+                    <option value="America/Denver">Mountain (MT)</option>
+                    <option value="America/Phoenix">Arizona (no DST)</option>
+                    <option value="America/Los_Angeles">Pacific (PT)</option>
+                    <option value="America/Anchorage">Alaska (AKT)</option>
+                    <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                  </optgroup>
+                  <optgroup label="Canada">
+                    <option value="America/Toronto">Toronto / Eastern</option>
+                    <option value="America/Winnipeg">Winnipeg / Central</option>
+                    <option value="America/Edmonton">Edmonton / Mountain</option>
+                    <option value="America/Vancouver">Vancouver / Pacific</option>
+                  </optgroup>
+                </select>
               </div>
 
               {gcError && (

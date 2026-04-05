@@ -1,7 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '../../../lib/supabase-server'
 
-function parseIcal(text: string): Array<{ opponent: string; game_date: string; game_time: string | null }> {
+function convertUtcToTimezone(v: string, timezone: string): { game_date: string; game_time: string | null } {
+  const isoStr = `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}T${v.slice(9,11)}:${v.slice(11,13)}:00Z`
+  const date = new Date(isoStr)
+  const dateParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date)
+  const tp: Record<string, string> = {}
+  for (const p of dateParts) tp[p.type] = p.value
+  const game_date = `${tp.year}-${tp.month}-${tp.day}`
+  const timeParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(date)
+  const tt: Record<string, string> = {}
+  for (const p of timeParts) tt[p.type] = p.value
+  const h = tt.hour === '24' ? '00' : tt.hour
+  return { game_date, game_time: `${h}:${tt.minute}` }
+}
+
+function parseIcal(text: string, timezone?: string): Array<{ opponent: string; game_date: string; game_time: string | null }> {
   const normalized = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
@@ -11,13 +29,14 @@ function parseIcal(text: string): Array<{ opponent: string; game_date: string; g
   const games: Array<{ opponent: string; game_date: string; game_time: string | null }> = []
   let inEvent = false
   let summary = ''
+  let dtstartRaw = ''
   let dtstartValue = ''
 
   for (const line of normalized.split('\n')) {
     const upper = line.toUpperCase()
 
     if (upper === 'BEGIN:VEVENT') {
-      inEvent = true; summary = ''; dtstartValue = ''
+      inEvent = true; summary = ''; dtstartRaw = ''; dtstartValue = ''
       continue
     }
     if (upper === 'END:VEVENT') {
@@ -27,11 +46,18 @@ function parseIcal(text: string): Array<{ opponent: string; game_date: string; g
       if (SKIP_KEYWORDS.some(kw => lsum.includes(kw))) continue
       const opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
       if (!opponent) continue
-      const v = dtstartValue.replace('Z', '')
-      const game_date = `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`
+      const isUtc = dtstartRaw.endsWith('Z')
+      const v = dtstartValue
+      let game_date = `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`
       let game_time: string | null = null
       if (v.length >= 13 && v[8] === 'T') {
-        game_time = `${v.slice(9,11)}:${v.slice(11,13)}`
+        if (isUtc && timezone) {
+          const converted = convertUtcToTimezone(v, timezone)
+          game_date = converted.game_date
+          game_time = converted.game_time
+        } else {
+          game_time = `${v.slice(9,11)}:${v.slice(11,13)}`
+        }
       }
       games.push({ opponent, game_date, game_time })
       continue
@@ -42,7 +68,7 @@ function parseIcal(text: string): Array<{ opponent: string; game_date: string; g
     const propName = line.slice(0, colonIdx).split(';')[0].toUpperCase()
     const value = line.slice(colonIdx + 1).trim()
     if (propName === 'SUMMARY') summary = value
-    if (propName === 'DTSTART') dtstartValue = value
+    if (propName === 'DTSTART') { dtstartRaw = value; dtstartValue = value.replace('Z', '') }
   }
 
   return games
@@ -61,10 +87,10 @@ export async function GET(request: Request) {
 
   const teamId = new URL(request.url).searchParams.get('teamId')
 
-  // Get active season with webcal_url
+  // Get active season with webcal_url and timezone
   let seasonQuery = supabase
     .from('seasons')
-    .select('id, webcal_url')
+    .select('id, webcal_url, timezone')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -88,7 +114,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Could not fetch schedule: ${e.message}` }, { status: 422 })
   }
 
-  const icalGames = parseIcal(icalText)
+  const icalGames = parseIcal(icalText, season.timezone ?? undefined)
 
   // Get existing games in season
   const { data: dbGames } = await supabase
