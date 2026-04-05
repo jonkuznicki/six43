@@ -61,8 +61,16 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
       const lsum = summary.toLowerCase()
       if (SKIP_KEYWORDS.some(kw => lsum.includes(kw))) continue
 
-      // Strip leading "vs. " or "@ "
-      const opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      // Extract opponent:
+      //   "vs Tigers" / "@ Tigers"  → "Tigers"
+      //   "Our Team vs Tigers" / "Our Team @ Tigers"  → "Tigers"
+      let opponent: string
+      if (/^(vs\.?\s*|@\s*)/i.test(summary)) {
+        opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      } else {
+        const mid = summary.match(/\s+(?:vs\.?|@)\s+(.+)$/i)
+        opponent = mid ? mid[1].trim() : summary.trim()
+      }
       if (!opponent) continue
 
       const isUtc = dtstartRaw.endsWith('Z')

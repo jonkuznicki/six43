@@ -44,7 +44,13 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
       if (!summary || !dtstartValue) continue
       const lsum = summary.toLowerCase()
       if (SKIP_KEYWORDS.some(kw => lsum.includes(kw))) continue
-      const opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      let opponent: string
+      if (/^(vs\.?\s*|@\s*)/i.test(summary)) {
+        opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      } else {
+        const mid = summary.match(/\s+(?:vs\.?|@)\s+(.+)$/i)
+        opponent = mid ? mid[1].trim() : summary.trim()
+      }
       if (!opponent) continue
       const isUtc = dtstartRaw.endsWith('Z')
       const v = dtstartValue
