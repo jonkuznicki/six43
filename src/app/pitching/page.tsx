@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
 
 type PlanSlot = { id?: string; player_id: string; notes: string }
+type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null }
 
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
@@ -11,7 +12,6 @@ function formatDate(d: string) {
   })
 }
 
-// Abbreviated name for compact cells
 function shortName(player: any) {
   if (!player) return '—'
   return `${player.first_name[0]}. ${player.last_name}`
@@ -27,7 +27,6 @@ function daysRest(lastPitchedDate: string | undefined, gameDate: string): string
   return ` · ${days}d rest`
 }
 
-const GRID = '140px repeat(4, 1fr)'
 const HEADER_STYLE: React.CSSProperties = {
   fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
   textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
@@ -38,20 +37,23 @@ const CELL_SEL: React.CSSProperties = {
   border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
   color: 'var(--fg)', fontSize: '11px', boxSizing: 'border-box', cursor: 'pointer',
 }
+const MIN_SLOTS = 4
+const MAX_SLOTS = 9
 
 export default function PitchingPage() {
   const supabase = createClient()
-  const [loading, setLoading] = useState(true)
-  const [seasons, setSeasons] = useState<any[]>([])
+  const [loading, setLoading]               = useState(true)
+  const [seasons, setSeasons]               = useState<any[]>([])
   const [selectedSeasonId, setSelectedSeasonId] = useState('')
-  const [activeSeason, setActiveSeason] = useState<any>(null)
-  const [players, setPlayers] = useState<any[]>([])
-  const [upcoming, setUpcoming] = useState<any[]>([])
-  const [finalized, setFinalized] = useState<any[]>([])
-  const [plans, setPlans] = useState<Record<string, Record<number, PlanSlot>>>({})
-  const [actualPitching, setActualPitching] = useState<Record<string, { player: any; innings: number }[]>>({})
-  const [lastPitched, setLastPitched] = useState<Record<string, string>>({}) // player_id → game_date
-  const [saving, setSaving] = useState<string | null>(null)
+  const [activeSeason, setActiveSeason]     = useState<any>(null)
+  const [players, setPlayers]               = useState<any[]>([])
+  const [upcoming, setUpcoming]             = useState<any[]>([])
+  const [finalized, setFinalized]           = useState<any[]>([])
+  const [plans, setPlans]                   = useState<Record<string, Record<number, PlanSlot>>>({})
+  const [actualPitching, setActualPitching] = useState<Record<string, ActualPitcher[]>>({})
+  const [lastPitched, setLastPitched]       = useState<Record<string, string>>({})
+  const [saving, setSaving]                 = useState<string | null>(null)
+  const [editingPitch, setEditingPitch]     = useState<Record<string, string>>({}) // slotId → draft value
 
   useEffect(() => { init() }, [])
   useEffect(() => { if (selectedSeasonId) loadSeason(selectedSeasonId) }, [selectedSeasonId])
@@ -90,11 +92,12 @@ export default function PitchingPage() {
       .eq('season_id', seasonId)
       .order('game_date', { ascending: true })
 
-    const upcomingGames = (gameRows ?? []).filter((g: any) => g.status !== 'final')
+    const upcomingGames  = (gameRows ?? []).filter((g: any) => g.status !== 'final')
     const finalizedGames = (gameRows ?? []).filter((g: any) => g.status === 'final')
     setUpcoming(upcomingGames)
     setFinalized([...finalizedGames].reverse())
 
+    // Load pitcher plans for upcoming games
     const upcomingIds = upcomingGames.map((g: any) => g.id)
     if (upcomingIds.length) {
       const { data: planRows } = await supabase
@@ -112,14 +115,17 @@ export default function PitchingPage() {
       setPlans(plansMap)
     }
 
+    // Load actual pitching data (from lineup slots) including pitch counts
     const finalizedIds = finalizedGames.map((g: any) => g.id)
     if (finalizedIds.length) {
       const { data: slotRows } = await supabase
         .from('lineup_slots')
-        .select('game_id, player_id, inning_positions, availability, player:players(first_name, last_name, jersey_number)')
+        .select('id, game_id, player_id, inning_positions, availability, pitch_count, player:players(first_name, last_name, jersey_number)')
         .in('game_id', finalizedIds)
-      const actualMap: Record<string, { player: any; innings: number }[]> = {}
+
+      const actualMap: Record<string, ActualPitcher[]> = {}
       const lastPitchedMap: Record<string, string> = {}
+
       for (const slot of slotRows ?? []) {
         if (slot.availability === 'absent') continue
         const game = finalizedGames.find((g: any) => g.id === slot.game_id)
@@ -129,8 +135,13 @@ export default function PitchingPage() {
           .filter((p: string | null) => p === 'P').length
         if (innings > 0) {
           if (!actualMap[slot.game_id]) actualMap[slot.game_id] = []
-          actualMap[slot.game_id].push({ player: slot.player, innings })
-          // Track most recent game date pitched per player
+          actualMap[slot.game_id].push({
+            player: slot.player,
+            playerId: slot.player_id,
+            slotId: slot.id,
+            innings,
+            pitchCount: slot.pitch_count ?? null,
+          })
           if (game && (!lastPitchedMap[slot.player_id] || game.game_date > lastPitchedMap[slot.player_id])) {
             lastPitchedMap[slot.player_id] = game.game_date
           }
@@ -142,6 +153,7 @@ export default function PitchingPage() {
       setActualPitching(actualMap)
       setLastPitched(lastPitchedMap)
     }
+
     setLoading(false)
   }
 
@@ -176,6 +188,38 @@ export default function PitchingPage() {
     }
     setSaving(null)
   }
+
+  async function savePitchCount(slotId: string, gameId: string, value: string) {
+    const count = value === '' ? null : parseInt(value)
+    if (count !== null && (isNaN(count) || count < 0)) return
+    await supabase.from('lineup_slots').update({ pitch_count: count }).eq('id', slotId)
+    setActualPitching(prev => ({
+      ...prev,
+      [gameId]: (prev[gameId] ?? []).map(p =>
+        p.slotId === slotId ? { ...p, pitchCount: count } : p
+      ),
+    }))
+    // Clear draft
+    setEditingPitch(prev => { const n = { ...prev }; delete n[slotId]; return n })
+  }
+
+  // Compute how many pitcher slots to show for upcoming games
+  const maxFilledSlot = Math.max(
+    MIN_SLOTS,
+    ...Object.values(plans).flatMap(g => Object.keys(g).map(Number))
+  )
+  const upcomingSlotCount = Math.min(MAX_SLOTS, maxFilledSlot + 1)
+
+  // Compute how many columns to show for past games
+  const maxActualPitchers = Math.max(
+    MIN_SLOTS,
+    ...Object.values(actualPitching).map(arr => arr.length)
+  )
+
+  const upcomingGrid = `140px repeat(${upcomingSlotCount}, 1fr)`
+  const pastGrid     = `140px repeat(${maxActualPitchers}, 1fr)`
+  const upcomingMinW = `${300 + upcomingSlotCount * 80}px`
+  const pastMinW     = `${300 + maxActualPitchers * 80}px`
 
   return (
     <main style={{
@@ -239,28 +283,26 @@ export default function PitchingPage() {
               <div style={{ overflowX: 'auto' }}>
                 {/* Column headers */}
                 <div style={{
-                  display: 'grid', gridTemplateColumns: GRID,
-                  gap: '6px', marginBottom: '4px', minWidth: '420px', padding: '0 2px',
+                  display: 'grid', gridTemplateColumns: upcomingGrid,
+                  gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
                 }}>
                   <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {[1, 2, 3, 4].map(s => (
-                    <div key={s} style={HEADER_STYLE}>P{s}</div>
+                  {Array.from({ length: upcomingSlotCount }, (_, i) => (
+                    <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
                   ))}
                 </div>
 
-                {/* Game rows */}
                 {upcoming.map((game, idx) => {
                   const gamePlans = plans[game.id] ?? {}
                   return (
                     <div key={game.id} style={{
-                      display: 'grid', gridTemplateColumns: GRID,
-                      gap: '6px', minWidth: '420px',
+                      display: 'grid', gridTemplateColumns: upcomingGrid,
+                      gap: '6px', minWidth: upcomingMinW,
                       background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
-                      borderRadius: '8px', padding: '10px 10px',
+                      borderRadius: '8px', padding: '10px',
                       marginBottom: '4px', alignItems: 'center',
                       border: '0.5px solid var(--border-subtle)',
                     }}>
-                      {/* Game info */}
                       <div>
                         <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
                           vs {game.opponent}
@@ -271,8 +313,8 @@ export default function PitchingPage() {
                         </div>
                       </div>
 
-                      {/* P1–P4 cells */}
-                      {[1, 2, 3, 4].map(slot => {
+                      {Array.from({ length: upcomingSlotCount }, (_, i) => {
+                        const slot = i + 1
                         const plan = gamePlans[slot]
                         const isSaving = saving === `${game.id}-${slot}`
                         return (
@@ -302,22 +344,27 @@ export default function PitchingPage() {
           {/* ── PAST GAMES ── */}
           {finalized.length > 0 && (
             <div style={{ marginTop: upcoming.length > 0 ? '1.75rem' : '1rem' }}>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
-              }}>
-                Past games
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                <div style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                }}>
+                  Past games
+                </div>
+                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)` }}>
+                  tap pitch count to edit
+                </div>
               </div>
 
               <div style={{ overflowX: 'auto' }}>
                 {/* Column headers */}
                 <div style={{
-                  display: 'grid', gridTemplateColumns: GRID,
-                  gap: '6px', marginBottom: '4px', minWidth: '420px', padding: '0 2px',
+                  display: 'grid', gridTemplateColumns: pastGrid,
+                  gap: '6px', marginBottom: '4px', minWidth: pastMinW, padding: '0 2px',
                 }}>
                   <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {[1, 2, 3, 4].map(s => (
-                    <div key={s} style={HEADER_STYLE}>P{s}</div>
+                  {Array.from({ length: maxActualPitchers }, (_, i) => (
+                    <div key={i} style={HEADER_STYLE}>P{i + 1}</div>
                   ))}
                 </div>
 
@@ -325,15 +372,15 @@ export default function PitchingPage() {
                   const pitchers = actualPitching[game.id] ?? []
                   return (
                     <div key={game.id} style={{
-                      display: 'grid', gridTemplateColumns: GRID,
-                      gap: '6px', minWidth: '420px',
+                      display: 'grid', gridTemplateColumns: pastGrid,
+                      gap: '6px', minWidth: pastMinW,
                       background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
-                      borderRadius: '8px', padding: '10px 10px',
-                      marginBottom: '4px', alignItems: 'center',
+                      borderRadius: '8px', padding: '10px',
+                      marginBottom: '4px', alignItems: 'start',
                       border: '0.5px solid var(--border-subtle)',
                     }}>
                       {/* Game info */}
-                      <div>
+                      <div style={{ paddingTop: '2px' }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
                           vs {game.opponent}
                         </div>
@@ -342,22 +389,72 @@ export default function PitchingPage() {
                         </div>
                       </div>
 
-                      {/* Top 4 pitchers in slots */}
-                      {[0, 1, 2, 3].map(i => {
+                      {/* Pitcher cells — as many as pitched */}
+                      {Array.from({ length: maxActualPitchers }, (_, i) => {
                         const p = pitchers[i]
+                        if (!p) return (
+                          <div key={i} style={{ textAlign: 'center', paddingTop: '2px' }}>
+                            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</div>
+                          </div>
+                        )
+
+                        const draftKey = p.slotId
+                        const isDrafting = draftKey in editingPitch
+                        const draftVal = editingPitch[draftKey] ?? ''
+
                         return (
                           <div key={i} style={{ textAlign: 'center' }}>
-                            {p ? (
-                              <>
-                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2 }}>
-                                  {shortName(p.player)}
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, marginTop: '1px' }}>
-                                  {p.innings} inn
-                                </div>
-                              </>
+                            {/* Name */}
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2, marginBottom: '2px' }}>
+                              {shortName(p.player)}
+                            </div>
+                            {/* Innings */}
+                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, marginBottom: '3px' }}>
+                              {p.innings} inn
+                            </div>
+                            {/* Pitch count — editable */}
+                            {isDrafting ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={draftVal}
+                                autoFocus
+                                onChange={e => setEditingPitch(prev => ({
+                                  ...prev, [draftKey]: e.target.value.replace(/\D/g, ''),
+                                }))}
+                                onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                  if (e.key === 'Escape') {
+                                    setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
+                                  }
+                                }}
+                                style={{
+                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
+                                  border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
+                                  color: 'var(--fg)', fontSize: '11px', textAlign: 'center',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
                             ) : (
-                              <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</div>
+                              <button
+                                onClick={() => setEditingPitch(prev => ({
+                                  ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '',
+                                }))}
+                                style={{
+                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
+                                  border: p.pitchCount != null
+                                    ? '0.5px solid var(--border-md)'
+                                    : '0.5px dashed var(--border-md)',
+                                  background: 'transparent',
+                                  color: p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
+                                  fontSize: '11px', cursor: 'pointer',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                {p.pitchCount != null ? `${p.pitchCount}p` : '+ pitches'}
+                              </button>
                             )}
                           </div>
                         )
