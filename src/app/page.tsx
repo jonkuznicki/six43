@@ -2,6 +2,33 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createServerClient } from '../lib/supabase-server'
 
+// ── Desktop grid illustration data ───────────────────────────────────────────
+
+const DEMO_POS: Record<string, { bg: string; fg: string }> = {
+  P:    { bg: 'rgba(232,160,32,0.22)',  fg: '#E8C060' },
+  C:    { bg: 'rgba(192,80,120,0.22)', fg: '#E090B0' },
+  '1B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
+  '2B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
+  SS:   { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
+  '3B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
+  LF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
+  CF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
+  RF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
+  Bnch: { bg: 'rgba(120,120,120,0.1)', fg: 'rgba(160,160,160,0.55)' },
+}
+
+const DEMO_PLAYERS = [
+  { name: 'Jake M.',    innings: ['P',   'P',   '1B', 'CF',  '1B', 'P'  ] },
+  { name: 'Connor B.', innings: ['C',   'C',   'C',  'C',   'C',  'C'  ] },
+  { name: 'Tyler S.',  innings: ['1B',  'SS',  'SS', '1B',  '2B', 'SS' ] },
+  { name: 'Marcus L.', innings: ['SS',  '2B',  '2B', 'SS',  '1B', '2B' ] },
+  { name: 'Ryan P.',   innings: ['LF',  'LF',  'CF', 'RF',  'LF', 'LF' ] },
+  { name: 'Drew K.',   innings: ['CF',  'RF',  'LF', 'LF',  'RF', 'CF' ] },
+  { name: 'Sam T.',    innings: ['2B',  '3B',  '3B', '2B',  '3B', '3B' ] },
+  { name: 'Alex W.',   innings: ['3B',  '1B',  'RF', '3B',  'SS', '1B' ] },
+  { name: 'Josh M.',   innings: ['RF',  'CF', 'Bnch','RF',  'CF', 'RF' ] },
+]
+
 const FEATURES = [
   { icon: '⚾', title: 'Lineup builder',        body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper.' },
   { icon: '📋', title: 'Attendance tracking',   body: 'Mark who\'s there on game day. Absent players are automatically removed from the lineup.' },
@@ -44,6 +71,121 @@ function PhoneMockup({ src, alt, caption }: { src: string; alt: string; caption?
       {caption && (
         <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '1rem' }}>{caption}</div>
       )}
+    </div>
+  )
+}
+
+function BrowserMockup({ children, caption }: { children: React.ReactNode; caption?: string }) {
+  return (
+    <div style={{ width: '100%' }}>
+      <div style={{
+        background: '#0B1F3A',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 24px 60px rgba(0,0,0,0.5)',
+      }}>
+        {/* Browser chrome */}
+        <div style={{
+          background: '#0d2240',
+          padding: '9px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF5F57' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFBD2E' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#28CA41' }} />
+          </div>
+          <div style={{
+            flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '4px',
+            padding: '3px 10px', fontSize: '10px', color: 'rgba(255,255,255,0.25)',
+            textAlign: 'center', maxWidth: '160px', margin: '0 auto',
+          }}>
+            six43.app
+          </div>
+        </div>
+        {children}
+      </div>
+      {caption && (
+        <div style={{ fontSize: '12px', color: 'rgba(var(--fg-rgb), 0.3)', marginTop: '1rem', textAlign: 'center' }}>
+          {caption}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DesktopLineupGrid() {
+  const innings = [1, 2, 3, 4, 5, 6]
+  return (
+    <div style={{ background: '#0B1F3A' }}>
+      {/* Topbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '7px 12px', background: '#0d2240',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+          vs Cardinals · Apr 12
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
+          <span style={{
+            fontSize: '9px', fontWeight: 700, padding: '2px 8px',
+            background: 'rgba(232,160,32,0.18)', color: '#E8C060', borderRadius: '4px',
+          }}>Lineup Ready</span>
+        </div>
+      </div>
+      {/* Grid */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={{ padding: '5px 10px', textAlign: 'left', color: 'rgba(255,255,255,0.2)', fontWeight: 600, fontSize: '9px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              Player
+            </th>
+            {innings.map(i => (
+              <th key={i} style={{ padding: '5px 6px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontWeight: 600, fontSize: '9px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                {i}
+              </th>
+            ))}
+            <th style={{ padding: '5px 10px', textAlign: 'right', color: 'rgba(255,255,255,0.2)', fontWeight: 600, fontSize: '9px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              Inn
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {DEMO_PLAYERS.map((player, pi) => {
+            const fieldingInnings = player.innings.filter(p => p !== 'Bnch').length
+            return (
+              <tr key={player.name} style={{ borderBottom: '0.5px solid rgba(255,255,255,0.04)' }}>
+                <td style={{ padding: '3px 10px', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.22)', marginRight: '5px' }}>{pi + 1}</span>
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.72)', fontWeight: 500 }}>{player.name}</span>
+                </td>
+                {player.innings.map((pos, ii) => {
+                  const c = DEMO_POS[pos]
+                  return (
+                    <td key={ii} style={{ padding: '3px 3px', textAlign: 'center' }}>
+                      <div style={{
+                        background: c?.bg ?? 'transparent',
+                        color: c?.fg ?? 'rgba(255,255,255,0.25)',
+                        borderRadius: '3px', padding: '2px 0',
+                        fontSize: '9px', fontWeight: 700,
+                        minWidth: '26px', display: 'inline-block',
+                      }}>{pos}</div>
+                    </td>
+                  )
+                })}
+                <td style={{ padding: '3px 10px', textAlign: 'right', fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>
+                  {fieldingInnings}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -159,12 +301,10 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="mkt-hero-phone">
-          <PhoneMockup
-            src="/screenshot-lineup.png"
-            alt="Six43 lineup builder"
-            caption="Tap to assign positions across every inning"
-          />
+        <div className="mkt-hero-browser">
+          <BrowserMockup caption="Build and manage lineups from your laptop">
+            <DesktopLineupGrid />
+          </BrowserMockup>
         </div>
       </section>
 
@@ -216,11 +356,13 @@ export default async function HomePage() {
       {/* ── Divider ── */}
       <div className="mkt-divider" />
 
-      {/* ── Spotlight 1: Lineup builder ── */}
+      {/* ── Spotlight 1: Lineup builder (desktop) ── */}
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight">
-          <div className="mkt-spotlight-img">
-            <PhoneMockup src="/screenshot-lineup.png" alt="Lineup builder" />
+          <div className="mkt-spotlight-img" style={{ maxWidth: '420px', width: '100%' }}>
+            <BrowserMockup>
+              <DesktopLineupGrid />
+            </BrowserMockup>
           </div>
           <div className="mkt-spotlight-text">
             <div style={{
@@ -231,10 +373,15 @@ export default async function HomePage() {
               Build a lineup in minutes,<br />not an hour
             </h2>
             <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
-              Select a position, then tap the cells to assign it across innings. The whole grid fills out as you go — no dragging, no spreadsheets, no paper lineups that fall apart in the rain.
+              See every player, every inning, all at once. Click cells to select, press a key or click a position to fill. Shift+click to paint a range. The whole grid fills out as you go — no spreadsheets, no paper lineups.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Assign positions across all innings at once', 'Batting order auto-populates from your roster', 'Print a clean lineup card to bring to the field'].map(item => (
+              {[
+                'Full grid view — every player across every inning',
+                'Keyboard shortcuts: P, C, 1, 2, SS, 3, and more',
+                'Shift+click or shift+arrow to fill multiple cells at once',
+                'Print a clean lineup card to bring to the field',
+              ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
@@ -378,6 +525,56 @@ export default async function HomePage() {
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Any device ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+          <div style={{
+            fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.3)`, marginBottom: '4px',
+          }}>
+            Any device
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '0.5rem' }}>
+            At your desk or on the field
+          </h2>
+          <p style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)`, maxWidth: '380px', margin: '0 auto', lineHeight: 1.6 }}>
+            Plan the lineup on your laptop the night before. Pull it up on your phone in the dugout. Same data, always in sync.
+          </p>
+        </div>
+
+        <div style={{
+          display: 'flex', gap: '2rem', alignItems: 'center',
+          justifyContent: 'center', flexWrap: 'wrap',
+        }}>
+          {/* Desktop */}
+          <div style={{ flex: 1, minWidth: '260px', maxWidth: '480px' }}>
+            <BrowserMockup>
+              <DesktopLineupGrid />
+            </BrowserMockup>
+            <div style={{
+              textAlign: 'center', fontSize: '12px',
+              color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '0.75rem',
+            }}>
+              Desktop — full grid, keyboard shortcuts
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div style={{ flexShrink: 0, width: '160px' }}>
+            <PhoneMockup src="/screenshot-lineup.png" alt="Six43 on mobile" />
+            <div style={{
+              textAlign: 'center', fontSize: '12px',
+              color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '0.75rem',
+            }}>
+              Mobile — game day, in the dugout
             </div>
           </div>
         </div>

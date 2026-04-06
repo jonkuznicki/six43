@@ -84,6 +84,7 @@ html[data-theme="light"] {
   padding: 3.5rem 1.5rem 2rem;
 }
 .mkt-hero-phone { padding: 0 1.5rem 4rem; text-align: center; }
+.mkt-hero-browser { padding: 0 1.5rem 4rem; width: 100%; }
 
 .mkt-steps { display: flex; flex-direction: column; }
 .mkt-step-connector { display: block; }
@@ -120,6 +121,7 @@ html[data-theme="light"] {
     padding: 0;
     margin-bottom: 0;
   }
+  .mkt-hero-browser { flex-shrink: 0; width: 520px; padding: 0; }
 
   .mkt-steps { flex-direction: row; gap: 2rem; align-items: flex-start; }
   .mkt-steps > div { flex: 1; }
