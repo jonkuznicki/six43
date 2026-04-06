@@ -182,14 +182,10 @@ export default function SettingsPage() {
       })))
     } else {
       const team = teams.find(t => t.id === seasonForm.teamId)
-      const hasActiveSeason = team?.seasons.some((s: any) => s.is_active)
-      // Auto-activate if this team has no active season yet
-      const newIsActive = !hasActiveSeason
-      if (newIsActive) {
-        // Deactivate any existing seasons first (shouldn't be any, but be safe)
-        for (const s of team?.seasons ?? []) {
-          await supabase.from('seasons').update({ is_active: false }).eq('id', s.id)
-        }
+      // Always activate the new season and deactivate any existing ones
+      const newIsActive = true
+      for (const s of team?.seasons ?? []) {
+        await supabase.from('seasons').update({ is_active: false }).eq('id', s.id)
       }
       const { data } = await supabase.from('seasons')
         .insert({ ...payload, team_id: seasonForm.teamId, is_active: newIsActive }).select().single()
@@ -404,15 +400,14 @@ export default function SettingsPage() {
           {/* Team header */}
           <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border-subtle)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Link href={`/games?teamId=${team.id}`} style={{ textDecoration: 'none' }}>
+            <div>
               <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--fg)' }}>{team.name}</div>
               {team.age_group && (
                 <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
                   {team.age_group}
                 </div>
               )}
-              <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px' }}>View schedule →</div>
-            </Link>
+            </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
                 onClick={() => toggleTeamActive(team.id, !team.is_active)}
@@ -514,13 +509,19 @@ export default function SettingsPage() {
                       style={{ ...smallBtn, color: 'rgba(232,100,80,0.6)' }}>✕</button>
                   </div>
                 </div>
-                {/* Manage roster for this season */}
-                <Link href={`/roster?seasonId=${season.id}`} style={{
-                  display: 'inline-block', fontSize: '12px', color: 'var(--accent)',
-                  textDecoration: 'none', fontWeight: 500,
-                }}>
-                  Manage roster →
-                </Link>
+                {/* Season links */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <Link href={`/games?teamId=${team.id}`} style={{
+                    fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 500,
+                  }}>
+                    View games →
+                  </Link>
+                  <Link href={`/roster?seasonId=${season.id}`} style={{
+                    fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
+                  }}>
+                    Manage roster →
+                  </Link>
+                </div>
               </div>
             ))}
 
@@ -618,15 +619,14 @@ export default function SettingsPage() {
               {/* Team header */}
               <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border-subtle)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Link href={`/games?teamId=${team.id}`} style={{ textDecoration: 'none' }}>
+                <div>
                   <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--fg)' }}>{team.name}</div>
                   {team.age_group && (
                     <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
                       {team.age_group}
                     </div>
                   )}
-                  <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px' }}>View schedule →</div>
-                </Link>
+                </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button
                     onClick={() => toggleTeamActive(team.id, !team.is_active)}
