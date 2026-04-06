@@ -73,10 +73,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [copying, setCopying]           = useState(false)
   const [showTip, setShowTip]           = useState(true)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
+  // selectedCells: Set of "si-ii" keys. Click = select only; palette/key = fill.
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
 
-  // Always-current reference so async callbacks see latest state
+  // Always-current references so async callbacks see latest state
   const slotsRef = useRef(slots)
   useEffect(() => { slotsRef.current = slots }, [slots])
+  const selectedCellsRef = useRef(selectedCells)
+  useEffect(() => { selectedCellsRef.current = selectedCells }, [selectedCells])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadData() }, [])
@@ -131,6 +136,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     }
 
     setSlots(slotData ?? [])
+
+    // Load season-to-date position history for all players
+    if (gameData?.season_id) {
+      const { data: statsData } = await supabase
+        .from('season_position_stats')
+        .select('player_id, innings_p, innings_c, innings_1b, innings_2b, innings_ss, innings_3b, innings_lf, innings_cf, innings_rf, innings_bench')
+        .eq('season_id', gameData.season_id)
+      if (statsData?.length) {
+        const ph: Record<string, Record<string, number>> = {}
+        for (const row of statsData) {
+          ph[row.player_id] = {
+            P: row.innings_p ?? 0, C: row.innings_c ?? 0,
+            '1B': row.innings_1b ?? 0, '2B': row.innings_2b ?? 0,
+            SS: row.innings_ss ?? 0, '3B': row.innings_3b ?? 0,
+            LF: row.innings_lf ?? 0, CF: row.innings_cf ?? 0,
+            RF: row.innings_rf ?? 0, Bench: row.innings_bench ?? 0,
+          }
+        }
+        setPlayerPositionHistory(ph)
+      }
+    }
+
     setLoading(false)
   }
 
@@ -158,23 +185,38 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
     }))
     const changedIds = [slotId]
-    // Swap: if assigning a non-bench position, bump the current holder to Bench
+    // Swap: if assigning a non-bench position, clear the current holder (go blank, not bench)
     if (newPos && newPos !== 'Bench') {
       const holder = next.find(s => s.id !== slotId && s.inning_positions[ii] === newPos)
-      if (holder) { holder.inning_positions[ii] = 'Bench'; changedIds.push(holder.id) }
+      if (holder) { holder.inning_positions[ii] = null; changedIds.push(holder.id) }
     }
     const target = next.find(s => s.id === slotId)
     if (target) target.inning_positions[ii] = newPos
     commit(next, changedIds)
   }
 
-  function paintCell(si: number, ii: number) {
+  // Fill all currently selected cells with a position (called from palette or key shortcut)
+  function fillSelected(pos: string) {
+    const sel = selectedCellsRef.current
+    if (sel.size === 0) return
     const active = slotsRef.current.filter(s => s.availability !== 'absent')
-    const slot = active[si]
-    if (!slot) return
-    // Toggle: clicking the same position clears it
-    const cur = (slot.inning_positions ?? [])[ii]
-    assignPosition(slot.id, ii, cur === activePos ? null : activePos)
+    const next = slotsRef.current.map(s => ({
+      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
+    }))
+    const changedIds = new Set<string>()
+    for (const key of Array.from(sel)) {
+      const [siStr, iiStr] = key.split('-')
+      const si = parseInt(siStr), ii = parseInt(iiStr)
+      const slot = active[si]
+      if (!slot) continue
+      if (pos && pos !== 'Bench') {
+        const holder = next.find(s => s.id !== slot.id && s.inning_positions[ii] === pos)
+        if (holder) { holder.inning_positions[ii] = null; changedIds.add(holder.id) }
+      }
+      const target = next.find(s => s.id === slot.id)
+      if (target) { target.inning_positions[ii] = pos; changedIds.add(target.id) }
+    }
+    if (changedIds.size) commit(next, Array.from(changedIds))
   }
 
   // ── Undo / Redo ───────────────────────────────────────────────────────────
@@ -224,6 +266,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPos } : s
     )
     setSlots(next)
+    setSelectedCells(new Set())
+    setFocused(null)
     supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPos }).eq('id', slotId).then(() => {})
   }
 
@@ -315,6 +359,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setTimeout(() => setSavedMsg(false), 2500)
   }
 
+  // ── Innings control ───────────────────────────────────────────────────────
+
+  async function changeInnings(delta: number) {
+    const cur = game?.innings_played ?? 6
+    const next = Math.min(9, Math.max(6, cur + delta))
+    if (next === cur) return
+    setGame((g: any) => ({ ...g, innings_played: next }))
+    await supabase.from('games').update({ innings_played: next }).eq('id', params.id)
+  }
+
   // ── Keyboard handling ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -329,35 +383,51 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       const { si, ii } = focused
       const rowCount = slotsRef.current.filter(s => s.availability !== 'absent').length
 
+      // Helper to move focus and reset selection to single cell
+      function moveFocus(newSi: number, newIi: number) {
+        setFocused({ si: newSi, ii: newIi })
+        setSelectedCells(new Set([`${newSi}-${newIi}`]))
+      }
+
       switch (e.key) {
         case 'ArrowRight': case 'Tab':
-          e.preventDefault(); setFocused({ si, ii: Math.min(ii + 1, inningCount - 1) }); return
+          e.preventDefault(); moveFocus(si, Math.min(ii + 1, inningCount - 1)); return
         case 'ArrowLeft':
-          e.preventDefault(); setFocused({ si, ii: Math.max(ii - 1, 0) }); return
+          e.preventDefault(); moveFocus(si, Math.max(ii - 1, 0)); return
         case 'ArrowDown':
-          e.preventDefault(); setFocused({ si: Math.min(si + 1, rowCount - 1), ii }); return
+          e.preventDefault(); moveFocus(Math.min(si + 1, rowCount - 1), ii); return
         case 'ArrowUp':
-          e.preventDefault(); setFocused({ si: Math.max(si - 1, 0), ii }); return
-        case 'Escape': setFocused(null); return
+          e.preventDefault(); moveFocus(Math.max(si - 1, 0), ii); return
+        case 'Escape': setFocused(null); setSelectedCells(new Set()); return
         case 'Delete': case 'Backspace': {
           e.preventDefault()
-          const slot = slotsRef.current.filter(s => s.availability !== 'absent')[si]
-          if (slot) assignPosition(slot.id, ii, null)
+          // Clear all selected cells
+          const active = slotsRef.current.filter(s => s.availability !== 'absent')
+          const next = slotsRef.current.map(s => ({
+            ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
+          }))
+          const changedIds = new Set<string>()
+          for (const key of Array.from(selectedCellsRef.current)) {
+            const [siStr, iiStr] = key.split('-')
+            const slot = active[parseInt(siStr)]
+            if (!slot) continue
+            const t = next.find(s => s.id === slot.id)
+            if (t) { t.inning_positions[parseInt(iiStr)] = null; changedIds.add(t.id) }
+          }
+          if (changedIds.size) commit(next, Array.from(changedIds))
           return
         }
       }
 
-      // Position shortcut keys
+      // Position shortcut keys — fill all selected cells, auto-advance for single selection
       const pos = KEY_POS[e.key.toLowerCase()]
       if (pos && teamPositions.includes(pos)) {
         e.preventDefault()
-        const slot = slotsRef.current.filter(s => s.availability !== 'absent')[si]
-        if (slot) {
-          const cur = (slot.inning_positions ?? [])[ii]
-          assignPosition(slot.id, ii, cur === pos ? null : pos)
-          setActivePos(pos)
-          // Auto-advance
-          if (ii < inningCount - 1) setFocused({ si, ii: ii + 1 })
+        setActivePos(pos)
+        fillSelected(pos)
+        // Auto-advance focus to next inning only when single cell selected
+        if (selectedCellsRef.current.size === 1 && ii < inningCount - 1) {
+          moveFocus(si, ii + 1)
         }
       }
     }
@@ -441,6 +511,25 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {/* Innings control */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <button
+              onClick={() => changeInnings(-1)}
+              disabled={inningCount <= 6}
+              style={topBtn(inningCount > 6)}
+              title="Fewer innings"
+            >−</button>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', minWidth: 44, textAlign: 'center', fontWeight: 600 }}>
+              {inningCount} inn
+            </span>
+            <button
+              onClick={() => changeInnings(1)}
+              disabled={inningCount >= 9}
+              style={topBtn(inningCount < 9)}
+              title="More innings"
+            >+</button>
+          </div>
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <button onClick={undo} disabled={!history.length} title="Undo (⌘Z)" style={topBtn(!!history.length)}>
             ↩ Undo
           </button>
@@ -490,9 +579,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </span>
           {[
             ['1', 'Mark absent players', 'Use the ✕ next to any player who isn\'t at the game'],
-            ['2', 'Select a position', 'Click a position button in the bottom-left, or press its key shortcut'],
-            ['3', 'Click cells to assign', 'Click any cell in the grid — it fills with your selected position'],
-            ['4', 'Save & Finalize', 'When all innings are set, click the gold button at the top right'],
+            ['2', 'Click cells to select', 'Click a cell to select it — nothing changes yet. Shift+click to select a range in the same row.'],
+            ['3', 'Fill with a position', 'Click a position button (or press its shortcut key) to fill all selected cells at once'],
+            ['4', 'Save & finalize', 'When all innings are set, click the gold button at the top right'],
           ].map(([n, label, tip]) => (
             <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={tip}>
               <span style={{
@@ -505,7 +594,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           ))}
           <div style={{ flex: 1 }} />
           <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, fontStyle: 'italic', flexShrink: 0 }}>
-            Tip: assigning a position moves the previous holder to Bench automatically
+            Tip: if a position is already taken, that player goes blank so you know to fill it
           </div>
           <button
             onClick={() => setShowTip(false)}
@@ -611,7 +700,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           {/* Position palette */}
           <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, marginBottom: 8 }}>
-              Select position, then click cells:
+              {selectedCells.size > 0
+                ? `Fill ${selectedCells.size} selected cell${selectedCells.size > 1 ? 's' : ''}:`
+                : 'Select cells, then fill:'}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
               {teamPositions.map(pos => {
@@ -621,7 +712,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 return (
                   <button
                     key={pos}
-                    onClick={() => setActivePos(pos)}
+                    onClick={() => { setActivePos(pos); fillSelected(pos) }}
                     style={{
                       padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
                       position: 'relative', minWidth: 34, textAlign: 'center',
@@ -746,7 +837,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     {innings.map(ii => {
                       const pos = (slot.inning_positions ?? [])[ii] ?? null
                       const pc = pos ? POS_COLOR[pos] : null
+                      const cellKey = `${si}-${ii}`
                       const isFoc = focused?.si === si && focused?.ii === ii
+                      const isSel = selectedCells.has(cellKey)
                       const isColFoc = focused?.ii === ii && focused?.si !== si
                       const isDupe = !!(pos && pos !== 'Bench' &&
                         activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
@@ -754,28 +847,54 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       return (
                         <td
                           key={ii}
-                          onClick={() => { setFocused({ si, ii }); paintCell(si, ii) }}
-                          title={pos ?? ''}
+                          onClick={(e) => {
+                            if (e.shiftKey && focused !== null && focused.si === si) {
+                              // Range-select within the same row
+                              const lo = Math.min(focused.ii, ii)
+                              const hi = Math.max(focused.ii, ii)
+                              const next = new Set<string>()
+                              for (let i = lo; i <= hi; i++) next.add(`${si}-${i}`)
+                              setSelectedCells(next)
+                            } else if (e.metaKey || e.ctrlKey) {
+                              // Toggle individual cell
+                              setSelectedCells(prev => {
+                                const next = new Set(prev)
+                                if (next.has(cellKey)) next.delete(cellKey)
+                                else next.add(cellKey)
+                                return next
+                              })
+                              setFocused({ si, ii })
+                            } else {
+                              // Single select — no position change
+                              setSelectedCells(new Set([cellKey]))
+                              setFocused({ si, ii })
+                            }
+                          }}
+                          title={pos ? pos : 'Click to select · shift+click to extend · ⌘+click to toggle'}
                           style={{
                             ...gCell,
                             textAlign: 'center', cursor: 'pointer',
                             background: isFoc
                               ? 'rgba(59,109,177,0.3)'
-                              : isColFoc
-                                ? 'rgba(59,109,177,0.06)'
-                                : pc ? pc.bg : 'transparent',
+                              : isSel
+                                ? 'rgba(59,109,177,0.14)'
+                                : isColFoc
+                                  ? 'rgba(59,109,177,0.05)'
+                                  : pc ? pc.bg : 'transparent',
                             outline: isFoc
-                              ? '2px solid rgba(59,109,177,0.8)'
-                              : isDupe
-                                ? '2px solid rgba(232,112,96,0.7)'
-                                : 'none',
+                              ? '2px solid rgba(59,109,177,0.85)'
+                              : isSel
+                                ? '1.5px solid rgba(59,109,177,0.4)'
+                                : isDupe
+                                  ? '2px solid rgba(232,112,96,0.7)'
+                                  : 'none',
                             outlineOffset: -2,
                             transition: 'background 0.05s',
                           }}
                         >
                           <span style={{
                             fontSize: 12, fontWeight: 800,
-                            color: isFoc ? '#80B0E8' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                            color: isFoc ? '#80B0E8' : isSel ? 'rgba(128,176,232,0.8)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
@@ -898,6 +1017,62 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             </div>
           )}
 
+          {/* Player position history — shown when a cell is focused */}
+          {focused && (() => {
+            const focusedSlot = activeSlots[focused.si]
+            if (!focusedSlot) return null
+            const ph = playerPositionHistory[focusedSlot.player_id] ?? {}
+            const hasHistory = Object.values(ph).some(v => v > 0)
+            const maxVal = Math.max(1, ...Object.values(ph))
+            return (
+              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6,
+                background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                  color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase', marginBottom: 7 }}>
+                  {focusedSlot.player?.first_name?.[0]}. {focusedSlot.player?.last_name} · this season
+                </div>
+                {!hasHistory ? (
+                  <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, fontStyle: 'italic' }}>
+                    No final games yet
+                  </div>
+                ) : teamPositions.map(pos => {
+                  const count = ph[pos] ?? 0
+                  const isActive = activePos === pos
+                  const pc = POS_COLOR[pos]
+                  const barPct = Math.round((count / maxVal) * 100)
+                  return (
+                    <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                      <span style={{
+                        fontSize: 8, fontWeight: 800, minWidth: 22, textAlign: 'center',
+                        padding: '1px 2px', borderRadius: 2, flexShrink: 0,
+                        background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
+                        color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.35)`,
+                      }}>
+                        {pos === 'Bench' ? 'B' : pos}
+                      </span>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2,
+                        background: `rgba(var(--fg-rgb),0.07)`, overflow: 'hidden' }}>
+                        {count > 0 && (
+                          <div style={{
+                            width: `${barPct}%`, height: '100%', borderRadius: 2,
+                            background: isActive ? (pc?.color ?? 'var(--accent)') : `rgba(var(--fg-rgb),0.18)`,
+                          }} />
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 9, minWidth: 14, textAlign: 'right', flexShrink: 0,
+                        color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.3)`,
+                        fontWeight: isActive ? 700 : 400,
+                      }}>
+                        {count}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
           {/* Keyboard shortcuts — collapsible */}
           <div style={{ marginTop: 12 }}>
             <button
@@ -913,11 +1088,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 6,
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
                 {([
-                  ['click', 'Assign active pos'],
-                  ['←↑↓→ / Tab', 'Navigate cells'],
-                  ['p c 1 2 s 3', 'P C 1B 2B SS 3B'],
-                  ['l  m  r  b', 'LF CF RF Bench'],
-                  ['Del', 'Clear cell'],
+                  ['click', 'Select cell'],
+                  ['shift+click', 'Extend selection (same row)'],
+                  ['⌘+click', 'Toggle cell in selection'],
+                  ['←↑↓→ / Tab', 'Move selection'],
+                  ['p c 1 2 s 3', 'Fill: P C 1B 2B SS 3B'],
+                  ['l  m  r  b', 'Fill: LF CF RF Bench'],
+                  ['Del', 'Clear selected cells'],
                   ['⌘Z / ⌘⇧Z', 'Undo / Redo'],
                 ] as [string, string][]).map(([k, d]) => (
                   <div key={k} style={{ display: 'flex', gap: 5, marginBottom: 3, alignItems: 'center' }}>
