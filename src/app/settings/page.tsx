@@ -181,11 +181,24 @@ export default function SettingsPage() {
         seasons: t.seasons.map((s: any) => s.id === seasonForm.id ? { ...s, ...payload } : s),
       })))
     } else {
+      const team = teams.find(t => t.id === seasonForm.teamId)
+      const hasActiveSeason = team?.seasons.some((s: any) => s.is_active)
+      // Auto-activate if this team has no active season yet
+      const newIsActive = !hasActiveSeason
+      if (newIsActive) {
+        // Deactivate any existing seasons first (shouldn't be any, but be safe)
+        for (const s of team?.seasons ?? []) {
+          await supabase.from('seasons').update({ is_active: false }).eq('id', s.id)
+        }
+      }
       const { data } = await supabase.from('seasons')
-        .insert({ ...payload, team_id: seasonForm.teamId, is_active: false }).select().single()
+        .insert({ ...payload, team_id: seasonForm.teamId, is_active: newIsActive }).select().single()
       if (data) {
         setTeams(prev => prev.map(t =>
-          t.id === seasonForm.teamId ? { ...t, seasons: [data, ...t.seasons] } : t
+          t.id === seasonForm.teamId ? {
+            ...t,
+            seasons: [data, ...t.seasons.map((s: any) => newIsActive ? { ...s, is_active: false } : s)],
+          } : t
         ))
       }
     }
@@ -433,6 +446,16 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {team.seasons.length > 0 && !team.seasons.some((s: any) => s.is_active) && (
+              <div style={{
+                padding: '8px 10px', borderRadius: '6px', marginBottom: '8px',
+                background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
+                fontSize: '12px', color: '#E8A020',
+              }}>
+                No active season — tap <strong>Activate →</strong> on a season below to start using it.
+              </div>
+            )}
+
             {team.seasons.map((season: any) => (
               <div key={season.id} style={{
                 padding: '9px 10px', marginBottom: '4px',
@@ -455,21 +478,30 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                    <button
-                      onClick={() => season.is_active
-                        ? deactivateSeason(team.id, season.id)
-                        : setActiveSeason(team.id, season.id)
-                      }
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '4px',
-                        fontSize: '11px', padding: '3px 8px', borderRadius: '20px', cursor: 'pointer',
-                        border: season.is_active ? '0.5px solid rgba(45,106,53,0.4)' : '0.5px solid var(--border-md)',
-                        background: season.is_active ? 'rgba(45,106,53,0.12)' : 'transparent',
-                        color: season.is_active ? '#6DB875' : `rgba(var(--fg-rgb), 0.4)`,
-                      }}>
-                      <span style={{ fontSize: '7px' }}>{season.is_active ? '●' : '○'}</span>
-                      {season.is_active ? 'Active' : 'Inactive'}
-                    </button>
+                    {season.is_active ? (
+                      <button
+                        onClick={() => deactivateSeason(team.id, season.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          fontSize: '11px', padding: '3px 8px', borderRadius: '20px', cursor: 'pointer',
+                          border: '0.5px solid rgba(45,106,53,0.4)',
+                          background: 'rgba(45,106,53,0.12)', color: '#6DB875',
+                        }}>
+                        <span style={{ fontSize: '7px' }}>●</span> Active
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setActiveSeason(team.id, season.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          fontSize: '11px', padding: '3px 10px', borderRadius: '20px', cursor: 'pointer',
+                          border: '0.5px solid rgba(59,109,177,0.5)',
+                          background: 'rgba(59,109,177,0.12)', color: '#80B0E8',
+                          fontWeight: 600,
+                        }}>
+                        Activate →
+                      </button>
+                    )}
                     <button onClick={() => setRolloverSeason({ ...season, team_id: team.id })} style={smallBtn}>
                       Rollover
                     </button>
