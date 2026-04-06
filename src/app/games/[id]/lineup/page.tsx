@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../lib/supabase'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
 
@@ -22,10 +23,16 @@ const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
 
 export default function LineupBuilder({ params }: { params: { id: string } }) {
   const supabase = createClient()
+  const router = useRouter()
   const [game, setGame] = useState<any>(null)
   const [slots, setSlots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [editorMode, setEditorMode] = useState<'paint' | 'pick'>('paint')
+
+  // Redirect desktop browsers to the full desktop editor
+  useEffect(() => {
+    if (window.innerWidth >= 960) router.replace(`/games/${params.id}/lineup/desktop`)
+  }, [])
   const [activePosition, setActivePosition] = useState<string>('P')
   const [pickTarget, setPickTarget] = useState<{ slotId: string; inningIndex: number } | null>(null)
   const [reorderMode, setReorderMode] = useState(false)

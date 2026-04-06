@@ -15,7 +15,11 @@ export default function AttendancePage({ params }: { params: { id: string } }) {
   // Set of player IDs marked absent
   const [absentIds, setAbsentIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => { load() }, [])
+  // Desktop users go directly to the full editor (attendance handled inline)
+  useEffect(() => {
+    if (window.innerWidth >= 960) { router.replace(`/games/${params.id}/lineup/desktop`); return }
+    load()
+  }, [])
 
   async function load() {
     const { data: gameData } = await supabase

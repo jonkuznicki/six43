@@ -1,0 +1,916 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createClient } from '../../../../../lib/supabase'
+import { formatTime } from '../../../../../lib/formatTime'
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const NAVY = '#0B1F3A'
+const GOLD  = '#E8A020'
+const BLANK: (string | null)[] = [null,null,null,null,null,null,null,null,null]
+
+// Keyboard shortcut → position name
+const KEY_POS: Record<string, string> = {
+  p: 'P', c: 'C', '1': '1B', '2': '2B', s: 'SS', '3': '3B',
+  l: 'LF', m: 'CF', r: 'RF', b: 'Bench',
+}
+// Position → shortcut label for palette
+const POS_KEY: Record<string, string> = {
+  P: 'p', C: 'c', '1B': '1', '2B': '2', SS: 's', '3B': '3',
+  LF: 'l', CF: 'm', RF: 'r', Bench: 'b',
+}
+const POS_COLOR: Record<string, { bg: string; color: string }> = {
+  P:    { bg: 'rgba(232,160,32,0.22)',  color: '#E8C060' },
+  C:    { bg: 'rgba(192,80,120,0.22)', color: '#E090B0' },
+  '1B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
+  '2B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
+  SS:   { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
+  '3B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
+  LF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
+  CF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
+  LC:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
+  RC:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
+  RF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
+  Bench:{ bg: 'rgba(120,120,120,0.1)', color: 'rgba(160,160,160,0.75)' },
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function benchFraction(slot: any, inningCount: number): number {
+  const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string | null)[]
+  const filled = pos.filter(p => p !== null).length
+  return filled ? pos.filter(p => p === 'Bench').length / filled : 0
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function DesktopLineupEditor({ params }: { params: { id: string } }) {
+  const supabase = createClient()
+
+  const [loading, setLoading]           = useState(true)
+  const [game, setGame]                 = useState<any>(null)
+  const [slots, setSlots]               = useState<any[]>([])
+  const [teamPositions, setTeamPositions] = useState<string[]>(
+    ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
+  )
+  const [activePos, setActivePos]       = useState('P')
+  const [focused, setFocused]           = useState<{ si: number; ii: number } | null>(null)
+  const [dragId, setDragId]             = useState<string | null>(null)
+  const [dragOverId, setDragOverId]     = useState<string | null>(null)
+  const [history, setHistory]           = useState<any[][]>([])
+  const [future, setFuture]             = useState<any[][]>([])
+  const [saving, setSaving]             = useState(false)
+  const [savedMsg, setSavedMsg]         = useState(false)
+  const [copyOpen, setCopyOpen]         = useState(false)
+  const [copyGames, setCopyGames]       = useState<any[]>([])
+  const [copyGameId, setCopyGameId]     = useState('')
+  const [copyMode, setCopyMode]         = useState<'full' | 'order'>('full')
+  const [copying, setCopying]           = useState(false)
+
+  // Always-current reference so async callbacks see latest state
+  const slotsRef = useRef(slots)
+  useEffect(() => { slotsRef.current = slots }, [slots])
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => { loadData() }, [])
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  async function loadData() {
+    const { data: gameData } = await supabase
+      .from('games')
+      .select('*, season:seasons(team:teams(name, positions))')
+      .eq('id', params.id).single()
+    setGame(gameData)
+
+    const team = (gameData as any)?.season?.team
+    const positions: string[] = team?.positions?.length
+      ? team.positions
+      : ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
+    setTeamPositions(positions)
+    setActivePos(positions[0] ?? 'P')
+
+    let { data: slotData } = await supabase
+      .from('lineup_slots')
+      .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+      .eq('game_id', params.id)
+      .order('batting_order', { ascending: true, nullsFirst: false })
+
+    // If no slots exist yet (first time opening the lineup), auto-create from roster
+    if (!slotData?.length && gameData?.season_id) {
+      const { data: players } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, jersey_number, batting_pref_order, innings_target')
+        .eq('season_id', gameData.season_id)
+        .eq('status', 'active')
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
+      if (players?.length) {
+        await supabase.from('lineup_slots').insert(
+          players.map((p, i) => ({
+            game_id: params.id,
+            player_id: p.id,
+            batting_order: i + 1,
+            availability: 'available',
+            inning_positions: [...BLANK],
+          }))
+        )
+        const { data: fresh } = await supabase
+          .from('lineup_slots')
+          .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+          .eq('game_id', params.id)
+          .order('batting_order', { ascending: true, nullsFirst: false })
+        slotData = fresh
+      }
+    }
+
+    setSlots(slotData ?? [])
+    setLoading(false)
+  }
+
+  // ── Position assignment ───────────────────────────────────────────────────
+
+  function commit(newSlots: any[], changedIds: string[]) {
+    setHistory(h => [...h.slice(-49), slotsRef.current])
+    setFuture([])
+    setSlots(newSlots)
+    // Debounced save
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      await Promise.all(
+        newSlots
+          .filter(s => changedIds.includes(s.id))
+          .map(s => supabase.from('lineup_slots').update({
+            inning_positions: s.inning_positions,
+          }).eq('id', s.id))
+      )
+    }, 500)
+  }
+
+  function assignPosition(slotId: string, ii: number, newPos: string | null) {
+    const next = slotsRef.current.map(s => ({
+      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
+    }))
+    const changedIds = [slotId]
+    // Swap: if assigning a non-bench position, bump the current holder to Bench
+    if (newPos && newPos !== 'Bench') {
+      const holder = next.find(s => s.id !== slotId && s.inning_positions[ii] === newPos)
+      if (holder) { holder.inning_positions[ii] = 'Bench'; changedIds.push(holder.id) }
+    }
+    const target = next.find(s => s.id === slotId)
+    if (target) target.inning_positions[ii] = newPos
+    commit(next, changedIds)
+  }
+
+  function paintCell(si: number, ii: number) {
+    const active = slotsRef.current.filter(s => s.availability !== 'absent')
+    const slot = active[si]
+    if (!slot) return
+    // Toggle: clicking the same position clears it
+    const cur = (slot.inning_positions ?? [])[ii]
+    assignPosition(slot.id, ii, cur === activePos ? null : activePos)
+  }
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────────
+
+  const undo = useCallback(() => {
+    setHistory(h => {
+      if (!h.length) return h
+      const prev = h[h.length - 1]
+      setFuture(f => [slotsRef.current, ...f.slice(0, 49)])
+      setSlots(prev)
+      slotsRef.current = prev
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(async () => {
+        await Promise.all(prev.map((s: any) =>
+          supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
+        ))
+      }, 300)
+      return h.slice(0, -1)
+    })
+  }, [])
+
+  const redo = useCallback(() => {
+    setFuture(f => {
+      if (!f.length) return f
+      const next = f[0]
+      setHistory(h => [...h.slice(-49), slotsRef.current])
+      setSlots(next)
+      slotsRef.current = next
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(async () => {
+        await Promise.all(next.map((s: any) =>
+          supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
+        ))
+      }, 300)
+      return f.slice(1)
+    })
+  }, [])
+
+  // ── Attendance ────────────────────────────────────────────────────────────
+
+  function toggleAbsent(slotId: string) {
+    const slot = slotsRef.current.find(s => s.id === slotId)
+    if (!slot) return
+    const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
+    const newPos = newAvail === 'absent' ? [...BLANK] : slot.inning_positions
+    const next = slotsRef.current.map(s =>
+      s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPos } : s
+    )
+    setSlots(next)
+    supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPos }).eq('id', slotId).then(() => {})
+  }
+
+  // ── Batting order ─────────────────────────────────────────────────────────
+
+  async function nudgeBattingOrder(slotId: string, dir: 'up' | 'down') {
+    const active = slotsRef.current.filter(s => s.availability !== 'absent')
+    const idx = active.findIndex(s => s.id === slotId)
+    if (dir === 'up' && idx === 0) return
+    if (dir === 'down' && idx === active.length - 1) return
+    const swap = dir === 'up' ? idx - 1 : idx + 1
+    const reordered = [...active];
+    [reordered[idx], reordered[swap]] = [reordered[swap], reordered[idx]]
+    const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
+    const next = [...updated, ...slotsRef.current.filter(s => s.availability === 'absent')]
+    setSlots(next)
+    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[swap].id)
+    await supabase.from('lineup_slots').update({ batting_order: swap + 1 }).eq('id', reordered[idx].id)
+  }
+
+  async function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
+    const active = slotsRef.current.filter(s => s.availability !== 'absent')
+    const fi = active.findIndex(s => s.id === dragId)
+    const ti = active.findIndex(s => s.id === targetId)
+    if (fi === -1 || ti === -1) { setDragId(null); setDragOverId(null); return }
+    const reordered = [...active]
+    const [moved] = reordered.splice(fi, 1)
+    reordered.splice(ti, 0, moved)
+    const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
+    const next = [...updated, ...slotsRef.current.filter(s => s.availability === 'absent')]
+    setSlots(next)
+    setDragId(null); setDragOverId(null)
+    await Promise.all(updated.map(s =>
+      supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id)
+    ))
+  }
+
+  // ── Copy from game ────────────────────────────────────────────────────────
+
+  async function openCopy() {
+    if (!game?.season_id) return
+    const { data } = await supabase
+      .from('games').select('id, opponent, game_date')
+      .eq('season_id', game.season_id).neq('id', params.id)
+      .order('game_date', { ascending: false })
+    setCopyGames(data ?? [])
+    setCopyGameId(data?.[0]?.id ?? '')
+    setCopyMode('full')
+    setCopyOpen(true)
+  }
+
+  async function doCopy() {
+    if (!copyGameId) return
+    setCopying(true)
+    const { data: src } = await supabase
+      .from('lineup_slots').select('player_id, batting_order, inning_positions')
+      .eq('game_id', copyGameId)
+    if (!src?.length) { setCopying(false); return }
+    const byPlayer = new Map(src.map((s: any) => [s.player_id, s]))
+    const current = slotsRef.current
+    const updates = current
+      .filter(s => s.availability !== 'absent' && byPlayer.has(s.player_id))
+      .map(s => {
+        const srcSlot: any = byPlayer.get(s.player_id)
+        return {
+          id: s.id,
+          batting_order: srcSlot.batting_order,
+          inning_positions: copyMode === 'full' ? srcSlot.inning_positions : [...BLANK],
+        }
+      })
+    const updateMap = new Map(updates.map(u => [u.id, u]))
+    const merged = current.map(s => updateMap.has(s.id) ? { ...s, ...updateMap.get(s.id) } : s)
+    const active = merged.filter(s => s.availability !== 'absent').sort((a: any, b: any) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
+    const next = [...active, ...merged.filter(s => s.availability === 'absent')]
+    setSlots(next)
+    await Promise.all(updates.map(u =>
+      supabase.from('lineup_slots').update({ batting_order: u.batting_order, inning_positions: u.inning_positions }).eq('id', u.id)
+    ))
+    setCopying(false); setCopyOpen(false)
+  }
+
+  // ── Save & finalize ───────────────────────────────────────────────────────
+
+  async function finalize() {
+    setSaving(true)
+    await supabase.from('games').update({ status: 'lineup_ready' }).eq('id', params.id)
+    setSaving(false); setSavedMsg(true)
+    setTimeout(() => setSavedMsg(false), 2500)
+  }
+
+  // ── Keyboard handling ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Ignore when typing in an input/select
+      if (['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return
+
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return }
+
+      if (!focused) return
+      const { si, ii } = focused
+      const rowCount = slotsRef.current.filter(s => s.availability !== 'absent').length
+
+      switch (e.key) {
+        case 'ArrowRight': case 'Tab':
+          e.preventDefault(); setFocused({ si, ii: Math.min(ii + 1, inningCount - 1) }); return
+        case 'ArrowLeft':
+          e.preventDefault(); setFocused({ si, ii: Math.max(ii - 1, 0) }); return
+        case 'ArrowDown':
+          e.preventDefault(); setFocused({ si: Math.min(si + 1, rowCount - 1), ii }); return
+        case 'ArrowUp':
+          e.preventDefault(); setFocused({ si: Math.max(si - 1, 0), ii }); return
+        case 'Escape': setFocused(null); return
+        case 'Delete': case 'Backspace': {
+          e.preventDefault()
+          const slot = slotsRef.current.filter(s => s.availability !== 'absent')[si]
+          if (slot) assignPosition(slot.id, ii, null)
+          return
+        }
+      }
+
+      // Position shortcut keys
+      const pos = KEY_POS[e.key.toLowerCase()]
+      if (pos && teamPositions.includes(pos)) {
+        e.preventDefault()
+        const slot = slotsRef.current.filter(s => s.availability !== 'absent')[si]
+        if (slot) {
+          const cur = (slot.inning_positions ?? [])[ii]
+          assignPosition(slot.id, ii, cur === pos ? null : pos)
+          setActivePos(pos)
+          // Auto-advance
+          if (ii < inningCount - 1) setFocused({ si, ii: ii + 1 })
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [focused, undo, redo, teamPositions])
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  const inningCount = game?.innings_played ?? 6
+  const innings = Array.from({ length: inningCount }, (_, i) => i)
+  const activeSlots = slots.filter(s => s.availability !== 'absent')
+  const absentSlots  = slots.filter(s => s.availability === 'absent')
+
+  // Right-panel: position summary for the focused (or first) inning
+  const summaryII = focused?.ii ?? 0
+  const posSummary: Record<string, string[]> = {}
+  for (const p of teamPositions) posSummary[p] = []
+  posSummary['_empty'] = []
+  for (const s of activeSlots) {
+    const p = (s.inning_positions ?? [])[summaryII] ?? null
+    if (!p) posSummary['_empty'].push(s.player?.last_name ?? '?')
+    else if (posSummary[p] !== undefined) posSummary[p].push(s.player?.last_name ?? '?')
+  }
+
+  const gameDate = game?.game_date
+    ? new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+      })
+    : ''
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', background: 'var(--bg)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        color: `rgba(var(--fg-rgb),0.35)`, fontSize: 14 }}>
+        Loading lineup…
+      </div>
+    )
+  }
+
+  // ── JSX ───────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100vh',
+      background: 'var(--bg)', color: 'var(--fg)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      overflow: 'hidden',
+    }}>
+
+      {/* ─── TOP BAR ─── */}
+      <div style={{
+        background: NAVY, display: 'flex', alignItems: 'center',
+        gap: 12, padding: '0 16px', height: 48, flexShrink: 0,
+      }}>
+        <a href="/games" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: 13 }}>
+          ← Games
+        </a>
+        <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
+            vs {game?.opponent}
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginLeft: 10 }}>
+            {gameDate}{game?.game_time ? ` · ${formatTime(game.game_time)}` : ''}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={undo} disabled={!history.length} title="Undo (⌘Z)" style={topBtn(!!history.length)}>
+            ↩ Undo
+          </button>
+          <button onClick={redo} disabled={!future.length} title="Redo (⌘⇧Z)" style={topBtn(!!future.length)}>
+            Redo ↪
+          </button>
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
+          <a
+            href={`/games/${params.id}/print`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ ...topBtn(true) as any, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+          >
+            🖨 Print
+          </a>
+          <a
+            href={`/games/${params.id}`}
+            style={{ ...topBtn(true) as any, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+          >
+            Mobile view
+          </a>
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          <button
+            onClick={finalize}
+            disabled={saving}
+            style={{
+              padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: savedMsg ? '#4a9c5a' : GOLD,
+              color: savedMsg ? '#fff' : NAVY,
+              fontSize: 13, fontWeight: 700, transition: 'background 0.25s',
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? 'Saving…' : savedMsg ? '✓ Saved' : 'Save & finalize'}
+          </button>
+        </div>
+      </div>
+
+      {/* ─── THREE PANELS ─── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* ── LEFT: Roster + Palette ── */}
+        <div style={{
+          width: 214, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          borderRight: '1px solid var(--border)', overflow: 'hidden',
+        }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
+
+            {/* Active players */}
+            <div style={secLabel}>Batting order · {activeSlots.length}</div>
+            {activeSlots.map((slot, si) => (
+              <div
+                key={slot.id}
+                draggable
+                onDragStart={() => setDragId(slot.id)}
+                onDragOver={e => { e.preventDefault(); setDragOverId(slot.id) }}
+                onDragLeave={() => setDragOverId(null)}
+                onDrop={() => handleDrop(slot.id)}
+                onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 8px', cursor: 'grab',
+                  borderTop: dragOverId === slot.id ? `2px solid rgba(59,109,177,0.6)` : '2px solid transparent',
+                  background: dragOverId === slot.id ? 'rgba(59,109,177,0.07)' : 'transparent',
+                  opacity: dragId === slot.id ? 0.35 : 1,
+                  transition: 'background 0.08s',
+                }}
+              >
+                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.22)`, width: 14, textAlign: 'right', flexShrink: 0 }}>
+                  {si + 1}
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                  <button onClick={() => nudgeBattingOrder(slot.id, 'up')} style={nudge}>▴</button>
+                  <button onClick={() => nudgeBattingOrder(slot.id, 'down')} style={nudge}>▾</button>
+                </div>
+                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, width: 22, textAlign: 'right', flexShrink: 0 }}>
+                  #{slot.player?.jersey_number}
+                </span>
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                </span>
+                <button
+                  onClick={() => toggleAbsent(slot.id)}
+                  title="Mark absent"
+                  style={{
+                    flexShrink: 0, width: 15, height: 15, borderRadius: 3,
+                    border: '1px solid var(--border-md)', background: 'transparent',
+                    cursor: 'pointer', fontSize: 8, padding: 0,
+                    color: `rgba(var(--fg-rgb),0.28)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >✕</button>
+              </div>
+            ))}
+
+            {/* Absent players */}
+            {absentSlots.length > 0 && (
+              <>
+                <div style={{ ...secLabel, paddingTop: 12 }}>Absent · {absentSlots.length}</div>
+                {absentSlots.map(slot => (
+                  <div key={slot.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '4px 8px 4px 36px', opacity: 0.38,
+                  }}>
+                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, width: 22, textAlign: 'right', flexShrink: 0 }}>
+                      #{slot.player?.jersey_number}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 12, textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                    </span>
+                    <button
+                      onClick={() => toggleAbsent(slot.id)}
+                      title="Mark present"
+                      style={{
+                        flexShrink: 0, width: 15, height: 15, borderRadius: 3,
+                        border: '1px solid rgba(109,184,117,0.45)', background: 'rgba(109,184,117,0.1)',
+                        cursor: 'pointer', fontSize: 8, padding: 0, color: '#6DB875',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >↩</button>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Position palette */}
+          <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: `rgba(var(--fg-rgb),0.28)`, marginBottom: 8 }}>
+              Active position
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {teamPositions.map(pos => {
+                const isActive = activePos === pos
+                const pc = POS_COLOR[pos]
+                const sc = POS_KEY[pos]
+                return (
+                  <button
+                    key={pos}
+                    onClick={() => setActivePos(pos)}
+                    style={{
+                      padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
+                      position: 'relative', minWidth: 34, textAlign: 'center',
+                      fontSize: 11, fontWeight: 700,
+                      border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : 'var(--border-md)'}`,
+                      background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
+                      color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.5)`,
+                      boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
+                    }}
+                  >
+                    {pos}
+                    {sc && (
+                      <span style={{ position: 'absolute', bottom: 0, right: 2, fontSize: 6, opacity: 0.4, fontWeight: 400 }}>
+                        {sc}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── CENTER: Grid ── */}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '100%' }}>
+            <colgroup>
+              <col style={{ width: 28 }} />
+              <col style={{ width: 150 }} />
+              {innings.map(i => <col key={i} style={{ width: 54 }} />)}
+              <col style={{ width: 58 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={gHdr}>#</th>
+                <th style={{ ...gHdr, textAlign: 'left', paddingLeft: 10 }}>Player</th>
+                {innings.map(ii => {
+                  // Per-inning validation indicators
+                  const counts: Record<string, number> = {}
+                  for (const s of activeSlots) {
+                    const p = (s.inning_positions ?? [])[ii]
+                    if (p) counts[p] = (counts[p] ?? 0) + 1
+                  }
+                  const hasDupe = Object.values(counts).some(v => v > 1)
+                  const allFilled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii])
+                  const hasMissing = teamPositions.filter(p => p !== 'Bench').some(p => !counts[p])
+                  const valid = allFilled && !hasDupe && !hasMissing
+                  const isColFoc = focused?.ii === ii
+
+                  return (
+                    <th
+                      key={ii}
+                      onClick={() => focused && setFocused({ si: focused.si, ii })}
+                      style={{
+                        ...gHdr,
+                        background: isColFoc ? 'rgba(59,109,177,0.15)' : 'var(--bg-card)',
+                        cursor: focused ? 'pointer' : 'default',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
+                        <span>{ii + 1}</span>
+                        <span style={{ fontSize: 8 }}>
+                          {hasDupe ? <span style={{ color: '#E87060' }}>⚠</span> : valid ? <span style={{ color: '#6DB875' }}>✓</span> : null}
+                        </span>
+                      </div>
+                    </th>
+                  )
+                })}
+                <th style={{ ...gHdr, fontSize: 9 }}>Bench%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeSlots.map((slot, si) => {
+                const bp = benchFraction(slot, inningCount)
+                const bpColor = bp > 0.45 ? '#E87060' : bp > 0.25 ? '#E8A020' : bp > 0 ? '#6DB875' : `rgba(var(--fg-rgb),0.2)`
+                const isRowFoc = focused?.si === si
+
+                return (
+                  <tr
+                    key={slot.id}
+                    style={{
+                      background: isRowFoc
+                        ? 'rgba(59,109,177,0.04)'
+                        : si % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.018)',
+                    }}
+                  >
+                    <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>
+                      {si + 1}
+                    </td>
+                    <td style={{
+                      ...gCell, paddingLeft: 10, fontWeight: 600, fontSize: 13,
+                      position: 'sticky', left: 0, zIndex: 1,
+                      background: isRowFoc ? 'rgba(59,109,177,0.06)' : 'var(--bg)',
+                      borderRight: '1px solid var(--border)',
+                    }}>
+                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 4 }}>
+                        #{slot.player?.jersey_number}
+                      </span>
+                      {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                    </td>
+
+                    {innings.map(ii => {
+                      const pos = (slot.inning_positions ?? [])[ii] ?? null
+                      const pc = pos ? POS_COLOR[pos] : null
+                      const isFoc = focused?.si === si && focused?.ii === ii
+                      const isColFoc = focused?.ii === ii && focused?.si !== si
+                      const isDupe = !!(pos && pos !== 'Bench' &&
+                        activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
+
+                      return (
+                        <td
+                          key={ii}
+                          onClick={() => { setFocused({ si, ii }); paintCell(si, ii) }}
+                          title={pos ?? ''}
+                          style={{
+                            ...gCell,
+                            textAlign: 'center', cursor: 'pointer',
+                            background: isFoc
+                              ? 'rgba(59,109,177,0.3)'
+                              : isColFoc
+                                ? 'rgba(59,109,177,0.06)'
+                                : pc ? pc.bg : 'transparent',
+                            outline: isFoc
+                              ? '2px solid rgba(59,109,177,0.8)'
+                              : isDupe
+                                ? '2px solid rgba(232,112,96,0.7)'
+                                : 'none',
+                            outlineOffset: -2,
+                            transition: 'background 0.05s',
+                          }}
+                        >
+                          <span style={{
+                            fontSize: 12, fontWeight: 800,
+                            color: isFoc ? '#80B0E8' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                          }}>
+                            {pos === 'Bench' ? 'B' : (pos ?? '·')}
+                          </span>
+                        </td>
+                      )
+                    })}
+
+                    <td style={{ ...gCell, textAlign: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: bpColor }}>
+                        {bp > 0 ? `${Math.round(bp * 100)}%` : '—'}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── RIGHT: Context ── */}
+        <div style={{
+          width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
+          overflowY: 'auto', padding: 12,
+        }}>
+          <div style={secLabel}>Inning {summaryII + 1} positions</div>
+
+          {teamPositions.filter(p => p !== 'Bench').map(pos => {
+            const players = posSummary[pos] ?? []
+            const dupe = players.length > 1
+            const empty = players.length === 0
+            const pc = POS_COLOR[pos]
+            return (
+              <div key={pos} style={{
+                display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px',
+                borderRadius: 4, marginBottom: 2,
+                background: dupe ? 'rgba(232,112,96,0.08)' : 'transparent',
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px',
+                  borderRadius: 3, textAlign: 'center', flexShrink: 0,
+                  background: pc?.bg ?? 'transparent', color: pc?.color ?? 'var(--fg)',
+                }}>
+                  {pos}
+                </span>
+                <span style={{
+                  fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  color: dupe ? '#E87060' : empty ? `rgba(var(--fg-rgb),0.2)` : 'var(--fg)',
+                  fontStyle: empty ? 'italic' : 'normal',
+                }}>
+                  {empty ? '—' : players.join(', ')}
+                </span>
+                {dupe && <span style={{ fontSize: 9, color: '#E87060', flexShrink: 0 }}>!</span>}
+              </div>
+            )
+          })}
+
+          {(posSummary['Bench']?.length ?? 0) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px', borderRadius: 4, marginBottom: 2 }}>
+              <span style={{ fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px', borderRadius: 3,
+                textAlign: 'center', flexShrink: 0,
+                background: 'rgba(120,120,120,0.12)', color: `rgba(var(--fg-rgb),0.4)` }}>
+                B
+              </span>
+              <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.38)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {posSummary['Bench'].join(', ')}
+              </span>
+            </div>
+          )}
+
+          {(posSummary['_empty']?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 6, padding: '5px 7px', borderRadius: 5,
+              background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.25)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#E8A020', marginBottom: 3, letterSpacing: '0.06em' }}>
+                UNASSIGNED
+              </div>
+              {posSummary['_empty'].map(n => (
+                <div key={n} style={{ fontSize: 11, color: '#E8A020' }}>{n}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Keyboard shortcuts reference */}
+          <div style={{ marginTop: 18, padding: '8px 10px', borderRadius: 6,
+            background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: `rgba(var(--fg-rgb),0.28)`, marginBottom: 8 }}>
+              Shortcuts
+            </div>
+            {([
+              ['click', 'Assign active pos'],
+              ['←↑↓→ / Tab', 'Navigate'],
+              ['p c 1 2 s 3', 'P C 1B 2B SS 3B'],
+              ['l  m  r  b', 'LF CF RF Bench'],
+              ['Del', 'Clear cell'],
+              ['⌘Z', 'Undo'],
+              ['⌘⇧Z', 'Redo'],
+            ] as [string, string][]).map(([k, d]) => (
+              <div key={k} style={{ display: 'flex', gap: 5, marginBottom: 3, alignItems: 'center' }}>
+                <code style={{
+                  fontSize: 9, background: 'var(--bg)', padding: '1px 4px',
+                  borderRadius: 3, border: '0.5px solid var(--border-md)',
+                  color: `rgba(var(--fg-rgb),0.55)`, flexShrink: 0,
+                  fontFamily: 'ui-monospace, monospace',
+                }}>
+                  {k}
+                </code>
+                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>{d}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Copy modal ─── */}
+      {copyOpen && (
+        <div
+          onClick={() => setCopyOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: 12, padding: '1.5rem',
+            width: 380, border: '0.5px solid var(--border)',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Copy from another game</div>
+            <div style={{ fontSize: 12, color: `rgba(var(--fg-rgb),0.4)`, marginBottom: '1.25rem' }}>
+              Import batting order and/or positions from a previous game.
+            </div>
+            <select value={copyGameId} onChange={e => setCopyGameId(e.target.value)} style={{
+              width: '100%', padding: '9px 12px', borderRadius: 8,
+              border: '0.5px solid var(--border-md)', background: 'var(--bg-card)',
+              color: 'var(--fg)', fontSize: 13, marginBottom: 10, boxSizing: 'border-box',
+            }}>
+              <option value=''>— select a game —</option>
+              {copyGames.map(g => (
+                <option key={g.id} value={g.id}>
+                  vs {g.opponent} · {new Date(g.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem' }}>
+              {(['full', 'order'] as const).map(m => (
+                <button key={m} onClick={() => setCopyMode(m)} style={{
+                  flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  border: `1.5px solid ${copyMode === m ? 'var(--accent)' : 'var(--border-md)'}`,
+                  background: copyMode === m ? 'rgba(59,109,177,0.1)' : 'transparent',
+                  color: copyMode === m ? 'var(--accent)' : `rgba(var(--fg-rgb),0.55)`,
+                }}>
+                  {m === 'full' ? 'Full lineup' : 'Batting order only'}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setCopyOpen(false)} style={{
+                flex: 1, padding: 10, borderRadius: 8, fontSize: 13,
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb),0.6)`, cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={doCopy} disabled={!copyGameId || copying} style={{
+                flex: 2, padding: 10, borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                cursor: copyGameId && !copying ? 'pointer' : 'not-allowed',
+                opacity: copyGameId && !copying ? 1 : 0.6,
+              }}>
+                {copying ? 'Copying…' : 'Copy lineup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Style constants ───────────────────────────────────────────────────────────
+
+function topBtn(active: boolean): React.CSSProperties {
+  return {
+    padding: '5px 10px', borderRadius: 5, border: 'none',
+    cursor: active ? 'pointer' : 'not-allowed',
+    background: 'rgba(255,255,255,0.08)',
+    color: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)',
+    fontSize: 12, fontWeight: 500, flexShrink: 0,
+  }
+}
+
+const secLabel: React.CSSProperties = {
+  padding: '0 10px 6px',
+  fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+  textTransform: 'uppercase', color: `rgba(var(--fg-rgb),0.26)`,
+}
+
+const nudge: React.CSSProperties = {
+  width: 12, height: 9, border: 'none', background: 'transparent',
+  cursor: 'pointer', padding: 0, fontSize: 8, lineHeight: 1,
+  color: `rgba(var(--fg-rgb),0.28)`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
+
+const gHdr: React.CSSProperties = {
+  padding: '6px 3px', textAlign: 'center',
+  fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: `rgba(var(--fg-rgb),0.32)`,
+  background: 'var(--bg-card)',
+  borderBottom: '1px solid var(--border)',
+  position: 'sticky', top: 0, zIndex: 10,
+  whiteSpace: 'nowrap',
+}
+
+const gCell: React.CSSProperties = {
+  padding: '0 3px', height: 34,
+  borderBottom: '0.5px solid var(--border-subtle)',
+  borderRight: '0.5px solid var(--border-subtle)',
+  boxSizing: 'border-box',
+}
