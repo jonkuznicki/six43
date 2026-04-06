@@ -20,13 +20,17 @@ export default function GameNotes({ gameId, notes }: { gameId: string; notes: st
   const [text, setText] = useState(() => readNotes(notes))
   const [saved, setSaved] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track current raw notes so concurrent edits don't overwrite other fields
+  const rawRef = useRef(notes)
 
   function handleChange(val: string) {
     setText(val)
     setSaved(false)
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(async () => {
-      await supabase.from('games').update({ notes: writeNotes(notes, val) }).eq('id', gameId)
+      const newRaw = writeNotes(rawRef.current, val)
+      await supabase.from('games').update({ notes: newRaw }).eq('id', gameId)
+      rawRef.current = newRaw
       setSaved(true)
     }, 800)
   }
@@ -45,7 +49,7 @@ export default function GameNotes({ gameId, notes }: { gameId: string; notes: st
       <textarea
         value={text}
         onChange={e => handleChange(e.target.value)}
-        placeholder="Weather, umpire, field notes…"
+        placeholder="e.g. Connor hurt his arm — no pitching · rainout makeup · tournament format 5 innings"
         rows={3}
         style={{
           width: '100%', padding: '10px 12px', borderRadius: '8px',

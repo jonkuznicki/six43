@@ -76,6 +76,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
   // selectedCells: Set of "si-ii" keys. Click = select only; palette/key = fill.
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [gameNotes, setGameNotes]       = useState('')
+  const [notesSaved, setNotesSaved]     = useState(true)
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesRawRef = useRef<string | null>(null)
 
   // Always-current references so async callbacks see latest state
   const slotsRef = useRef(slots)
@@ -94,6 +99,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       .select('*, season:seasons(team:teams(name, positions))')
       .eq('id', params.id).single()
     setGame(gameData)
+    const rawNotes = (gameData as any)?.notes ?? null
+    notesRawRef.current = rawNotes
+    try { setGameNotes(JSON.parse(rawNotes ?? '{}')._notes ?? '') } catch { setGameNotes('') }
 
     const team = (gameData as any)?.season?.team
     const positions: string[] = team?.positions?.length
@@ -359,6 +367,33 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setTimeout(() => setSavedMsg(false), 2500)
   }
 
+  // ── Clear lineup ─────────────────────────────────────────────────────────
+
+  function clearLineup() {
+    const next = slotsRef.current.map(s => ({ ...s, inning_positions: [...BLANK] }))
+    commit(next, next.map(s => s.id))
+    setSelectedCells(new Set())
+    setFocused(null)
+    setConfirmClear(false)
+  }
+
+  // ── Game notes ────────────────────────────────────────────────────────────
+
+  function handleNotesChange(val: string) {
+    setGameNotes(val)
+    setNotesSaved(false)
+    if (notesTimer.current) clearTimeout(notesTimer.current)
+    notesTimer.current = setTimeout(async () => {
+      let parsed: any = {}
+      try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
+      parsed._notes = val
+      const newRaw = JSON.stringify(parsed)
+      await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
+      notesRawRef.current = newRaw
+      setNotesSaved(true)
+    }, 800)
+  }
+
   // ── Innings control ───────────────────────────────────────────────────────
 
   async function changeInnings(delta: number) {
@@ -537,6 +572,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             Redo ↪
           </button>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          {confirmClear ? (
+            <>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Clear all positions?</span>
+              <button onClick={clearLineup} style={{ ...topBtn(true), color: '#E87060' }}>Yes, clear</button>
+              <button onClick={() => setConfirmClear(false)} style={topBtn(true)}>Cancel</button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmClear(true)} style={topBtn(true)}>Clear lineup</button>
+          )}
           <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
           <a
             href={`/games/${params.id}/print`}
@@ -1072,6 +1116,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               </div>
             )
           })()}
+
+          {/* Game notes */}
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span style={{ ...secLabel, padding: 0 }}>Notes</span>
+              {!notesSaved && <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.3)` }}>saving…</span>}
+            </div>
+            <textarea
+              value={gameNotes}
+              onChange={e => handleNotesChange(e.target.value)}
+              placeholder="e.g. Connor hurt his arm — no pitching"
+              rows={3}
+              style={{
+                width: '100%', padding: '7px 9px', borderRadius: 6,
+                border: '0.5px solid var(--border-md)',
+                background: 'var(--bg-input)', color: 'var(--fg)',
+                fontSize: 11, resize: 'vertical', boxSizing: 'border-box',
+                fontFamily: 'inherit', lineHeight: 1.5,
+              }}
+            />
+          </div>
 
           {/* Keyboard shortcuts — collapsible */}
           <div style={{ marginTop: 12 }}>
