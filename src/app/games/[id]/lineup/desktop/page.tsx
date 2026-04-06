@@ -424,10 +424,35 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
 
       switch (e.key) {
-        case 'ArrowRight': case 'Tab':
-          e.preventDefault(); moveFocus(si, Math.min(ii + 1, inningCount - 1)); return
-        case 'ArrowLeft':
-          e.preventDefault(); moveFocus(si, Math.max(ii - 1, 0)); return
+        case 'ArrowRight': case 'Tab': {
+          e.preventDefault()
+          const newIi = Math.min(ii + 1, inningCount - 1)
+          if (e.shiftKey && e.key !== 'Tab') {
+            // Extend selection rightward within the same row
+            setSelectedCells(prev => {
+              const next = new Set(prev)
+              next.add(`${si}-${newIi}`)
+              return next
+            })
+          } else {
+            moveFocus(si, newIi)
+          }
+          return
+        }
+        case 'ArrowLeft': {
+          e.preventDefault()
+          const newIi = Math.max(ii - 1, 0)
+          if (e.shiftKey) {
+            setSelectedCells(prev => {
+              const next = new Set(prev)
+              next.add(`${si}-${newIi}`)
+              return next
+            })
+          } else {
+            moveFocus(si, newIi)
+          }
+          return
+        }
         case 'ArrowDown':
           e.preventDefault(); moveFocus(Math.min(si + 1, rowCount - 1), ii); return
         case 'ArrowUp':
@@ -814,17 +839,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   const allFilled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii])
                   const hasMissing = teamPositions.filter(p => p !== 'Bench').some(p => !counts[p])
                   const valid = allFilled && !hasDupe && !hasMissing
-                  const isColFoc = focused?.ii === ii
-
                   return (
                     <th
                       key={ii}
-                      onClick={() => focused && setFocused({ si: focused.si, ii })}
-                      style={{
-                        ...gHdr,
-                        background: isColFoc ? 'rgba(59,109,177,0.15)' : 'var(--bg-card)',
-                        cursor: focused ? 'pointer' : 'default',
-                      }}
+                      style={{ ...gHdr }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
                         <span>{ii + 1}</span>
@@ -862,15 +880,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   : bi > expectedBenchInnings + 1.0 ? '#E87060'
                   : bi > expectedBenchInnings + 0.5 ? '#E8A020'
                   : '#6DB875'
-                const isRowFoc = focused?.si === si
-
                 return (
                   <tr
                     key={slot.id}
                     style={{
-                      background: isRowFoc
-                        ? 'rgba(59,109,177,0.04)'
-                        : si % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.018)',
+                      background: si % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.018)',
                     }}
                   >
                     <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>
@@ -879,7 +893,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     <td style={{
                       ...gCell, paddingLeft: 10, fontWeight: 600, fontSize: 13,
                       position: 'sticky', left: 0, zIndex: 1,
-                      background: isRowFoc ? 'rgba(59,109,177,0.06)' : 'var(--bg)',
+                      background: 'var(--bg)',
                       borderRight: '1px solid var(--border)',
                     }}>
                       <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 4 }}>
@@ -894,7 +908,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       const cellKey = `${si}-${ii}`
                       const isFoc = focused?.si === si && focused?.ii === ii
                       const isSel = selectedCells.has(cellKey)
-                      const isColFoc = focused?.ii === ii && focused?.si !== si
                       const isDupe = !!(pos && pos !== 'Bench' &&
                         activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
 
@@ -932,9 +945,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                               ? 'rgba(59,109,177,0.3)'
                               : isSel
                                 ? 'rgba(59,109,177,0.14)'
-                                : isColFoc
-                                  ? 'rgba(59,109,177,0.05)'
-                                  : pc ? pc.bg : 'transparent',
+                                : pc ? pc.bg : 'transparent',
                             outline: isFoc
                               ? '2px solid rgba(59,109,177,0.85)'
                               : isSel
@@ -948,7 +959,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                         >
                           <span style={{
                             fontSize: 12, fontWeight: 800,
-                            color: isFoc ? '#80B0E8' : isSel ? 'rgba(128,176,232,0.8)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
@@ -1164,8 +1175,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
                 {([
                   ['click', 'Select cell'],
+                  ['shift+← →', 'Extend selection (same row)'],
                   ['shift+click', 'Extend selection (same row)'],
-                  ['⌘+click', 'Toggle cell in selection'],
+                  ['⌘+click', 'Toggle cell'],
                   ['←↑↓→ / Tab', 'Move selection'],
                   ['p c 1 2 s 3', 'Fill: P C 1B 2B SS 3B'],
                   ['l  m  r  b', 'Fill: LF CF RF Bench'],
