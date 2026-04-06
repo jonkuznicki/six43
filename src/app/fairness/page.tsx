@@ -254,19 +254,28 @@ export default function FairnessPage() {
         </select>
       )}
 
-      {/* View toggle */}
-      <div style={{ display: 'flex', background: 'var(--bg-input)',
-        borderRadius: '6px', padding: '2px', gap: '2px', marginBottom: '1rem', width: 'fit-content' }}>
-        {(['summary', 'positions'] as const).map(v => (
-          <button key={v} onClick={() => setView(v)} style={{
-            padding: '5px 14px', borderRadius: '4px', border: 'none',
-            background: view === v ? 'var(--accent)' : 'transparent',
-            color: view === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.5)`,
-            fontSize: '12px', fontWeight: view === v ? 700 : 400, cursor: 'pointer',
-          }}>
-            {v === 'summary' ? 'Summary' : 'By position'}
-          </button>
-        ))}
+      {/* View toggle + Pitching link */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-input)',
+          borderRadius: '6px', padding: '2px', gap: '2px' }}>
+          {(['summary', 'positions'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)} style={{
+              padding: '5px 14px', borderRadius: '4px', border: 'none',
+              background: view === v ? 'var(--accent)' : 'transparent',
+              color: view === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.5)`,
+              fontSize: '12px', fontWeight: view === v ? 700 : 400, cursor: 'pointer',
+            }}>
+              {v === 'summary' ? 'Summary' : 'By position'}
+            </button>
+          ))}
+        </div>
+        <Link href="/pitching" style={{
+          fontSize: '12px', fontWeight: 600, color: `rgba(var(--fg-rgb), 0.45)`,
+          textDecoration: 'none', padding: '5px 12px', borderRadius: '6px',
+          border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
+        }}>
+          Pitching log →
+        </Link>
       </div>
 
       {loading && (

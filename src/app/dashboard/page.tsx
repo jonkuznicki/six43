@@ -1,7 +1,11 @@
 import { createServerClient } from '../../lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { formatTime } from '../../lib/formatTime'
+import TeamSelect from '../games/TeamSelect'
+
+export const dynamic = 'force-dynamic'
 
 function parseRecord(games: any[]): { w: number; l: number } {
   let w = 0, l = 0
@@ -36,20 +40,44 @@ function formatDate(d: string) {
   })
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: { teamId?: string }
+}) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: season } = await supabase
+  const { data: allTeams } = await supabase
+    .from('teams')
+    .select('id, name, is_active')
+    .order('created_at')
+
+  const teams = (allTeams ?? []).filter((t: any) => t.is_active !== false)
+
+  const cookieStore = await cookies()
+  const cookieTeamId = cookieStore.get('selected_team_id')?.value ?? null
+
+  const selectedTeamId =
+    (searchParams.teamId && teams.find((t: any) => t.id === searchParams.teamId))
+      ? searchParams.teamId
+      : (cookieTeamId && teams.find((t: any) => t.id === cookieTeamId))
+        ? cookieTeamId
+        : teams[0]?.id ?? null
+
+  const selectedTeam = teams.find((t: any) => t.id === selectedTeamId) ?? null
+
+  let seasonQuery = supabase
     .from('seasons')
-    .select('id, name, innings_per_game, teams(id, name)')
+    .select('id, name, innings_per_game')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
-    .maybeSingle()
 
-  const team = (season as any)?.teams ?? null
+  if (selectedTeamId) seasonQuery = (seasonQuery as any).eq('team_id', selectedTeamId)
+
+  const { data: season } = await seasonQuery.maybeSingle()
 
   const { data: games } = season ? await supabase
     .from('games')
@@ -58,10 +86,10 @@ export default async function Dashboard() {
     .order('game_date', { ascending: true }) : { data: [] }
 
   const today = new Date().toISOString().split('T')[0]
-  const nextGame = (games ?? []).find(g => g.status === 'scheduled' && g.game_date >= today)
-  const recentGames = [...(games ?? [])].filter(g => g.status === 'final').reverse().slice(0, 3)
+  const nextGame = (games ?? []).find((g: any) => g.status === 'scheduled' && g.game_date >= today)
+  const recentGames = [...(games ?? [])].filter((g: any) => g.status === 'final').reverse().slice(0, 3)
   const record = parseRecord(games ?? [])
-  const upcomingCount = (games ?? []).filter(g => g.status === 'scheduled').length
+  const upcomingCount = (games ?? []).filter((g: any) => g.status === 'scheduled').length
 
   const { count: rosterCount } = season ? await supabase
     .from('players')
@@ -77,22 +105,31 @@ export default async function Dashboard() {
     }}>
 
       {/* Header */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <Link href="/" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: 900, letterSpacing: '-1px', marginBottom: '4px' }}>
-            Six<span style={{ color: 'var(--accent)' }}>43</span>
-          </h1>
-        </Link>
-        {team ? (
-          <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.5)` }}>
-            {team.name} · {season?.name}
+      <div style={{ marginBottom: '0.25rem' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '2px' }}>
+          Six<span style={{ color: 'var(--accent)' }}>43</span>
+        </h1>
+        {season && (
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '1rem' }}>
+            {season.name}
           </div>
-        ) : (
-          <Link href="/settings" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>
-            Set up your team →
-          </Link>
         )}
       </div>
+
+      {/* Team selector (only shown when multiple teams) */}
+      <TeamSelect teams={teams} selectedTeamId={selectedTeamId} basePath="/dashboard" />
+
+      {!season && teams.length > 0 && (
+        <Link href="/settings" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
+          No active season — set one up in Team Settings →
+        </Link>
+      )}
+
+      {!season && teams.length === 0 && (
+        <Link href="/settings" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
+          Get started — set up your team →
+        </Link>
+      )}
 
       {/* Next game */}
       {nextGame ? (
@@ -116,8 +153,8 @@ export default async function Dashboard() {
             </div>
           </div>
         </Link>
-      ) : (
-        <Link href="/games/new" style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
+      ) : season ? (
+        <Link href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
           <div style={{
             background: 'var(--bg-card)', border: '0.5px dashed var(--border-strong)',
             borderRadius: '14px', padding: '20px 18px', textAlign: 'center',
@@ -130,33 +167,35 @@ export default async function Dashboard() {
             </div>
           </div>
         </Link>
-      )}
+      ) : null}
 
       {/* Stats row */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
-        {[
-          { label: 'Record', value: season ? `${record.w}–${record.l}` : '—' },
-          { label: 'Upcoming', value: upcomingCount },
-          { label: 'Players', value: rosterCount ?? 0 },
-        ].map(s => (
-          <div key={s.label} style={{
-            flex: 1, background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-            borderRadius: '10px', padding: '12px 14px',
-          }}>
-            <div style={{ fontSize: '20px', fontWeight: 800 }}>{s.value}</div>
-            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px',
-              textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+      {season && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+          {[
+            { label: 'Record',   value: `${record.w}–${record.l}` },
+            { label: 'Upcoming', value: upcomingCount },
+            { label: 'Players',  value: rosterCount ?? 0 },
+          ].map(s => (
+            <div key={s.label} style={{
+              flex: 1, background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '10px', padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: '20px', fontWeight: 800 }}>{s.value}</div>
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px',
+                textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Quick actions */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '1.5rem' }}>
         {[
-          { href: '/games/new', label: '+ New game', sub: 'Schedule a game' },
-          { href: '/roster',    label: '👥 Roster',  sub: `${rosterCount ?? 0} active players` },
-          { href: '/fairness',  label: '📊 Playing time', sub: 'Season fairness' },
-          { href: '/settings',  label: '⚙️ Settings', sub: 'Team & season' },
+          { href: `/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`, label: '+ New game',       sub: 'Schedule a game' },
+          { href: `/roster${season ? `?seasonId=${season.id}` : ''}`,               label: '👥 Roster',        sub: `${rosterCount ?? 0} active players` },
+          { href: '/fairness',                                                        label: '📊 Playing time',  sub: 'Season fairness' },
+          { href: '/settings',                                                        label: '⚙️ Team Settings', sub: 'Team & season' },
         ].map(a => (
           <a key={a.href} href={a.href} style={{
             textDecoration: 'none', background: 'var(--bg-card)',
@@ -176,7 +215,7 @@ export default async function Dashboard() {
             textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
             Recent results
           </div>
-          {recentGames.map(game => {
+          {recentGames.map((game: any) => {
             const score = getBoxScore(game)
             const won = score ? score.us > score.them : null
             return (

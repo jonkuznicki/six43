@@ -6,9 +6,11 @@ import { setSelectedTeamId } from '../../lib/selectedTeam'
 export default function TeamSelect({
   teams,
   selectedTeamId,
+  basePath = '/games',
 }: {
   teams: { id: string; name: string }[]
   selectedTeamId: string | null
+  basePath?: string
 }) {
   const router = useRouter()
 
@@ -19,7 +21,7 @@ export default function TeamSelect({
       value={selectedTeamId ?? ''}
       onChange={e => {
         setSelectedTeamId(e.target.value)
-        router.push(`/games?teamId=${e.target.value}`)
+        router.push(`${basePath}?teamId=${e.target.value}`)
       }}
       style={{
         width: '100%', padding: '9px 12px', borderRadius: '8px',

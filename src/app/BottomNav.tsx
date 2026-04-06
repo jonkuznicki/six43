@@ -4,11 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/dashboard', label: 'Home',         icon: '⌂' },
-  { href: '/games',     label: 'Games',        icon: '⚾' },
-  { href: '/roster',    label: 'Roster',       icon: '👥' },
-  { href: '/fairness',  label: 'Playing Time', icon: '📊' },
-  { href: '/settings',  label: 'Settings',     icon: '⚙' },
+  { href: '/dashboard', label: 'Home',          icon: '⌂' },
+  { href: '/games',     label: 'Games',         icon: '⚾' },
+  { href: '/fairness',  label: 'Playing Time',  icon: '📊' },
+  { href: '/settings',  label: 'Team Settings', icon: '⚙' },
 ]
 
 export default function BottomNav() {
