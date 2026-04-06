@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
+import { setSelectedTeamId } from '../../lib/selectedTeam'
 
 type PlanSlot = { id?: string; player_id: string; notes: string }
 type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null }
@@ -54,9 +55,16 @@ export default function PitchingPage() {
   const [lastPitched, setLastPitched]       = useState<Record<string, string>>({})
   const [saving, setSaving]                 = useState<string | null>(null)
   const [editingPitch, setEditingPitch]     = useState<Record<string, string>>({}) // slotId → draft value
+  const [slotCount, setSlotCount]           = useState(MIN_SLOTS)
 
   useEffect(() => { init() }, [])
-  useEffect(() => { if (selectedSeasonId) loadSeason(selectedSeasonId) }, [selectedSeasonId])
+  useEffect(() => {
+    if (!selectedSeasonId) return
+    loadSeason(selectedSeasonId)
+    // Persist selected team across all pages when season changes
+    const season = seasons.find(s => s.id === selectedSeasonId)
+    if (season?.team_id) setSelectedTeamId(season.team_id)
+  }, [selectedSeasonId])
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -123,6 +131,9 @@ export default function PitchingPage() {
         }
       }
       setPlans(plansMap)
+      // Set initial slot count from highest filled slot + 1 empty
+      const maxFilled = Math.max(MIN_SLOTS, ...Object.values(plansMap).flatMap(g => Object.keys(g).map(Number)))
+      setSlotCount(Math.min(MAX_SLOTS, maxFilled + 1))
     }
 
     // Load actual pitching data (from lineup slots) including pitch counts
@@ -213,22 +224,15 @@ export default function PitchingPage() {
     setEditingPitch(prev => { const n = { ...prev }; delete n[slotId]; return n })
   }
 
-  // Compute how many pitcher slots to show for upcoming games
-  const maxFilledSlot = Math.max(
-    MIN_SLOTS,
-    ...Object.values(plans).flatMap(g => Object.keys(g).map(Number))
-  )
-  const upcomingSlotCount = Math.min(MAX_SLOTS, maxFilledSlot + 1)
-
   // Compute how many columns to show for past games
   const maxActualPitchers = Math.max(
     MIN_SLOTS,
     ...Object.values(actualPitching).map(arr => arr.length)
   )
 
-  const upcomingGrid = `140px repeat(${upcomingSlotCount}, 1fr)`
+  const upcomingGrid = `140px repeat(${slotCount}, 1fr)`
   const pastGrid     = `140px repeat(${maxActualPitchers}, 1fr)`
-  const upcomingMinW = `${300 + upcomingSlotCount * 80}px`
+  const upcomingMinW = `${300 + slotCount * 80}px`
   const pastMinW     = `${300 + maxActualPitchers * 80}px`
 
   return (
@@ -408,11 +412,38 @@ export default function PitchingPage() {
           {/* ── UPCOMING ── */}
           {upcoming.length > 0 && (
             <div style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
-              }}>
-                Upcoming
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                }}>
+                  Upcoming
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    onClick={() => setSlotCount(c => Math.max(1, c - 1))}
+                    disabled={slotCount <= 1}
+                    style={{
+                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                      background: 'transparent', cursor: slotCount <= 1 ? 'not-allowed' : 'pointer',
+                      color: slotCount <= 1 ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                    }}
+                  >−</button>
+                  <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, minWidth: 48, textAlign: 'center' }}>
+                    {slotCount} pitcher{slotCount !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={() => setSlotCount(c => Math.min(MAX_SLOTS, c + 1))}
+                    disabled={slotCount >= MAX_SLOTS}
+                    style={{
+                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                      background: 'transparent', cursor: slotCount >= MAX_SLOTS ? 'not-allowed' : 'pointer',
+                      color: slotCount >= MAX_SLOTS ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                    }}
+                  >+</button>
+                </div>
               </div>
 
               <div style={{ overflowX: 'auto' }}>
@@ -421,7 +452,7 @@ export default function PitchingPage() {
                   gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
                 }}>
                   <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {Array.from({ length: upcomingSlotCount }, (_, i) => (
+                  {Array.from({ length: slotCount }, (_, i) => (
                     <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
                   ))}
                 </div>
@@ -447,7 +478,7 @@ export default function PitchingPage() {
                         </div>
                       </div>
 
-                      {Array.from({ length: upcomingSlotCount }, (_, i) => {
+                      {Array.from({ length: slotCount }, (_, i) => {
                         const slot = i + 1
                         const plan = gamePlans[slot]
                         const isSaving = saving === `${game.id}-${slot}`

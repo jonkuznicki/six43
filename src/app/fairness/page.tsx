@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
+import { setSelectedTeamId } from '../../lib/selectedTeam'
 import Link from 'next/link'
 
 // Positions in display order (positions view uses grouped OF)
@@ -66,7 +67,12 @@ export default function FairnessPage() {
   const [loadingDetail, setLoadingDetail] = useState(false)
 
   useEffect(() => { init() }, [])
-  useEffect(() => { if (selectedSeasonId) loadStats(selectedSeasonId) }, [selectedSeasonId])
+  useEffect(() => {
+    if (!selectedSeasonId) return
+    loadStats(selectedSeasonId)
+    const season = seasons.find((s: any) => s.id === selectedSeasonId)
+    if (season?.team_id) setSelectedTeamId(season.team_id)
+  }, [selectedSeasonId])
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
