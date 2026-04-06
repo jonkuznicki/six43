@@ -186,11 +186,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .order('created_at', { ascending: false })
       console.log('[lastGame] otherGames:', otherGames, 'error:', otherErr)
 
-      // Pick the most recently dated game, or fall back to the most recently created
-      const dated = (otherGames ?? []).filter(g => g.game_date).sort(
+      // Only consider final games as "previous game"
+      const finalGames = (otherGames ?? []).filter(g => g.status === 'final')
+      const dated = finalGames.filter(g => g.game_date).sort(
         (a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime()
       )
-      const prevGame = dated[0] ?? otherGames?.[0]
+      const prevGame = dated[0] ?? finalGames[0]
       console.log('[lastGame] prevGame selected:', prevGame)
       if (prevGame) {
         const { data: prevSlots, error: slotsErr } = await supabase
