@@ -221,7 +221,28 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             innings_played: game.innings_played,
             game_time: game.game_time ?? null,
           }} />
-          {hasLineup && <PrintButton />}
+          {hasLineup && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ flex: 1 }}>
+                <PrintButton />
+              </div>
+              <Link
+                href={`/games/${game.id}/exchange-card`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none', flex: 1 }}
+              >
+                <div style={{
+                  fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
+                  border: '0.5px solid var(--border-strong)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.55)`, cursor: 'pointer',
+                  textAlign: 'center',
+                }}>
+                  🤝 Exchange card
+                </div>
+              </Link>
+            </div>
+          )}
           <ShareButton gameId={game.id} initialToken={(game as any).share_token ?? null} />
         </div>
 
