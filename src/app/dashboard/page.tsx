@@ -63,10 +63,10 @@ export default async function Dashboard() {
   const record = parseRecord(games ?? [])
   const upcomingCount = (games ?? []).filter(g => g.status === 'scheduled').length
 
-  const { count: rosterCount } = team ? await supabase
+  const { count: rosterCount } = season ? await supabase
     .from('players')
     .select('id', { count: 'exact', head: true })
-    .eq('team_id', team.id)
+    .eq('season_id', season.id)
     .eq('status', 'active') : { count: 0 }
 
   return (
@@ -147,6 +147,25 @@ export default async function Dashboard() {
             <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px',
               textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
           </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '1.5rem' }}>
+        {[
+          { href: '/games/new', label: '+ New game', sub: 'Schedule a game' },
+          { href: '/roster',    label: '👥 Roster',  sub: `${rosterCount ?? 0} active players` },
+          { href: '/fairness',  label: '📊 Playing time', sub: 'Season fairness' },
+          { href: '/settings',  label: '⚙️ Settings', sub: 'Team & season' },
+        ].map(a => (
+          <a key={a.href} href={a.href} style={{
+            textDecoration: 'none', background: 'var(--bg-card)',
+            border: '0.5px solid var(--border)', borderRadius: '10px',
+            padding: '12px 14px', display: 'block',
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--fg)', marginBottom: '2px' }}>{a.label}</div>
+            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>{a.sub}</div>
+          </a>
         ))}
       </div>
 

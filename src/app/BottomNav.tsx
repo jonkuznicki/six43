@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/games',    label: 'Games',        icon: '⚾' },
-  { href: '/pitching', label: 'Pitching',     icon: '🎯' },
-  { href: '/fairness', label: 'Playing Time', icon: '📊' },
-  { href: '/settings', label: 'Settings',     icon: '⚙' },
+  { href: '/dashboard', label: 'Home',         icon: '⌂' },
+  { href: '/games',     label: 'Games',        icon: '⚾' },
+  { href: '/roster',    label: 'Roster',       icon: '👥' },
+  { href: '/fairness',  label: 'Playing Time', icon: '📊' },
+  { href: '/settings',  label: 'Settings',     icon: '⚙' },
 ]
 
 export default function BottomNav() {
@@ -28,7 +29,9 @@ export default function BottomNav() {
       zIndex: 100,
     }}>
       {TABS.map(tab => {
-        const active = pathname.startsWith(tab.href)
+        const active = tab.href === '/dashboard'
+          ? pathname === '/dashboard'
+          : pathname.startsWith(tab.href)
         return (
           <Link key={tab.href} href={tab.href} style={{
             flex: 1,

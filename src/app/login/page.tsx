@@ -23,7 +23,7 @@ export default function LoginPage() {
     if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setError(error.message); setLoading(false) }
-      else router.push('/games')
+      else router.push('/dashboard')
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
