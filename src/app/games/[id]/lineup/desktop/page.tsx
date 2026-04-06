@@ -37,10 +37,14 @@ const POS_COLOR: Record<string, { bg: string; color: string }> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function benchFraction(slot: any, inningCount: number): number {
-  const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string | null)[]
-  const filled = pos.filter(p => p !== null).length
-  return filled ? pos.filter(p => p === 'Bench').length / filled : 0
+function benchInnings(slot: any, inningCount: number): number {
+  return (slot.inning_positions ?? []).slice(0, inningCount)
+    .filter((p: string | null) => p === 'Bench').length
+}
+
+function assignedInnings(slot: any, inningCount: number): number {
+  return (slot.inning_positions ?? []).slice(0, inningCount)
+    .filter((p: string | null) => p !== null).length
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -67,6 +71,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [copyGameId, setCopyGameId]     = useState('')
   const [copyMode, setCopyMode]         = useState<'full' | 'order'>('full')
   const [copying, setCopying]           = useState(false)
+  const [showTip, setShowTip]           = useState(true)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   // Always-current reference so async callbacks see latest state
   const slotsRef = useRef(slots)
@@ -366,6 +372,20 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const activeSlots = slots.filter(s => s.availability !== 'absent')
   const absentSlots  = slots.filter(s => s.availability === 'absent')
 
+  // How many players should sit the bench each inning
+  const fieldingPositionCount = teamPositions.filter(p => p !== 'Bench').length
+  const benchPerInning = Math.max(0, activeSlots.length - fieldingPositionCount)
+  // Expected bench innings per player over the full game
+  const expectedBenchInnings = activeSlots.length > 0
+    ? (inningCount * benchPerInning) / activeSlots.length
+    : 0
+
+  // Show tip banner while lineup is mostly empty
+  const totalAssigned = activeSlots.reduce(
+    (sum, s) => sum + assignedInnings(s, inningCount), 0
+  )
+  const tipVisible = showTip && totalAssigned < activeSlots.length
+
   // Right-panel: position summary for the focused (or first) inning
   const summaryII = focused?.ii ?? 0
   const posSummary: Record<string, string[]> = {}
@@ -459,6 +479,42 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         </div>
       </div>
 
+      {/* ─── INSTRUCTION BANNER ─── */}
+      {tipVisible && (
+        <div style={{
+          background: 'rgba(232,160,32,0.09)', borderBottom: '1px solid rgba(232,160,32,0.2)',
+          padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 12, color: GOLD, fontWeight: 700, flexShrink: 0 }}>
+            How to build a lineup:
+          </span>
+          {[
+            ['1', 'Mark absent players', 'Use the ✕ next to any player who isn\'t at the game'],
+            ['2', 'Select a position', 'Click a position button in the bottom-left, or press its key shortcut'],
+            ['3', 'Click cells to assign', 'Click any cell in the grid — it fills with your selected position'],
+            ['4', 'Save & Finalize', 'When all innings are set, click the gold button at the top right'],
+          ].map(([n, label, tip]) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={tip}>
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%', background: GOLD, color: NAVY,
+                fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>{n}</span>
+              <span style={{ fontSize: 12, color: `rgba(var(--fg-rgb),0.7)` }}>{label}</span>
+            </div>
+          ))}
+          <div style={{ flex: 1 }} />
+          <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, fontStyle: 'italic', flexShrink: 0 }}>
+            Tip: assigning a position moves the previous holder to Bench automatically
+          </div>
+          <button
+            onClick={() => setShowTip(false)}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer',
+              color: `rgba(var(--fg-rgb),0.35)`, fontSize: 16, padding: '0 4px', flexShrink: 0 }}
+          >×</button>
+        </div>
+      )}
+
       {/* ─── THREE PANELS ─── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
@@ -470,7 +526,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
 
             {/* Active players */}
-            <div style={secLabel}>Batting order · {activeSlots.length}</div>
+            <div style={{ ...secLabel, display: 'flex', justifyContent: 'space-between', paddingRight: 10 }}>
+              <span>Batting order · {activeSlots.length}</span>
+              <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.22)`, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                drag to reorder
+              </span>
+            </div>
             {activeSlots.map((slot, si) => (
               <div
                 key={slot.id}
@@ -549,9 +610,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
           {/* Position palette */}
           <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-              textTransform: 'uppercase', color: `rgba(var(--fg-rgb),0.28)`, marginBottom: 8 }}>
-              Active position
+            <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, marginBottom: 8 }}>
+              Select position, then click cells:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
               {teamPositions.map(pos => {
@@ -592,7 +652,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               <col style={{ width: 28 }} />
               <col style={{ width: 150 }} />
               {innings.map(i => <col key={i} style={{ width: 54 }} />)}
-              <col style={{ width: 58 }} />
+              <col style={{ width: 62 }} />
             </colgroup>
             <thead>
               <tr>
@@ -630,13 +690,33 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     </th>
                   )
                 })}
-                <th style={{ ...gHdr, fontSize: 9 }}>Bench%</th>
+                <th
+                  style={{ ...gHdr, fontSize: 9 }}
+                  title={benchPerInning > 0
+                    ? `${benchPerInning} player${benchPerInning !== 1 ? 's' : ''} bench each inning. Each player should bench ~${expectedBenchInnings.toFixed(1)} innings.`
+                    : 'Everyone plays every inning'}
+                >
+                  <div style={{ lineHeight: 1.3 }}>
+                    <div>Bench</div>
+                    {benchPerInning > 0 && (
+                      <div style={{ fontSize: 7, opacity: 0.5, fontWeight: 400 }}>
+                        ~{expectedBenchInnings.toFixed(1)} exp
+                      </div>
+                    )}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
               {activeSlots.map((slot, si) => {
-                const bp = benchFraction(slot, inningCount)
-                const bpColor = bp > 0.45 ? '#E87060' : bp > 0.25 ? '#E8A020' : bp > 0 ? '#6DB875' : `rgba(var(--fg-rgb),0.2)`
+                const bi = benchInnings(slot, inningCount)
+                const ai = assignedInnings(slot, inningCount)
+                // Color based on whether this player has benched more/less than their fair share
+                const bpColor = bi === 0
+                  ? `rgba(var(--fg-rgb),0.18)`
+                  : bi > expectedBenchInnings + 1.0 ? '#E87060'
+                  : bi > expectedBenchInnings + 0.5 ? '#E8A020'
+                  : '#6DB875'
                 const isRowFoc = focused?.si === si
 
                 return (
@@ -703,10 +783,20 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       )
                     })}
 
-                    <td style={{ ...gCell, textAlign: 'center' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: bpColor }}>
-                        {bp > 0 ? `${Math.round(bp * 100)}%` : '—'}
-                      </span>
+                    <td
+                      style={{ ...gCell, textAlign: 'center' }}
+                      title={bi > 0
+                        ? `${bi} bench inning${bi !== 1 ? 's' : ''} of ${ai} assigned (expected ~${expectedBenchInnings.toFixed(1)})`
+                        : ai > 0 ? 'No bench innings yet' : 'No innings assigned'}
+                    >
+                      {bi > 0 ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: bpColor }}>
+                          {bi}
+                          <span style={{ fontSize: 8, opacity: 0.6, fontWeight: 400 }}> inn</span>
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.18)` }}>—</span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -720,7 +810,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
           overflowY: 'auto', padding: 12,
         }}>
-          <div style={secLabel}>Inning {summaryII + 1} positions</div>
+          <div style={{ ...secLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Inning {summaryII + 1}</span>
+            {focused && <span style={{ opacity: 0.55, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+              {focused.ii === summaryII ? '' : ''}
+            </span>}
+          </div>
 
           {teamPositions.filter(p => p !== 'Bench').map(pos => {
             const players = posSummary[pos] ?? []
@@ -777,34 +872,68 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             </div>
           )}
 
-          {/* Keyboard shortcuts reference */}
-          <div style={{ marginTop: 18, padding: '8px 10px', borderRadius: 6,
-            background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-              textTransform: 'uppercase', color: `rgba(var(--fg-rgb),0.28)`, marginBottom: 8 }}>
-              Shortcuts
+          {/* Bench context */}
+          {activeSlots.length > 0 && (
+            <div style={{ marginTop: 10, padding: '7px 9px', borderRadius: 5,
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+              {benchPerInning > 0 ? (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.6)`, marginBottom: 2 }}>
+                    {benchPerInning} on bench each inning
+                  </div>
+                  <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>
+                    ~{expectedBenchInnings.toFixed(1)} bench innings per player over {inningCount} innings
+                  </div>
+                  {absentSlots.length > 0 && (
+                    <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, marginTop: 3 }}>
+                      ({absentSlots.length} absent, {activeSlots.length} active)
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.45)` }}>
+                  All {activeSlots.length} players field every inning
+                </div>
+              )}
             </div>
-            {([
-              ['click', 'Assign active pos'],
-              ['←↑↓→ / Tab', 'Navigate'],
-              ['p c 1 2 s 3', 'P C 1B 2B SS 3B'],
-              ['l  m  r  b', 'LF CF RF Bench'],
-              ['Del', 'Clear cell'],
-              ['⌘Z', 'Undo'],
-              ['⌘⇧Z', 'Redo'],
-            ] as [string, string][]).map(([k, d]) => (
-              <div key={k} style={{ display: 'flex', gap: 5, marginBottom: 3, alignItems: 'center' }}>
-                <code style={{
-                  fontSize: 9, background: 'var(--bg)', padding: '1px 4px',
-                  borderRadius: 3, border: '0.5px solid var(--border-md)',
-                  color: `rgba(var(--fg-rgb),0.55)`, flexShrink: 0,
-                  fontFamily: 'ui-monospace, monospace',
-                }}>
-                  {k}
-                </code>
-                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>{d}</span>
+          )}
+
+          {/* Keyboard shortcuts — collapsible */}
+          <div style={{ marginTop: 12 }}>
+            <button
+              onClick={() => setShowShortcuts(s => !s)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, display: 'flex',
+                alignItems: 'center', gap: 4 }}
+            >
+              <span style={{ fontSize: 8 }}>{showShortcuts ? '▾' : '▸'}</span>
+              Keyboard shortcuts
+            </button>
+            {showShortcuts && (
+              <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 6,
+                background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+                {([
+                  ['click', 'Assign active pos'],
+                  ['←↑↓→ / Tab', 'Navigate cells'],
+                  ['p c 1 2 s 3', 'P C 1B 2B SS 3B'],
+                  ['l  m  r  b', 'LF CF RF Bench'],
+                  ['Del', 'Clear cell'],
+                  ['⌘Z / ⌘⇧Z', 'Undo / Redo'],
+                ] as [string, string][]).map(([k, d]) => (
+                  <div key={k} style={{ display: 'flex', gap: 5, marginBottom: 3, alignItems: 'center' }}>
+                    <code style={{
+                      fontSize: 9, background: 'var(--bg)', padding: '1px 4px',
+                      borderRadius: 3, border: '0.5px solid var(--border-md)',
+                      color: `rgba(var(--fg-rgb),0.55)`, flexShrink: 0,
+                      fontFamily: 'ui-monospace, monospace',
+                    }}>
+                      {k}
+                    </code>
+                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>{d}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
