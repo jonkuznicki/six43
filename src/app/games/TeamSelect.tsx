@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { setSelectedTeamId } from '../../lib/selectedTeam'
 
 export default function TeamSelect({
   teams,
@@ -16,7 +17,10 @@ export default function TeamSelect({
   return (
     <select
       value={selectedTeamId ?? ''}
-      onChange={e => router.push(`/games?teamId=${e.target.value}`)}
+      onChange={e => {
+        setSelectedTeamId(e.target.value)
+        router.push(`/games?teamId=${e.target.value}`)
+      }}
       style={{
         width: '100%', padding: '9px 12px', borderRadius: '8px',
         border: '0.5px solid var(--border-md)',

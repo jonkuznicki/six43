@@ -79,12 +79,22 @@ export default function FairnessPage() {
 
     const { data: seasonRows } = await supabase
       .from('seasons')
-      .select('id, name, is_active, team:teams(name)')
+      .select('id, name, is_active, team_id, team:teams(name)')
       .in('team_id', teamIds)
       .order('created_at', { ascending: false })
 
     setSeasons(seasonRows ?? [])
-    const active = (seasonRows ?? []).find((s: any) => s.is_active) ?? seasonRows?.[0]
+
+    // Prefer the cookie-stored team's active season
+    const cookieMatch = document.cookie.match(/(?:^|; )selected_team_id=([^;]*)/)
+    const storedTeamId = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null
+    const preferred = storedTeamId
+      ? (seasonRows ?? []).find((s: any) => s.team_id === storedTeamId && s.is_active)
+        ?? (seasonRows ?? []).find((s: any) => s.team_id === storedTeamId)
+      : null
+    const active = preferred
+      ?? (seasonRows ?? []).find((s: any) => s.is_active)
+      ?? seasonRows?.[0]
     setActiveSeason(active)
     if (active) setSelectedSeasonId(active.id)
     else setLoading(false)

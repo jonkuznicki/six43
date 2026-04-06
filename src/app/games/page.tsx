@@ -1,5 +1,6 @@
 import { createServerClient } from '../../lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import TeamSelect from './TeamSelect'
 import GameCard from './GameCard'
@@ -24,9 +25,15 @@ export default async function GamesPage({
 
   const teams = (allTeams ?? []).filter(t => t.is_active !== false)
 
-  const selectedTeamId = (searchParams.teamId && teams.find(t => t.id === searchParams.teamId))
-    ? searchParams.teamId
-    : teams[0]?.id ?? null
+  const cookieStore = await cookies()
+  const cookieTeamId = cookieStore.get('selected_team_id')?.value ?? null
+
+  const selectedTeamId =
+    (searchParams.teamId && teams.find(t => t.id === searchParams.teamId))
+      ? searchParams.teamId
+      : (cookieTeamId && teams.find(t => t.id === cookieTeamId))
+        ? cookieTeamId
+        : teams[0]?.id ?? null
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId) ?? null
 

@@ -84,9 +84,12 @@ export default function RosterPage() {
       resolvedSeasonName = season.name
       resolvedTeamName = (season as any).teams?.name ?? ''
     } else {
-      // Fall back: find the active season for the given team (or first team)
-      const { data: team } = teamIdParam
-        ? await supabase.from('teams').select('id, name').eq('id', teamIdParam).single()
+      // Fall back: find the active season for the given team (cookie → URL param → first team)
+      const cookieMatch = document.cookie.match(/(?:^|; )selected_team_id=([^;]*)/)
+      const cookieTeamId = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null
+      const resolvedTeamIdParam = teamIdParam ?? cookieTeamId
+      const { data: team } = resolvedTeamIdParam
+        ? await supabase.from('teams').select('id, name').eq('id', resolvedTeamIdParam).single()
         : await supabase.from('teams').select('id, name').order('created_at').limit(1).single()
       if (!team) { setLoading(false); return }
       resolvedTeamId = team.id
