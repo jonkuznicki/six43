@@ -176,25 +176,19 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
     // Load most recent previous game's slot positions for last-game context in right panel
     if (gameData?.season_id) {
-      const { data: prevGames } = await supabase
+      // Get all other games in this season, most recent first
+      const { data: otherGames } = await supabase
         .from('games')
-        .select('id, innings_played')
-        .eq('season_id', gameData.season_id)
-        .neq('id', params.id)
-        .not('game_date', 'is', null)       // skip undated games
-        .order('game_date', { ascending: false })
-        .limit(1)
-
-      // Fallback: if no dated games, grab any other game by creation order
-      const { data: fallbackGames } = !prevGames?.length ? await supabase
-        .from('games')
-        .select('id, innings_played')
+        .select('id, innings_played, game_date')
         .eq('season_id', gameData.season_id)
         .neq('id', params.id)
         .order('created_at', { ascending: false })
-        .limit(1) : { data: null }
 
-      const prevGame = prevGames?.[0] ?? fallbackGames?.[0]
+      // Pick the most recently dated game, or fall back to the most recently created
+      const dated = (otherGames ?? []).filter(g => g.game_date).sort(
+        (a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime()
+      )
+      const prevGame = dated[0] ?? otherGames?.[0]
       if (prevGame) {
         const { data: prevSlots } = await supabase
           .from('lineup_slots')
