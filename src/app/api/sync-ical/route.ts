@@ -26,7 +26,7 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
     .replace(/\n[ \t]/g, '')
 
   const SKIP_KEYWORDS = ['practice', 'training', 'scrimmage', 'event']
-  const games: Array<{ opponent: string; game_date: string; game_time: string | null }> = []
+  const games: Array<{ opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away' }> = []
   let inEvent = false
   let summary = ''
   let dtstartRaw = ''
