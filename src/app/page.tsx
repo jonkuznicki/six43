@@ -190,6 +190,203 @@ function DesktopLineupGrid() {
   )
 }
 
+function FullDesktopLineupEditor() {
+  const innings = [0, 1, 2, 3, 4, 5]
+  const focusedInning = 2 // right panel shows inning 3
+  const focusedCell = { pi: 0, ii: 0 } // Jake M., inning 1
+
+  // Right panel: who's at each position in inning 3
+  const inning3Summary = [
+    { pos: 'P',  player: null          },
+    { pos: 'C',  player: 'Connor B.'  },
+    { pos: '1B', player: 'Jake M.'    },
+    { pos: '2B', player: 'Marcus L.'  },
+    { pos: 'SS', player: 'Tyler S.'   },
+    { pos: '3B', player: 'Sam T.'     },
+    { pos: 'LF', player: 'Drew K.'    },
+    { pos: 'CF', player: 'Ryan P.'    },
+    { pos: 'RF', player: 'Alex W.'    },
+  ]
+
+  const palette = ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
+  const jerseys  = [12, 5, 8, 3, 17, 9, 22, 7, 14]
+
+  return (
+    <div style={{ background: '#0B1F3A', display: 'flex', flexDirection: 'column', height: '290px' }}>
+
+      {/* ── Topbar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px',
+        background: '#0d2240', borderBottom: '1px solid rgba(255,255,255,0.07)',
+        flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden',
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap' }}>vs Cardinals · Apr 12</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>↩ Undo</span>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>Redo ↪</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>Clear lineup</span>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>🖨 Print</span>
+        <div style={{ flex: 1 }} />
+        {[
+          { label: 'Scheduled',    active: false, color: 'rgba(255,255,255,0.3)',   bg: 'transparent',          border: 'rgba(255,255,255,0.1)' },
+          { label: 'Lineup Ready', active: true,  color: '#80B0E8',                 bg: 'rgba(59,109,177,0.3)', border: '#80B0E8' },
+          { label: 'Final',        active: false, color: 'rgba(255,255,255,0.3)',   bg: 'transparent',          border: 'rgba(255,255,255,0.1)' },
+        ].map(s => (
+          <span key={s.label} style={{
+            fontSize: 8, fontWeight: s.active ? 700 : 500, whiteSpace: 'nowrap',
+            color: s.color, padding: '2px 6px', borderRadius: 3,
+            border: `1px solid ${s.border}`, background: s.bg,
+          }}>{s.label}</span>
+        ))}
+      </div>
+
+      {/* ── Three panels ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left: Roster + Palette */}
+        <div style={{
+          width: 128, flexShrink: 0,
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{ flex: 1, overflowY: 'hidden', padding: '5px 0' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', padding: '0 8px 3px' }}>
+              Batting order · 9
+            </div>
+            {DEMO_PLAYERS.map((p, i) => (
+              <div key={p.name} style={{
+                display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px',
+              }}>
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)', width: 10, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.22)', width: 18, flexShrink: 0 }}>#{jerseys[i]}</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Palette */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '5px 7px 6px', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 3 }}>Select cells, then fill:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {palette.map(pos => {
+                const c = DEMO_POS[pos] ?? { bg: 'rgba(120,120,120,0.1)', fg: 'rgba(255,255,255,0.3)' }
+                const active = pos === 'P'
+                return (
+                  <div key={pos} style={{
+                    padding: '2px 3px', borderRadius: 3, fontSize: 7, fontWeight: 700,
+                    border: `1px solid ${active ? c.fg : 'rgba(255,255,255,0.12)'}`,
+                    background: active ? c.bg : 'transparent',
+                    color: active ? c.fg : 'rgba(255,255,255,0.35)',
+                    minWidth: pos === 'Bench' ? 32 : 20, textAlign: 'center',
+                  }}>{pos}</div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Center: Grid */}
+        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', width: 16 }}>#</th>
+                <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'left', minWidth: 58, borderRight: '1px solid rgba(255,255,255,0.06)' }}>Player</th>
+                {innings.map(i => (
+                  <th key={i} style={{
+                    padding: '3px 4px', fontSize: 7, fontWeight: 600,
+                    borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', minWidth: 26,
+                    color: i === focusedInning ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.2)',
+                    background: i === focusedInning ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  }}>
+                    {i + 1}
+                    {i === focusedInning && <div style={{ fontSize: 5, color: '#6DB875', lineHeight: 1 }}>✓</div>}
+                  </th>
+                ))}
+                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>Bench</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEMO_PLAYERS.map((player, pi) => {
+                const benchCount = player.innings.filter(p => p === 'Bnch').length
+                return (
+                  <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.018)' }}>
+                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(255,255,255,0.22)' }}>{pi + 1}</td>
+                    <td style={{ padding: '2px 6px', fontSize: 9, color: 'rgba(255,255,255,0.72)', fontWeight: 500, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                      {player.name}
+                    </td>
+                    {player.innings.map((pos, ii) => {
+                      const c = DEMO_POS[pos]
+                      const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
+                      const isSel = pi === focusedCell.pi && ii === 1
+                      const isColFoc = ii === focusedInning
+                      return (
+                        <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(255,255,255,0.025)' : 'transparent' }}>
+                          <div style={{
+                            background: isFoc ? 'rgba(59,109,177,0.4)' : isSel ? 'rgba(59,109,177,0.14)' : (c?.bg ?? 'transparent'),
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : (c?.fg ?? 'rgba(255,255,255,0.18)'),
+                            borderRadius: 2, padding: '1px 0',
+                            fontSize: 8, fontWeight: 700,
+                            minWidth: 22, display: 'inline-block',
+                            outline: isFoc ? '1.5px solid rgba(59,109,177,0.85)' : isSel ? '1px solid rgba(59,109,177,0.4)' : 'none',
+                            outlineOffset: -1,
+                          }}>{pos === 'Bnch' ? 'B' : pos}</div>
+                        </td>
+                      )
+                    })}
+                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 8, fontWeight: 700, color: benchCount > 0 ? '#6DB875' : 'rgba(255,255,255,0.18)' }}>
+                      {benchCount > 0 ? benchCount : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right: Inning summary */}
+        <div style={{
+          width: 98, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.07)',
+          padding: '7px 7px', overflowY: 'hidden',
+        }}>
+          <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 4 }}>
+            Inning 3
+          </div>
+          {inning3Summary.map(({ pos, player }) => {
+            const c = DEMO_POS[pos]
+            const empty = !player
+            return (
+              <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(232,112,96,0.07)' : 'transparent' }}>
+                <span style={{
+                  fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2,
+                  textAlign: 'center', flexShrink: 0,
+                  background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(255,255,255,0.5)',
+                }}>{pos}</span>
+                <span style={{
+                  fontSize: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  color: empty ? 'rgba(232,112,96,0.8)' : 'rgba(255,255,255,0.65)',
+                  fontStyle: empty ? 'italic' : 'normal',
+                }}>{player ?? '—'}</span>
+                {empty && <span style={{ fontSize: 7, color: '#E87060', flexShrink: 0 }}>!</span>}
+              </div>
+            )
+          })}
+          <div style={{ marginTop: 6, padding: '5px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)' }}>Bench: Josh M.</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>~0.7 bench inn exp</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 export default async function HomePage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -555,9 +752,9 @@ export default async function HomePage() {
           justifyContent: 'center', flexWrap: 'wrap',
         }}>
           {/* Desktop */}
-          <div style={{ flex: 1, minWidth: '260px', maxWidth: '480px' }}>
+          <div style={{ flex: 1, minWidth: '260px', maxWidth: '520px' }}>
             <BrowserMockup>
-              <DesktopLineupGrid />
+              <FullDesktopLineupEditor />
             </BrowserMockup>
             <div style={{
               textAlign: 'center', fontSize: '12px',
