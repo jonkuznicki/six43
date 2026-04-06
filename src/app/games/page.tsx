@@ -25,6 +25,9 @@ export default async function GamesPage({
 
   const teams = (allTeams ?? []).filter(t => t.is_active !== false)
 
+  // Brand-new user with no teams — send them through the setup wizard
+  if (teams.length === 0) redirect('/setup')
+
   const cookieStore = await cookies()
   const cookieTeamId = cookieStore.get('selected_team_id')?.value ?? null
 
