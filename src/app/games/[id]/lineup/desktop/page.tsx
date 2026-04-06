@@ -177,23 +177,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     // Load most recent previous game's slot positions for last-game context in right panel
     if (gameData?.season_id) {
       // Get all other games in this season, most recent first
-      const { data: otherGames } = await supabase
+      console.log('[lastGame] season_id:', gameData.season_id, 'current game:', params.id)
+      const { data: otherGames, error: otherErr } = await supabase
         .from('games')
-        .select('id, innings_played, game_date')
+        .select('id, innings_played, game_date, status')
         .eq('season_id', gameData.season_id)
         .neq('id', params.id)
         .order('created_at', { ascending: false })
+      console.log('[lastGame] otherGames:', otherGames, 'error:', otherErr)
 
       // Pick the most recently dated game, or fall back to the most recently created
       const dated = (otherGames ?? []).filter(g => g.game_date).sort(
         (a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime()
       )
       const prevGame = dated[0] ?? otherGames?.[0]
+      console.log('[lastGame] prevGame selected:', prevGame)
       if (prevGame) {
-        const { data: prevSlots } = await supabase
+        const { data: prevSlots, error: slotsErr } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, availability')
           .eq('game_id', prevGame.id)
+        console.log('[lastGame] prevSlots:', prevSlots?.length, 'error:', slotsErr)
         if (prevSlots) {
           const prevInn = prevGame.innings_played ?? gameData.season?.innings_per_game ?? 6
           const lgh: Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}> = {}
