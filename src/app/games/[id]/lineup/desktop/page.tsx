@@ -64,8 +64,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [dragOverId, setDragOverId]     = useState<string | null>(null)
   const [history, setHistory]           = useState<any[][]>([])
   const [future, setFuture]             = useState<any[][]>([])
-  const [saving, setSaving]             = useState(false)
-  const [savedMsg, setSavedMsg]         = useState(false)
+  const [statusSaving, setStatusSaving] = useState(false)
   const [copyOpen, setCopyOpen]         = useState(false)
   const [copyGames, setCopyGames]       = useState<any[]>([])
   const [copyGameId, setCopyGameId]     = useState('')
@@ -358,13 +357,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setCopying(false); setCopyOpen(false)
   }
 
-  // ── Save & finalize ───────────────────────────────────────────────────────
+  // ── Game status ───────────────────────────────────────────────────────────
 
-  async function finalize() {
-    setSaving(true)
-    await supabase.from('games').update({ status: 'lineup_ready' }).eq('id', params.id)
-    setSaving(false); setSavedMsg(true)
-    setTimeout(() => setSavedMsg(false), 2500)
+  async function saveStatus(newStatus: string) {
+    setStatusSaving(true)
+    setGame((g: any) => ({ ...g, status: newStatus }))
+    await supabase.from('games').update({ status: newStatus }).eq('id', params.id)
+    setStatusSaving(false)
   }
 
   // ── Clear lineup ─────────────────────────────────────────────────────────
@@ -596,19 +595,30 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             Mobile view
           </a>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
-          <button
-            onClick={finalize}
-            disabled={saving}
-            style={{
-              padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: savedMsg ? '#4a9c5a' : GOLD,
-              color: savedMsg ? '#fff' : NAVY,
-              fontSize: 13, fontWeight: 700, transition: 'background 0.25s',
-              opacity: saving ? 0.7 : 1,
-            }}
-          >
-            {saving ? 'Saving…' : savedMsg ? '✓ Saved' : 'Save & finalize'}
-          </button>
+          {/* Status segmented control */}
+          {([
+            { key: 'scheduled',    label: 'Scheduled',     color: 'rgba(255,255,255,0.55)', activeBg: 'rgba(255,255,255,0.12)', activeBorder: 'rgba(255,255,255,0.3)' },
+            { key: 'lineup_ready', label: 'Lineup Ready',  color: '#80B0E8',                activeBg: 'rgba(59,109,177,0.35)',  activeBorder: '#80B0E8' },
+            { key: 'final',        label: 'Final',         color: '#6DB875',                activeBg: 'rgba(45,106,53,0.35)',   activeBorder: '#6DB875' },
+          ] as const).map(({ key, label, color, activeBg, activeBorder }) => {
+            const isActive = (game?.status ?? 'scheduled') === key
+            return (
+              <button
+                key={key}
+                onClick={() => !isActive && !statusSaving && saveStatus(key)}
+                disabled={statusSaving}
+                style={{
+                  padding: '5px 11px', borderRadius: 5, border: `1px solid ${isActive ? activeBorder : 'rgba(255,255,255,0.1)'}`,
+                  background: isActive ? activeBg : 'transparent',
+                  color: isActive ? color : 'rgba(255,255,255,0.3)',
+                  fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: isActive ? 'default' : 'pointer',
+                  opacity: statusSaving ? 0.6 : 1, transition: 'all 0.15s', flexShrink: 0,
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -625,7 +635,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             ['1', 'Mark absent players', 'Use the ✕ next to any player who isn\'t at the game'],
             ['2', 'Click cells to select', 'Click a cell to select it — nothing changes yet. Shift+click to select a range in the same row.'],
             ['3', 'Fill with a position', 'Click a position button (or press its shortcut key) to fill all selected cells at once'],
-            ['4', 'Save & finalize', 'When all innings are set, click the gold button at the top right'],
+            ['4', 'Set status', 'Click Lineup Ready in the top-right when done, or Final after the game'],
           ].map(([n, label, tip]) => (
             <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={tip}>
               <span style={{
