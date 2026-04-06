@@ -844,6 +844,69 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 ))}
               </>
             )}
+
+            {/* ── Inning summary ── */}
+            {activeSlots.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6 }}>
+                <div style={{ ...secLabel, padding: '0 10px 4px' }}>Inning summary</div>
+                <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
+                  <colgroup>
+                    <col style={{ width: 20 }} />
+                    <col />
+                    <col style={{ width: 20 }} />
+                    <col style={{ width: 20 }} />
+                    <col style={{ width: 22 }} />
+                    <col style={{ width: 22 }} />
+                    <col style={{ width: 22 }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }}>#</th>
+                      <th style={{ ...gHdr, position: 'static', textAlign: 'left', paddingLeft: 6, fontSize: 8 }}>Player</th>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Pitcher innings">P</th>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Catcher innings">C</th>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Infield innings (1B 2B SS 3B)">IF</th>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Outfield innings">OF</th>
+                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Bench innings">B</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeSlots.map((slot, si) => {
+                      const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
+                      const pIn     = pos.filter(p => p === 'P').length
+                      const cIn     = pos.filter(p => p === 'C').length
+                      const ifIn    = pos.filter(p => IF_POS.has(p ?? '')).length
+                      const ofIn    = pos.filter(p => OF_POS.has(p ?? '')).length
+                      const benchIn = pos.filter(p => p === 'Bench').length
+                      const sumCell = (count: number, pc: typeof POS_COLOR[string] | undefined) => (
+                        <td style={{ ...gCell, textAlign: 'center', height: 26, padding: '0 1px' }}>
+                          {count > 0 ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: pc?.color ?? 'var(--fg)' }}>{count}</span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.15)` }}>—</span>
+                          )}
+                        </td>
+                      )
+                      return (
+                        <tr key={slot.id} style={{ background: si % 2 === 0 ? 'transparent' : `rgba(var(--fg-rgb),0.018)` }}>
+                          <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 9, height: 26 }}>{si + 1}</td>
+                          <td style={{ ...gCell, paddingLeft: 6, fontSize: 11, maxWidth: 0, overflow: 'hidden', height: 26 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                              {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                            </span>
+                          </td>
+                          {sumCell(pIn,     POS_COLOR.P)}
+                          {sumCell(cIn,     POS_COLOR.C)}
+                          {sumCell(ifIn,    POS_COLOR['1B'])}
+                          {sumCell(ofIn,    POS_COLOR.LF)}
+                          {sumCell(benchIn, POS_COLOR.Bench)}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Position palette */}
@@ -1067,69 +1130,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             </tbody>
           </table>
 
-          {/* ── Inning summary ── */}
-          <div style={{ borderTop: '1px solid var(--border)', padding: '10px 0 14px' }}>
-            <div style={{ ...secLabel, padding: '0 10px 8px' }}>Inning summary</div>
-            <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
-              <colgroup>
-                <col style={{ width: 28 }} />
-                <col style={{ width: 150 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 50 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={{ ...gHdr, position: 'static' }} />
-                  <th style={{ ...gHdr, position: 'static', textAlign: 'left', paddingLeft: 10 }}>Player</th>
-                  <th style={{ ...gHdr, position: 'static' }} title="Pitcher innings">P</th>
-                  <th style={{ ...gHdr, position: 'static' }} title="Catcher innings">C</th>
-                  <th style={{ ...gHdr, position: 'static' }} title="Infield innings (1B 2B SS 3B)">IF</th>
-                  <th style={{ ...gHdr, position: 'static' }} title="Outfield innings">OF</th>
-                  <th style={{ ...gHdr, position: 'static' }} title="Bench innings">Bench</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeSlots.map((slot, si) => {
-                  const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
-                  const pIn    = pos.filter(p => p === 'P').length
-                  const cIn    = pos.filter(p => p === 'C').length
-                  const ifIn   = pos.filter(p => IF_POS.has(p ?? '')).length
-                  const ofIn   = pos.filter(p => OF_POS.has(p ?? '')).length
-                  const benchIn = pos.filter(p => p === 'Bench').length
-                  const cell = (count: number, pc: typeof POS_COLOR[string] | undefined) => (
-                    <td key={count} style={{ ...gCell, textAlign: 'center' }}>
-                      {count > 0 ? (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: pc?.color ?? 'var(--fg)' }}>{count}</span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.15)` }}>—</span>
-                      )}
-                    </td>
-                  )
-                  return (
-                    <tr key={slot.id} style={{ background: si % 2 === 0 ? 'transparent' : `rgba(var(--fg-rgb),0.018)` }}>
-                      <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>{si + 1}</td>
-                      <td style={{ ...gCell, paddingLeft: 10, fontSize: 12, maxWidth: 0, overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                          <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 4, flexShrink: 0 }}>#{slot.player?.jersey_number}</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-                            {slot.player?.first_name?.[0]}. {slot.player?.last_name}
-                          </span>
-                        </div>
-                      </td>
-                      {cell(pIn,    POS_COLOR.P)}
-                      {cell(cIn,    POS_COLOR.C)}
-                      {cell(ifIn,   POS_COLOR['1B'])}
-                      {cell(ofIn,   POS_COLOR.LF)}
-                      {cell(benchIn, POS_COLOR.Bench)}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         {/* ── RIGHT: Context ── */}
@@ -1196,32 +1196,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               {posSummary['_empty'].map(n => (
                 <div key={n} style={{ fontSize: 11, color: '#E8A020' }}>{n}</div>
               ))}
-            </div>
-          )}
-
-          {/* Bench context */}
-          {activeSlots.length > 0 && (
-            <div style={{ marginTop: 10, padding: '7px 9px', borderRadius: 5,
-              background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
-              {benchPerInning > 0 ? (
-                <>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.6)`, marginBottom: 2 }}>
-                    {benchPerInning} on bench each inning
-                  </div>
-                  <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>
-                    ~{expectedBenchInnings.toFixed(1)} bench innings per player over {inningCount} innings
-                  </div>
-                  {absentSlots.length > 0 && (
-                    <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, marginTop: 3 }}>
-                      ({absentSlots.length} absent, {activeSlots.length} active)
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.45)` }}>
-                  All {activeSlots.length} players field every inning
-                </div>
-              )}
             </div>
           )}
 
@@ -1342,6 +1316,32 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               }}
             />
           </div>
+
+          {/* Bench context */}
+          {activeSlots.length > 0 && (
+            <div style={{ marginTop: 10, padding: '7px 9px', borderRadius: 5,
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+              {benchPerInning > 0 ? (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.6)`, marginBottom: 2 }}>
+                    {benchPerInning} on bench each inning
+                  </div>
+                  <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.38)` }}>
+                    ~{expectedBenchInnings.toFixed(1)} bench innings per player over {inningCount} innings
+                  </div>
+                  {absentSlots.length > 0 && (
+                    <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, marginTop: 3 }}>
+                      ({absentSlots.length} absent, {activeSlots.length} active)
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.45)` }}>
+                  All {activeSlots.length} players field every inning
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Keyboard shortcuts — collapsible */}
           <div style={{ marginTop: 12 }}>
