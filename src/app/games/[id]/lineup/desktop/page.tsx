@@ -104,7 +104,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   async function loadData() {
     const { data: gameData } = await supabase
       .from('games')
-      .select('*, season:seasons(team:teams(name, positions))')
+      .select('*, season:seasons(innings_per_game, team:teams(name, positions))')
       .eq('id', params.id).single()
     setGame(gameData)
     const rawNotes = (gameData as any)?.notes ?? null
@@ -181,16 +181,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .select('id, innings_played')
         .eq('season_id', gameData.season_id)
         .neq('id', params.id)
+        .not('game_date', 'is', null)       // skip undated games
         .order('game_date', { ascending: false })
         .limit(1)
-      const prevGame = prevGames?.[0]
+
+      // Fallback: if no dated games, grab any other game by creation order
+      const { data: fallbackGames } = !prevGames?.length ? await supabase
+        .from('games')
+        .select('id, innings_played')
+        .eq('season_id', gameData.season_id)
+        .neq('id', params.id)
+        .order('created_at', { ascending: false })
+        .limit(1) : { data: null }
+
+      const prevGame = prevGames?.[0] ?? fallbackGames?.[0]
       if (prevGame) {
         const { data: prevSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, availability')
           .eq('game_id', prevGame.id)
         if (prevSlots) {
-          const prevInn = prevGame.innings_played ?? 6
+          const prevInn = prevGame.innings_played ?? gameData.season?.innings_per_game ?? 6
           const lgh: Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}> = {}
           for (const s of prevSlots) {
             if (s.availability === 'absent') continue
@@ -1281,8 +1292,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             if (!focusedSlot) return null
             const lg = lastGameHistory[focusedSlot.player_id]
             if (!lg) return null
-            const total = lg.P + lg.C + lg.IF + lg.OF + lg.Bench
-            if (total === 0) return null
             return (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6,
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
