@@ -1291,7 +1291,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             const focusedSlot = activeSlots[focused.si]
             if (!focusedSlot) return null
             const lg = lastGameHistory[focusedSlot.player_id]
-            if (!lg) return null
+            const histKeys = Object.keys(lastGameHistory)
             return (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6,
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
@@ -1299,12 +1299,18 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase', marginBottom: 6 }}>
                   Last game
                 </div>
-                {([
-                  ['Pitcher',   lg.P,     POS_COLOR.P],
-                  ['Catcher',   lg.C,     POS_COLOR.C],
-                  ['Infield',   lg.IF,    POS_COLOR['1B']],
-                  ['Outfield',  lg.OF,    POS_COLOR.LF],
-                  ['Bench',     lg.Bench, POS_COLOR.Bench],
+                {!lg ? (
+                  <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, fontStyle: 'italic' }}>
+                    {histKeys.length === 0
+                      ? 'No previous game found'
+                      : 'Not in previous game'}
+                  </div>
+                ) : ([
+                  ['Pitcher',  lg.P,     POS_COLOR.P],
+                  ['Catcher',  lg.C,     POS_COLOR.C],
+                  ['Infield',  lg.IF,    POS_COLOR['1B']],
+                  ['Outfield', lg.OF,    POS_COLOR.LF],
+                  ['Bench',    lg.Bench, POS_COLOR.Bench],
                 ] as [string, number, typeof POS_COLOR[string] | undefined][]).map(([label, count, pc]) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', marginBottom: 3 }}>
