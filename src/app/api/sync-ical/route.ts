@@ -19,7 +19,7 @@ function convertUtcToTimezone(v: string, timezone: string): { game_date: string;
   return { game_date, game_time: `${h}:${tt.minute}` }
 }
 
-function parseIcal(text: string, timezone?: string): Array<{ opponent: string; game_date: string; game_time: string | null }> {
+function parseIcal(text: string, timezone?: string): Array<{ opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away' }> {
   const normalized = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
@@ -45,11 +45,19 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
       const lsum = summary.toLowerCase()
       if (SKIP_KEYWORDS.some(kw => lsum.includes(kw))) continue
       let opponent: string
-      if (/^(vs\.?\s*|@\s*)/i.test(summary)) {
-        opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      let location: 'Home' | 'Away' = 'Home'
+      if (/^vs\.?\s*/i.test(summary)) {
+        location = 'Home'
+        opponent = summary.replace(/^vs\.?\s*/i, '').trim()
+      } else if (/^@\s*/i.test(summary)) {
+        location = 'Away'
+        opponent = summary.replace(/^@\s*/i, '').trim()
       } else {
-        const mid = summary.match(/\s+(?:vs\.?|@)\s+(.+)$/i)
-        opponent = mid ? mid[1].trim() : summary.trim()
+        const midVs = summary.match(/\s+vs\.?\s+(.+)$/i)
+        const midAt = summary.match(/\s+@\s+(.+)$/i)
+        if (midVs) { location = 'Home'; opponent = midVs[1].trim() }
+        else if (midAt) { location = 'Away'; opponent = midAt[1].trim() }
+        else { opponent = summary.trim() }
       }
       if (!opponent) continue
       const isUtc = dtstartRaw.endsWith('Z')
@@ -65,7 +73,7 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
           game_time = `${v.slice(9,11)}:${v.slice(11,13)}`
         }
       }
-      games.push({ opponent, game_date, game_time })
+      games.push({ opponent, game_date, game_time, location })
       continue
     }
     if (!inEvent) continue
@@ -81,7 +89,7 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
 }
 
 export type SyncChange =
-  | { type: 'new';     opponent: string; game_date: string; game_time: string | null }
+  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away' }
   | { type: 'changed'; game_id: string; opponent: string; old_date: string; old_time: string | null; new_date: string; new_time: string | null }
   | { type: 'removed'; game_id: string; opponent: string; game_date: string }
   | { type: 'skipped'; game_id: string; opponent: string; game_date: string; reason: string }
@@ -141,7 +149,7 @@ export async function GET(request: Request) {
     )
 
     if (!dbMatch) {
-      changes.push({ type: 'new', ...icalGame })
+      changes.push({ type: 'new', opponent: icalGame.opponent, game_date: icalGame.game_date, game_time: icalGame.game_time, location: icalGame.location })
     } else {
       matchedDbIds.add(dbMatch.id)
       const dateChanged = dbMatch.game_date !== icalGame.game_date

@@ -27,7 +27,7 @@ function convertUtcToTimezone(v: string, timezone: string): { game_date: string;
 }
 
 // Simple iCal parser — handles GameChanger's format without external deps
-function parseIcal(text: string, timezone?: string): Array<{ opponent: string; game_date: string; game_time: string | null }> {
+function parseIcal(text: string, timezone?: string): Array<{ opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away' }> {
   // Normalize line endings and unfold continuation lines
   const normalized = text
     .replace(/\r\n/g, '\n')
@@ -61,15 +61,24 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
       const lsum = summary.toLowerCase()
       if (SKIP_KEYWORDS.some(kw => lsum.includes(kw))) continue
 
-      // Extract opponent:
-      //   "vs Tigers" / "@ Tigers"  → "Tigers"
-      //   "Our Team vs Tigers" / "Our Team @ Tigers"  → "Tigers"
+      // Extract opponent and home/away:
+      //   "vs Tigers" → opponent "Tigers", Home
+      //   "@ Tigers"  → opponent "Tigers", Away
+      //   "Our Team vs Tigers" / "Our Team @ Tigers" → same logic
       let opponent: string
-      if (/^(vs\.?\s*|@\s*)/i.test(summary)) {
-        opponent = summary.replace(/^(vs\.?\s*|@\s*)/i, '').trim()
+      let location: 'Home' | 'Away' = 'Home'
+      if (/^vs\.?\s*/i.test(summary)) {
+        location = 'Home'
+        opponent = summary.replace(/^vs\.?\s*/i, '').trim()
+      } else if (/^@\s*/i.test(summary)) {
+        location = 'Away'
+        opponent = summary.replace(/^@\s*/i, '').trim()
       } else {
-        const mid = summary.match(/\s+(?:vs\.?|@)\s+(.+)$/i)
-        opponent = mid ? mid[1].trim() : summary.trim()
+        const midVs = summary.match(/\s+vs\.?\s+(.+)$/i)
+        const midAt = summary.match(/\s+@\s+(.+)$/i)
+        if (midVs) { location = 'Home'; opponent = midVs[1].trim() }
+        else if (midAt) { location = 'Away'; opponent = midAt[1].trim() }
+        else { opponent = summary.trim() }
       }
       if (!opponent) continue
 
@@ -91,7 +100,7 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
         }
       }
 
-      games.push({ opponent, game_date, game_time })
+      games.push({ opponent, game_date, game_time, location })
       continue
     }
 

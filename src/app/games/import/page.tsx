@@ -12,6 +12,7 @@ type ParsedGame = {
   opponent: string
   game_date: string
   game_time: string | null
+  location: 'Home' | 'Away'
   selected: boolean
 }
 
@@ -24,7 +25,7 @@ type AddedGame = {
 }
 
 type SyncChange =
-  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; selected: boolean }
+  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away'; selected: boolean }
   | { type: 'changed'; game_id: string; opponent: string; old_date: string; old_time: string | null; new_date: string; new_time: string | null; selected: boolean }
   | { type: 'removed'; game_id: string; opponent: string; game_date: string; selected: boolean }
   | { type: 'skipped'; game_id: string; opponent: string; game_date: string; reason: string }
@@ -113,7 +114,6 @@ function ImportPageInner() {
   })
   const [gcPreviewing, setGcPrev]   = useState(false)
   const [gcGames, setGcGames]       = useState<ParsedGame[]>([])
-  const [gcLocation, setGcLoc]      = useState<Location>('Home')
   const [gcImporting, setGcImp]     = useState(false)
   const [gcError, setGcError]       = useState('')
   const [gcDone, setGcDone]         = useState(false)
@@ -223,10 +223,11 @@ function ImportPageInner() {
 
     const { data: existing } = await supabase
       .from('games')
-      .select('game_date')
+      .select('game_date, opponent')
       .eq('season_id', season.id)
 
-    const existingDates = new Set((existing ?? []).map((g: any) => g.game_date))
+    // Dedup by opponent+date so a manually-entered game on the same date doesn't block a GC game
+    const existingKeys = new Set((existing ?? []).map((g: any) => `${g.game_date}|${g.opponent.toLowerCase().trim()}`))
 
     // Try to get max game_number — may not exist if migration hasn't run
     let num = 1
@@ -242,7 +243,7 @@ function ImportPageInner() {
     } catch { /* column may not exist yet */ }
 
     const newGames = selected
-      .filter(g => !existingDates.has(g.game_date))
+      .filter(g => !existingKeys.has(`${g.game_date}|${g.opponent.toLowerCase().trim()}`))
       .sort((a, b) => a.game_date.localeCompare(b.game_date))
 
     // Try insert with game_number; fall back without if column missing
@@ -251,7 +252,7 @@ function ImportPageInner() {
       opponent:    g.opponent,
       game_date:   g.game_date,
       game_time:   g.game_time,
-      location:    gcLocation,
+      location:    g.location,
       status:      'scheduled',
       game_number: num++,
     }))
@@ -266,7 +267,7 @@ function ImportPageInner() {
           opponent:  g.opponent,
           game_date: g.game_date,
           game_time: g.game_time,
-          location:  gcLocation,
+          location:  g.location,
           status:    'scheduled',
         }))
         const res2 = await supabase.from('games').insert(rowsNoNum)
@@ -338,7 +339,8 @@ function ImportPageInner() {
     }
 
     const { changes } = await res.json()
-    setSyncChanges((changes as SyncChange[]).map(c => ({ ...c, selected: c.type !== 'skipped' } as SyncChange)))
+    // 'new' and 'changed' default selected; 'removed' defaults unchecked so manual games aren't deleted by accident
+    setSyncChanges((changes as SyncChange[]).map(c => ({ ...c, selected: c.type === 'new' || c.type === 'changed' } as SyncChange)))
     setSyncDone(true)
     setSyncing(false)
   }
@@ -366,7 +368,7 @@ function ImportPageInner() {
           opponent:    change.opponent,
           game_date:   change.game_date,
           game_time:   change.game_time,
-          location:    'Home',
+          location:    change.location,
           status:      'scheduled',
           game_number: num++,
         })
@@ -387,6 +389,12 @@ function ImportPageInner() {
 
   function toggleGcGame(i: number) {
     setGcGames(prev => prev.map((g, idx) => idx === i ? { ...g, selected: !g.selected } : g))
+  }
+
+  function toggleGcGameLocation(i: number) {
+    setGcGames(prev => prev.map((g, idx) =>
+      idx === i ? { ...g, location: g.location === 'Home' ? 'Away' : 'Home' } : g
+    ))
   }
 
   function toggleSyncChange(i: number) {
@@ -553,15 +561,15 @@ function ImportPageInner() {
                   <div style={{ background: s.card, border: s.border, borderRadius: '10px',
                     overflow: 'hidden', marginBottom: '1rem' }}>
                     {gcGames.map((g, i) => (
-                      <label key={i} style={{
+                      <div key={i} style={{
                         display: 'flex', gap: '12px', alignItems: 'center',
-                        padding: '12px 14px', cursor: 'pointer',
+                        padding: '12px 14px',
                         borderBottom: i < gcGames.length - 1 ? s.border : 'none',
                         background: g.selected ? 'transparent' : 'rgba(var(--fg-rgb),0.04)',
                       }}>
                         <input type="checkbox" checked={g.selected}
                           onChange={() => toggleGcGame(i)}
-                          style={{ accentColor: s.accent, width: '16px', height: '16px', flexShrink: 0 }} />
+                          style={{ accentColor: s.accent, width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '14px', fontWeight: 600, color: g.selected ? s.fg : s.muted }}>
                             {g.opponent}
@@ -570,16 +578,26 @@ function ImportPageInner() {
                             {fmt(g.game_date)}{g.game_time ? ` · ${fmtTime(g.game_time)}` : ''}
                           </div>
                         </div>
-                      </label>
+                        <button
+                          onClick={() => toggleGcGameLocation(i)}
+                          title="Click to toggle Home / Away"
+                          style={{
+                            flexShrink: 0, padding: '3px 9px', borderRadius: '20px',
+                            border: `0.5px solid ${g.location === 'Home' ? 'rgba(109,184,117,0.4)' : 'rgba(232,160,32,0.4)'}`,
+                            background: g.location === 'Home' ? 'rgba(109,184,117,0.1)' : 'rgba(232,160,32,0.1)',
+                            color: g.location === 'Home' ? '#6DB875' : s.accent,
+                            fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+                            opacity: g.selected ? 1 : 0.4,
+                          }}
+                        >
+                          {g.location === 'Home' ? 'Home' : 'Away'}
+                        </button>
+                      </div>
                     ))}
                   </div>
 
-                  {/* Location for all */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '11px', color: s.muted, marginBottom: '6px' }}>
-                      Location (applies to all games)
-                    </div>
-                    <LocationPicker value={gcLocation} onChange={setGcLoc} />
+                  <div style={{ fontSize: '11px', color: s.muted, marginBottom: '1rem' }}>
+                    Home/Away detected from your schedule. Click a badge to flip it.
                   </div>
 
                   <button onClick={handleImport} disabled={gcImporting || selectedGcCount === 0} style={{
@@ -816,8 +834,16 @@ function ImportPageInner() {
                               }}>{chip.label}</span>
                             </div>
                             {c.type === 'new' && (
-                              <div style={{ fontSize: '11px', color: s.muted }}>
-                                {fmt(c.game_date)}{c.game_time ? ` · ${fmtTime(c.game_time)}` : ''}
+                              <div style={{ fontSize: '11px', color: s.muted, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>{fmt(c.game_date)}{c.game_time ? ` · ${fmtTime(c.game_time)}` : ''}</span>
+                                <span style={{
+                                  padding: '1px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700,
+                                  border: `0.5px solid ${c.location === 'Home' ? 'rgba(109,184,117,0.4)' : 'rgba(232,160,32,0.4)'}`,
+                                  background: c.location === 'Home' ? 'rgba(109,184,117,0.1)' : 'rgba(232,160,32,0.1)',
+                                  color: c.location === 'Home' ? '#6DB875' : s.accent,
+                                }}>
+                                  {c.location}
+                                </span>
                               </div>
                             )}
                             {c.type === 'changed' && (
@@ -833,7 +859,7 @@ function ImportPageInner() {
                             )}
                             {c.type === 'removed' && (
                               <div style={{ fontSize: '11px', color: s.muted }}>
-                                {fmt(c.game_date)} — will be deleted
+                                {fmt(c.game_date)} — not in GameChanger{isSelected ? ' · will be deleted' : ' · kept (unchecked)'}
                               </div>
                             )}
                             {c.type === 'skipped' && (
