@@ -222,26 +222,21 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             game_time: game.game_time ?? null,
           }} />
           {hasLineup && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <div style={{ flex: 1 }}>
-                <PrintButton />
+            <Link
+              href={`/games/${game.id}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              <div style={{
+                fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.55)`, cursor: 'pointer',
+                textAlign: 'center',
+              }}>
+                🖨 Print lineup + exchange card
               </div>
-              <Link
-                href={`/games/${game.id}/exchange-card`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: 'none', flex: 1 }}
-              >
-                <div style={{
-                  fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
-                  border: '0.5px solid var(--border-strong)', background: 'transparent',
-                  color: `rgba(var(--fg-rgb), 0.55)`, cursor: 'pointer',
-                  textAlign: 'center',
-                }}>
-                  🤝 Exchange card
-                </div>
-              </Link>
-            </div>
+            </Link>
           )}
           <ShareButton gameId={game.id} initialToken={(game as any).share_token ?? null} />
         </div>

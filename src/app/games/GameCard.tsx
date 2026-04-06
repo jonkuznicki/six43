@@ -219,36 +219,20 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
             )}
 
             {status === 'lineup_ready' && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <Link
-                  href={`/games/${game.id}/print`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: 'none', flex: 1 }}
-                >
-                  <div style={{
-                    padding: '12px 14px', borderRadius: '8px',
-                    border: '0.5px solid var(--border-md)', background: 'transparent',
-                    fontSize: '14px', color: 'var(--fg)', textAlign: 'center',
-                  }}>
-                    🖨 Print lineup
-                  </div>
-                </Link>
-                <Link
-                  href={`/games/${game.id}/exchange-card`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: 'none', flex: 1 }}
-                >
-                  <div style={{
-                    padding: '12px 14px', borderRadius: '8px',
-                    border: '0.5px solid var(--border-md)', background: 'transparent',
-                    fontSize: '14px', color: 'var(--fg)', textAlign: 'center',
-                  }}>
-                    🤝 Exchange card
-                  </div>
-                </Link>
-              </div>
+              <Link
+                href={`/games/${game.id}/print`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}
+              >
+                <div style={{
+                  padding: '12px 14px', borderRadius: '8px',
+                  border: '0.5px solid var(--border-md)', background: 'transparent',
+                  fontSize: '14px', color: 'var(--fg)',
+                }}>
+                  🖨 Print lineup + exchange card →
+                </div>
+              </Link>
             )}
 
             {!confirmDelete ? (
