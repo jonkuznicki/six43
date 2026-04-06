@@ -85,6 +85,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const slotsRef = useRef(slots)
   useEffect(() => { slotsRef.current = slots }, [slots])
   const selectedCellsRef = useRef(selectedCells)
+  // Anchor for shift-selection: the cell where selection started (stays fixed while shift-arrowing)
+  const anchorRef = useRef<{ si: number; ii: number } | null>(null)
   useEffect(() => { selectedCellsRef.current = selectedCells }, [selectedCells])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -417,10 +419,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       const { si, ii } = focused
       const rowCount = slotsRef.current.filter(s => s.availability !== 'absent').length
 
-      // Helper to move focus and reset selection to single cell
+      // Helper to move focus, reset selection to single cell, and update anchor
       function moveFocus(newSi: number, newIi: number) {
         setFocused({ si: newSi, ii: newIi })
         setSelectedCells(new Set([`${newSi}-${newIi}`]))
+        anchorRef.current = { si: newSi, ii: newIi }
       }
 
       switch (e.key) {
@@ -428,12 +431,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           e.preventDefault()
           const newIi = Math.min(ii + 1, inningCount - 1)
           if (e.shiftKey && e.key !== 'Tab') {
-            // Extend selection rightward within the same row
-            setSelectedCells(prev => {
-              const next = new Set(prev)
-              next.add(`${si}-${newIi}`)
-              return next
-            })
+            // Move cursor forward; compute full range from anchor to new cursor
+            const anchor = anchorRef.current ?? { si, ii }
+            setFocused({ si, ii: newIi })
+            if (anchor.si === si) {
+              const lo = Math.min(anchor.ii, newIi)
+              const hi = Math.max(anchor.ii, newIi)
+              const next = new Set<string>()
+              for (let i = lo; i <= hi; i++) next.add(`${si}-${i}`)
+              setSelectedCells(next)
+            }
           } else {
             moveFocus(si, newIi)
           }
@@ -443,11 +450,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           e.preventDefault()
           const newIi = Math.max(ii - 1, 0)
           if (e.shiftKey) {
-            setSelectedCells(prev => {
-              const next = new Set(prev)
-              next.add(`${si}-${newIi}`)
-              return next
-            })
+            // Move cursor back; compute full range from anchor to new cursor
+            const anchor = anchorRef.current ?? { si, ii }
+            setFocused({ si, ii: newIi })
+            if (anchor.si === si) {
+              const lo = Math.min(anchor.ii, newIi)
+              const hi = Math.max(anchor.ii, newIi)
+              const next = new Set<string>()
+              for (let i = lo; i <= hi; i++) next.add(`${si}-${i}`)
+              setSelectedCells(next)
+            }
           } else {
             moveFocus(si, newIi)
           }
@@ -916,12 +928,14 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                           key={ii}
                           onClick={(e) => {
                             if (e.shiftKey && focused !== null && focused.si === si) {
-                              // Range-select within the same row
-                              const lo = Math.min(focused.ii, ii)
-                              const hi = Math.max(focused.ii, ii)
+                              // Range-select from anchor to clicked cell
+                              const anchor = anchorRef.current ?? focused
+                              const lo = Math.min(anchor.ii, ii)
+                              const hi = Math.max(anchor.ii, ii)
                               const next = new Set<string>()
                               for (let i = lo; i <= hi; i++) next.add(`${si}-${i}`)
                               setSelectedCells(next)
+                              setFocused({ si, ii })
                             } else if (e.metaKey || e.ctrlKey) {
                               // Toggle individual cell
                               setSelectedCells(prev => {
@@ -931,10 +945,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                                 return next
                               })
                               setFocused({ si, ii })
+                              anchorRef.current = { si, ii }
                             } else {
-                              // Single select — no position change
+                              // Single select — sets anchor for future shift-selections
                               setSelectedCells(new Set([cellKey]))
                               setFocused({ si, ii })
+                              anchorRef.current = { si, ii }
                             }
                           }}
                           title={pos ? pos : 'Click to select · shift+click to extend · ⌘+click to toggle'}
