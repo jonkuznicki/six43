@@ -307,8 +307,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             const pCount = (slot.inning_positions ?? []).slice(0, gameInn)
               .filter((p: string|null) => p === 'P').length
             if (pCount > 0) {
+              const referenceDate = currentDate2
+                ? new Date(currentDate2 + 'T12:00:00').getTime()
+                : Date.now()
               const daysSince = Math.floor(
-                (Date.now() - new Date(game.game_date + 'T12:00:00').getTime()) / 86400000
+                (referenceDate - new Date(game.game_date + 'T12:00:00').getTime()) / 86400000
               )
               ph[slot.player_id] = { lastDate: game.game_date, lastInnings: pCount, daysSince }
             }
@@ -1291,17 +1294,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             </div>
           )}
 
-          {(posSummary['_empty']?.length ?? 0) > 0 && (
-            <div style={{ marginTop: 6, padding: '5px 7px', borderRadius: 5,
-              background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.25)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#E8A020', marginBottom: 3, letterSpacing: '0.06em' }}>
-                UNASSIGNED
-              </div>
-              {posSummary['_empty'].map(n => (
-                <div key={n} style={{ fontSize: 11, color: '#E8A020' }}>{n}</div>
-              ))}
-            </div>
-          )}
 
           {/* Player position history — shown when a cell is focused */}
           {focused && (() => {
