@@ -191,25 +191,67 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
     setSlots(slotData ?? [])
 
-    // Load season-to-date position history for all players
+    // Load position history for all players from ALL previous games (any status)
     if (gameData?.season_id) {
+      const currentDate = (gameData as any)?.game_date ?? null
+      const defaultInn  = (gameData as any)?.season?.innings_per_game ?? 6
+
+      // Base: final game stats from pre-aggregated view
       const { data: statsData } = await supabase
         .from('season_position_stats')
         .select('player_id, innings_p, innings_c, innings_1b, innings_2b, innings_ss, innings_3b, innings_lf, innings_cf, innings_rf, innings_bench')
         .eq('season_id', gameData.season_id)
-      if (statsData?.length) {
-        const ph: Record<string, Record<string, number>> = {}
-        for (const row of statsData) {
-          ph[row.player_id] = {
-            P: row.innings_p ?? 0, C: row.innings_c ?? 0,
-            '1B': row.innings_1b ?? 0, '2B': row.innings_2b ?? 0,
-            SS: row.innings_ss ?? 0, '3B': row.innings_3b ?? 0,
-            LF: row.innings_lf ?? 0, CF: row.innings_cf ?? 0,
-            RF: row.innings_rf ?? 0, Bench: row.innings_bench ?? 0,
-          }
+
+      const ph: Record<string, Record<string, number>> = {}
+      for (const row of statsData ?? []) {
+        ph[row.player_id] = {
+          P: row.innings_p ?? 0, C: row.innings_c ?? 0,
+          '1B': row.innings_1b ?? 0, '2B': row.innings_2b ?? 0,
+          SS: row.innings_ss ?? 0, '3B': row.innings_3b ?? 0,
+          LF: row.innings_lf ?? 0, CF: row.innings_cf ?? 0,
+          RF: row.innings_rf ?? 0, Bench: row.innings_bench ?? 0,
         }
-        setPlayerPositionHistory(ph)
       }
+
+      // Supplement: non-final games before the current game date (not double-counted with the view)
+      let nonFinalQuery = supabase
+        .from('games')
+        .select('id, innings_played, game_date')
+        .eq('season_id', (gameData as any).season_id)
+        .neq('id', params.id)
+        .neq('status', 'final')
+      if (currentDate) nonFinalQuery = (nonFinalQuery as any).lt('game_date', currentDate)
+
+      const { data: nonFinalGames } = await nonFinalQuery
+      if (nonFinalGames?.length) {
+        const { data: nonFinalSlots } = await supabase
+          .from('lineup_slots')
+          .select('player_id, inning_positions, availability, game_id')
+          .in('game_id', nonFinalGames.map((g: any) => g.id))
+
+        for (const slot of nonFinalSlots ?? []) {
+          if (slot.availability === 'absent') continue
+          const game = nonFinalGames.find((g: any) => g.id === slot.game_id)
+          const maxInn = game?.innings_played ?? defaultInn
+          const pos = (slot.inning_positions ?? []).slice(0, maxInn) as (string|null)[]
+          if (!ph[slot.player_id]) {
+            ph[slot.player_id] = { P:0, C:0, '1B':0, '2B':0, SS:0, '3B':0, LF:0, CF:0, RF:0, Bench:0 }
+          }
+          const r = ph[slot.player_id]
+          r.P     += pos.filter(p => p === 'P').length
+          r.C     += pos.filter(p => p === 'C').length
+          r['1B'] += pos.filter(p => p === '1B').length
+          r['2B'] += pos.filter(p => p === '2B').length
+          r.SS    += pos.filter(p => p === 'SS').length
+          r['3B'] += pos.filter(p => p === '3B').length
+          r.LF    += pos.filter(p => p === 'LF').length
+          r.CF    += pos.filter(p => p === 'CF').length
+          r.RF    += pos.filter(p => p === 'RF').length
+          r.Bench += pos.filter(p => p === 'Bench').length
+        }
+      }
+
+      if (Object.keys(ph).length) setPlayerPositionHistory(ph)
     }
 
     // Load most recent previous game's slot positions for last-game context in right panel
@@ -1294,7 +1336,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
                 <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
                   color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase', marginBottom: 7 }}>
-                  {focusedSlot.player?.first_name?.[0]}. {focusedSlot.player?.last_name} · this season
+                  {focusedSlot.player?.first_name?.[0]}. {focusedSlot.player?.last_name} · prior games
                 </div>
                 {!hasHistory ? (
                   <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, fontStyle: 'italic' }}>
