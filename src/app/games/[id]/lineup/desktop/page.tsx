@@ -849,98 +849,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       {/* ─── THREE PANELS ─── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* ── LEFT: Roster + Palette ── */}
+        {/* ── LEFT: Inning Summary + Palette ── */}
         <div style={{
-          width: 214, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          width: 175, flexShrink: 0, display: 'flex', flexDirection: 'column',
           borderRight: '1px solid var(--border)', overflow: 'hidden',
         }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
 
-            {/* Active players */}
-            <div style={{ ...secLabel, display: 'flex', justifyContent: 'space-between', paddingRight: 10 }}>
-              <span>Batting order · {activeSlots.length}</span>
-              <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.22)`, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                drag to reorder
-              </span>
-            </div>
-            {activeSlots.map((slot, si) => (
-              <div
-                key={slot.id}
-                draggable
-                onDragStart={() => setDragId(slot.id)}
-                onDragOver={e => { e.preventDefault(); setDragOverId(slot.id) }}
-                onDragLeave={() => setDragOverId(null)}
-                onDrop={() => handleDrop(slot.id)}
-                onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 8px', cursor: 'grab',
-                  borderTop: dragOverId === slot.id ? `2px solid rgba(59,109,177,0.6)` : '2px solid transparent',
-                  background: dragOverId === slot.id ? 'rgba(59,109,177,0.07)' : 'transparent',
-                  opacity: dragId === slot.id ? 0.35 : 1,
-                  transition: 'background 0.08s',
-                }}
-              >
-                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.22)`, width: 14, textAlign: 'right', flexShrink: 0 }}>
-                  {si + 1}
-                </span>
-                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                  <button onClick={() => nudgeBattingOrder(slot.id, 'up')} style={nudge}>▴</button>
-                  <button onClick={() => nudgeBattingOrder(slot.id, 'down')} style={nudge}>▾</button>
-                </div>
-                <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, width: 22, textAlign: 'right', flexShrink: 0 }}>
-                  #{slot.player?.jersey_number}
-                </span>
-                <span style={{ flex: 1, fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {slot.player?.first_name?.[0]}. {slot.player?.last_name}
-                </span>
-                <button
-                  onClick={() => toggleAbsent(slot.id)}
-                  title="Mark absent"
-                  style={{
-                    flexShrink: 0, width: 15, height: 15, borderRadius: 3,
-                    border: '1px solid var(--border-md)', background: 'transparent',
-                    cursor: 'pointer', fontSize: 8, padding: 0,
-                    color: `rgba(var(--fg-rgb),0.28)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >✕</button>
-              </div>
-            ))}
-
-            {/* Absent players */}
-            {absentSlots.length > 0 && (
-              <>
-                <div style={{ ...secLabel, paddingTop: 12 }}>Absent · {absentSlots.length}</div>
-                {absentSlots.map(slot => (
-                  <div key={slot.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '4px 8px 4px 36px', opacity: 0.38,
-                  }}>
-                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, width: 22, textAlign: 'right', flexShrink: 0 }}>
-                      #{slot.player?.jersey_number}
-                    </span>
-                    <span style={{ flex: 1, fontSize: 12, textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {slot.player?.first_name?.[0]}. {slot.player?.last_name}
-                    </span>
-                    <button
-                      onClick={() => toggleAbsent(slot.id)}
-                      title="Mark present"
-                      style={{
-                        flexShrink: 0, width: 15, height: 15, borderRadius: 3,
-                        border: '1px solid rgba(109,184,117,0.45)', background: 'rgba(109,184,117,0.1)',
-                        cursor: 'pointer', fontSize: 8, padding: 0, color: '#6DB875',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >↩</button>
-                  </div>
-                ))}
-              </>
-            )}
-
             {/* ── Inning summary ── */}
             {activeSlots.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6 }}>
+              <div style={{ paddingTop: 2 }}>
                 <div style={{ ...secLabel, padding: '0 10px 4px' }}>Inning summary</div>
                 <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
                   <colgroup>
@@ -1045,15 +963,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '100%' }}>
             <colgroup>
-              <col style={{ width: 28 }} />
-              <col style={{ width: 150 }} />
+              <col style={{ width: 24 }} />
+              <col style={{ width: 190 }} />
               {innings.map(i => <col key={i} style={{ width: 54 }} />)}
               <col style={{ width: 62 }} />
             </colgroup>
             <thead>
               <tr>
                 <th style={gHdr}>#</th>
-                <th style={{ ...gHdr, textAlign: 'left', paddingLeft: 10 }}>Player</th>
+                <th style={{ ...gHdr, textAlign: 'left', paddingLeft: 8 }}>Player <span style={{ fontSize: 7, opacity: 0.4, fontWeight: 400 }}>drag to reorder</span></th>
                 {innings.map(ii => {
                   // Per-inning validation indicators
                   const counts: Record<string, number> = {}
@@ -1110,27 +1028,55 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 return (
                   <tr
                     key={slot.id}
+                    draggable
+                    onDragStart={() => setDragId(slot.id)}
+                    onDragOver={e => { e.preventDefault(); setDragOverId(slot.id) }}
+                    onDragLeave={() => setDragOverId(null)}
+                    onDrop={() => handleDrop(slot.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
                     style={{
-                      background: si % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.018)',
+                      background: dragOverId === slot.id
+                        ? 'rgba(59,109,177,0.07)'
+                        : si % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.018)',
+                      opacity: dragId === slot.id ? 0.35 : 1,
+                      borderTop: dragOverId === slot.id ? '2px solid rgba(59,109,177,0.6)' : '2px solid transparent',
+                      transition: 'background 0.08s',
                     }}
                   >
-                    <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>
+                    <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10, cursor: 'grab' }}>
                       {si + 1}
                     </td>
                     <td style={{
-                      ...gCell, paddingLeft: 10, fontWeight: 600, fontSize: 13,
+                      ...gCell, paddingLeft: 5, fontWeight: 600, fontSize: 12,
                       position: 'sticky', left: 0, zIndex: 1,
                       background: 'var(--bg)',
                       borderRight: '1px solid var(--border)',
                       maxWidth: 0, overflow: 'hidden',
+                      cursor: 'grab',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                        <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 5, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
+                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
+                        </div>
+                        <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
                           #{slot.player?.jersey_number}
                         </span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                           {slot.player?.first_name?.[0]}. {slot.player?.last_name}
                         </span>
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
+                          title="Mark absent"
+                          style={{
+                            flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                            border: '1px solid var(--border-md)', background: 'transparent',
+                            cursor: 'pointer', fontSize: 8, padding: 0,
+                            color: `rgba(var(--fg-rgb),0.28)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginRight: 3,
+                          }}
+                        >✕</button>
                       </div>
                     </td>
 
@@ -1226,6 +1172,40 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   </tr>
                 )
               })}
+              {/* Absent rows */}
+              {absentSlots.map(slot => (
+                <tr key={slot.id} style={{ opacity: 0.35 }}>
+                  <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>—</td>
+                  <td style={{
+                    ...gCell, paddingLeft: 5, fontSize: 12,
+                    position: 'sticky', left: 0, zIndex: 1,
+                    background: 'var(--bg)', borderRight: '1px solid var(--border)',
+                    maxWidth: 0, overflow: 'hidden',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
+                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
+                        #{slot.player?.jersey_number}
+                      </span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'line-through' }}>
+                        {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                      </span>
+                      <button
+                        onClick={() => toggleAbsent(slot.id)}
+                        title="Mark present"
+                        style={{
+                          flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                          border: '1px solid rgba(109,184,117,0.45)', background: 'rgba(109,184,117,0.1)',
+                          cursor: 'pointer', fontSize: 8, padding: 0, color: '#6DB875',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          marginRight: 3,
+                        }}
+                      >↩</button>
+                    </div>
+                  </td>
+                  {innings.map(ii => <td key={ii} style={{ ...gCell }} />)}
+                  <td style={{ ...gCell }} />
+                </tr>
+              ))}
             </tbody>
           </table>
 
