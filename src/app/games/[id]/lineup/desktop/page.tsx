@@ -51,6 +51,25 @@ function assignedInnings(slot: any, inningCount: number): number {
     .filter((p: string | null) => p !== null).length
 }
 
+// Returns the set of inning indices that belong to a run of 2+ consecutive Bench slots
+function consecutiveBenchRuns(slot: any, inningCount: number): Set<number> {
+  const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
+  const flagged = new Set<number>()
+  let runStart = 0, runLen = 0
+  for (let i = 0; i <= pos.length; i++) {
+    if (i < pos.length && pos[i] === 'Bench') {
+      if (runLen === 0) runStart = i
+      runLen++
+    } else {
+      if (runLen >= 2) {
+        for (let j = runStart; j < runStart + runLen; j++) flagged.add(j)
+      }
+      runLen = 0
+    }
+  }
+  return flagged
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DesktopLineupEditor({ params }: { params: { id: string } }) {
@@ -78,6 +97,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
   const [lastGameHistory, setLastGameHistory] = useState<Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}>>({})
+  const [pitchingHistory, setPitchingHistory] = useState<Record<string, {lastDate:string,lastInnings:number,daysSince:number}>>({})
   // selectedCells: Set of "si-ii" keys. Click = select only; palette/key = fill.
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
@@ -176,7 +196,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
     // Load most recent previous game's slot positions for last-game context in right panel
     if (gameData?.season_id) {
-      // Get all other games in this season, most recent first
       const { data: otherGames } = await supabase
         .from('games')
         .select('id, innings_played, game_date, status')
@@ -184,19 +203,18 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .neq('id', params.id)
         .order('created_at', { ascending: false })
 
-      // Only consider final games as "previous game"
-      const finalGames = (otherGames ?? []).filter(g => g.status === 'final')
-      const dated = finalGames.filter(g => g.game_date).sort(
+      // Pick the most recently dated game regardless of status (prefer dated, fall back to any)
+      const dated = (otherGames ?? []).filter(g => g.game_date).sort(
         (a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime()
       )
-      const prevGame = dated[0] ?? finalGames[0]
+      const prevGame = dated[0] ?? (otherGames ?? [])[0]
       if (prevGame) {
         const { data: prevSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, availability')
           .eq('game_id', prevGame.id)
         if (prevSlots) {
-          const prevInn = prevGame.innings_played ?? gameData.season?.innings_per_game ?? 6
+          const prevInn = prevGame.innings_played ?? (gameData as any).season?.innings_per_game ?? 6
           const lgh: Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}> = {}
           for (const s of prevSlots) {
             if (s.availability === 'absent') continue
@@ -211,6 +229,43 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           }
           setLastGameHistory(lgh)
         }
+      }
+
+      // Load pitching history for rest-days widget
+      const { data: finalGames } = await supabase
+        .from('games')
+        .select('id, game_date, innings_played')
+        .eq('season_id', gameData.season_id)
+        .neq('id', params.id)
+        .eq('status', 'final')
+        .not('game_date', 'is', null)
+        .order('game_date', { ascending: false })
+        .limit(15)
+
+      if (finalGames?.length) {
+        const { data: pitchSlots } = await supabase
+          .from('lineup_slots')
+          .select('player_id, inning_positions, game_id')
+          .in('game_id', finalGames.map(g => g.id))
+
+        const ph: Record<string, {lastDate:string,lastInnings:number,daysSince:number}> = {}
+        const defaultInn = (gameData as any).season?.innings_per_game ?? 6
+        for (const game of finalGames) {
+          const gameSlots = (pitchSlots ?? []).filter(s => s.game_id === game.id)
+          const gameInn = game.innings_played ?? defaultInn
+          for (const slot of gameSlots) {
+            if (ph[slot.player_id]) continue // already have most recent
+            const pCount = (slot.inning_positions ?? []).slice(0, gameInn)
+              .filter((p: string|null) => p === 'P').length
+            if (pCount > 0) {
+              const daysSince = Math.floor(
+                (Date.now() - new Date(game.game_date + 'T12:00:00').getTime()) / 86400000
+              )
+              ph[slot.player_id] = { lastDate: game.game_date, lastInnings: pCount, daysSince }
+            }
+          }
+        }
+        setPitchingHistory(ph)
       }
     }
 
@@ -1013,6 +1068,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   : bi > expectedBenchInnings + 1.0 ? '#E87060'
                   : bi > expectedBenchInnings + 0.5 ? '#E8A020'
                   : '#6DB875'
+                const benchRunSet = consecutiveBenchRuns(slot, inningCount)
                 return (
                   <tr
                     key={slot.id}
@@ -1048,6 +1104,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       const isSel = selectedCells.has(cellKey)
                       const isDupe = !!(pos && pos !== 'Bench' &&
                         activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
+                      const isConsecBench = pos === 'Bench' && benchRunSet.has(ii)
 
                       return (
                         <td
@@ -1087,21 +1144,25 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                               ? 'rgba(59,109,177,0.3)'
                               : isSel
                                 ? 'rgba(59,109,177,0.14)'
-                                : pc ? pc.bg : 'transparent',
+                                : isConsecBench
+                                  ? 'rgba(232,160,32,0.13)'
+                                  : pc ? pc.bg : 'transparent',
                             outline: isFoc
                               ? '2px solid rgba(59,109,177,0.85)'
                               : isSel
                                 ? '1.5px solid rgba(59,109,177,0.4)'
                                 : isDupe
                                   ? '2px solid rgba(232,112,96,0.7)'
-                                  : 'none',
+                                  : isConsecBench
+                                    ? '1px solid rgba(232,160,32,0.3)'
+                                    : 'none',
                             outlineOffset: -2,
                             transition: 'background 0.05s',
                           }}
                         >
                           <span style={{
                             fontSize: 12, fontWeight: 800,
-                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : isConsecBench ? '#E8A020' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
@@ -1292,6 +1353,101 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     </span>
                   </div>
                 ))}
+              </div>
+            )
+          })()}
+
+          {/* This game breakdown — shown when a cell is focused */}
+          {focused && (() => {
+            const focusedSlot = activeSlots[focused.si]
+            if (!focusedSlot) return null
+            const pos = (focusedSlot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
+            const tgP     = pos.filter(p => p === 'P').length
+            const tgC     = pos.filter(p => p === 'C').length
+            const tgIF    = pos.filter(p => IF_POS.has(p ?? '')).length
+            const tgOF    = pos.filter(p => OF_POS.has(p ?? '')).length
+            const tgBench = pos.filter(p => p === 'Bench').length
+            return (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6,
+                background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                  color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase', marginBottom: 6 }}>
+                  This game
+                </div>
+                {([
+                  ['Pitcher',  tgP,     POS_COLOR.P],
+                  ['Catcher',  tgC,     POS_COLOR.C],
+                  ['Infield',  tgIF,    POS_COLOR['1B']],
+                  ['Outfield', tgOF,    POS_COLOR.LF],
+                  ['Bench',    tgBench, POS_COLOR.Bench],
+                ] as [string, number, typeof POS_COLOR[string] | undefined][]).map(([label, count, pc]) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between',
+                    alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ fontSize: 10, color: count > 0 ? (pc?.color ?? `rgba(var(--fg-rgb),0.55)`) : `rgba(var(--fg-rgb),0.25)` }}>
+                      {label}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: count > 0 ? 700 : 400,
+                      color: count > 0 ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.2)` }}>
+                      {count > 0 ? `${count} inn` : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Pitching rest — shown when a cell is focused */}
+          {focused && (() => {
+            const focusedSlot = activeSlots[focused.si]
+            if (!focusedSlot) return null
+            const ph = pitchingHistory[focusedSlot.player_id]
+            const thisGameP = (focusedSlot.inning_positions ?? []).slice(0, inningCount)
+              .filter((p: string|null) => p === 'P').length
+            if (!ph && thisGameP === 0) return null
+            const shortRest = ph && ph.daysSince < 3
+            return (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6,
+                background: shortRest ? 'rgba(232,112,96,0.08)' : 'var(--bg-card)',
+                border: `0.5px solid ${shortRest ? 'rgba(232,112,96,0.35)' : 'var(--border)'}` }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                  color: shortRest ? '#E87060' : `rgba(var(--fg-rgb),0.3)`,
+                  textTransform: 'uppercase', marginBottom: 6 }}>
+                  Pitching rest{shortRest ? ' · ⚠ Short rest' : ''}
+                </div>
+                {ph && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.5)` }}>Last pitched</span>
+                      <span style={{ fontSize: 10, fontWeight: 700,
+                        color: shortRest ? '#E87060' : `rgba(var(--fg-rgb),0.7)` }}>
+                        {new Date(ph.lastDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.5)` }}>Innings pitched</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: POS_COLOR.P?.color }}>
+                        {ph.lastInnings} inn
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      marginBottom: thisGameP > 0 ? 6 : 0 }}>
+                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.5)` }}>Days rest</span>
+                      <span style={{ fontSize: 10, fontWeight: 700,
+                        color: shortRest ? '#E87060' : ph.daysSince >= 4 ? '#6DB875' : `rgba(var(--fg-rgb),0.7)` }}>
+                        {ph.daysSince}d
+                      </span>
+                    </div>
+                  </>
+                )}
+                {thisGameP > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    paddingTop: ph ? 4 : 0, borderTop: ph ? '0.5px solid var(--border)' : 'none' }}>
+                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.5)` }}>This game</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: POS_COLOR.P?.color }}>
+                      {thisGameP} inn
+                    </span>
+                  </div>
+                )}
               </div>
             )
           })()}
