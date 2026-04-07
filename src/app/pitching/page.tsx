@@ -57,6 +57,8 @@ export default function PitchingPage() {
   const [editingPitch, setEditingPitch]     = useState<Record<string, string>>({}) // slotId → draft value
   const [slotCount, setSlotCount]           = useState(MIN_SLOTS)
   const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
+  // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
+  const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
 
   useEffect(() => { init() }, [])
   useEffect(() => {
@@ -116,8 +118,9 @@ export default function PitchingPage() {
     setUpcoming(upcomingGames)
     setFinalized([...finalizedGames].reverse())
 
-    // Load pitcher plans for upcoming games
+    // Load pitcher plans + lineup data for upcoming games
     const upcomingIds = upcomingGames.map((g: any) => g.id)
+    let upLineupSlotsData: any[] = []
     if (upcomingIds.length) {
       const { data: planRows } = await supabase
         .from('pitcher_plans')
@@ -136,14 +139,17 @@ export default function PitchingPage() {
       const maxFilled = Math.max(MIN_SLOTS, ...Object.values(plansMap).flatMap(g => Object.keys(g).map(Number)))
       setSlotCount(Math.min(MAX_SLOTS, maxFilled + 1))
 
-      // Load lineup P-assignments for upcoming games (to enable "sync from lineup")
+      // Load lineup data for upcoming games (for "sync from lineup" + scheduled pitch history)
       const { data: upLineupSlots } = await supabase
         .from('lineup_slots')
         .select('game_id, player_id, inning_positions, availability')
         .in('game_id', upcomingIds)
+      upLineupSlotsData = upLineupSlots ?? []
+
+      // lineupPitchers: who has actual P innings in each upcoming game's saved lineup
       const lpMap: Record<string, string[]> = {}
       for (const game of upcomingGames) {
-        const gameSlots = (upLineupSlots ?? []).filter(
+        const gameSlots = upLineupSlotsData.filter(
           (s: any) => s.game_id === game.id && s.availability !== 'absent'
         )
         const pitchers: { playerId: string; count: number }[] = []
@@ -155,6 +161,17 @@ export default function PitchingPage() {
         if (pitchers.length) lpMap[game.id] = pitchers.map(p => p.playerId)
       }
       setLineupPitchers(lpMap)
+
+      // scheduledPitchHistory: one entry per (player, game) with actual P innings in non-final lineup
+      const sph: Array<{ playerId: string; gameDate: string }> = []
+      for (const slot of upLineupSlotsData) {
+        if (slot.availability === 'absent') continue
+        const game = upcomingGames.find((g: any) => g.id === slot.game_id)
+        if (!game?.game_date) continue
+        const innings = (slot.inning_positions ?? []).filter((p: string | null) => p === 'P').length
+        if (innings > 0) sph.push({ playerId: slot.player_id, gameDate: game.game_date })
+      }
+      setScheduledPitchHistory(sph)
     }
 
     // Load actual pitching data (from lineup slots) including pitch counts
@@ -250,6 +267,30 @@ export default function PitchingPage() {
     for (let i = 0; i < Math.min(pitcherIds.length, slotCount); i++) {
       await setPlanPlayer(gameId, i + 1, pitcherIds[i])
     }
+  }
+
+  // Returns the most recent date a player pitched BEFORE the given game date,
+  // considering: final game actuals + scheduled game lineup P innings + earlier upcoming plans
+  function effectiveLastPitched(playerId: string, beforeDate: string): string | undefined {
+    let best = lastPitched[playerId] // from final games (already in the past)
+
+    // Actual P innings in any scheduled game before this date
+    for (const { playerId: pid, gameDate } of scheduledPitchHistory) {
+      if (pid === playerId && gameDate < beforeDate && (!best || gameDate > best)) {
+        best = gameDate
+      }
+    }
+
+    // Pitcher plans for any earlier upcoming game
+    for (const earlierGame of upcoming) {
+      if (!earlierGame.game_date || earlierGame.game_date >= beforeDate) continue
+      const isPlanned = Object.values(plans[earlierGame.id] ?? {}).some(
+        (s: PlanSlot) => s.player_id === playerId
+      )
+      if (isPlanned && (!best || earlierGame.game_date > best)) best = earlierGame.game_date
+    }
+
+    return best
   }
 
   // Compute how many columns to show for past games
@@ -524,14 +565,19 @@ export default function PitchingPage() {
                         const plan = gamePlans[slot]
                         const isSaving = saving === `${game.id}-${slot}`
 
-                        // Rest-day warning for the planned pitcher
+                        // Rest-day warning for the planned pitcher — uses effective last pitched
+                        // (accounts for final games, scheduled game actuals, and earlier upcoming plans)
                         let restWarning: { label: string; color: string } | null = null
-                        if (plan?.player_id && lastPitched[plan.player_id]) {
-                          const last = new Date(lastPitched[plan.player_id] + 'T12:00:00')
-                          const gd   = new Date(game.game_date + 'T12:00:00')
-                          const days = Math.round((gd.getTime() - last.getTime()) / 86400000)
-                          if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
-                          else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+                        if (plan?.player_id) {
+                          const effLast = effectiveLastPitched(plan.player_id, game.game_date)
+                          if (effLast) {
+                            const days = Math.round(
+                              (new Date(game.game_date + 'T12:00:00').getTime() -
+                               new Date(effLast + 'T12:00:00').getTime()) / 86400000
+                            )
+                            if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
+                            else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+                          }
                         }
 
                         return (
@@ -543,15 +589,13 @@ export default function PitchingPage() {
                               style={{
                                 ...CELL_SEL,
                                 opacity: isSaving ? 0.5 : 1,
-                                borderColor: restWarning
-                                  ? restWarning.color
-                                  : undefined,
+                                borderColor: restWarning ? restWarning.color : undefined,
                               }}
                             >
                               <option value="">—</option>
                               {players.map(p => (
                                 <option key={p.id} value={p.id}>
-                                  #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
+                                  #{p.jersey_number} {p.last_name}{daysRest(effectiveLastPitched(p.id, game.game_date), game.game_date)}
                                 </option>
                               ))}
                             </select>
