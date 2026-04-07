@@ -295,27 +295,30 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         }
       }
 
-      // Load pitching history for rest-days widget
-      const { data: finalGames } = await supabase
+      // Load pitching history for rest-days widget — all previous games regardless of status
+      const currentDate2 = (gameData as any)?.game_date ?? null
+      let prevGamesQuery = supabase
         .from('games')
         .select('id, game_date, innings_played')
-        .eq('season_id', gameData.season_id)
+        .eq('season_id', (gameData as any).season_id)
         .neq('id', params.id)
-        .eq('status', 'final')
         .not('game_date', 'is', null)
         .order('game_date', { ascending: false })
-        .limit(15)
+        .limit(20)
+      if (currentDate2) prevGamesQuery = (prevGamesQuery as any).lt('game_date', currentDate2)
 
-      if (finalGames?.length) {
+      const { data: prevGames } = await prevGamesQuery
+      if (prevGames?.length) {
         const { data: pitchSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, game_id')
-          .in('game_id', finalGames.map(g => g.id))
+          .in('game_id', prevGames.map((g: any) => g.id))
 
         const ph: Record<string, {lastDate:string,lastInnings:number,daysSince:number}> = {}
         const defaultInn = (gameData as any).season?.innings_per_game ?? 6
-        for (const game of finalGames) {
-          const gameSlots = (pitchSlots ?? []).filter(s => s.game_id === game.id)
+        // Games are already sorted date desc — first match per player is most recent
+        for (const game of prevGames) {
+          const gameSlots = (pitchSlots ?? []).filter((s: any) => s.game_id === game.id)
           const gameInn = game.innings_played ?? defaultInn
           for (const slot of gameSlots) {
             if (ph[slot.player_id]) continue // already have most recent
