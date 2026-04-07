@@ -56,6 +56,7 @@ export default function PitchingPage() {
   const [saving, setSaving]                 = useState<string | null>(null)
   const [editingPitch, setEditingPitch]     = useState<Record<string, string>>({}) // slotId → draft value
   const [slotCount, setSlotCount]           = useState(MIN_SLOTS)
+  const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
 
   useEffect(() => { init() }, [])
   useEffect(() => {
@@ -134,6 +135,26 @@ export default function PitchingPage() {
       // Set initial slot count from highest filled slot + 1 empty
       const maxFilled = Math.max(MIN_SLOTS, ...Object.values(plansMap).flatMap(g => Object.keys(g).map(Number)))
       setSlotCount(Math.min(MAX_SLOTS, maxFilled + 1))
+
+      // Load lineup P-assignments for upcoming games (to enable "sync from lineup")
+      const { data: upLineupSlots } = await supabase
+        .from('lineup_slots')
+        .select('game_id, player_id, inning_positions, availability')
+        .in('game_id', upcomingIds)
+      const lpMap: Record<string, string[]> = {}
+      for (const game of upcomingGames) {
+        const gameSlots = (upLineupSlots ?? []).filter(
+          (s: any) => s.game_id === game.id && s.availability !== 'absent'
+        )
+        const pitchers: { playerId: string; count: number }[] = []
+        for (const slot of gameSlots) {
+          const count = (slot.inning_positions ?? []).filter((p: string | null) => p === 'P').length
+          if (count > 0) pitchers.push({ playerId: slot.player_id, count })
+        }
+        pitchers.sort((a, b) => b.count - a.count)
+        if (pitchers.length) lpMap[game.id] = pitchers.map(p => p.playerId)
+      }
+      setLineupPitchers(lpMap)
     }
 
     // Load actual pitching data (from lineup slots) including pitch counts
@@ -222,6 +243,13 @@ export default function PitchingPage() {
     }))
     // Clear draft
     setEditingPitch(prev => { const n = { ...prev }; delete n[slotId]; return n })
+  }
+
+  async function syncFromLineup(gameId: string) {
+    const pitcherIds = lineupPitchers[gameId] ?? []
+    for (let i = 0; i < Math.min(pitcherIds.length, slotCount); i++) {
+      await setPlanPlayer(gameId, i + 1, pitcherIds[i])
+    }
   }
 
   // Compute how many columns to show for past games
@@ -476,27 +504,66 @@ export default function PitchingPage() {
                           {formatDate(game.game_date)}
                           {game.location ? ` · ${game.location}` : ''}
                         </div>
+                        {lineupPitchers[game.id]?.length > 0 && (
+                          <button
+                            onClick={() => syncFromLineup(game.id)}
+                            style={{
+                              marginTop: '5px', fontSize: '9px', fontWeight: 700,
+                              padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
+                              border: '0.5px solid var(--border-md)',
+                              background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`,
+                            }}
+                          >
+                            ↓ from lineup
+                          </button>
+                        )}
                       </div>
 
                       {Array.from({ length: slotCount }, (_, i) => {
                         const slot = i + 1
                         const plan = gamePlans[slot]
                         const isSaving = saving === `${game.id}-${slot}`
+
+                        // Rest-day warning for the planned pitcher
+                        let restWarning: { label: string; color: string } | null = null
+                        if (plan?.player_id && lastPitched[plan.player_id]) {
+                          const last = new Date(lastPitched[plan.player_id] + 'T12:00:00')
+                          const gd   = new Date(game.game_date + 'T12:00:00')
+                          const days = Math.round((gd.getTime() - last.getTime()) / 86400000)
+                          if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
+                          else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+                        }
+
                         return (
-                          <select
-                            key={slot}
-                            value={plan?.player_id ?? ''}
-                            onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
-                            disabled={isSaving}
-                            style={{ ...CELL_SEL, opacity: isSaving ? 0.5 : 1 }}
-                          >
-                            <option value="">—</option>
-                            {players.map(p => (
-                              <option key={p.id} value={p.id}>
-                                #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
-                              </option>
-                            ))}
-                          </select>
+                          <div key={slot}>
+                            <select
+                              value={plan?.player_id ?? ''}
+                              onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
+                              disabled={isSaving}
+                              style={{
+                                ...CELL_SEL,
+                                opacity: isSaving ? 0.5 : 1,
+                                borderColor: restWarning
+                                  ? restWarning.color
+                                  : undefined,
+                              }}
+                            >
+                              <option value="">—</option>
+                              {players.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  #{p.jersey_number} {p.last_name}{daysRest(lastPitched[p.id], game.game_date)}
+                                </option>
+                              ))}
+                            </select>
+                            {restWarning && (
+                              <div style={{
+                                fontSize: '9px', fontWeight: 700, textAlign: 'center',
+                                marginTop: '2px', color: restWarning.color,
+                              }}>
+                                {restWarning.label}
+                              </div>
+                            )}
+                          </div>
                         )
                       })}
                     </div>

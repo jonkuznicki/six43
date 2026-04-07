@@ -77,6 +77,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
   const [loading, setLoading]           = useState(true)
   const [game, setGame]                 = useState<any>(null)
+  const [prevGameId, setPrevGameId]     = useState<string | null>(null)
+  const [nextGameId, setNextGameId]     = useState<string | null>(null)
   const [slots, setSlots]               = useState<any[]>([])
   const [teamPositions, setTeamPositions] = useState<string[]>(
     ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
@@ -127,6 +129,22 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       .select('*, season:seasons(innings_per_game, team:teams(name, positions))')
       .eq('id', params.id).single()
     setGame(gameData)
+
+    // Adjacent-game navigation
+    if ((gameData as any)?.season_id) {
+      const { data: seasonGames } = await supabase
+        .from('games')
+        .select('id, game_date')
+        .eq('season_id', (gameData as any).season_id)
+        .not('game_date', 'is', null)
+        .order('game_date', { ascending: true })
+      if (seasonGames?.length) {
+        const idx = seasonGames.findIndex((g: any) => g.id === params.id)
+        setPrevGameId(idx > 0 ? seasonGames[idx - 1].id : null)
+        setNextGameId(idx < seasonGames.length - 1 ? seasonGames[idx + 1].id : null)
+      }
+    }
+
     const rawNotes = (gameData as any)?.notes ?? null
     notesRawRef.current = rawNotes
     try { setGameNotes(JSON.parse(rawNotes ?? '{}')._notes ?? '') } catch { setGameNotes('') }
@@ -686,13 +704,33 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           ← Games
         </a>
         <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
-            vs {game?.opponent}
-          </span>
-          <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginLeft: 10 }}>
-            {gameDate}{game?.game_time ? ` · ${formatTime(game.game_time)}` : ''}
-          </span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {prevGameId ? (
+            <a href={`/games/${prevGameId}/lineup/desktop`}
+              title="Previous game"
+              style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>
+              ‹
+            </a>
+          ) : (
+            <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>‹</span>
+          )}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
+              vs {game?.opponent}
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginLeft: 10 }}>
+              {gameDate}{game?.game_time ? ` · ${formatTime(game.game_time)}` : ''}
+            </span>
+          </div>
+          {nextGameId ? (
+            <a href={`/games/${nextGameId}/lineup/desktop`}
+              title="Next game"
+              style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>
+              ›
+            </a>
+          ) : (
+            <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>›</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {/* Innings control */}
