@@ -51,24 +51,6 @@ function assignedInnings(slot: any, inningCount: number): number {
     .filter((p: string | null) => p !== null).length
 }
 
-// Returns the set of inning indices that belong to a run of 2+ consecutive Bench slots
-function consecutiveBenchRuns(slot: any, inningCount: number): Set<number> {
-  const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
-  const flagged = new Set<number>()
-  let runStart = 0, runLen = 0
-  for (let i = 0; i <= pos.length; i++) {
-    if (i < pos.length && pos[i] === 'Bench') {
-      if (runLen === 0) runStart = i
-      runLen++
-    } else {
-      if (runLen >= 2) {
-        for (let j = runStart; j < runStart + runLen; j++) flagged.add(j)
-      }
-      runLen = 0
-    }
-  }
-  return flagged
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -1073,7 +1055,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   : bi > expectedBenchInnings + 1.0 ? '#E87060'
                   : bi > expectedBenchInnings + 0.5 ? '#E8A020'
                   : '#6DB875'
-                const benchRunSet = consecutiveBenchRuns(slot, inningCount)
                 return (
                   <tr
                     key={slot.id}
@@ -1137,7 +1118,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       const isSel = selectedCells.has(cellKey)
                       const isDupe = !!(pos && pos !== 'Bench' &&
                         activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
-                      const isConsecBench = pos === 'Bench' && benchRunSet.has(ii)
 
                       return (
                         <td
@@ -1177,25 +1157,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                               ? 'rgba(59,109,177,0.3)'
                               : isSel
                                 ? 'rgba(59,109,177,0.14)'
-                                : isConsecBench
-                                  ? 'rgba(232,160,32,0.13)'
-                                  : pc ? pc.bg : 'transparent',
+                                : pc ? pc.bg : 'transparent',
                             outline: isFoc
                               ? '2px solid rgba(59,109,177,0.85)'
                               : isSel
                                 ? '1.5px solid rgba(59,109,177,0.4)'
                                 : isDupe
                                   ? '2px solid rgba(232,112,96,0.7)'
-                                  : isConsecBench
-                                    ? '1px solid rgba(232,160,32,0.3)'
-                                    : 'none',
+                                  : 'none',
                             outlineOffset: -2,
                             transition: 'background 0.05s',
                           }}
                         >
                           <span style={{
                             fontSize: 12, fontWeight: 800,
-                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : isConsecBench ? '#E8A020' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
