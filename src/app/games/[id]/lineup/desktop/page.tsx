@@ -883,16 +883,56 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       {/* ─── THREE PANELS ─── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* ── LEFT: Inning Summary + Palette ── */}
+        {/* ── LEFT: Inning helper + Summary + Notes + Palette ── */}
         <div style={{
-          width: 175, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column',
           borderRight: '1px solid var(--border)', overflow: 'hidden',
         }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
 
+            {/* ── Inning position helper (moved from right panel) ── */}
+            <div style={{ padding: '0 10px 6px' }}>
+              <div style={{ ...secLabel, padding: '0 0 4px' }}>Inning {summaryII + 1}</div>
+              {teamPositions.filter(p => p !== 'Bench').map(pos => {
+                const players = posSummary[pos] ?? []
+                const dupe = players.length > 1
+                const empty = players.length === 0
+                const pc = POS_COLOR[pos]
+                return (
+                  <div key={pos} style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px',
+                    borderRadius: 4, marginBottom: 2,
+                    background: dupe ? 'rgba(232,112,96,0.08)' : 'transparent',
+                  }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px',
+                      borderRadius: 3, textAlign: 'center', flexShrink: 0,
+                      background: pc?.bg ?? 'transparent', color: pc?.color ?? 'var(--fg)',
+                    }}>{pos}</span>
+                    <span style={{
+                      fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      color: dupe ? '#E87060' : empty ? `rgba(var(--fg-rgb),0.2)` : 'var(--fg)',
+                      fontStyle: empty ? 'italic' : 'normal',
+                    }}>{empty ? '—' : players.join(', ')}</span>
+                    {dupe && <span style={{ fontSize: 9, color: '#E87060', flexShrink: 0 }}>!</span>}
+                  </div>
+                )
+              })}
+              {(posSummary['Bench']?.length ?? 0) > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px', borderRadius: 4, marginBottom: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px', borderRadius: 3,
+                    textAlign: 'center', flexShrink: 0,
+                    background: 'rgba(120,120,120,0.12)', color: `rgba(var(--fg-rgb),0.4)` }}>B</span>
+                  <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.38)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {posSummary['Bench'].join(', ')}
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* ── Inning summary ── */}
             {activeSlots.length > 0 && (
-              <div style={{ paddingTop: 2 }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
                 <div style={{ ...secLabel, padding: '0 10px 4px' }}>Inning summary</div>
                 <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
                   <colgroup>
@@ -952,6 +992,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 </table>
               </div>
             )}
+
+            {/* ── Notes (separator between summary and palette) ── */}
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, padding: '8px 10px 4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <span style={{ ...secLabel, padding: 0 }}>Notes</span>
+                {!notesSaved && <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.3)` }}>saving…</span>}
+              </div>
+              <textarea
+                value={gameNotes}
+                onChange={e => handleNotesChange(e.target.value)}
+                placeholder="e.g. Connor hurt his arm — no pitching"
+                rows={3}
+                style={{
+                  width: '100%', padding: '6px 8px', borderRadius: 6,
+                  border: '0.5px solid var(--border-md)',
+                  background: 'var(--bg-input)', color: 'var(--fg)',
+                  fontSize: 11, resize: 'vertical', boxSizing: 'border-box',
+                  fontFamily: 'inherit', lineHeight: 1.5,
+                }}
+              />
+            </div>
           </div>
 
           {/* Position palette */}
@@ -1244,57 +1305,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
           overflowY: 'auto', padding: 12,
         }}>
-          <div style={{ ...secLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Inning {summaryII + 1}</span>
-            {focused && <span style={{ opacity: 0.55, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-              {focused.ii === summaryII ? '' : ''}
-            </span>}
-          </div>
-
-          {teamPositions.filter(p => p !== 'Bench').map(pos => {
-            const players = posSummary[pos] ?? []
-            const dupe = players.length > 1
-            const empty = players.length === 0
-            const pc = POS_COLOR[pos]
-            return (
-              <div key={pos} style={{
-                display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px',
-                borderRadius: 4, marginBottom: 2,
-                background: dupe ? 'rgba(232,112,96,0.08)' : 'transparent',
-              }}>
-                <span style={{
-                  fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px',
-                  borderRadius: 3, textAlign: 'center', flexShrink: 0,
-                  background: pc?.bg ?? 'transparent', color: pc?.color ?? 'var(--fg)',
-                }}>
-                  {pos}
-                </span>
-                <span style={{
-                  fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: dupe ? '#E87060' : empty ? `rgba(var(--fg-rgb),0.2)` : 'var(--fg)',
-                  fontStyle: empty ? 'italic' : 'normal',
-                }}>
-                  {empty ? '—' : players.join(', ')}
-                </span>
-                {dupe && <span style={{ fontSize: 9, color: '#E87060', flexShrink: 0 }}>!</span>}
-              </div>
-            )
-          })}
-
-          {(posSummary['Bench']?.length ?? 0) > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px', borderRadius: 4, marginBottom: 2 }}>
-              <span style={{ fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px', borderRadius: 3,
-                textAlign: 'center', flexShrink: 0,
-                background: 'rgba(120,120,120,0.12)', color: `rgba(var(--fg-rgb),0.4)` }}>
-                B
-              </span>
-              <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.38)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {posSummary['Bench'].join(', ')}
-              </span>
-            </div>
-          )}
-
-
           {/* Player position history — shown when a cell is focused */}
           {focused && (() => {
             const focusedSlot = activeSlots[focused.si]
@@ -1486,27 +1496,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               </div>
             )
           })()}
-
-          {/* Game notes */}
-          <div style={{ marginTop: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-              <span style={{ ...secLabel, padding: 0 }}>Notes</span>
-              {!notesSaved && <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.3)` }}>saving…</span>}
-            </div>
-            <textarea
-              value={gameNotes}
-              onChange={e => handleNotesChange(e.target.value)}
-              placeholder="e.g. Connor hurt his arm — no pitching"
-              rows={3}
-              style={{
-                width: '100%', padding: '7px 9px', borderRadius: 6,
-                border: '0.5px solid var(--border-md)',
-                background: 'var(--bg-input)', color: 'var(--fg)',
-                fontSize: 11, resize: 'vertical', boxSizing: 'border-box',
-                fontFamily: 'inherit', lineHeight: 1.5,
-              }}
-            />
-          </div>
 
           {/* Bench context */}
           {activeSlots.length > 0 && (
