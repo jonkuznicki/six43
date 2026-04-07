@@ -221,11 +221,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .neq('id', params.id)
         .order('created_at', { ascending: false })
 
-      // Pick the most recently dated game regardless of status (prefer dated, fall back to any)
-      const dated = (otherGames ?? []).filter(g => g.game_date).sort(
-        (a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime()
-      )
-      const prevGame = dated[0] ?? (otherGames ?? [])[0]
+      // Pick the most recently dated game BEFORE this game's date, regardless of status
+      const currentDate = (gameData as any)?.game_date ?? null
+      const sorted = (otherGames ?? [])
+        .filter(g => g.game_date)
+        .sort((a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime())
+      const prevGame =
+        sorted.find(g => !currentDate || g.game_date < currentDate) ??
+        sorted[0] ??
+        (otherGames ?? [])[0]
       if (prevGame) {
         const { data: prevSlots } = await supabase
           .from('lineup_slots')
@@ -1345,7 +1349,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
                 <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
                   color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase', marginBottom: 6 }}>
-                  Last completed game
+                  Previous game
                 </div>
                 {!lg ? (
                   <div style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.35)`, fontStyle: 'italic' }}>
