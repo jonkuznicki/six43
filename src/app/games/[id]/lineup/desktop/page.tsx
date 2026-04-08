@@ -820,10 +820,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           {/* Status dropdown */}
           {(() => {
             const status = game?.status ?? 'scheduled'
-            const statusStyles: Record<string, { color: string; bg: string; border: string }> = {
-              scheduled:    { color: 'rgba(255,255,255,0.7)', bg: 'rgba(255,255,255,0.08)',  border: 'rgba(255,255,255,0.25)' },
-              lineup_ready: { color: '#80B0E8',               bg: 'rgba(59,109,177,0.3)',   border: '#80B0E8' },
-              final:        { color: '#6DB875',               bg: 'rgba(45,106,53,0.3)',    border: '#6DB875' },
+            const statusStyles: Record<string, { color: string; border: string }> = {
+              scheduled:    { color: 'rgba(255,255,255,0.7)', border: 'rgba(255,255,255,0.25)' },
+              lineup_ready: { color: '#80B0E8',               border: '#80B0E8' },
+              final:        { color: '#6DB875',               border: '#6DB875' },
             }
             const s = statusStyles[status] ?? statusStyles.scheduled
             return (
@@ -834,7 +834,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 style={{
                   padding: '5px 8px', borderRadius: 5,
                   border: `1px solid ${s.border}`,
-                  background: s.bg,
+                  background: '#0d2240',
                   color: s.color,
                   fontSize: 12, fontWeight: 700, cursor: 'pointer',
                   opacity: statusSaving ? 0.6 : 1, flexShrink: 0,
