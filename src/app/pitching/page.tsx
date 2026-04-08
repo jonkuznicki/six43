@@ -152,12 +152,13 @@ export default function PitchingPage() {
         const gameSlots = upLineupSlotsData.filter(
           (s: any) => s.game_id === game.id && s.availability !== 'absent'
         )
-        const pitchers: { playerId: string; count: number }[] = []
+        const pitchers: { playerId: string; firstInning: number }[] = []
         for (const slot of gameSlots) {
-          const count = (slot.inning_positions ?? []).filter((p: string | null) => p === 'P').length
-          if (count > 0) pitchers.push({ playerId: slot.player_id, count })
+          const pos = slot.inning_positions ?? []
+          const firstInning = pos.findIndex((p: string | null) => p === 'P')
+          if (firstInning >= 0) pitchers.push({ playerId: slot.player_id, firstInning })
         }
-        pitchers.sort((a, b) => b.count - a.count)
+        pitchers.sort((a, b) => a.firstInning - b.firstInning)
         if (pitchers.length) lpMap[game.id] = pitchers.map(p => p.playerId)
       }
       setLineupPitchers(lpMap)
