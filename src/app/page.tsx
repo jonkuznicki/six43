@@ -387,6 +387,253 @@ function FullDesktopLineupEditor() {
   )
 }
 
+function BrowserMockupLight({ children, caption }: { children: React.ReactNode; caption?: string }) {
+  return (
+    <div style={{ width: '100%' }}>
+      <div style={{
+        background: '#f0ede8',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        boxShadow: '0 0 0 1px rgba(0,0,0,0.1), 0 24px 60px rgba(0,0,0,0.15)',
+      }}>
+        <div style={{
+          background: '#e4e0da',
+          padding: '9px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          borderBottom: '1px solid rgba(0,0,0,0.07)',
+        }}>
+          <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF5F57' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFBD2E' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#28CA41' }} />
+          </div>
+          <div style={{
+            flex: 1, background: 'rgba(0,0,0,0.07)', borderRadius: '4px',
+            padding: '3px 10px', fontSize: '10px', color: 'rgba(0,0,0,0.4)',
+            textAlign: 'center', maxWidth: '160px', margin: '0 auto',
+          }}>
+            six43.app
+          </div>
+        </div>
+        {children}
+      </div>
+      {caption && (
+        <div style={{ fontSize: '12px', color: 'rgba(var(--fg-rgb), 0.3)', marginTop: '1rem', textAlign: 'center' }}>
+          {caption}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const LIGHT_POS: Record<string, { bg: string; fg: string }> = {
+  P:     { bg: 'rgba(232,160,32,0.2)',   fg: '#9E6A00' },
+  C:     { bg: 'rgba(192,80,120,0.18)',  fg: '#A03060' },
+  '1B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
+  '2B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
+  SS:    { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
+  '3B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
+  LF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
+  CF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
+  RF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
+  Bnch:  { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' },
+  Bench: { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' },
+}
+
+function FullDesktopLineupEditorLight() {
+  const innings = [0, 1, 2, 3, 4, 5]
+  const focusedInning = 2
+  const focusedCell = { pi: 0, ii: 0 }
+
+  const inning3Summary = [
+    { pos: 'P',  player: null          },
+    { pos: 'C',  player: 'Connor B.'  },
+    { pos: '1B', player: 'Jake M.'    },
+    { pos: '2B', player: 'Marcus L.'  },
+    { pos: 'SS', player: 'Tyler S.'   },
+    { pos: '3B', player: 'Sam T.'     },
+    { pos: 'LF', player: 'Drew K.'    },
+    { pos: 'CF', player: 'Ryan P.'    },
+    { pos: 'RF', player: 'Alex W.'    },
+  ]
+
+  const palette = ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
+  const jerseys  = [12, 5, 8, 3, 17, 9, 22, 7, 14]
+
+  return (
+    <div style={{ background: '#f0ede8', display: 'flex', flexDirection: 'column', height: '290px' }}>
+
+      {/* Topbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px',
+        background: '#e8e4de', borderBottom: '1px solid rgba(20,40,65,0.08)',
+        flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden',
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(20,40,65,0.8)', whiteSpace: 'nowrap' }}>vs Cardinals · Apr 12</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>↩ Undo</span>
+        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>Redo ↪</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>Clear lineup</span>
+        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>🖨 Print</span>
+        <div style={{ flex: 1 }} />
+        {[
+          { label: 'Scheduled',    active: false, color: 'rgba(20,40,65,0.35)', bg: 'transparent',           border: 'rgba(20,40,65,0.15)' },
+          { label: 'Lineup Ready', active: true,  color: '#2A5A9E',             bg: 'rgba(59,109,177,0.15)', border: '#2A5A9E' },
+          { label: 'Final',        active: false, color: 'rgba(20,40,65,0.35)', bg: 'transparent',           border: 'rgba(20,40,65,0.15)' },
+        ].map(s => (
+          <span key={s.label} style={{
+            fontSize: 8, fontWeight: s.active ? 700 : 500, whiteSpace: 'nowrap',
+            color: s.color, padding: '2px 6px', borderRadius: 3,
+            border: `1px solid ${s.border}`, background: s.bg,
+          }}>{s.label}</span>
+        ))}
+      </div>
+
+      {/* Three panels */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left: Roster + Palette */}
+        <div style={{
+          width: 128, flexShrink: 0,
+          borderRight: '1px solid rgba(20,40,65,0.08)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{ flex: 1, overflowY: 'hidden', padding: '5px 0' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(20,40,65,0.3)', padding: '0 8px 3px' }}>
+              Batting order · 9
+            </div>
+            {DEMO_PLAYERS.map((p, i) => (
+              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px' }}>
+                <span style={{ fontSize: 8, color: 'rgba(20,40,65,0.25)', width: 10, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 8, color: 'rgba(20,40,65,0.3)', width: 18, flexShrink: 0 }}>#{jerseys[i]}</span>
+                <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: '1px solid rgba(20,40,65,0.08)', padding: '5px 7px 6px', background: 'rgba(20,40,65,0.02)', flexShrink: 0 }}>
+            <div style={{ fontSize: 7, color: 'rgba(20,40,65,0.35)', marginBottom: 3 }}>Select cells, then fill:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {palette.map(pos => {
+                const c = LIGHT_POS[pos] ?? { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' }
+                const active = pos === 'P'
+                return (
+                  <div key={pos} style={{
+                    padding: '2px 3px', borderRadius: 3, fontSize: 7, fontWeight: 700,
+                    border: `1px solid ${active ? c.fg : 'rgba(20,40,65,0.15)'}`,
+                    background: active ? c.bg : 'transparent',
+                    color: active ? c.fg : 'rgba(20,40,65,0.4)',
+                    minWidth: pos === 'Bench' ? 32 : 20, textAlign: 'center',
+                  }}>{pos}</div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Center: Grid */}
+        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center', width: 16 }}>#</th>
+                <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'left', minWidth: 58, borderRight: '1px solid rgba(20,40,65,0.07)' }}>Player</th>
+                {innings.map(i => (
+                  <th key={i} style={{
+                    padding: '3px 4px', fontSize: 7, fontWeight: 600,
+                    borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center', minWidth: 26,
+                    color: i === focusedInning ? 'rgba(20,40,65,0.6)' : 'rgba(20,40,65,0.25)',
+                    background: i === focusedInning ? 'rgba(20,40,65,0.03)' : 'transparent',
+                  }}>
+                    {i + 1}
+                    {i === focusedInning && <div style={{ fontSize: 5, color: '#2A6633', lineHeight: 1 }}>✓</div>}
+                  </th>
+                ))}
+                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center' }}>Bench</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEMO_PLAYERS.map((player, pi) => {
+                const benchCount = player.innings.filter(p => p === 'Bnch').length
+                return (
+                  <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(20,40,65,0.02)' }}>
+                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(20,40,65,0.3)' }}>{pi + 1}</td>
+                    <td style={{ padding: '2px 6px', fontSize: 9, color: 'rgba(20,40,65,0.75)', fontWeight: 500, whiteSpace: 'nowrap', borderRight: '1px solid rgba(20,40,65,0.07)' }}>
+                      {player.name}
+                    </td>
+                    {player.innings.map((pos, ii) => {
+                      const c = LIGHT_POS[pos]
+                      const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
+                      const isSel = pi === focusedCell.pi && ii === 1
+                      const isColFoc = ii === focusedInning
+                      return (
+                        <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(20,40,65,0.025)' : 'transparent' }}>
+                          <div style={{
+                            background: isFoc ? 'rgba(59,109,177,0.25)' : isSel ? 'rgba(59,109,177,0.1)' : (c?.bg ?? 'transparent'),
+                            color: isFoc ? '#142841' : isSel ? '#2A5A9E' : (c?.fg ?? 'rgba(20,40,65,0.2)'),
+                            borderRadius: 2, padding: '1px 0',
+                            fontSize: 8, fontWeight: 700,
+                            minWidth: 22, display: 'inline-block',
+                            outline: isFoc ? '1.5px solid rgba(59,109,177,0.7)' : isSel ? '1px solid rgba(59,109,177,0.3)' : 'none',
+                            outlineOffset: -1,
+                          }}>{pos === 'Bnch' ? 'B' : pos}</div>
+                        </td>
+                      )
+                    })}
+                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 8, fontWeight: 700, color: benchCount > 0 ? '#2A6633' : 'rgba(20,40,65,0.2)' }}>
+                      {benchCount > 0 ? benchCount : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right: Inning summary */}
+        <div style={{
+          width: 98, flexShrink: 0, borderLeft: '1px solid rgba(20,40,65,0.08)',
+          padding: '7px 7px', overflowY: 'hidden',
+        }}>
+          <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(20,40,65,0.3)', marginBottom: 4 }}>
+            Inning 3
+          </div>
+          {inning3Summary.map(({ pos, player }) => {
+            const c = LIGHT_POS[pos]
+            const empty = !player
+            return (
+              <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(200,80,70,0.07)' : 'transparent' }}>
+                <span style={{
+                  fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2,
+                  textAlign: 'center', flexShrink: 0,
+                  background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(20,40,65,0.5)',
+                }}>{pos}</span>
+                <span style={{
+                  fontSize: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  color: empty ? 'rgba(180,60,50,0.85)' : 'rgba(20,40,65,0.7)',
+                  fontStyle: empty ? 'italic' : 'normal',
+                }}>{player ?? '—'}</span>
+                {empty && <span style={{ fontSize: 7, color: '#B83C32', flexShrink: 0 }}>!</span>}
+              </div>
+            )
+          })}
+          <div style={{ marginTop: 6, padding: '5px 6px', borderRadius: 4, background: 'rgba(20,40,65,0.03)', border: '0.5px solid rgba(20,40,65,0.08)' }}>
+            <div style={{ fontSize: 8, color: 'rgba(20,40,65,0.5)' }}>Bench: Josh M.</div>
+            <div style={{ fontSize: 7, color: 'rgba(20,40,65,0.3)', marginTop: 1 }}>~0.7 bench inn exp</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 export default async function HomePage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -500,7 +747,7 @@ export default async function HomePage() {
 
         <div className="mkt-hero-browser">
           <BrowserMockup caption="Build and manage lineups from your laptop">
-            <DesktopLineupGrid />
+            <FullDesktopLineupEditor />
           </BrowserMockup>
         </div>
       </section>
@@ -753,9 +1000,9 @@ export default async function HomePage() {
         }}>
           {/* Desktop */}
           <div style={{ flex: 1, minWidth: '260px', maxWidth: '520px' }}>
-            <BrowserMockup>
-              <FullDesktopLineupEditor />
-            </BrowserMockup>
+            <BrowserMockupLight>
+              <FullDesktopLineupEditorLight />
+            </BrowserMockupLight>
             <div style={{
               textAlign: 'center', fontSize: '12px',
               color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '0.75rem',
