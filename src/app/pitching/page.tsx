@@ -5,7 +5,7 @@ import { createClient } from '../../lib/supabase'
 import { setSelectedTeamId } from '../../lib/selectedTeam'
 
 type PlanSlot = { id?: string; player_id: string; notes: string }
-type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null }
+type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null; firstInning: number }
 
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
@@ -189,9 +189,9 @@ export default function PitchingPage() {
         if (slot.availability === 'absent') continue
         const game = finalizedGames.find((g: any) => g.id === slot.game_id)
         const maxInn = game?.innings_played ?? 9
-        const innings = (slot.inning_positions ?? [])
-          .slice(0, maxInn)
-          .filter((p: string | null) => p === 'P').length
+        const positions = (slot.inning_positions ?? []).slice(0, maxInn)
+        const innings = positions.filter((p: string | null) => p === 'P').length
+        const firstInning = positions.findIndex((p: string | null) => p === 'P')
         if (innings > 0) {
           if (!actualMap[slot.game_id]) actualMap[slot.game_id] = []
           actualMap[slot.game_id].push({
@@ -200,6 +200,7 @@ export default function PitchingPage() {
             slotId: slot.id,
             innings,
             pitchCount: slot.pitch_count ?? null,
+            firstInning,
           })
           if (game && (!lastPitchedMap[slot.player_id] || game.game_date > lastPitchedMap[slot.player_id])) {
             lastPitchedMap[slot.player_id] = game.game_date
@@ -207,7 +208,7 @@ export default function PitchingPage() {
         }
       }
       for (const id of Object.keys(actualMap)) {
-        actualMap[id].sort((a, b) => b.innings - a.innings)
+        actualMap[id].sort((a, b) => a.firstInning - b.firstInning)
       }
       setActualPitching(actualMap)
       setLastPitched(lastPitchedMap)
