@@ -787,10 +787,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </div>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <button onClick={undo} disabled={!history.length} title="Undo (⌘Z)" style={topBtn(!!history.length)}>
-            ↩ Undo
+            ↩
           </button>
           <button onClick={redo} disabled={!future.length} title="Redo (⌘⇧Z)" style={topBtn(!!future.length)}>
-            Redo ↪
+            ↪
           </button>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           {confirmClear ? (
@@ -817,30 +817,35 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             Mobile view
           </a>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
-          {/* Status segmented control */}
-          {([
-            { key: 'scheduled',    label: 'Scheduled',     color: 'rgba(255,255,255,0.55)', activeBg: 'rgba(255,255,255,0.12)', activeBorder: 'rgba(255,255,255,0.3)' },
-            { key: 'lineup_ready', label: 'Lineup Ready',  color: '#80B0E8',                activeBg: 'rgba(59,109,177,0.35)',  activeBorder: '#80B0E8' },
-            { key: 'final',        label: 'Final',         color: '#6DB875',                activeBg: 'rgba(45,106,53,0.35)',   activeBorder: '#6DB875' },
-          ] as const).map(({ key, label, color, activeBg, activeBorder }) => {
-            const isActive = (game?.status ?? 'scheduled') === key
+          {/* Status dropdown */}
+          {(() => {
+            const status = game?.status ?? 'scheduled'
+            const statusStyles: Record<string, { color: string; bg: string; border: string }> = {
+              scheduled:    { color: 'rgba(255,255,255,0.7)', bg: 'rgba(255,255,255,0.08)',  border: 'rgba(255,255,255,0.25)' },
+              lineup_ready: { color: '#80B0E8',               bg: 'rgba(59,109,177,0.3)',   border: '#80B0E8' },
+              final:        { color: '#6DB875',               bg: 'rgba(45,106,53,0.3)',    border: '#6DB875' },
+            }
+            const s = statusStyles[status] ?? statusStyles.scheduled
             return (
-              <button
-                key={key}
-                onClick={() => !isActive && !statusSaving && saveStatus(key)}
+              <select
+                value={status}
+                onChange={e => !statusSaving && saveStatus(e.target.value)}
                 disabled={statusSaving}
                 style={{
-                  padding: '5px 11px', borderRadius: 5, border: `1px solid ${isActive ? activeBorder : 'rgba(255,255,255,0.1)'}`,
-                  background: isActive ? activeBg : 'transparent',
-                  color: isActive ? color : 'rgba(255,255,255,0.3)',
-                  fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: isActive ? 'default' : 'pointer',
-                  opacity: statusSaving ? 0.6 : 1, transition: 'all 0.15s', flexShrink: 0,
+                  padding: '5px 8px', borderRadius: 5,
+                  border: `1px solid ${s.border}`,
+                  background: s.bg,
+                  color: s.color,
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  opacity: statusSaving ? 0.6 : 1, flexShrink: 0,
                 }}
               >
-                {label}
-              </button>
+                <option value="scheduled">Scheduled</option>
+                <option value="lineup_ready">Lineup Ready</option>
+                <option value="final">Final</option>
+              </select>
             )
-          })}
+          })()}
         </div>
       </div>
 
