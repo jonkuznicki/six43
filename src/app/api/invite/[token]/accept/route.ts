@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
   // Accept the invite
   const { error } = await service
     .from('team_members')
-    .update({ user_id: user.id, accepted_at: new Date().toISOString() })
+    .update({ user_id: user.id, accepted_at: new Date().toISOString(), email: user.email ?? null })
     .eq('id', invite.id)
 
   if (error) {

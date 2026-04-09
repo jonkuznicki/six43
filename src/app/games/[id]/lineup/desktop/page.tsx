@@ -85,6 +85,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   // selectedCells: Set of "si-ii" keys. Click = select only; palette/key = fill.
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
+  const [readOnly, setReadOnly]         = useState(false)
   const [gameNotes, setGameNotes]       = useState('')
   const [notesSaved, setNotesSaved]     = useState(true)
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -108,7 +109,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   async function loadData() {
     const { data: gameData } = await supabase
       .from('games')
-      .select('*, season:seasons(innings_per_game, team:teams(name, positions))')
+      .select('*, season:seasons(innings_per_game, team_id, team:teams(name, positions))')
       .eq('id', params.id).single()
     setGame(gameData)
 
@@ -137,6 +138,18 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       : ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
     setTeamPositions(positions)
     setActivePos(positions[0] ?? 'P')
+
+    // Check if the current user is a read-only member of this team
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user && (gameData as any)?.season?.team_id) {
+      const { data: membership } = await supabase
+        .from('team_members')
+        .select('read_only')
+        .eq('team_id', (gameData as any).season.team_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (membership?.read_only) setReadOnly(true)
+    }
 
     let { data: slotData } = await supabase
       .from('lineup_slots')
@@ -360,6 +373,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
   // Fill all currently selected cells with a position (called from palette or key shortcut)
   function fillSelected(pos: string) {
+    if (readOnly) return
     const sel = selectedCellsRef.current
     if (sel.size === 0) return
     const active = slotsRef.current.filter(s => s.availability !== 'absent')
@@ -421,6 +435,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   // ── Attendance ────────────────────────────────────────────────────────────
 
   function toggleAbsent(slotId: string) {
+    if (readOnly) return
     const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
     const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
@@ -755,6 +770,14 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginLeft: 10 }}>
               {gameDate}{game?.game_time ? ` · ${formatTime(game.game_time)}` : ''}
             </span>
+            {readOnly && (
+              <span style={{
+                marginLeft: 10, fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                borderRadius: 4, background: 'rgba(232,160,32,0.15)',
+                color: '#E8A020', border: '1px solid rgba(232,160,32,0.3)',
+                letterSpacing: '0.04em',
+              }}>VIEW ONLY</span>
+            )}
           </div>
           {nextGameId ? (
             <a href={`/games/${nextGameId}/lineup/desktop`}
@@ -767,6 +790,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {!readOnly && (<>
           {/* Innings control */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <button
@@ -803,6 +827,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <button onClick={() => setConfirmClear(true)} style={topBtn(true)}>Clear lineup</button>
           )}
           <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
+          </>)}
           <a
             href={`/games/${params.id}/print`}
             target="_blank" rel="noopener noreferrer"
@@ -816,6 +841,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           >
             Mobile view
           </a>
+          {!readOnly && (<>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           {/* Status dropdown */}
           {(() => {
@@ -846,6 +872,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               </select>
             )
           })()}
+          </>)}
         </div>
       </div>
 
