@@ -65,6 +65,8 @@ export default function FairnessPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<StatRow | null>(null)
   const [playerSlots, setPlayerSlots] = useState<any[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [gameCount, setGameCount] = useState(0)
+  const [benchPatterns, setBenchPatterns] = useState<Record<string, number[]>>({})
 
   useEffect(() => { init() }, [])
   useEffect(() => {
@@ -121,6 +123,7 @@ export default function FairnessPage() {
       .eq('status', 'final')
       .order('game_date', { ascending: false })
     setGames(games ?? [])
+    setGameCount((games ?? []).length)
 
     const gameIds = (games ?? []).map((g: any) => g.id)
     const lcMap: Record<string, number> = {}
@@ -137,18 +140,40 @@ export default function FairnessPage() {
     if (gameIds.length) {
       const { data: slots } = await supabase
         .from('lineup_slots')
-        .select('player_id, inning_positions, game_id')
+        .select('player_id, inning_positions, game_id, availability')
         .in('game_id', gameIds)
+
+      const benchByInning: Record<string, Record<number, { benched: number; played: number }>> = {}
 
       for (const slot of slots ?? []) {
         const game = (games ?? []).find((g: any) => g.id === slot.game_id)
         const maxInn = game?.innings_played ?? 9
-        const positions: string[] = slot.inning_positions ?? []
+        const positions: (string | null)[] = slot.inning_positions ?? []
+
         positions.slice(0, maxInn).forEach((pos: string) => {
           if (pos === 'LC') lcMap[slot.player_id] = (lcMap[slot.player_id] ?? 0) + 1
           if (pos === 'RC') rcMap[slot.player_id] = (rcMap[slot.player_id] ?? 0) + 1
         })
+
+        if (slot.availability === 'absent') continue
+        if (!benchByInning[slot.player_id]) benchByInning[slot.player_id] = {}
+        positions.slice(0, maxInn).forEach((pos, idx) => {
+          if (!benchByInning[slot.player_id][idx]) benchByInning[slot.player_id][idx] = { benched: 0, played: 0 }
+          benchByInning[slot.player_id][idx].played++
+          if (!pos || pos === 'Bench') benchByInning[slot.player_id][idx].benched++
+        })
       }
+
+      // Flag innings where benched ≥ 50% of the time in ≥ 2 games
+      const patterns: Record<string, number[]> = {}
+      for (const [playerId, inningMap] of Object.entries(benchByInning)) {
+        const flagged = Object.entries(inningMap)
+          .filter(([, { benched, played }]) => played >= 2 && benched / played >= 0.5)
+          .map(([idx]) => Number(idx))
+          .sort((a, b) => a - b)
+        if (flagged.length) patterns[playerId] = flagged
+      }
+      setBenchPatterns(patterns)
     }
 
     const rows: StatRow[] = (viewData ?? []).map((r: any) => ({
@@ -295,6 +320,7 @@ export default function FairnessPage() {
           {/* Season summary bar */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             {[
+              { label: 'Games', value: gameCount },
               { label: 'Players', value: stats.length },
               { label: 'Avg bench', value: pct(avgBench), color: avgBench > 0.4 ? '#E87060' : avgBench > 0.25 ? '#E8A020' : '#6DB875' },
               { label: 'Max innings', value: totalInnings },
@@ -368,6 +394,24 @@ export default function FairnessPage() {
 
                     {/* Bench % bar */}
                     <BenchBar pct={row.bench_pct} />
+
+                    {/* Bench pattern flags */}
+                    {(benchPatterns[row.player_id]?.length ?? 0) > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Often benched:
+                        </span>
+                        {benchPatterns[row.player_id].map(i => (
+                          <span key={i} style={{
+                            fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px',
+                            background: 'rgba(232,160,32,0.12)', color: '#E8A020',
+                            border: '0.5px solid rgba(232,160,32,0.25)',
+                          }}>
+                            Inn {i + 1}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Target progress */}
                     {(row.innings_target ?? 0) > 0 && (() => {
@@ -522,6 +566,55 @@ export default function FairnessPage() {
                 color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '4px',
               }}>✕</button>
             </div>
+
+            {/* Bench by inning */}
+            {!loadingDetail && playerSlots.length > 0 && (() => {
+              const freq: Record<number, { benched: number; played: number }> = {}
+              for (const slot of playerSlots) {
+                if (slot.availability === 'absent') continue
+                const game = games.find((g: any) => g.id === slot.game_id)
+                const maxInn = game?.innings_played ?? 6
+                const positions: (string | null)[] = (slot.inning_positions ?? []).slice(0, maxInn)
+                positions.forEach((pos, idx) => {
+                  if (!freq[idx]) freq[idx] = { benched: 0, played: 0 }
+                  freq[idx].played++
+                  if (!pos || pos === 'Bench') freq[idx].benched++
+                })
+              }
+              const maxIdx = Math.max(...Object.keys(freq).map(Number))
+              if (maxIdx < 0) return null
+              return (
+                <div style={{ padding: '0.75rem 1.25rem', borderBottom: '0.5px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
+                    Bench frequency by inning
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
+                    {Array.from({ length: maxIdx + 1 }, (_, i) => {
+                      const { benched = 0, played = 0 } = freq[i] ?? {}
+                      const pctVal = played > 0 ? benched / played : 0
+                      const color = pctVal >= 0.5 ? '#E87060' : pctVal >= 0.33 ? '#E8A020' : '#6DB875'
+                      return (
+                        <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: '9px', fontWeight: 700, color, marginBottom: '3px' }}>
+                            {played > 0 ? Math.round(pctVal * 100) + '%' : '—'}
+                          </div>
+                          <div style={{ height: '32px', background: 'var(--border-subtle)', borderRadius: '3px', overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
+                            <div style={{
+                              width: '100%',
+                              height: `${Math.round(pctVal * 100)}%`,
+                              background: color,
+                              borderRadius: '3px',
+                              minHeight: pctVal > 0 ? '2px' : 0,
+                            }} />
+                          </div>
+                          <div style={{ fontSize: '8px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '3px' }}>Inn {i + 1}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Game list */}
             <div style={{ overflowY: 'auto', padding: '0.75rem 1.25rem 2rem' }}>
