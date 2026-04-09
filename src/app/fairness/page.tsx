@@ -150,7 +150,7 @@ export default function FairnessPage() {
         const maxInn = game?.innings_played ?? 9
         const positions: (string | null)[] = slot.inning_positions ?? []
 
-        positions.slice(0, maxInn).forEach((pos: string) => {
+        positions.slice(0, maxInn).forEach((pos) => {
           if (pos === 'LC') lcMap[slot.player_id] = (lcMap[slot.player_id] ?? 0) + 1
           if (pos === 'RC') rcMap[slot.player_id] = (rcMap[slot.player_id] ?? 0) + 1
         })
