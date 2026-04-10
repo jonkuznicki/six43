@@ -64,6 +64,10 @@ export default function RosterPage() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [rosterView, setRosterView] = useState<'players' | 'evaluations'>('players')
+  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null)
+  const [reportPlayer, setReportPlayer] = useState<any>(null)
+  const [reportText, setReportText] = useState('')
+  const [reportCopied, setReportCopied] = useState(false)
   const [evalPlayer, setEvalPlayer] = useState<any>(null)
   const [evalNotes, setEvalNotes] = useState<any[]>([])
   const [evalScores, setEvalScores] = useState<Record<string, number | null>>({})
@@ -254,6 +258,26 @@ export default function RosterPage() {
     setSavingNote(false)
   }
 
+  async function generateReport(player: any) {
+    if (!seasonId) return
+    setGeneratingReportId(player.id)
+    try {
+      const res = await fetch('/api/players/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: player.id, seasonId }),
+      })
+      const data = await res.json()
+      if (data.report) {
+        setReportPlayer(player)
+        setReportText(data.report)
+        setReportCopied(false)
+      }
+    } finally {
+      setGeneratingReportId(null)
+    }
+  }
+
   async function deleteNote(noteId: string) {
     setDeletingNoteId(noteId)
     await supabase.from('player_eval_notes').delete().eq('id', noteId)
@@ -420,62 +444,42 @@ export default function RosterPage() {
       {/* ── EVALUATIONS VIEW ── */}
       {rosterView === 'evaluations' && (
         <div>
-          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1rem' }}>
-            Tap a player name to open their evaluation sheet.
+          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            Add notes during the season using the Notes button on each player. At season end, generate a personalized evaluation summary for each player to share with families.
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '360px' }}>
-              <thead>
-                <tr>
-                  <th style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'left', padding: '4px 8px 8px 0', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Player</th>
-                  {EVAL_SKILLS.map(s => (
-                    <th key={s.key} style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'center', padding: '4px 4px 8px', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 48 }}>{s.short}</th>
-                  ))}
-                  <th style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'left', padding: '4px 0 8px 8px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {players.filter(p => p.status === 'active').map((player, idx) => {
-                  const scores = player.eval_scores ?? {}
-                  const avg = (() => {
-                    const vals = EVAL_SKILLS.map(s => scores[s.key]).filter((v): v is number => typeof v === 'number')
-                    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null
-                  })()
-                  return (
-                    <tr key={player.id} style={{ borderTop: '0.5px solid var(--border-subtle)', background: idx % 2 === 0 ? 'transparent' : 'var(--bg-card-alt)' }}>
-                      <td style={{ padding: '8px 8px 8px 0', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                        <button onClick={() => openEval(player)} style={{
-                          background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg)',
-                          fontSize: '13px', fontWeight: 500, padding: 0, textAlign: 'left',
-                        }}>
-                          <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '6px' }}>#{player.jersey_number}</span>
-                          {player.first_name[0]}. {player.last_name}
-                          {avg && <span style={{ fontSize: '10px', color: 'var(--accent)', marginLeft: '6px', fontWeight: 700 }}>{avg}</span>}
-                        </button>
-                      </td>
-                      {EVAL_SKILLS.map(s => {
-                        const v = scores[s.key]
-                        return (
-                          <td key={s.key} style={{ textAlign: 'center', padding: '8px 4px' }}>
-                            {typeof v === 'number' ? (
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: v >= 4 ? '#6DB875' : v >= 3 ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.45)` }}>{v}</span>
-                            ) : (
-                              <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>
-                            )}
-                          </td>
-                        )
-                      })}
-                      <td style={{ padding: '8px 0 8px 8px', fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        —
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '1rem', textAlign: 'center' }}>
-            Tap a player name to open their evaluation
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {players.filter(p => p.status === 'active').map(player => (
+              <div key={player.id} style={{
+                background: 'var(--bg-card)', border: '0.5px solid var(--border-subtle)',
+                borderRadius: '8px', padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+              }}>
+                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, width: '24px', textAlign: 'center', flexShrink: 0 }}>
+                  {player.jersey_number}
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 500, flex: 1 }}>
+                  {player.first_name} {player.last_name}
+                </span>
+                <button onClick={() => openEval(player)} style={{
+                  fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+                  border: '0.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', flexShrink: 0,
+                }}>Notes</button>
+                <button
+                  onClick={() => generateReport(player)}
+                  disabled={generatingReportId === player.id}
+                  style={{
+                    fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+                    border: 'none', background: generatingReportId === player.id ? 'rgba(59,109,177,0.15)' : 'rgba(59,109,177,0.2)',
+                    color: generatingReportId === player.id ? `rgba(var(--fg-rgb), 0.3)` : '#80B0E8',
+                    cursor: generatingReportId === player.id ? 'not-allowed' : 'pointer', flexShrink: 0,
+                    fontWeight: 600,
+                  }}
+                >
+                  {generatingReportId === player.id ? '…' : '✦ Report'}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -691,6 +695,57 @@ export default function RosterPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REPORT MODAL ── */}
+      {reportPlayer && reportText && (
+        <div onClick={() => setReportPlayer(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: '16px 16px 0 0', padding: '1.5rem',
+            width: '100%', maxWidth: '480px', border: '0.5px solid var(--border)',
+            maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: 700 }}>
+                  {reportPlayer.first_name} {reportPlayer.last_name}
+                </div>
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                  End-of-season evaluation
+                </div>
+              </div>
+              <button onClick={() => setReportPlayer(null)} style={{
+                fontSize: '22px', lineHeight: 1, background: 'none', border: 'none',
+                color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '0 4px',
+              }}>×</button>
+            </div>
+            <div style={{
+              flex: 1, overflowY: 'auto', fontSize: '14px', lineHeight: 1.7,
+              color: `rgba(var(--fg-rgb), 0.85)`, marginBottom: '1rem',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {reportText}
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(reportText)
+                setReportCopied(true)
+                setTimeout(() => setReportCopied(false), 2500)
+              }}
+              style={{
+                width: '100%', padding: '11px', borderRadius: '7px', border: 'none',
+                background: reportCopied ? 'rgba(45,106,53,0.3)' : 'var(--accent)',
+                color: reportCopied ? '#6DB875' : 'var(--accent-text)',
+                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              {reportCopied ? '✓ Copied to clipboard' : 'Copy to clipboard'}
+            </button>
           </div>
         </div>
       )}
