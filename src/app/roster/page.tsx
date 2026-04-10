@@ -501,8 +501,22 @@ export default function RosterPage() {
         )}
 
         {players.length === 0 && (
-          <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
-            No players yet. Add your first player to get started.
+          <div style={{ textAlign: 'center', marginTop: '4rem', padding: '0 1rem' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚾</div>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--fg)', marginBottom: '8px' }}>
+              No players yet
+            </div>
+            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, lineHeight: 1.6, maxWidth: '260px', margin: '0 auto 20px' }}>
+              Add each player on your roster so they show up in the lineup builder.
+            </div>
+            <button
+              onClick={() => openEdit(null)}
+              style={{
+                fontSize: '14px', fontWeight: 700, padding: '10px 24px', borderRadius: '8px',
+                border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', cursor: 'pointer',
+              }}>
+              + Add first player
+            </button>
           </div>
         )}
       </>)}

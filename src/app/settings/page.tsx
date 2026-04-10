@@ -65,6 +65,8 @@ export default function SettingsPage() {
   const [generatingInvite, setGeneratingInvite] = useState<string | null>(null)
   const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null)
 
+  const [tab, setTab] = useState<string>('team')
+
   useEffect(() => { loadData() }, [])
 
   async function signOut() {
@@ -338,9 +340,33 @@ export default function SettingsPage() {
       fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto',
       padding: '1.5rem 1rem 6rem',
     }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '1.5rem' }}>Settings</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '1rem' }}>Settings</h1>
 
-      {/* ── Roster & Lineup ── */}
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex', gap: '2px', marginBottom: '1.5rem',
+        background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+        borderRadius: '10px', padding: '3px',
+      }}>
+        {([
+          { id: 'team', label: 'Team' },
+          { id: 'season', label: 'Season' },
+          { id: 'coaches', label: 'Coaches' },
+          { id: 'account', label: 'Account' },
+        ]).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            flex: 1, padding: '7px 4px', borderRadius: '7px', border: 'none',
+            background: tab === t.id ? 'var(--bg)' : 'transparent',
+            color: tab === t.id ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.45)`,
+            fontSize: '13px', fontWeight: tab === t.id ? 700 : 500,
+            cursor: 'pointer',
+            boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* ── Roster & Lineup (Account tab only) ── */}
+      {tab === 'account' && (
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '10px' }}>
@@ -381,17 +407,22 @@ export default function SettingsPage() {
           </Link>
         </div>
       </div>
+      )}
 
-      {/* Teams & Seasons section */}
+      {/* Teams & Seasons section — hidden on account tab */}
+      {tab !== 'account' && (
+      <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)` }}>
-          Teams & Seasons
+          {tab === 'team' ? 'Teams' : tab === 'season' ? 'Seasons' : 'Coaching Staff'}
         </div>
+        {tab === 'team' && (
         <button onClick={() => { setTeamForm(BLANK_TEAM); setTeamError('') }} style={{
           fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
           border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', cursor: 'pointer',
         }}>+ Add team</button>
+        )}
       </div>
 
       {teams.length === 0 && (
@@ -440,11 +471,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Seasons */}
+          {/* Seasons — season tab only */}
+          {tab === 'season' && (
           <div style={{ padding: '10px 16px 14px' }}>
-            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-              letterSpacing: '0.08em', marginBottom: '8px' }}>Seasons</div>
-
             {team.seasons.length === 0 && (
               <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.3)`, marginBottom: '10px' }}>
                 No seasons yet.
@@ -541,9 +570,13 @@ export default function SettingsPage() {
                 color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer' }}>
               + Add season
             </button>
+          </div>
+          )}
 
-            {/* ── COACHES / INVITES ── */}
-            <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '0.5px solid var(--border-subtle)' }}>
+          {/* ── COACHES / INVITES — coaches tab only ── */}
+          {tab === 'coaches' && (
+          <div style={{ padding: '10px 16px 14px' }}>
+            <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
                   letterSpacing: '0.08em' }}>Coaches</div>
@@ -627,6 +660,7 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+          )}
         </div>
       ))}
 
@@ -679,7 +713,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Seasons */}
+              {/* Seasons — season tab only */}
+              {tab === 'season' && (
               <div style={{ padding: '10px 16px 14px' }}>
                 <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
                   letterSpacing: '0.08em', marginBottom: '8px' }}>Seasons</div>
@@ -753,9 +788,12 @@ export default function SettingsPage() {
                   + Add season
                 </button>
               </div>
+              )}
             </div>
           ))}
         </>
+      )}
+      </>
       )}
 
       {/* ── TEAM FORM ── */}
@@ -951,7 +989,9 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── PLAN ── */}
+      {/* ── PLAN + ACCOUNT (account tab only) ── */}
+      {tab === 'account' && (
+      <>
       <div style={{ marginTop: '2rem', borderTop: '0.5px solid var(--border-subtle)', paddingTop: '1.5rem' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '12px' }}>
@@ -1050,6 +1090,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+      </>
+      )}
 
       {/* ── CHANGE PASSWORD ── */}
       {showChangePassword && (

@@ -310,8 +310,14 @@ export default function FairnessPage() {
       )}
 
       {!loading && stats.length === 0 && (
-        <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
-          No finalized games yet. Mark games as Finished to see playing time stats.
+        <div style={{ textAlign: 'center', marginTop: '4rem', padding: '0 1rem' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>📊</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--fg)', marginBottom: '8px' }}>
+            No stats yet
+          </div>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, lineHeight: 1.6, maxWidth: '280px', margin: '0 auto' }}>
+            Playing time stats appear here after you mark games as Final. Build a lineup and finish a game to see how time is distributed.
+          </div>
         </div>
       )}
 

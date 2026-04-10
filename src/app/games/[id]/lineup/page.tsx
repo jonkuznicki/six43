@@ -285,8 +285,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     return innings.every(i => activeSlots.some(s => s.inning_positions[i] === pos))
   }
   const COL_NUM = 28
-  const COL_NAME = 104
-  const COL_INN = 40
+  const COL_NAME = 110
+  const COL_INN = 42
   const COL_STATUS = 24
   const reorderWidth = reorderMode ? 56 : 0
 
@@ -432,7 +432,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             return (
               <button key={pos} onClick={() => setActivePosition(pos)} style={{
                 flexShrink: 0,
-                padding: '5px 9px', borderRadius: '6px', cursor: 'pointer',
+                padding: '8px 11px', borderRadius: '6px', cursor: 'pointer',
                 background: isActive ? c.bg : complete ? 'transparent' : `${c.bg.replace('0.25', '0.12')}`,
                 border: isActive
                   ? `1.5px solid ${c.color}`
@@ -584,7 +584,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                           }
                         }}
                         style={{
-                          width: '34px', height: '26px', borderRadius: '4px',
+                          width: '36px', height: '32px', borderRadius: '4px',
                           border: isPickSelected
                             ? '1.5px solid #80B0E8'
                             : isActivePosHere

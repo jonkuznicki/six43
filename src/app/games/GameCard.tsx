@@ -91,20 +91,27 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
     router.refresh()
   }
 
+  const isFinal = status === 'final'
+  const isUpcoming = !isFinal
+
   return (
     <>
       <div style={{
-        background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+        background: isFinal ? 'var(--bg-card)' : 'var(--bg-card)',
+        border: isUpcoming
+          ? '0.5px solid var(--border-md)'
+          : '0.5px solid var(--border-subtle)',
         borderRadius: '10px', marginBottom: '8px', display: 'flex', overflow: 'hidden',
+        opacity: isFinal ? 0.7 : 1,
       }}>
         {/* Main card area */}
         <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--fg)', marginBottom: '4px' }}>
+              <div style={{ fontSize: isUpcoming ? '16px' : '14px', fontWeight: isUpcoming ? 600 : 400, color: 'var(--fg)', marginBottom: '4px' }}>
                 vs {game.opponent}
               </div>
-              <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+              <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), ${isUpcoming ? '0.55' : '0.35'})` }}>
                 {formatted}{game.location ? ` · ${game.location}` : ''}
                 {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
               </div>
@@ -219,20 +226,34 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
             )}
 
             {status === 'lineup_ready' && (
-              <Link
-                href={`/games/${game.id}/print`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}
-              >
-                <div style={{
-                  padding: '12px 14px', borderRadius: '8px',
-                  border: '0.5px solid var(--border-md)', background: 'transparent',
-                  fontSize: '14px', color: 'var(--fg)',
-                }}>
-                  🖨 Print lineup + exchange card →
-                </div>
-              </Link>
+              <>
+                <Link
+                  href={`/games/${game.id}/gameday`}
+                  style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}
+                >
+                  <div style={{
+                    padding: '12px 14px', borderRadius: '8px',
+                    border: '0.5px solid var(--border-md)', background: 'transparent',
+                    fontSize: '14px', color: 'var(--fg)',
+                  }}>
+                    ⚾ Game day view →
+                  </div>
+                </Link>
+                <Link
+                  href={`/games/${game.id}/print`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}
+                >
+                  <div style={{
+                    padding: '12px 14px', borderRadius: '8px',
+                    border: '0.5px solid var(--border-md)', background: 'transparent',
+                    fontSize: '14px', color: 'var(--fg)',
+                  }}>
+                    🖨 Print lineup + exchange card →
+                  </div>
+                </Link>
+              </>
             )}
 
             {!confirmDelete ? (

@@ -176,9 +176,12 @@ export default async function GamePage({ params }: { params: { id: string } }) {
               ))}
             </>
           ) : (
-            <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`,
-              marginTop: '2rem', fontSize: '14px' }}>
-              No lineup built yet.
+            <div style={{ textAlign: 'center', marginTop: '2rem', padding: '1rem 0' }}>
+              <div style={{ fontSize: '28px', marginBottom: '8px' }}>📋</div>
+              <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, lineHeight: 1.5 }}>
+                No lineup built yet.<br />
+                <span style={{ fontSize: '12px' }}>Tap "Build lineup" below to start.</span>
+              </div>
             </div>
           )}
         </div>
@@ -221,6 +224,18 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             innings_played: game.innings_played,
             game_time: game.game_time ?? null,
           }} />
+          {hasLineup && (
+            <Link href={`/games/${game.id}/gameday`} style={{ textDecoration: 'none' }}>
+              <div style={{
+                fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.55)`, cursor: 'pointer',
+                textAlign: 'center',
+              }}>
+                ⚾ Game day view
+              </div>
+            </Link>
+          )}
           {hasLineup && (
             <Link
               href={`/games/${game.id}/print`}

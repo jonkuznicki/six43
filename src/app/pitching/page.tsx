@@ -408,8 +408,21 @@ export default function PitchingPage() {
       )}
 
       {!loading && upcoming.length === 0 && finalized.length === 0 && (
-        <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
-          No games scheduled yet.
+        <div style={{ textAlign: 'center', marginTop: '4rem', padding: '0 1rem' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎯</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--fg)', marginBottom: '8px' }}>
+            No games scheduled yet
+          </div>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, lineHeight: 1.6, maxWidth: '280px', margin: '0 auto 20px' }}>
+            Pitch counts and rest days will appear here once you have games on your schedule.
+          </div>
+          <a href="/games" style={{
+            display: 'inline-block', fontSize: '13px', fontWeight: 600, padding: '9px 20px', borderRadius: '7px',
+            border: '0.5px solid var(--border-md)', background: 'transparent',
+            color: `rgba(var(--fg-rgb), 0.6)`, textDecoration: 'none',
+          }}>
+            Go to Games →
+          </a>
         </div>
       )}
 
