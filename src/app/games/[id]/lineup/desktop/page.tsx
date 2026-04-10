@@ -86,6 +86,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
   const [readOnly, setReadOnly]         = useState(false)
+  const [showPlayerNotes, setShowPlayerNotes] = useState(false)
+  const [playerNoteInputs, setPlayerNoteInputs] = useState<Record<string, string>>({})
+  const [savingPlayerNotes, setSavingPlayerNotes] = useState(false)
   const [gameNotes, setGameNotes]       = useState('')
   const [notesSaved, setNotesSaved]     = useState(true)
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -546,6 +549,29 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setGame((g: any) => ({ ...g, status: newStatus }))
     await supabase.from('games').update({ status: newStatus }).eq('id', params.id)
     setStatusSaving(false)
+    if (newStatus === 'final') {
+      setPlayerNoteInputs({})
+      setShowPlayerNotes(true)
+    }
+  }
+
+  async function savePlayerNotes() {
+    const seasonId = game?.season_id
+    if (!seasonId) return
+    const entries = Object.entries(playerNoteInputs).filter(([, v]) => v.trim())
+    if (!entries.length) { setShowPlayerNotes(false); return }
+    setSavingPlayerNotes(true)
+    const today = new Date().toISOString().split('T')[0]
+    await Promise.all(entries.map(([playerId, body]) =>
+      supabase.from('player_eval_notes').insert({
+        player_id: playerId,
+        season_id: seasonId,
+        note_date: today,
+        body: body.trim(),
+      })
+    ))
+    setSavingPlayerNotes(false)
+    setShowPlayerNotes(false)
   }
 
   // ── Clear lineup ─────────────────────────────────────────────────────────
@@ -1654,6 +1680,72 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               }}>
                 {copying ? 'Copying…' : 'Copy lineup'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── POST-GAME PLAYER NOTES ── */}
+      {showPlayerNotes && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300,
+        }}>
+          <div style={{
+            background: 'var(--bg2)', borderRadius: '14px', padding: '1.5rem',
+            width: '460px', maxWidth: '95vw', border: '0.5px solid var(--border)',
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>Game notes</div>
+              <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb),0.45)` }}>
+                Jot a quick note on any player from today's game. All fields are optional.
+              </div>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
+              {slots
+                .filter(s => s.availability !== 'absent')
+                .sort((a, b) => (a.batting_order ?? 99) - (b.batting_order ?? 99))
+                .map(slot => {
+                  const p = slot.player
+                  if (!p) return null
+                  return (
+                    <div key={slot.player_id}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, marginBottom: '4px' }}>
+                        #{p.jersey_number} {p.first_name} {p.last_name}
+                      </div>
+                      <textarea
+                        value={playerNoteInputs[slot.player_id] ?? ''}
+                        onChange={e => setPlayerNoteInputs(prev => ({ ...prev, [slot.player_id]: e.target.value }))}
+                        placeholder="Quick observation…"
+                        rows={2}
+                        style={{
+                          width: '100%', padding: '8px 10px', borderRadius: '6px',
+                          border: '0.5px solid var(--border-md)',
+                          background: 'var(--bg-input)', color: 'var(--fg)',
+                          fontSize: '13px', boxSizing: 'border-box', resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowPlayerNotes(false)} style={{
+                flex: 1, padding: '10px', borderRadius: '7px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: `rgba(var(--fg-rgb),0.6)`, fontSize: '13px', cursor: 'pointer',
+              }}>Skip</button>
+              <button onClick={savePlayerNotes} disabled={savingPlayerNotes} style={{
+                flex: 2, padding: '10px', borderRadius: '7px', border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '13px', fontWeight: 700,
+                cursor: savingPlayerNotes ? 'not-allowed' : 'pointer',
+                opacity: savingPlayerNotes ? 0.7 : 1,
+              }}>{savingPlayerNotes ? 'Saving…' : 'Save notes'}</button>
             </div>
           </div>
         </div>
