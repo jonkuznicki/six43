@@ -1151,7 +1151,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   )
                 })}
                 <th
-                  style={{ ...gHdr, fontSize: 9 }}
+                  style={{ ...gHdr, fontSize: 9, position: 'sticky', right: 0, zIndex: 2, borderLeft: '1px solid var(--border)' }}
                   title={benchPerInning > 0
                     ? `${benchPerInning} player${benchPerInning !== 1 ? 's' : ''} bench each inning. Each player should bench ~${expectedBenchInnings.toFixed(1)} innings.`
                     : 'Everyone plays every inning'}
@@ -1302,7 +1302,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     })}
 
                     <td
-                      style={{ ...gCell, textAlign: 'center' }}
+                      style={{
+                        ...gCell, textAlign: 'center',
+                        position: 'sticky', right: 0, zIndex: 1,
+                        background: si % 2 === 0 ? 'var(--bg)' : 'color-mix(in srgb, var(--bg) 97%, var(--fg) 3%)',
+                        borderLeft: '1px solid var(--border)',
+                      }}
                       title={bi > 0
                         ? `${bi} bench inning${bi !== 1 ? 's' : ''} of ${ai} assigned (expected ~${expectedBenchInnings.toFixed(1)})`
                         : ai > 0 ? 'No bench innings yet' : 'No innings assigned'}
@@ -1350,7 +1355,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     </div>
                   </td>
                   {innings.map(ii => <td key={ii} style={{ ...gCell }} />)}
-                  <td style={{ ...gCell }} />
+                  <td style={{ ...gCell, position: 'sticky', right: 0, background: 'var(--bg)', borderLeft: '1px solid var(--border)' }} />
                 </tr>
               ))}
             </tbody>
