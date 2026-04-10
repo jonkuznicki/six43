@@ -152,6 +152,20 @@ export default function RosterPage() {
     setShowForm(true)
   }
 
+  function downloadCsvTemplate() {
+    const rows = [
+      'First Name,Last Name,Jersey Number,Position',
+      'Alex,Smith,12,SS',
+      'Jordan,Lee,7,P',
+      'Taylor,Brown,21,C',
+    ]
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'six43-roster-template.csv'
+    a.click()
+  }
+
   function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -394,11 +408,17 @@ export default function RosterPage() {
           )}
           {rosterView === 'players' && (<>
             <input ref={csvInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleCsvFile} />
-            <button onClick={() => csvInputRef.current?.click()} disabled={!seasonId} style={{
-              fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
-              border: '0.5px solid var(--border-md)', background: 'transparent',
-              color: seasonId ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
-            }}>↑ CSV</button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <button onClick={() => csvInputRef.current?.click()} disabled={!seasonId} style={{
+                fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
+                border: '0.5px solid var(--border-md)', background: 'transparent',
+                color: seasonId ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
+              }}>↑ Import CSV</button>
+              <button onClick={downloadCsvTemplate} style={{
+                fontSize: '10px', background: 'none', border: 'none', cursor: 'pointer',
+                color: `rgba(var(--fg-rgb), 0.3)`, padding: 0, textDecoration: 'underline',
+              }}>download template</button>
+            </div>
             <button onClick={openAdd} disabled={!seasonId} style={{
               fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
               border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',

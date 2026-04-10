@@ -92,6 +92,20 @@ export default function SetupWizard() {
     playerFirstRef.current?.focus()
   }
 
+  function downloadCsvTemplate() {
+    const rows = [
+      'First Name,Last Name,Jersey Number,Position',
+      'Alex,Smith,12,SS',
+      'Jordan,Lee,7,P',
+      'Taylor,Brown,21,C',
+    ]
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'six43-roster-template.csv'
+    a.click()
+  }
+
   function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -332,17 +346,28 @@ export default function SetupWizard() {
               style={{ display: 'none' }}
               onChange={handleCsvFile}
             />
-            <button
-              onClick={() => csvInputRef.current?.click()}
-              style={{
-                width: '100%', padding: '11px', borderRadius: 8, marginBottom: 16,
-                border: '0.5px dashed var(--border-md)', background: 'transparent',
-                color: `rgba(var(--fg-rgb),0.5)`, fontSize: 13, cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              ↑ Import from CSV (GameChanger or spreadsheet)
-            </button>
+            <div style={{ marginBottom: 16 }}>
+              <button
+                onClick={() => csvInputRef.current?.click()}
+                style={{
+                  width: '100%', padding: '11px', borderRadius: 8,
+                  border: '0.5px dashed var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb),0.5)`, fontSize: 13, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                ↑ Import from CSV or spreadsheet
+              </button>
+              <div style={{ textAlign: 'center', marginTop: 6 }}>
+                <button onClick={downloadCsvTemplate} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: `rgba(var(--fg-rgb),0.3)`, fontSize: 11, textDecoration: 'underline',
+                  fontFamily: 'inherit', padding: 0,
+                }}>
+                  download template
+                </button>
+              </div>
+            </div>
 
             {/* CSV preview */}
             {csvPreview && (
