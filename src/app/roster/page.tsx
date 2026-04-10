@@ -38,6 +38,14 @@ function PosChip({ pos }: { pos: string | null }) {
 
 const BLANK = { first_name: '', last_name: '', jersey_number: '', primary_position: '', status: 'active', innings_target: '' }
 
+const EVAL_SKILLS = [
+  { key: 'hitting',      label: 'Hitting',      short: 'Hit' },
+  { key: 'fielding',     label: 'Fielding',      short: 'Fld' },
+  { key: 'arm',          label: 'Arm',           short: 'Arm' },
+  { key: 'speed',        label: 'Speed',         short: 'Spd' },
+  { key: 'coachability', label: 'Coachability',  short: 'Cch' },
+]
+
 export default function RosterPage() {
   const supabase = createClient()
   const [players, setPlayers] = useState<any[]>([])
@@ -55,6 +63,15 @@ export default function RosterPage() {
   const [reorderMode, setReorderMode] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [rosterView, setRosterView] = useState<'players' | 'evaluations'>('players')
+  const [evalPlayer, setEvalPlayer] = useState<any>(null)
+  const [evalNotes, setEvalNotes] = useState<any[]>([])
+  const [evalScores, setEvalScores] = useState<Record<string, number | null>>({})
+  const [newNote, setNewNote] = useState('')
+  const [newNoteDate, setNewNoteDate] = useState(new Date().toISOString().split('T')[0])
+  const [evalLoading, setEvalLoading] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null)
 
   useEffect(() => { loadRoster() }, [])
 
@@ -199,6 +216,51 @@ export default function RosterPage() {
     setDeleting(false)
   }
 
+  async function openEval(player: any) {
+    setEvalPlayer(player)
+    setEvalScores(player.eval_scores ?? {})
+    setEvalNotes([])
+    setNewNote('')
+    setNewNoteDate(new Date().toISOString().split('T')[0])
+    if (!seasonId) return
+    setEvalLoading(true)
+    const { data } = await supabase
+      .from('player_eval_notes')
+      .select('*')
+      .eq('player_id', player.id)
+      .eq('season_id', seasonId)
+      .order('note_date', { ascending: false })
+    setEvalNotes(data ?? [])
+    setEvalLoading(false)
+  }
+
+  async function saveScore(skill: string, value: number | null) {
+    if (!evalPlayer) return
+    const next = { ...evalScores, [skill]: value }
+    setEvalScores(next)
+    await supabase.from('players').update({ eval_scores: next }).eq('id', evalPlayer.id)
+    setPlayers(prev => prev.map(p => p.id === evalPlayer.id ? { ...p, eval_scores: next } : p))
+  }
+
+  async function addNote() {
+    if (!newNote.trim() || !evalPlayer || !seasonId) return
+    setSavingNote(true)
+    const { data } = await supabase.from('player_eval_notes').insert({
+      player_id: evalPlayer.id, season_id: seasonId,
+      note_date: newNoteDate, body: newNote.trim(),
+    }).select().single()
+    if (data) setEvalNotes(prev => [data, ...prev])
+    setNewNote('')
+    setSavingNote(false)
+  }
+
+  async function deleteNote(noteId: string) {
+    setDeletingNoteId(noteId)
+    await supabase.from('player_eval_notes').delete().eq('id', noteId)
+    setEvalNotes(prev => prev.filter(n => n.id !== noteId))
+    setDeletingNoteId(null)
+  }
+
   async function handleDrop(targetId: string) {
     if (!dragId || dragId === targetId) { setDragId(null); return }
     const active = players.filter(p => p.status === 'active')
@@ -248,7 +310,7 @@ export default function RosterPage() {
         }}>Depth Chart</Link>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Roster</h1>
           {(teamName || seasonName) && (
@@ -258,7 +320,7 @@ export default function RosterPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {active.length > 1 && (
+          {rosterView === 'players' && active.length > 1 && (
             <button onClick={() => setReorderMode(m => !m)} style={{
               fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
               border: '0.5px solid var(--border-md)',
@@ -266,13 +328,31 @@ export default function RosterPage() {
               color: reorderMode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.6)`, cursor: 'pointer',
             }}>{reorderMode ? '✓ Done' : '↕ Order'}</button>
           )}
-          <button onClick={openAdd} disabled={!seasonId} style={{
-            fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
-            border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',
-            color: seasonId ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
-          }}>+ Add player</button>
+          {rosterView === 'players' && (
+            <button onClick={openAdd} disabled={!seasonId} style={{
+              fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
+              border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',
+              color: seasonId ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
+            }}>+ Add player</button>
+          )}
         </div>
       </div>
+
+      {/* View toggle */}
+      {players.length > 0 && (
+        <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: '6px', padding: '2px', gap: '2px', marginBottom: '1.25rem' }}>
+          {(['players', 'evaluations'] as const).map(v => (
+            <button key={v} onClick={() => setRosterView(v)} style={{
+              flex: 1, padding: '5px 10px', borderRadius: '4px', border: 'none',
+              background: rosterView === v ? 'var(--accent)' : 'transparent',
+              color: rosterView === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.5)`,
+              fontSize: '12px', fontWeight: rosterView === v ? 700 : 400, cursor: 'pointer',
+            }}>
+              {v === 'players' ? 'Players' : 'Evaluations'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!seasonId && (
         <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, textAlign: 'center', marginTop: '3rem' }}>
@@ -281,57 +361,122 @@ export default function RosterPage() {
         </div>
       )}
 
-      {/* Active players */}
-      {active.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-            letterSpacing: '0.08em', marginBottom: '8px' }}>
-            {reorderMode ? 'Drag to set batting order' : `Active · ${active.length}`}
-          </div>
-          {active.map((player, idx) => (
-            <div
-              key={player.id}
-              draggable={reorderMode}
-              onDragStart={() => setDragId(player.id)}
-              onDragOver={e => { e.preventDefault(); setDragOverId(player.id) }}
-              onDrop={() => handleDrop(player.id)}
-              onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-              style={{
-                opacity: dragId === player.id ? 0.4 : 1,
-                outline: dragOverId === player.id && dragId !== player.id
-                  ? '2px solid var(--accent)' : 'none',
-                borderRadius: '8px',
-                cursor: reorderMode ? 'grab' : 'default',
-              }}
-            >
-              <PlayerRow
-                player={player}
-                onEdit={reorderMode ? () => {} : openEdit}
-                onDelete={setDeleteConfirm}
-                reorderMode={reorderMode}
-                order={idx + 1}
-              />
+      {/* ── PLAYERS VIEW ── */}
+      {rosterView === 'players' && (<>
+        {active.length > 0 && (
+          <section style={{ marginBottom: '2rem' }}>
+            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
+              letterSpacing: '0.08em', marginBottom: '8px' }}>
+              {reorderMode ? 'Drag to set batting order' : `Active · ${active.length}`}
             </div>
-          ))}
-        </section>
-      )}
+            {active.map((player, idx) => (
+              <div
+                key={player.id}
+                draggable={reorderMode}
+                onDragStart={() => setDragId(player.id)}
+                onDragOver={e => { e.preventDefault(); setDragOverId(player.id) }}
+                onDrop={() => handleDrop(player.id)}
+                onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                style={{
+                  opacity: dragId === player.id ? 0.4 : 1,
+                  outline: dragOverId === player.id && dragId !== player.id
+                    ? '2px solid var(--accent)' : 'none',
+                  borderRadius: '8px',
+                  cursor: reorderMode ? 'grab' : 'default',
+                }}
+              >
+                <PlayerRow
+                  player={player}
+                  onEdit={reorderMode ? () => {} : openEdit}
+                  onDelete={setDeleteConfirm}
+                  onEval={reorderMode ? undefined : openEval}
+                  reorderMode={reorderMode}
+                  order={idx + 1}
+                />
+              </div>
+            ))}
+          </section>
+        )}
 
-      {/* Inactive / injured players */}
-      {inactive.length > 0 && (
-        <section>
-          <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-            letterSpacing: '0.08em', marginBottom: '8px' }}>
-            Inactive / Injured · {inactive.length}
+        {inactive.length > 0 && (
+          <section>
+            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
+              letterSpacing: '0.08em', marginBottom: '8px' }}>
+              Inactive / Injured · {inactive.length}
+            </div>
+            {inactive.map(player => (
+              <PlayerRow key={player.id} player={player} onEdit={openEdit} onDelete={setDeleteConfirm} onEval={openEval} />
+            ))}
+          </section>
+        )}
+
+        {players.length === 0 && (
+          <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
+            No players yet. Add your first player to get started.
           </div>
-          {inactive.map(player => (
-            <PlayerRow key={player.id} player={player} onEdit={openEdit} onDelete={setDeleteConfirm} />
-          ))}
-        </section>
-      )}
+        )}
+      </>)}
 
-      {players.length === 0 && (
-        <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
-          No players yet. Add your first player to get started.
+      {/* ── EVALUATIONS VIEW ── */}
+      {rosterView === 'evaluations' && (
+        <div>
+          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1rem' }}>
+            Tap a player name to open their evaluation sheet.
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '360px' }}>
+              <thead>
+                <tr>
+                  <th style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'left', padding: '4px 8px 8px 0', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Player</th>
+                  {EVAL_SKILLS.map(s => (
+                    <th key={s.key} style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'center', padding: '4px 4px 8px', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 48 }}>{s.short}</th>
+                  ))}
+                  <th style={{ fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'left', padding: '4px 0 8px 8px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.filter(p => p.status === 'active').map((player, idx) => {
+                  const scores = player.eval_scores ?? {}
+                  const avg = (() => {
+                    const vals = EVAL_SKILLS.map(s => scores[s.key]).filter((v): v is number => typeof v === 'number')
+                    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null
+                  })()
+                  return (
+                    <tr key={player.id} style={{ borderTop: '0.5px solid var(--border-subtle)', background: idx % 2 === 0 ? 'transparent' : 'var(--bg-card-alt)' }}>
+                      <td style={{ padding: '8px 8px 8px 0', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => openEval(player)} style={{
+                          background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg)',
+                          fontSize: '13px', fontWeight: 500, padding: 0, textAlign: 'left',
+                        }}>
+                          <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '6px' }}>#{player.jersey_number}</span>
+                          {player.first_name[0]}. {player.last_name}
+                          {avg && <span style={{ fontSize: '10px', color: 'var(--accent)', marginLeft: '6px', fontWeight: 700 }}>{avg}</span>}
+                        </button>
+                      </td>
+                      {EVAL_SKILLS.map(s => {
+                        const v = scores[s.key]
+                        return (
+                          <td key={s.key} style={{ textAlign: 'center', padding: '8px 4px' }}>
+                            {typeof v === 'number' ? (
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: v >= 4 ? '#6DB875' : v >= 3 ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.45)` }}>{v}</span>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td style={{ padding: '8px 0 8px 8px', fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        —
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '1rem', textAlign: 'center' }}>
+            Tap a player name to open their evaluation
+          </div>
         </div>
       )}
 
@@ -418,6 +563,138 @@ export default function RosterPage() {
         </div>
       )}
 
+      {/* ── EVAL BOTTOM SHEET ── */}
+      {evalPlayer && (
+        <div onClick={() => setEvalPlayer(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: '16px 16px 0 0', padding: '1.5rem',
+            width: '100%', maxWidth: '480px', border: '0.5px solid var(--border)',
+            maxHeight: '85vh', overflowY: 'auto',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: 700 }}>
+                  #{evalPlayer.jersey_number} {evalPlayer.first_name} {evalPlayer.last_name}
+                </div>
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                  {evalPlayer.primary_position ?? 'No position'} · Player evaluation
+                </div>
+              </div>
+              <button onClick={() => setEvalPlayer(null)} style={{
+                fontSize: '22px', lineHeight: 1, background: 'none', border: 'none',
+                color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '0 4px',
+              }}>×</button>
+            </div>
+
+            {/* Skill scores */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`,
+                textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                Skill Scores
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {EVAL_SKILLS.map(skill => {
+                  const current = evalScores[skill.key] ?? null
+                  return (
+                    <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '13px', width: '90px', flexShrink: 0 }}>{skill.label}</div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[1, 2, 3, 4, 5].map(v => (
+                          <button key={v} onClick={() => saveScore(skill.key, current === v ? null : v)} style={{
+                            width: '32px', height: '32px', borderRadius: '6px', border: 'none',
+                            background: current === v
+                              ? (v >= 4 ? '#2A6633' : v >= 3 ? 'rgba(59,109,177,0.5)' : 'rgba(180,60,40,0.35)')
+                              : 'var(--bg-input)',
+                            color: current === v
+                              ? (v >= 4 ? '#6DB875' : v >= 3 ? '#80B0E8' : '#E87060')
+                              : `rgba(var(--fg-rgb), 0.35)`,
+                            fontWeight: current === v ? 700 : 400,
+                            fontSize: '14px', cursor: 'pointer', flexShrink: 0,
+                          }}>{v}</button>
+                        ))}
+                      </div>
+                      {current !== null && (
+                        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)` }}>
+                          {current >= 4 ? 'Strong' : current >= 3 ? 'Average' : 'Needs work'}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Add note */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`,
+                textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                Add Note
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input
+                  type="date"
+                  value={newNoteDate}
+                  onChange={e => setNewNoteDate(e.target.value)}
+                  style={{ ...inputStyle, width: 'auto', flex: '0 0 auto' }}
+                />
+              </div>
+              <textarea
+                value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                placeholder="Add an observation or note…"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
+              />
+              <button onClick={addNote} disabled={savingNote || !newNote.trim()} style={{
+                marginTop: '8px', width: '100%', padding: '10px', borderRadius: '6px',
+                border: 'none', background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '13px', fontWeight: 700, cursor: savingNote || !newNote.trim() ? 'not-allowed' : 'pointer',
+                opacity: savingNote || !newNote.trim() ? 0.5 : 1,
+              }}>{savingNote ? 'Saving…' : 'Add Note'}</button>
+            </div>
+
+            {/* Notes log */}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`,
+                textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                Notes {evalNotes.length > 0 ? `· ${evalNotes.length}` : ''}
+              </div>
+              {evalLoading ? (
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'center', padding: '1rem 0' }}>Loading…</div>
+              ) : evalNotes.length === 0 ? (
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.3)`, textAlign: 'center', padding: '1rem 0' }}>No notes yet</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {evalNotes.map(note => (
+                    <div key={note.id} style={{
+                      background: 'var(--bg-card)', borderRadius: '8px', padding: '10px 12px',
+                      border: '0.5px solid var(--border-subtle)',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, flexShrink: 0 }}>
+                          {new Date(note.note_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                        <button
+                          onClick={() => deleteNote(note.id)}
+                          disabled={deletingNoteId === note.id}
+                          style={{ fontSize: '12px', background: 'none', border: 'none',
+                            color: `rgba(var(--fg-rgb), 0.25)`, cursor: 'pointer', flexShrink: 0, padding: 0 }}
+                        >✕</button>
+                      </div>
+                      <div style={{ fontSize: '13px', marginTop: '4px', lineHeight: 1.5 }}>{note.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── DELETE CONFIRM ── */}
       {deleteConfirm && (
         <div onClick={() => setDeleteConfirm(null)} style={{
@@ -451,10 +728,11 @@ export default function RosterPage() {
   )
 }
 
-function PlayerRow({ player, onEdit, onDelete, reorderMode, order }: {
+function PlayerRow({ player, onEdit, onDelete, onEval, reorderMode, order }: {
   player: any
   onEdit: (p: any) => void
   onDelete: (id: string) => void
+  onEval?: (p: any) => void
   reorderMode?: boolean
   order?: number
 }) {
@@ -495,13 +773,20 @@ function PlayerRow({ player, onEdit, onDelete, reorderMode, order }: {
       )}
       {reorderMode ? (
         <span style={{ fontSize: '16px', color: `rgba(var(--fg-rgb), 0.2)`, flexShrink: 0 }}>⠿</span>
-      ) : (
+      ) : (<>
+        {onEval && (
+          <button onClick={() => onEval(player)} style={{
+            fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+            border: '0.5px solid var(--border-md)', background: 'transparent',
+            color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', flexShrink: 0,
+          }}>Eval</button>
+        )}
         <button onClick={() => onEdit(player)} style={{
           fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
           border: '0.5px solid var(--border-md)', background: 'transparent',
           color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', flexShrink: 0,
         }}>Edit</button>
-      )}
+      </>)}
     </div>
   )
 }
