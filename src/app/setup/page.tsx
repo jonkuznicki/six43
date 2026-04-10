@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { parseRosterCsv, type ParsedPlayer } from '../../lib/parseRosterCsv'
 
 const POSITIONS_BASEBALL = ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
 const POSITIONS_SOFTBALL = ['P','C','1B','2B','SS','3B','LF','LC','RC','RF','Bench']
@@ -39,6 +40,8 @@ export default function SetupWizard() {
   const [pFirst,  setPFirst]  = useState('')
   const [pLast,   setPLast]   = useState('')
   const [pJersey, setPJersey] = useState('')
+  const [csvPreview, setCsvPreview] = useState<ParsedPlayer[] | null>(null)
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
   // ── Step 3 state ──────────────────────────────────────────────────────────
   const [games,      setGames]      = useState<GameRow[]>([])
@@ -87,6 +90,31 @@ export default function SetupWizard() {
     setPlayers(p => [...p, { firstName: pFirst.trim(), lastName: pLast.trim(), jersey: pJersey.trim() }])
     setPFirst(''); setPLast(''); setPJersey('')
     playerFirstRef.current?.focus()
+  }
+
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      const parsed = parseRosterCsv(text)
+      setCsvPreview(parsed)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  function confirmCsvImport() {
+    if (!csvPreview) return
+    const toAdd: PlayerRow[] = csvPreview
+      .filter(p => p.firstName || p.lastName)
+      .map(p => ({ firstName: p.firstName, lastName: p.lastName, jersey: p.jersey }))
+    setPlayers(prev => {
+      const existing = new Set(prev.map(p => `${p.firstName}|${p.lastName}|${p.jersey}`))
+      return [...prev, ...toAdd.filter(p => !existing.has(`${p.firstName}|${p.lastName}|${p.jersey}`))]
+    })
+    setCsvPreview(null)
   }
 
   async function finishStep2() {
@@ -295,6 +323,84 @@ export default function SetupWizard() {
             <p style={{ fontSize: 14, color: `rgba(var(--fg-rgb),0.45)`, marginBottom: 28 }}>
               Add as many or as few as you like. You can always add more from the Roster page.
             </p>
+
+            {/* CSV import */}
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={handleCsvFile}
+            />
+            <button
+              onClick={() => csvInputRef.current?.click()}
+              style={{
+                width: '100%', padding: '11px', borderRadius: 8, marginBottom: 16,
+                border: '0.5px dashed var(--border-md)', background: 'transparent',
+                color: `rgba(var(--fg-rgb),0.5)`, fontSize: 13, cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ↑ Import from CSV (GameChanger or spreadsheet)
+            </button>
+
+            {/* CSV preview */}
+            {csvPreview && (
+              <div style={{
+                background: 'var(--bg-card)', borderRadius: 10,
+                border: '0.5px solid var(--border)', marginBottom: 16, overflow: 'hidden',
+              }}>
+                <div style={{ padding: '10px 14px', borderBottom: '0.5px solid var(--border-subtle)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    {csvPreview.length} player{csvPreview.length !== 1 ? 's' : ''} found in file
+                  </div>
+                  <button onClick={() => setCsvPreview(null)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: `rgba(var(--fg-rgb),0.3)`, fontSize: 16, padding: 0,
+                  }}>×</button>
+                </div>
+                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                  {csvPreview.slice(0, 30).map((p, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '7px 14px',
+                      borderBottom: i < csvPreview.length - 1 ? '0.5px solid var(--border-subtle)' : 'none',
+                    }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, width: 24, height: 24, borderRadius: '50%',
+                        background: p.jersey ? 'rgba(45,106,53,0.15)' : 'rgba(var(--fg-rgb),0.07)',
+                        color: p.jersey ? '#6DB875' : `rgba(var(--fg-rgb),0.3)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {p.jersey || '?'}
+                      </span>
+                      <span style={{ flex: 1, fontSize: 13 }}>
+                        {p.firstName} {p.lastName}
+                        {p.position && <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, marginLeft: 6 }}>{p.position}</span>}
+                      </span>
+                    </div>
+                  ))}
+                  {csvPreview.length > 30 && (
+                    <div style={{ padding: '8px 14px', fontSize: 12, color: `rgba(var(--fg-rgb),0.35)`, fontStyle: 'italic' }}>
+                      …and {csvPreview.length - 30} more
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: '10px 14px', borderTop: '0.5px solid var(--border-subtle)', display: 'flex', gap: 8 }}>
+                  <button onClick={() => setCsvPreview(null)} style={{
+                    flex: 1, padding: '9px', borderRadius: 7, border: '0.5px solid var(--border-md)',
+                    background: 'transparent', color: `rgba(var(--fg-rgb),0.5)`, fontSize: 13, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}>Cancel</button>
+                  <button onClick={confirmCsvImport} style={{
+                    flex: 2, padding: '9px', borderRadius: 7, border: 'none',
+                    background: GOLD, color: NAVY, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}>Add {csvPreview.length} player{csvPreview.length !== 1 ? 's' : ''}</button>
+                </div>
+              </div>
+            )}
 
             {/* Inline add row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>

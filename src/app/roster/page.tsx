@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../lib/supabase'
 import Link from 'next/link'
+import { parseRosterCsv, type ParsedPlayer } from '../../lib/parseRosterCsv'
 
 const POSITIONS = ['P','C','1B','2B','SS','3B','LF','CF','RF']
 
@@ -63,6 +64,9 @@ export default function RosterPage() {
   const [reorderMode, setReorderMode] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [csvPreview, setCsvPreview] = useState<ParsedPlayer[] | null>(null)
+  const [importingCsv, setImportingCsv] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
   const [rosterView, setRosterView] = useState<'players' | 'evaluations'>('players')
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null)
   const [reportPlayer, setReportPlayer] = useState<any>(null)
@@ -146,6 +150,38 @@ export default function RosterPage() {
     setForm(BLANK)
     setError('')
     setShowForm(true)
+  }
+
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      setCsvPreview(parseRosterCsv(text))
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  async function confirmCsvImport() {
+    if (!csvPreview || !teamId || !seasonId) return
+    setImportingCsv(true)
+    const rows = csvPreview.filter(p => p.firstName || p.lastName)
+    const maxOrder = players.reduce((m, p) => Math.max(m, p.batting_pref_order ?? 0), 0)
+    const { data } = await supabase.from('players').insert(
+      rows.map((p, i) => ({
+        team_id: teamId, season_id: seasonId,
+        first_name: p.firstName, last_name: p.lastName,
+        jersey_number: parseInt(p.jersey) || 0,
+        primary_position: p.position || null,
+        batting_pref_order: maxOrder + i + 1,
+        status: 'active',
+      }))
+    ).select()
+    if (data) setPlayers(prev => [...prev, ...data])
+    setCsvPreview(null)
+    setImportingCsv(false)
   }
 
   function openEdit(player: any) {
@@ -356,13 +392,19 @@ export default function RosterPage() {
               color: reorderMode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.6)`, cursor: 'pointer',
             }}>{reorderMode ? '✓ Done' : '↕ Order'}</button>
           )}
-          {rosterView === 'players' && (
+          {rosterView === 'players' && (<>
+            <input ref={csvInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleCsvFile} />
+            <button onClick={() => csvInputRef.current?.click()} disabled={!seasonId} style={{
+              fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
+              border: '0.5px solid var(--border-md)', background: 'transparent',
+              color: seasonId ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
+            }}>↑ CSV</button>
             <button onClick={openAdd} disabled={!seasonId} style={{
               fontSize: '13px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px',
               border: 'none', background: seasonId ? 'var(--accent)' : 'var(--bg-card)',
               color: seasonId ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.3)`, cursor: seasonId ? 'pointer' : 'not-allowed',
             }}>+ Add player</button>
-          )}
+          </>)}
         </div>
       </div>
 
@@ -698,6 +740,67 @@ export default function RosterPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CSV IMPORT PREVIEW ── */}
+      {csvPreview && (
+        <div onClick={() => setCsvPreview(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg2)', borderRadius: '16px 16px 0 0', padding: '1.5rem',
+            width: '100%', maxWidth: '480px', border: '0.5px solid var(--border)',
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700 }}>
+                {csvPreview.length} player{csvPreview.length !== 1 ? 's' : ''} found
+              </div>
+              <button onClick={() => setCsvPreview(null)} style={{
+                fontSize: '22px', lineHeight: 1, background: 'none', border: 'none',
+                color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '0 4px',
+              }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+              {csvPreview.slice(0, 50).map((p, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '7px 0',
+                  borderBottom: '0.5px solid var(--border-subtle)',
+                }}>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 700, width: '28px', height: '28px', borderRadius: '50%',
+                    background: p.jersey ? 'rgba(45,106,53,0.15)' : 'rgba(var(--fg-rgb),0.07)',
+                    color: p.jersey ? '#6DB875' : `rgba(var(--fg-rgb),0.3)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>{p.jersey || '?'}</span>
+                  <span style={{ flex: 1, fontSize: '13px' }}>
+                    {p.firstName} {p.lastName}
+                    {p.position && <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb),0.4)`, marginLeft: '6px' }}>{p.position}</span>}
+                  </span>
+                </div>
+              ))}
+              {csvPreview.length > 50 && (
+                <div style={{ padding: '8px 0', fontSize: '12px', color: `rgba(var(--fg-rgb),0.35)`, fontStyle: 'italic' }}>
+                  …and {csvPreview.length - 50} more
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setCsvPreview(null)} style={{
+                flex: 1, padding: '11px', borderRadius: '7px', border: '0.5px solid var(--border-strong)',
+                background: 'transparent', color: `rgba(var(--fg-rgb),0.6)`, fontSize: '13px', cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={confirmCsvImport} disabled={importingCsv} style={{
+                flex: 2, padding: '11px', borderRadius: '7px', border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '13px', fontWeight: 700, cursor: importingCsv ? 'not-allowed' : 'pointer',
+                opacity: importingCsv ? 0.7 : 1,
+              }}>{importingCsv ? 'Importing…' : `Import ${csvPreview.length} player${csvPreview.length !== 1 ? 's' : ''}`}</button>
             </div>
           </div>
         </div>
