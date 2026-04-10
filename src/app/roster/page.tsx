@@ -272,7 +272,11 @@ export default function RosterPage() {
         setReportPlayer(player)
         setReportText(data.report)
         setReportCopied(false)
+      } else {
+        alert(`Report error: ${data.error ?? 'Unknown error'}`)
       }
+    } catch (e: any) {
+      alert(`Request failed: ${e.message}`)
     } finally {
       setGeneratingReportId(null)
     }
