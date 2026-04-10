@@ -447,7 +447,7 @@ export default function PitchingPage() {
                   return (
                     <div key={game.id} style={{
                       display: 'grid', gridTemplateColumns: pastGrid,
-                      gap: '6px', minWidth: pastMinW,
+                      gap: '6px',
                       background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
                       borderRadius: '8px', padding: '10px',
                       marginBottom: '4px', alignItems: 'start',
