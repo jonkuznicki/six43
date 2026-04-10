@@ -3,9 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '../../../../lib/supabase-service'
 import { createServerClient } from '../../../../lib/supabase-server'
 
-const anthropic = new Anthropic()
-
 export async function POST(req: Request) {
+  try {
   // Auth check
   const authClient = await createServerClient()
   const { data: { user } } = await authClient.auth.getUser()
@@ -113,6 +112,8 @@ ${notesBlock}
 
 Write a 2–3 paragraph player evaluation suitable for sharing with the player's parents. Be encouraging, honest, and specific. Reference the actual stats and notes where relevant. Focus on what the player did well, areas where they grew or can continue to develop, and something that makes this player stand out as an individual. Use a warm, personal tone appropriate for youth sports. Do not use bullet points — write in flowing paragraphs.`
 
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-6',
     max_tokens: 600,
@@ -122,4 +123,8 @@ Write a 2–3 paragraph player evaluation suitable for sharing with the player's
   const report = (message.content[0] as any).text
 
   return NextResponse.json({ report })
+  } catch (e: any) {
+    console.error('Report generation error:', e)
+    return NextResponse.json({ error: e.message ?? 'Internal error' }, { status: 500 })
+  }
 }
