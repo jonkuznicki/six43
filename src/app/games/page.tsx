@@ -62,7 +62,7 @@ export default async function GamesPage({
 
   const allGames = games ?? []
   const today = new Date().toISOString().split('T')[0]
-  const firstUpcomingIdx = allGames.findIndex(g => g.game_date >= today || g.status !== 'final')
+  const firstUpcomingIdx = allGames.findIndex(g => g.game_date > today || (g.game_date === today && g.status !== 'final'))
   const teamName = selectedTeam?.name ?? 'Us'
 
   // Dashboard summary card data
