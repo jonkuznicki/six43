@@ -5,6 +5,7 @@ import Link from 'next/link'
 import TeamSelect from './TeamSelect'
 import GameCard from './GameCard'
 import SyncPanel from './SyncPanel'
+import ScrollToToday from './ScrollToToday'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,13 +60,12 @@ export default async function GamesPage({
     .eq('season_id', season.id)
     .eq('status', 'active') : { count: 0 }
 
-  const upcoming = (games ?? []).filter(g =>
-    g.status === 'scheduled' || g.status === 'lineup_ready' || g.status === 'in_progress'
-  )
-  const recent = (games ?? []).filter(g => g.status === 'final')
+  const allGames = games ?? []
+  const today = new Date().toISOString().split('T')[0]
+  const firstUpcomingIdx = allGames.findIndex(g => g.game_date >= today || g.status !== 'final')
   const teamName = selectedTeam?.name ?? 'Us'
 
-  const showGettingStarted = teams.length === 0 || !season || (games ?? []).length === 0
+  const showGettingStarted = teams.length === 0 || !season || allGames.length === 0
 
   const steps = [
     {
@@ -238,30 +238,25 @@ export default async function GamesPage({
             </div>
           )}
 
-          {/* Upcoming */}
-          {upcoming.length > 0 && (
+          {/* All games in chronological order, scroll to today on load */}
+          {allGames.length > 0 && (
             <>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
-              }}>
-                Upcoming
-              </div>
-              {upcoming.map(g => <GameCard key={g.id} game={g} teamName={teamName} />)}
-              <div style={{ marginBottom: '1.5rem' }} />
-            </>
-          )}
-
-          {/* Recent */}
-          {recent.length > 0 && (
-            <>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px',
-              }}>
-                Recent
-              </div>
-              {recent.map(g => <GameCard key={g.id} game={g} teamName={teamName} />)}
+              <ScrollToToday />
+              {allGames.map((g, idx) => (
+                <div key={g.id}>
+                  {idx === firstUpcomingIdx && (
+                    <div id="today-anchor" style={{
+                      fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                      textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                      marginBottom: '8px',
+                      marginTop: idx > 0 ? '1.5rem' : 0,
+                    }}>
+                      Upcoming
+                    </div>
+                  )}
+                  <GameCard game={g} teamName={teamName} />
+                </div>
+              ))}
             </>
           )}
         </>
