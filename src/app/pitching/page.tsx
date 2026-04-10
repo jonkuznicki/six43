@@ -336,9 +336,8 @@ export default function PitchingPage() {
   )
 
   const upcomingGrid = `140px repeat(${slotCount}, 1fr)`
-  const pastGrid     = `140px repeat(${maxActualPitchers}, 1fr)`
+  const pastGrid     = `120px repeat(${maxActualPitchers}, 1fr)`
   const upcomingMinW = `${300 + slotCount * 80}px`
-  const pastMinW     = `${300 + maxActualPitchers * 80}px`
 
   return (
     <main style={{
@@ -435,7 +434,7 @@ export default function PitchingPage() {
                 {/* Column headers */}
                 <div style={{
                   display: 'grid', gridTemplateColumns: pastGrid,
-                  gap: '6px', marginBottom: '4px', minWidth: pastMinW, padding: '0 2px',
+                  gap: '6px', marginBottom: '4px', padding: '0 2px',
                 }}>
                   <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
                   {Array.from({ length: maxActualPitchers }, (_, i) => (
