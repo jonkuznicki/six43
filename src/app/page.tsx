@@ -30,15 +30,18 @@ const DEMO_PLAYERS = [
 ]
 
 const FEATURES = [
-  { icon: '⚾', title: 'Lineup builder',        body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper.' },
-  { icon: '📋', title: 'Attendance tracking',   body: 'Mark who\'s there on game day. Absent players are automatically removed from the lineup.' },
-  { icon: '📊', title: 'Playing time fairness', body: 'See bench %, innings by position, and season totals. Get flagged before a kid sits too long.' },
-  { icon: '🎯', title: 'Pitching planner',      body: 'Log pitch counts and track rest days. See who\'s eligible for your next game at a glance.' },
-  { icon: '🔄', title: 'GameChanger sync',      body: 'Paste your webcal link and your full schedule imports in seconds. Keep it in sync all season.' },
-  { icon: '📐', title: 'Depth chart',           body: 'Rank players at every position and flag who can\'t play certain spots. Always current.' },
-  { icon: '🔗', title: 'Share with your staff', body: 'Invite assistant coaches. Generate a read-only link for anyone who just needs the card.' },
-  { icon: '🖨️', title: 'Print-ready card',      body: 'One tap to print a clean lineup card to bring to the field. Works from phone or desktop.' },
-  { icon: '📱', title: 'Works everywhere',      body: 'Install on your phone like an app or use from your laptop. Same lineup, everywhere.' },
+  { icon: '⚾', title: 'Lineup builder',           body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper.' },
+  { icon: '📋', title: 'Attendance tracking',      body: 'Mark who\'s there on game day. Absent players are automatically removed from the lineup.' },
+  { icon: '📊', title: 'Playing time fairness',    body: 'See bench %, innings by position, and season totals. Get flagged before a kid sits too long.' },
+  { icon: '🎯', title: 'Pitching planner',         body: 'Track pitch counts, rest days, and per-game limits. Season totals and over-limit warnings built in.' },
+  { icon: '✦',  title: 'AI player evaluations',   body: 'Add notes throughout the season. At the end, generate a personalized report for each player\'s family in one tap.' },
+  { icon: '🔄', title: 'GameChanger sync',         body: 'Paste your webcal link and your full schedule imports in seconds. Keep it in sync all season.' },
+  { icon: '📐', title: 'Depth chart',              body: 'Rank players at every position and flag who can\'t play certain spots. Always current.' },
+  { icon: '🔗', title: 'Share with your staff',    body: 'Invite assistant coaches with full edit access or read-only view. Everyone sees the same lineup.' },
+  { icon: '📝', title: 'Post-game notes',          body: 'When you mark a game Final, a quick prompt lets you jot a note on any player while it\'s fresh.' },
+  { icon: '🖨️', title: 'Print-ready card',         body: 'One tap to print a clean lineup card to bring to the field. Works from phone or desktop.' },
+  { icon: '📱', title: 'Works everywhere',         body: 'Install on your phone like an app or use from your laptop. Same lineup, everywhere.' },
+  { icon: '📥', title: 'Roster import',            body: 'Import your roster from a CSV or spreadsheet in seconds. Paste a template and go.' },
 ]
 
 function PhoneMockup({ src, alt, caption }: { src: string; alt: string; caption?: string }) {
@@ -752,6 +755,28 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── Social proof bar ── */}
+      <section style={{ padding: '1.5rem 1.5rem', borderTop: '0.5px solid var(--border-subtle)', borderBottom: '0.5px solid var(--border-subtle)' }}>
+        <div style={{ maxWidth: '760px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '2rem' }}>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, textAlign: 'center' }}>
+            <span style={{ fontWeight: 700, color: 'var(--fg)' }}>Travel · Rec · Tournament</span>
+            <span style={{ margin: '0 8px', opacity: 0.3 }}>·</span>
+            Built for youth baseball &amp; softball coaches
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {[1,2,3,4,5].map(i => (
+              <span key={i} style={{ color: 'var(--accent)', fontSize: '14px' }}>★</span>
+            ))}
+            <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, marginLeft: '4px' }}>
+              "So much better than my old spreadsheets"
+            </span>
+          </div>
+          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>
+            Free to start · No credit card
+          </div>
+        </div>
+      </section>
+
       {/* ── Divider ── */}
       <div className="mkt-divider" />
 
@@ -1061,6 +1086,25 @@ export default async function HomePage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Testimonial ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: '40px', color: 'var(--accent)', lineHeight: 1, marginBottom: '1.25rem', opacity: 0.6 }}>"</div>
+          <blockquote style={{
+            fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 600, lineHeight: 1.55,
+            color: 'var(--fg)', margin: '0 0 1.5rem', fontStyle: 'italic',
+          }}>
+            This is amazing! So much better than my old spreadsheets.
+          </blockquote>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, fontWeight: 600 }}>
+            9U Travel Baseball Coach
+          </div>
         </div>
       </section>
 

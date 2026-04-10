@@ -8,7 +8,8 @@ import InstallPrompt from './InstallPrompt'
 
 export const metadata: Metadata = {
   title: 'Six43 — Youth Baseball Lineup Manager',
-  description: 'Build fair lineups and track playing time for every kid on your roster. Six43 is the lineup management app built for youth baseball coaches.',
+  description: 'Build fair lineups and track playing time for every kid on your roster. Six43 is the lineup management app built for youth baseball and softball coaches.',
+  keywords: ['youth baseball lineup manager', 'baseball lineup app', 'travel baseball lineup', 'little league lineup app', 'youth softball lineup manager', 'baseball lineup maker', 'pitch count tracker'],
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.png',
