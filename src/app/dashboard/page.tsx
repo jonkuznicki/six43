@@ -86,7 +86,7 @@ export default async function Dashboard({
     .order('game_date', { ascending: true }) : { data: [] }
 
   const today = new Date().toISOString().split('T')[0]
-  const nextGame = (games ?? []).find((g: any) => g.status === 'scheduled' && g.game_date >= today)
+  const nextGame = (games ?? []).find((g: any) => (g.status === 'scheduled' || g.status === 'lineup_ready') && g.game_date >= today)
   const recentGames = [...(games ?? [])].filter((g: any) => g.status === 'final').reverse().slice(0, 3)
   const record = parseRecord(games ?? [])
   const upcomingCount = (games ?? []).filter((g: any) => g.status === 'scheduled').length
