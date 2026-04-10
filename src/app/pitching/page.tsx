@@ -56,6 +56,8 @@ export default function PitchingPage() {
   const [saving, setSaving]                 = useState<string | null>(null)
   const [editingPitch, setEditingPitch]     = useState<Record<string, string>>({}) // slotId → draft value
   const [slotCount, setSlotCount]           = useState(MIN_SLOTS)
+  const [pitchLimit, setPitchLimit]         = useState<number | null>(null)
+  const [pitchLimitDraft, setPitchLimitDraft] = useState('')
   const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
@@ -77,7 +79,7 @@ export default function PitchingPage() {
     if (!teamIds.length) { setLoading(false); return }
     const { data: seasonRows } = await supabase
       .from('seasons')
-      .select('id, name, is_active, team_id, team:teams(name)')
+      .select('id, name, is_active, team_id, pitch_count_limit, team:teams(name)')
       .in('team_id', teamIds)
       .order('created_at', { ascending: false })
     setSeasons(seasonRows ?? [])
@@ -99,6 +101,11 @@ export default function PitchingPage() {
 
   async function loadSeason(seasonId: string) {
     setLoading(true)
+    const season = seasons.find(s => s.id === seasonId)
+    const limit = season?.pitch_count_limit ?? null
+    setPitchLimit(limit)
+    setPitchLimitDraft(limit != null ? String(limit) : '')
+
     const { data: playerRows } = await supabase
       .from('players')
       .select('id, first_name, last_name, jersey_number')
@@ -264,6 +271,14 @@ export default function PitchingPage() {
     setEditingPitch(prev => { const n = { ...prev }; delete n[slotId]; return n })
   }
 
+  async function savePitchLimit(value: string) {
+    const num = value === '' ? null : parseInt(value)
+    if (num !== null && (isNaN(num) || num < 1)) return
+    setPitchLimit(num)
+    await supabase.from('seasons').update({ pitch_count_limit: num }).eq('id', selectedSeasonId)
+    setSeasons(prev => prev.map(s => s.id === selectedSeasonId ? { ...s, pitch_count_limit: num } : s))
+  }
+
   async function syncFromLineup(gameId: string) {
     const pitcherIds = lineupPitchers[gameId] ?? []
     for (let i = 0; i < Math.min(pitcherIds.length, slotCount); i++) {
@@ -295,6 +310,25 @@ export default function PitchingPage() {
     return best
   }
 
+  // Season pitch count totals per player
+  const seasonPitchTotals: Record<string, { name: string; total: number; games: number; overLimit: number }> = {}
+  for (const pitchers of Object.values(actualPitching)) {
+    for (const p of pitchers) {
+      if (!p.player) continue
+      const name = shortName(p.player)
+      if (!seasonPitchTotals[p.playerId]) {
+        seasonPitchTotals[p.playerId] = { name, total: 0, games: 0, overLimit: 0 }
+      }
+      const entry = seasonPitchTotals[p.playerId]
+      entry.games++
+      if (p.pitchCount != null) {
+        entry.total += p.pitchCount
+        if (pitchLimit != null && p.pitchCount > pitchLimit) entry.overLimit++
+      }
+    }
+  }
+  const seasonTotalsList = Object.values(seasonPitchTotals).sort((a, b) => b.total - a.total)
+
   // Compute how many columns to show for past games
   const maxActualPitchers = Math.max(
     MIN_SLOTS,
@@ -314,11 +348,38 @@ export default function PitchingPage() {
     }}>
 
       {/* Header */}
-      <div style={{ marginBottom: '0.25rem' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>Pitcher Planner</h1>
-        {activeSeason && (
-          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
-            {(activeSeason as any).team?.name} · {activeSeason.name}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>Pitcher Planner</h1>
+          {activeSeason && (
+            <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
+              {(activeSeason as any).team?.name} · {activeSeason.name}
+            </div>
+          )}
+        </div>
+        {!loading && selectedSeasonId && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)`, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Pitch limit
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="no limit"
+              value={pitchLimitDraft}
+              onChange={e => setPitchLimitDraft(e.target.value.replace(/\D/g, ''))}
+              onBlur={() => savePitchLimit(pitchLimitDraft)}
+              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              style={{
+                width: '72px', padding: '5px 8px', borderRadius: '6px', textAlign: 'center',
+                border: pitchLimit != null ? '0.5px solid rgba(232,160,32,0.5)' : '0.5px solid var(--border-md)',
+                background: 'var(--bg-input)', color: pitchLimit != null ? '#E8A020' : 'var(--fg)',
+                fontSize: '13px', fontWeight: pitchLimit != null ? 700 : 400,
+              }}
+            />
+            {pitchLimit != null && (
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>per game</div>
+            )}
           </div>
         )}
       </div>
@@ -415,6 +476,7 @@ export default function PitchingPage() {
                         const draftKey = p.slotId
                         const isDrafting = draftKey in editingPitch
                         const draftVal = editingPitch[draftKey] ?? ''
+                        const overLimit = pitchLimit != null && p.pitchCount != null && p.pitchCount > pitchLimit
 
                         return (
                           <div key={i} style={{ textAlign: 'center' }}>
@@ -456,18 +518,21 @@ export default function PitchingPage() {
                                 onClick={() => setEditingPitch(prev => ({
                                   ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '',
                                 }))}
+                                title={overLimit ? `Exceeds ${pitchLimit}p limit` : undefined}
                                 style={{
                                   width: '100%', padding: '3px 4px', borderRadius: '4px',
-                                  border: p.pitchCount != null
-                                    ? '0.5px solid var(--border-md)'
-                                    : '0.5px dashed var(--border-md)',
-                                  background: 'transparent',
-                                  color: p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
+                                  border: overLimit
+                                    ? '0.5px solid rgba(232,112,96,0.6)'
+                                    : p.pitchCount != null
+                                      ? '0.5px solid var(--border-md)'
+                                      : '0.5px dashed var(--border-md)',
+                                  background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
+                                  color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
                                   fontSize: '11px', cursor: 'pointer',
-                                  textAlign: 'center',
+                                  textAlign: 'center', fontWeight: overLimit ? 700 : 400,
                                 }}
                               >
-                                {p.pitchCount != null ? `${p.pitchCount}p` : '+ pitches'}
+                                {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
                               </button>
                             )}
                           </div>
@@ -615,6 +680,54 @@ export default function PitchingPage() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+          {/* ── SEASON TOTALS ── */}
+          {seasonTotalsList.length > 0 && (
+            <div style={{ marginTop: '1.75rem' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
+                Season pitch totals
+              </div>
+              <div style={{ background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border-subtle)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '0.5px solid var(--border-subtle)' }}>
+                      <th style={{ ...HEADER_STYLE, textAlign: 'left', padding: '8px 12px' }}>Pitcher</th>
+                      <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Games</th>
+                      <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Total</th>
+                      <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Avg/game</th>
+                      {pitchLimit != null && <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Over limit</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seasonTotalsList.map((entry, idx) => {
+                      const avg = entry.games > 0 ? (entry.total / entry.games).toFixed(0) : '—'
+                      const hasOverLimit = entry.overLimit > 0
+                      return (
+                        <tr key={idx} style={{ borderTop: idx > 0 ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                          <td style={{ fontSize: '13px', fontWeight: 500, padding: '8px 12px' }}>{entry.name}</td>
+                          <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>{entry.games}</td>
+                          <td style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', padding: '8px',
+                            color: hasOverLimit ? '#E87060' : 'var(--fg)' }}>
+                            {entry.total > 0 ? `${entry.total}p` : '—'}
+                          </td>
+                          <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                            {entry.total > 0 ? `${avg}p` : '—'}
+                          </td>
+                          {pitchLimit != null && (
+                            <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px' }}>
+                              {hasOverLimit
+                                ? <span style={{ color: '#E87060', fontWeight: 700 }}>{entry.overLimit}×</span>
+                                : <span style={{ color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>}
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
