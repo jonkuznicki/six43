@@ -5,7 +5,6 @@ import Link from 'next/link'
 import TeamSelect from './TeamSelect'
 import GameCard from './GameCard'
 import SyncPanel from './SyncPanel'
-import ScrollToToday from './ScrollToToday'
 
 export const dynamic = 'force-dynamic'
 
@@ -389,7 +388,6 @@ export default async function GamesPage({
           {/* All games in chronological order, scroll to today on load */}
           {allGames.length > 0 && (
             <>
-              <ScrollToToday />
               {(() => {
                 const shownTournamentIds = new Set<string>()
                 // Pre-compute last index for each tournament so we can close the box
