@@ -62,6 +62,17 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
   const teamName: string = (game as any)?.season?.team?.name ?? 'Us'
 
+  // Adjacent games for prev/next navigation
+  const { data: seasonGames } = await supabase
+    .from('games')
+    .select('id, opponent, game_date')
+    .eq('season_id', game.season_id)
+    .order('game_date', { ascending: true })
+
+  const gameIndex = (seasonGames ?? []).findIndex((g: any) => g.id === params.id)
+  const prevGame = gameIndex > 0 ? (seasonGames ?? [])[gameIndex - 1] : null
+  const nextGame = gameIndex < (seasonGames ?? []).length - 1 ? (seasonGames ?? [])[gameIndex + 1] : null
+
   const { data: slots } = await supabase
     .from('lineup_slots')
     .select('*, player:players(first_name, last_name, jersey_number)')
@@ -97,10 +108,34 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         maxWidth: '480px', margin: '0 auto',
       }}>
 
-        <Link href="/games" style={{
-          fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
-          textDecoration: 'none', display: 'block', marginBottom: '1rem',
-        }}>‹ Games</Link>
+        {/* Navigation row: prev / back to list / next */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: '1rem',
+        }}>
+          {prevGame ? (
+            <Link href={`/games/${prevGame.id}`} style={{
+              fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+              textDecoration: 'none', maxWidth: '38%', overflow: 'hidden',
+              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>‹ vs {prevGame.opponent}</Link>
+          ) : (
+            <span />
+          )}
+          <Link href="/games" style={{
+            fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+            textDecoration: 'none', flexShrink: 0,
+          }}>All games</Link>
+          {nextGame ? (
+            <Link href={`/games/${nextGame.id}`} style={{
+              fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
+              textDecoration: 'none', maxWidth: '38%', overflow: 'hidden',
+              textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right',
+            }}>vs {nextGame.opponent} ›</Link>
+          ) : (
+            <span />
+          )}
+        </div>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between',
@@ -254,6 +289,15 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </Link>
           )}
           <ShareButton gameId={game.id} initialToken={(game as any).share_token ?? null} />
+          <Link href="/pitching" style={{ textDecoration: 'none' }}>
+            <div style={{
+              fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
+              border: '0.5px solid var(--border-strong)', background: 'transparent',
+              color: `rgba(var(--fg-rgb), 0.55)`, textAlign: 'center',
+            }}>
+              🎯 Pitcher planner
+            </div>
+          </Link>
         </div>
 
       </main>

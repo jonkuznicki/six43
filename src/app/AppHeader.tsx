@@ -23,7 +23,7 @@ export default function AppHeader() {
       padding: '0 1.25rem',
       height: '48px',
     }}>
-      <Link href="/games" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
+      <Link href="/dashboard" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
         <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.01em' }}>
           Six<span style={{ color: 'var(--accent)' }}>43</span>
         </span>

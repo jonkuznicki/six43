@@ -7,6 +7,7 @@ import { useTheme } from './ThemeProvider'
 const TABS = [
   { href: '/dashboard', label: 'Home',          icon: '⌂' },
   { href: '/games',     label: 'Games',         icon: '⚾' },
+  { href: '/pitching',  label: 'Pitching',      icon: '🎯' },
   { href: '/fairness',  label: 'Playing Time',  icon: '📊' },
   { href: '/settings',  label: 'Team Settings', icon: '⚙️' },
 ]
