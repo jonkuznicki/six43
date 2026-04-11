@@ -276,7 +276,7 @@ export default async function GamesPage({
           {/* Buttons — sticky below app header */}
           {season && (
             <div style={{
-              position: 'sticky', top: '48px', zIndex: 30,
+              position: 'sticky', top: 'var(--sticky-content-top)', zIndex: 30,
               background: 'var(--nav-bg)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',

@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Layout tokens ── */
+:root {
+  --sticky-content-top: 48px; /* below AppHeader on mobile */
+}
+
+@media (min-width: 768px) {
+  :root {
+    --sticky-content-top: 0px; /* no AppHeader on desktop */
+  }
+}
+
 /* ── Color tokens (dark = default) ── */
 :root {
   --bg: #0B1F3A;
