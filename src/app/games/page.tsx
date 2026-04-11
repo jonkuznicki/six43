@@ -273,9 +273,15 @@ export default async function GamesPage({
             </div>
           )}
 
-          {/* Buttons */}
+          {/* Buttons — sticky below app header */}
           {season && (
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{
+              position: 'sticky', top: '48px', zIndex: 30,
+              background: 'var(--bg)',
+              paddingTop: '0.75rem', paddingBottom: '0.75rem',
+              marginBottom: '0.75rem',
+              boxShadow: '0 4px 12px var(--bg)',
+            }}>
               {/* Row 1: New game (full width) */}
               <div style={{ marginBottom: '8px' }}>
                 <Link

@@ -29,19 +29,28 @@ export default function AppHeader() {
         </span>
       </Link>
 
-      <button
-        onClick={toggle}
-        title="Toggle theme"
-        style={{
-          background: 'transparent', border: 'none',
-          cursor: 'pointer', fontSize: '18px',
-          padding: '6px', borderRadius: '6px',
-          color: `rgba(var(--fg-rgb), 0.5)`,
-          lineHeight: 1,
-        }}
-      >
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <Link href="/" style={{
+          fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)`,
+          textDecoration: 'none', padding: '6px 8px', borderRadius: '6px',
+          fontWeight: 500,
+        }}>
+          ← site
+        </Link>
+        <button
+          onClick={toggle}
+          title="Toggle theme"
+          style={{
+            background: 'transparent', border: 'none',
+            cursor: 'pointer', fontSize: '18px',
+            padding: '6px', borderRadius: '6px',
+            color: `rgba(var(--fg-rgb), 0.5)`,
+            lineHeight: 1,
+          }}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </div>
     </header>
   )
 }

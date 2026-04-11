@@ -73,6 +73,14 @@ export default function Sidebar() {
           <span style={{ fontSize: '15px' }}>?</span>
           <span>Help &amp; FAQ</span>
         </Link>
+        <Link href="/" style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '12px', padding: '4px 0',
+          textDecoration: 'none',
+        }}>
+          <span style={{ fontSize: '14px' }}>←</span>
+          <span>Back to six43.app</span>
+        </Link>
       </div>
     </aside>
   )
