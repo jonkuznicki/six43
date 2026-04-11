@@ -277,10 +277,14 @@ export default async function GamesPage({
           {season && (
             <div style={{
               position: 'sticky', top: '48px', zIndex: 30,
-              background: 'var(--bg)',
+              background: 'var(--nav-bg)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              borderBottom: '0.5px solid var(--border)',
               paddingTop: '0.75rem', paddingBottom: '0.75rem',
+              marginLeft: '-1.5rem', marginRight: '-1.5rem',
+              paddingLeft: '1.5rem', paddingRight: '1.5rem',
               marginBottom: '0.75rem',
-              boxShadow: '0 4px 12px var(--bg)',
             }}>
               {/* Row 1: New game (full width) */}
               <div style={{ marginBottom: '8px' }}>
