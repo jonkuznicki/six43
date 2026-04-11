@@ -6,7 +6,11 @@ export default function ScrollToToday({ hasPastGames }: { hasPastGames: boolean 
   useEffect(() => {
     if (!hasPastGames) return
     const el = document.getElementById('today-anchor')
-    if (el) el.scrollIntoView({ block: 'start' })
+    if (!el) return
+    const sticky = document.getElementById('games-sticky-bar')
+    const offset = sticky ? sticky.offsetHeight : 0
+    const top = el.getBoundingClientRect().top + window.scrollY - offset
+    window.scrollTo({ top, behavior: 'instant' })
   }, [hasPastGames])
   return null
 }
