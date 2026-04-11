@@ -52,7 +52,9 @@ export default async function GamesPage({
     .from('games')
     .select('*')
     .eq('season_id', season.id)
-    .order('game_date', { ascending: true }) : { data: [] }
+    .order('game_date', { ascending: true })
+    .order('game_type', { ascending: true, nullsFirst: false })
+    .order('game_time', { ascending: true, nullsFirst: false }) : { data: [] }
 
   const { data: tournaments } = season ? await supabase
     .from('tournaments')
@@ -380,10 +382,17 @@ export default async function GamesPage({
               <ScrollToToday />
               {(() => {
                 const shownTournamentIds = new Set<string>()
+                // Pre-compute last index for each tournament so we can close the box
+                const tournamentLastIdx: Record<string, number> = {}
+                allGames.forEach((g, i) => {
+                  if (g.tournament_id) tournamentLastIdx[g.tournament_id] = i
+                })
+
                 return allGames.map((g, idx) => {
                   const showTournamentHeader = g.tournament_id && !shownTournamentIds.has(g.tournament_id)
                   if (showTournamentHeader) shownTournamentIds.add(g.tournament_id)
                   const tournament = g.tournament_id ? tournamentMap[g.tournament_id] : null
+                  const isLastInTournament = g.tournament_id && tournamentLastIdx[g.tournament_id] === idx
 
                   return (
                     <div key={g.id}>
@@ -401,10 +410,13 @@ export default async function GamesPage({
                         <Link href={`/tournaments/${g.tournament_id}`} style={{ textDecoration: 'none', display: 'block' }}>
                           <div style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 12px', borderRadius: '8px', marginBottom: '6px',
+                            padding: '8px 12px',
+                            borderRadius: '8px 8px 0 0', marginBottom: '0',
                             marginTop: idx > 0 ? '0.5rem' : 0,
                             background: 'rgba(232,160,32,0.07)',
-                            border: '0.5px solid rgba(232,160,32,0.25)',
+                            borderTop: '0.5px solid rgba(232,160,32,0.25)',
+                            borderLeft: '0.5px solid rgba(232,160,32,0.25)',
+                            borderRight: '0.5px solid rgba(232,160,32,0.25)',
                           }}>
                             <div>
                               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
@@ -419,7 +431,31 @@ export default async function GamesPage({
                           </div>
                         </Link>
                       )}
-                      <GameCard game={g} teamName={teamName} />
+                      <div style={g.tournament_id ? {
+                        borderLeft: '0.5px solid rgba(232,160,32,0.25)',
+                        borderRight: '0.5px solid rgba(232,160,32,0.25)',
+                        padding: '0 4px',
+                      } : {}}>
+                        <GameCard game={g} teamName={teamName} />
+                      </div>
+                      {isLastInTournament && tournament && (
+                        <Link href={`/tournaments/${g.tournament_id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                            padding: '6px 12px',
+                            borderRadius: '0 0 8px 8px',
+                            background: 'rgba(232,160,32,0.04)',
+                            borderBottom: '0.5px solid rgba(232,160,32,0.25)',
+                            borderLeft: '0.5px solid rgba(232,160,32,0.25)',
+                            borderRight: '0.5px solid rgba(232,160,32,0.25)',
+                            marginBottom: '0.5rem',
+                          }}>
+                            <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>
+                              View tournament →
+                            </span>
+                          </div>
+                        </Link>
+                      )}
                     </div>
                   )
                 })

@@ -38,7 +38,9 @@ export default async function TournamentPage({ params }: { params: { id: string 
     .from('games')
     .select('*')
     .eq('tournament_id', params.id)
+    .order('game_type', { ascending: true, nullsFirst: false })
     .order('game_date', { ascending: true })
+    .order('game_time', { ascending: true, nullsFirst: false })
 
   const today       = new Date().toISOString().split('T')[0]
   const seasonId    = (tournament.season as any)?.id ?? tournament.season_id
