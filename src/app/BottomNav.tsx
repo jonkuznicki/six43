@@ -8,6 +8,7 @@ const TABS = [
   { href: '/games',     label: 'Games',        icon: '⚾' },
   { href: '/pitching',  label: 'Pitching',     icon: '🎯' },
   { href: '/fairness',  label: 'Playing Time', icon: '📊' },
+  { href: '/roster',    label: 'Roster',       icon: '👥' },
 ]
 
 export default function BottomNav() {

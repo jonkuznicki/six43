@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '../../../lib/supabase'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
@@ -186,8 +187,15 @@ export default function LineupWithNotes({ slots, inningCount, seasonId, gameDate
                 fontSize: '12px', color: '#6DB875',
                 background: 'rgba(45,106,53,0.15)', border: '0.5px solid rgba(45,106,53,0.3)',
                 borderRadius: '6px', padding: '8px 12px', marginBottom: '12px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
-                Note saved
+                <span>Note saved</span>
+                <Link
+                  href="/roster"
+                  style={{ color: '#6DB875', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                >
+                  View in Roster →
+                </Link>
               </div>
             )}
 
