@@ -54,6 +54,15 @@ export default async function GamesPage({
     .eq('season_id', season.id)
     .order('game_date', { ascending: true }) : { data: [] }
 
+  const { data: tournaments } = season ? await supabase
+    .from('tournaments')
+    .select('id, name, start_date, end_date')
+    .eq('season_id', season.id) : { data: [] }
+
+  const tournamentMap: Record<string, any> = Object.fromEntries(
+    (tournaments ?? []).map((t: any) => [t.id, t])
+  )
+
   const { count: playerCount } = season ? await supabase
     .from('players')
     .select('id', { count: 'exact', head: true })
@@ -265,18 +274,32 @@ export default async function GamesPage({
           {/* Buttons */}
           {season && (
             <div style={{ marginBottom: '1.5rem' }}>
-              {/* Row 1: New game + Playing time */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              {/* Row 1: New game (full width) */}
+              <div style={{ marginBottom: '8px' }}>
                 <Link
                   href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`}
-                  style={{ textDecoration: 'none', flex: 1 }}
+                  style={{ textDecoration: 'none', display: 'block' }}
                 >
                   <div style={{
                     background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: '8px',
                     padding: '12px 16px', textAlign: 'center', fontWeight: 700, fontSize: '14px',
                   }}>+ New game</div>
                 </Link>
-                <Link href="/fairness" style={{ textDecoration: 'none' }}>
+              </div>
+
+              {/* Row 2: Tournament + Playing time */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <Link
+                  href={`/tournaments/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`}
+                  style={{ textDecoration: 'none', flex: 1 }}
+                >
+                  <div style={{
+                    background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.7)`,
+                    borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
+                    fontSize: '13px', border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
+                  }}>🏆 Tournament</div>
+                </Link>
+                <Link href="/fairness" style={{ textDecoration: 'none', flex: 1 }}>
                   <div style={{
                     background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.7)`,
                     borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
@@ -355,21 +378,52 @@ export default async function GamesPage({
           {allGames.length > 0 && (
             <>
               <ScrollToToday />
-              {allGames.map((g, idx) => (
-                <div key={g.id}>
-                  {idx === firstUpcomingIdx && (
-                    <div id="today-anchor" style={{
-                      fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                      textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
-                      marginBottom: '8px',
-                      marginTop: idx > 0 ? '1.5rem' : 0,
-                    }}>
-                      Upcoming
+              {(() => {
+                const shownTournamentIds = new Set<string>()
+                return allGames.map((g, idx) => {
+                  const showTournamentHeader = g.tournament_id && !shownTournamentIds.has(g.tournament_id)
+                  if (showTournamentHeader) shownTournamentIds.add(g.tournament_id)
+                  const tournament = g.tournament_id ? tournamentMap[g.tournament_id] : null
+
+                  return (
+                    <div key={g.id}>
+                      {idx === firstUpcomingIdx && (
+                        <div id="today-anchor" style={{
+                          fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                          marginBottom: '8px',
+                          marginTop: idx > 0 ? '1.5rem' : 0,
+                        }}>
+                          Upcoming
+                        </div>
+                      )}
+                      {showTournamentHeader && tournament && (
+                        <Link href={`/tournaments/${g.tournament_id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', borderRadius: '8px', marginBottom: '6px',
+                            marginTop: idx > 0 ? '0.5rem' : 0,
+                            background: 'rgba(232,160,32,0.07)',
+                            border: '0.5px solid rgba(232,160,32,0.25)',
+                          }}>
+                            <div>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
+                                textTransform: 'uppercase', letterSpacing: '0.07em', marginRight: '8px' }}>
+                                Tournament
+                              </span>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }}>
+                                {tournament.name}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '12px', color: 'var(--accent)' }}>›</span>
+                          </div>
+                        </Link>
+                      )}
+                      <GameCard game={g} teamName={teamName} />
                     </div>
-                  )}
-                  <GameCard game={g} teamName={teamName} />
-                </div>
-              ))}
+                  )
+                })
+              })()}
             </>
           )}
         </>

@@ -91,16 +91,21 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
     router.refresh()
   }
 
-  const isFinal = status === 'final'
-  const isUpcoming = !isFinal
+  const isFinal       = status === 'final'
+  const isUpcoming    = !isFinal
+  const isPlaceholder = !!game.is_placeholder
+  const today         = new Date().toISOString().split('T')[0]
+  const isStale       = isPlaceholder && game.game_date < today
 
   return (
     <>
       <div style={{
-        background: isFinal ? 'var(--bg-card)' : 'var(--bg-card)',
-        border: isUpcoming
-          ? '0.5px solid var(--border-md)'
-          : '0.5px solid var(--border-subtle)',
+        background: 'var(--bg-card)',
+        border: isPlaceholder
+          ? `1px dashed ${isStale ? 'rgba(232,112,96,0.45)' : 'rgba(var(--fg-rgb), 0.2)'}`
+          : isUpcoming
+            ? '0.5px solid var(--border-md)'
+            : '0.5px solid var(--border-subtle)',
         borderRadius: '10px', marginBottom: '8px', display: 'flex', overflow: 'hidden',
         opacity: isFinal ? 0.7 : 1,
       }}>
@@ -108,8 +113,20 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
         <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: isUpcoming ? '16px' : '14px', fontWeight: isUpcoming ? 600 : 400, color: 'var(--fg)', marginBottom: '4px' }}>
-                vs {game.opponent}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: isUpcoming ? '16px' : '14px', fontWeight: isUpcoming ? 600 : 400, color: 'var(--fg)' }}>
+                  {isPlaceholder ? game.opponent : `vs ${game.opponent}`}
+                </span>
+                {isPlaceholder && (
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px',
+                    background: isStale ? 'rgba(232,112,96,0.1)' : 'rgba(var(--fg-rgb),0.06)',
+                    color: isStale ? '#E87060' : `rgba(var(--fg-rgb), 0.4)`,
+                    border: `0.5px solid ${isStale ? 'rgba(232,112,96,0.3)' : 'rgba(var(--fg-rgb), 0.15)'}`,
+                  }}>
+                    {isStale ? 'Needs swap' : 'TBD'}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), ${isUpcoming ? '0.55' : '0.35'})` }}>
                 {formatted}{game.location ? ` · ${game.location}` : ''}
@@ -117,10 +134,12 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 500, padding: '2px 8px',
-                borderRadius: '4px', background: sc.bg, color: sc.color }}>
-                {sc.label}
-              </span>
+              {!isPlaceholder && (
+                <span style={{ fontSize: '11px', fontWeight: 500, padding: '2px 8px',
+                  borderRadius: '4px', background: sc.bg, color: sc.color }}>
+                  {sc.label}
+                </span>
+              )}
               <span style={{ color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '16px' }}>›</span>
             </div>
           </div>

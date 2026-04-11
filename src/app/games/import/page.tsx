@@ -25,7 +25,7 @@ type AddedGame = {
 }
 
 type SyncChange =
-  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away'; selected: boolean }
+  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away'; selected: boolean; suggested_placeholder_id?: string; suggested_placeholder_label?: string }
   | { type: 'changed'; game_id: string; opponent: string; old_date: string; old_time: string | null; new_date: string; new_time: string | null; selected: boolean }
   | { type: 'removed'; game_id: string; opponent: string; game_date: string; selected: boolean }
   | { type: 'skipped'; game_id: string; opponent: string; game_date: string; reason: string }
@@ -834,16 +834,28 @@ function ImportPageInner() {
                               }}>{chip.label}</span>
                             </div>
                             {c.type === 'new' && (
-                              <div style={{ fontSize: '11px', color: s.muted, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{fmt(c.game_date)}{c.game_time ? ` · ${fmtTime(c.game_time)}` : ''}</span>
-                                <span style={{
-                                  padding: '1px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700,
-                                  border: `0.5px solid ${c.location === 'Home' ? 'rgba(109,184,117,0.4)' : 'rgba(232,160,32,0.4)'}`,
-                                  background: c.location === 'Home' ? 'rgba(109,184,117,0.1)' : 'rgba(232,160,32,0.1)',
-                                  color: c.location === 'Home' ? '#6DB875' : s.accent,
-                                }}>
-                                  {c.location}
-                                </span>
+                              <div style={{ fontSize: '11px', color: s.muted }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: c.suggested_placeholder_id ? '6px' : 0 }}>
+                                  <span>{fmt(c.game_date)}{c.game_time ? ` · ${fmtTime(c.game_time)}` : ''}</span>
+                                  <span style={{
+                                    padding: '1px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700,
+                                    border: `0.5px solid ${c.location === 'Home' ? 'rgba(109,184,117,0.4)' : 'rgba(232,160,32,0.4)'}`,
+                                    background: c.location === 'Home' ? 'rgba(109,184,117,0.1)' : 'rgba(232,160,32,0.1)',
+                                    color: c.location === 'Home' ? '#6DB875' : s.accent,
+                                  }}>
+                                    {c.location}
+                                  </span>
+                                </div>
+                                {c.suggested_placeholder_id && (
+                                  <div style={{
+                                    fontSize: '11px', padding: '5px 9px', borderRadius: '6px',
+                                    background: 'rgba(232,160,32,0.08)',
+                                    border: '0.5px solid rgba(232,160,32,0.25)',
+                                    color: s.accent,
+                                  }}>
+                                    Looks like it may replace <strong>{c.suggested_placeholder_label}</strong> — swap from the tournament view after importing.
+                                  </div>
+                                )}
                               </div>
                             )}
                             {c.type === 'changed' && (

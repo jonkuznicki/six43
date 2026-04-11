@@ -89,7 +89,7 @@ function parseIcal(text: string, timezone?: string): Array<{ opponent: string; g
 }
 
 export type SyncChange =
-  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away' }
+  | { type: 'new';     opponent: string; game_date: string; game_time: string | null; location: 'Home' | 'Away'; suggested_placeholder_id?: string; suggested_placeholder_label?: string }
   | { type: 'changed'; game_id: string; opponent: string; old_date: string; old_time: string | null; new_date: string; new_time: string | null }
   | { type: 'removed'; game_id: string; opponent: string; game_date: string }
   | { type: 'skipped'; game_id: string; opponent: string; game_date: string; reason: string }
@@ -130,10 +130,10 @@ export async function GET(request: Request) {
 
   const icalGames = parseIcal(icalText, season.timezone ?? undefined)
 
-  // Get existing games in season
+  // Get existing games in season (including placeholder flag for exclusion logic)
   const { data: dbGames } = await supabase
     .from('games')
-    .select('id, opponent, game_date, game_time, status')
+    .select('id, opponent, game_date, game_time, status, is_placeholder, tournament_id')
     .eq('season_id', season.id)
 
   const changes: SyncChange[] = []
@@ -141,15 +141,36 @@ export async function GET(request: Request) {
   // Track which DB games were matched
   const matchedDbIds = new Set<string>()
 
+  // Build list of unmatched placeholders for swap suggestions
+  const placeholders = (dbGames ?? []).filter((g: any) => g.is_placeholder)
+
   for (const icalGame of icalGames) {
-    // Find a DB game with matching opponent (case-insensitive, unmatched)
-    const dbMatch = (dbGames ?? []).find(g =>
+    // Find a DB game with matching opponent (case-insensitive, unmatched, non-placeholder)
+    const dbMatch = (dbGames ?? []).find((g: any) =>
       !matchedDbIds.has(g.id) &&
+      !g.is_placeholder &&
       g.opponent.toLowerCase().trim() === icalGame.opponent.toLowerCase().trim()
     )
 
     if (!dbMatch) {
-      changes.push({ type: 'new', opponent: icalGame.opponent, game_date: icalGame.game_date, game_time: icalGame.game_time, location: icalGame.location })
+      // Check if a placeholder exists within ±1 day for a swap suggestion
+      const suggestedPH = placeholders.find((ph: any) => {
+        const phDate  = new Date(ph.game_date + 'T12:00:00').getTime()
+        const gcDate  = new Date(icalGame.game_date + 'T12:00:00').getTime()
+        const diffDays = Math.abs(phDate - gcDate) / (1000 * 60 * 60 * 24)
+        return diffDays <= 1
+      })
+      changes.push({
+        type: 'new',
+        opponent:   icalGame.opponent,
+        game_date:  icalGame.game_date,
+        game_time:  icalGame.game_time,
+        location:   icalGame.location,
+        ...(suggestedPH ? {
+          suggested_placeholder_id:    suggestedPH.id,
+          suggested_placeholder_label: suggestedPH.opponent,
+        } : {}),
+      })
     } else {
       matchedDbIds.add(dbMatch.id)
       const dateChanged = dbMatch.game_date !== icalGame.game_date
@@ -171,6 +192,8 @@ export async function GET(request: Request) {
   // Check for removed / skipped
   for (const dbGame of dbGames ?? []) {
     if (matchedDbIds.has(dbGame.id)) continue
+    // Placeholders are intentionally unmatched — never flag them as removed
+    if ((dbGame as any).is_placeholder) continue
 
     if (dbGame.status === 'in_progress' || dbGame.status === 'final') {
       changes.push({
