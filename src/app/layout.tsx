@@ -12,8 +12,12 @@ export const metadata: Metadata = {
   keywords: ['youth baseball lineup manager', 'baseball lineup app', 'travel baseball lineup', 'little league lineup app', 'youth softball lineup manager', 'baseball lineup maker', 'pitch count tracker'],
   manifest: '/manifest.json',
   icons: {
-    icon: '/favicon.png',
-    apple: '/icons/icon-192.png',
+    icon: [
+      { url: '/icons/Six43-favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/Six43-favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/Six43-favicon-64x64.png', sizes: '64x64', type: 'image/png' },
+    ],
+    apple: '/icons/Six43-favicon-128x128.png',
   },
   appleWebApp: {
     capable: true,

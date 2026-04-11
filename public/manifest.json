@@ -14,19 +14,19 @@
       "description": "Jump to your next upcoming game",
       "url": "/today",
       "icons": [
-        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+        { "src": "/icons/Six43-favicon-128x128.png", "sizes": "128x128", "type": "image/png" }
       ]
     }
   ],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
+      "src": "/icons/Six43-favicon-128x128.png",
+      "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/six43-favicon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
