@@ -13,11 +13,11 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/icons/Six43-favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/icons/Six43-favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/Six43-favicon-64x64.png', sizes: '64x64', type: 'image/png' },
+      { url: '/icons/six43-favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/six43-favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/six43-favicon-64x64.png', sizes: '64x64', type: 'image/png' },
     ],
-    apple: '/icons/Six43-favicon-128x128.png',
+    apple: '/icons/six43-favicon-128x128.png',
   },
   appleWebApp: {
     capable: true,
