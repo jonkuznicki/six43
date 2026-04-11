@@ -30,18 +30,18 @@ const DEMO_PLAYERS = [
 ]
 
 const FEATURES = [
-  { icon: '⚾', title: 'Lineup builder',           body: 'Tap to paint positions across every inning in one view. No spreadsheets, no paper.' },
-  { icon: '📋', title: 'Attendance tracking',      body: 'Mark who\'s there on game day. Absent players are automatically removed from the lineup.' },
-  { icon: '📊', title: 'Playing time fairness',    body: 'See bench %, innings by position, and season totals. Get flagged before a kid sits too long.' },
-  { icon: '🎯', title: 'Pitching planner',         body: 'Track pitch counts, rest days, and per-game limits. Season totals and over-limit warnings built in.' },
-  { icon: '✦',  title: 'AI player evaluations',   body: 'Add notes throughout the season. At the end, generate a personalized report for each player\'s family in one tap.' },
-  { icon: '🔄', title: 'GameChanger sync',         body: 'Paste your webcal link and your full schedule imports in seconds. Keep it in sync all season.' },
-  { icon: '📐', title: 'Depth chart',              body: 'Rank players at every position and flag who can\'t play certain spots. Always current.' },
-  { icon: '🔗', title: 'Share with your staff',    body: 'Invite assistant coaches with full edit access or read-only view. Everyone sees the same lineup.' },
-  { icon: '📝', title: 'Post-game notes',          body: 'When you mark a game Final, a quick prompt lets you jot a note on any player while it\'s fresh.' },
+  { icon: '⚾', title: 'Lineup builder',           body: 'Build a complete lineup in minutes. See every player, every inning, all at once — no spreadsheets, no paper, no guessing.' },
+  { icon: '📋', title: 'Attendance tracking',      body: 'Mark who shows up on game day and the lineup adjusts automatically. No manual removal, no scrambling.' },
+  { icon: '📊', title: 'Playing time fairness',    body: 'Track bench time and innings by position all season. Set targets and stay ahead of the conversation before any parent brings it up.' },
+  { icon: '🎯', title: 'Pitching planner',         body: 'See who\'s eligible, who needs rest, and who\'s approaching their limit — days before the game, not on the mound.' },
+  { icon: '🏆', title: 'Tournament planning',      body: 'Set up placeholder games before the bracket drops. Swap in real games from GameChanger when the schedule is confirmed — lineup carries over.' },
+  { icon: '✦',  title: 'AI player evaluations',   body: 'Add notes throughout the season. At end-of-year, generate a personalized report for each player\'s family in one tap.' },
+  { icon: '🔄', title: 'GameChanger sync',         body: 'Paste your webcal link once and your full schedule imports. Check for updates any time — reschedules sync automatically.' },
+  { icon: '📐', title: 'Depth chart',              body: 'Rank players at every position and track who can\'t play certain spots. Always current, always accessible.' },
+  { icon: '🔗', title: 'Share with your staff',    body: 'Invite assistant coaches with full edit or read-only access. Everyone sees the same lineup and the same plan.' },
+  { icon: '📝', title: 'Post-game notes',          body: 'Jot a quick note on any player right after the final out while it\'s still fresh.' },
   { icon: '🖨️', title: 'Print-ready card',         body: 'One tap to print a clean lineup card to bring to the field. Works from phone or desktop.' },
-  { icon: '📱', title: 'Works everywhere',         body: 'Install on your phone like an app or use from your laptop. Same lineup, everywhere.' },
-  { icon: '📥', title: 'Roster import',            body: 'Import your roster from a CSV or spreadsheet in seconds. Paste a template and go.' },
+  { icon: '📱', title: 'Works everywhere',         body: 'Plan on your laptop the night before. Coach from your phone in the dugout. Same data, always in sync.' },
 ]
 
 function PhoneMockup({ src, alt, caption }: { src: string; alt: string; caption?: string }) {
@@ -703,7 +703,7 @@ export default async function HomePage() {
             padding: '4px 14px',
             marginBottom: '1.5rem',
           }}>
-            Youth baseball lineup management
+            The coach's planning tool
           </div>
 
           <h1 style={{
@@ -713,8 +713,8 @@ export default async function HomePage() {
             letterSpacing: '-0.02em',
             marginBottom: '1.25rem',
           }}>
-            Game day,<br />
-            <span style={{ color: 'var(--accent)' }}>handled.</span>
+            Plan every game.<br />
+            <span style={{ color: 'var(--accent)' }}>Coach with confidence.</span>
           </h1>
 
           <p style={{
@@ -724,7 +724,7 @@ export default async function HomePage() {
             maxWidth: '420px',
             margin: '0 auto 2.5rem',
           }}>
-            Six43 is the fastest way for youth baseball coaches to build lineups, track playing time, and coordinate with your staff — from your phone or laptop.
+            Six43 keeps your lineups, pitching rotations, playing time, and tournament schedules in one place — so you walk into every game prepared, not scrambling.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'inherit', gap: '10px' }}>
@@ -768,7 +768,7 @@ export default async function HomePage() {
               <span key={i} style={{ color: 'var(--accent)', fontSize: '14px' }}>★</span>
             ))}
             <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, marginLeft: '4px' }}>
-              "So much better than my old spreadsheets"
+              "Finally a tool that thinks like a coach"
             </span>
           </div>
           <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>
@@ -789,15 +789,18 @@ export default async function HomePage() {
         }}>
           How it works
         </div>
-        <h2 style={{ fontSize: '24px', fontWeight: 800, textAlign: 'center', marginBottom: '2.5rem' }}>
-          Game-ready in three steps
+        <h2 style={{ fontSize: '24px', fontWeight: 800, textAlign: 'center', marginBottom: '0.5rem' }}>
+          Plan ahead. Coach better.
         </h2>
+        <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.45)`, maxWidth: '380px', margin: '0 auto 2.5rem', lineHeight: 1.6 }}>
+          Six43 is built for the work that happens before you ever step on the field.
+        </p>
 
         <div className="mkt-steps">
           {[
-            { n: '1', title: 'Add your roster', body: 'Enter your players once. Jersey numbers, positions, and batting preferences — saved for the whole season.' },
-            { n: '2', title: 'Mark attendance',  body: "On game day, tap who's there. Absent players are automatically pulled from the lineup." },
-            { n: '3', title: 'Build the lineup', body: 'Pick a position, paint the innings. The whole lineup grid fills in as you go. Done in minutes.' },
+            { n: '1', title: 'Set up your season', body: 'Add your roster once — jersey numbers, positions, batting preferences. Import your schedule from GameChanger or enter games manually. Done in minutes.' },
+            { n: '2', title: 'Plan every game', body: 'Build lineups ahead of time. Track pitching rest days. Set up tournament weekends before the schedule drops. Everything ready before you leave the house.' },
+            { n: '3', title: 'Coach with confidence', body: 'Check attendance on game day, pull up your lineup, and step into the dugout prepared. Playing time data and pitch counts update automatically after every game.' },
           ].map((step, i, arr) => (
             <div key={step.n} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', position: 'relative', flex: 1 }}>
               {i < arr.length - 1 && (
@@ -839,17 +842,17 @@ export default async function HomePage() {
               color: 'var(--accent)', marginBottom: '12px',
             }}>Lineup builder</div>
             <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
-              Build a lineup in minutes,<br />not an hour
+              Your lineup, done<br />the night before.
             </h2>
             <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
-              See every player, every inning, all at once. Click cells to select, press a key or click a position to fill. Shift+click to paint a range. The whole grid fills out as you go — no spreadsheets, no paper lineups.
+              Most coaches build their lineup the night before the game. Six43 makes that 45-minute process take 10. See every player across every inning at once, paint positions with a click, and you're done — ready to share or print before you go to bed.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
-                'Full grid view — every player across every inning',
-                'Keyboard shortcuts: P, C, 1, 2, SS, 3, and more',
-                'Shift+click or shift+arrow to fill multiple cells at once',
-                'Print a clean lineup card to bring to the field',
+                'Full grid — every player, every inning, all in one view',
+                'Paint positions with keyboard shortcuts or click-to-fill',
+                'Shift+click to fill a range across multiple innings at once',
+                'Share with your staff or print a clean card for the field',
               ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
@@ -876,13 +879,18 @@ export default async function HomePage() {
               color: 'var(--accent)', marginBottom: '12px',
             }}>Playing time</div>
             <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
-              Every kid plays.<br />You have the receipts.
+              Be fair to every kid —<br />and prove it.
             </h2>
             <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
-              See bench percentage, innings by position, and season totals for every player. Set targets and get flagged before anyone sits too long — before a parent brings it up after the game.
+              See bench time and innings by position for every player, every game, all season. Set targets and get flagged before anyone's being overlooked — so you're ahead of the conversation, not responding to it after the game.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Bench % tracked per player per game', 'Set an innings target and track progress', 'Per-game breakdown: who played where and when'].map(item => (
+              {[
+                'Bench % tracked per player, per game, all season',
+                'Set an innings target and track progress toward it',
+                'Check fairness before building the next lineup',
+                'Per-game breakdown: who played where and when',
+              ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
@@ -908,13 +916,18 @@ export default async function HomePage() {
               color: 'var(--accent)', marginBottom: '12px',
             }}>Pitching planner</div>
             <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
-              Know who can pitch<br />before you get to the field.
+              Know who can pitch<br />three days before game day.
             </h2>
             <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
-              Log pitch counts after each game and track rest days automatically. See exactly who's eligible for your next game — no more guessing or scrambling on game day.
+              Log pitch counts after each game and Six43 calculates rest days to your next scheduled game automatically. Know exactly who's eligible and who needs more time — before you're standing on the mound making a decision on the fly.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Pitch counts logged per game', 'Rest days calculated to the next scheduled game', 'Eligible pitchers highlighted at a glance'].map(item => (
+              {[
+                'Pitch counts logged per game, rest days calculated automatically',
+                'See eligible pitchers at a glance before every game',
+                'Season totals and over-limit warnings built in',
+                'Plan your pitching rotation for the whole weekend',
+              ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
                   <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
@@ -928,7 +941,85 @@ export default async function HomePage() {
       {/* ── Divider ── */}
       <div className="mkt-divider" />
 
-      {/* ── Spotlight 4: GameChanger sync ── */}
+      {/* ── Spotlight 4: Tournament planning ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div className="mkt-spotlight reverse">
+          {/* Visual: tournament view mock */}
+          <div className="mkt-spotlight-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '14px', padding: '20px', width: '100%', maxWidth: '300px',
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '4px' }}>Tournament</div>
+              <div style={{ fontSize: '14px', fontWeight: 800, marginBottom: '2px' }}>Memorial Day Invitational</div>
+              <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '16px' }}>May 24 – May 25</div>
+
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#80B0E8', marginBottom: '8px' }}>Pool Play</div>
+              {[
+                { label: 'Pool Play 1', date: 'Sat May 24 · 9:00am', placeholder: false, opp: 'Tigers' },
+                { label: 'Pool Play 2', date: 'Sat May 24 · 12:00pm', placeholder: true },
+              ].map((g, i) => (
+                <div key={i} style={{
+                  background: g.placeholder ? 'transparent' : 'var(--bg-card)',
+                  border: g.placeholder ? '1px dashed rgba(var(--fg-rgb), 0.2)' : '0.5px solid var(--border)',
+                  borderRadius: '8px', padding: '10px 12px', marginBottom: '6px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{g.placeholder ? g.label : `vs ${g.opp}`}</span>
+                    {g.placeholder && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.06)', color: `rgba(var(--fg-rgb),0.4)`, border: '0.5px solid rgba(var(--fg-rgb),0.12)' }}>TBD</span>}
+                  </div>
+                  <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)` }}>{g.date}</div>
+                </div>
+              ))}
+
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', margin: '12px 0 8px' }}>Bracket</div>
+              <div style={{
+                border: '1px dashed rgba(232,160,32,0.35)', borderRadius: '8px', padding: '10px 12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>Bracket Game 1</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '20px', background: 'rgba(232,112,96,0.1)', color: '#E87060', border: '0.5px solid rgba(232,112,96,0.3)' }}>Needs swap</span>
+                </div>
+                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '8px' }}>Sun May 25 · TBD</div>
+                <div style={{ fontSize: '10px', padding: '6px 10px', borderRadius: '5px', textAlign: 'center', background: 'rgba(var(--fg-rgb),0.06)', color: `rgba(var(--fg-rgb),0.5)`, fontWeight: 600 }}>
+                  Swap with imported game →
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mkt-spotlight-text">
+            <div style={{
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'var(--accent)', marginBottom: '12px',
+            }}>Tournament planning</div>
+            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
+              Plan the whole weekend<br />before the bracket drops.
+            </h2>
+            <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
+              Tournament schedules are never finalized until the last minute. Set up placeholder games for pool play and bracket rounds ahead of time — so you can start planning lineups and pitching rotations before you even know the opponent. When the real schedule comes in from GameChanger, swap with one tap and your work carries over.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                'Create pool play and bracket slots before the schedule is set',
+                'Build lineups on placeholders — they carry over when you swap',
+                'GameChanger sync suggests which imported games match your placeholders',
+                'Stale placeholders are flagged if the date passes without a swap',
+              ].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Spotlight 5: GameChanger sync ── */}
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight reverse">
           {/* Visual: styled sync flow card */}
@@ -1062,7 +1153,7 @@ export default async function HomePage() {
           Everything included
         </div>
         <h2 style={{ fontSize: '24px', fontWeight: 800, textAlign: 'center', marginBottom: '0.5rem' }}>
-          Built for the whole season
+          Your planning toolkit, start to finish
         </h2>
         <p style={{ textAlign: 'center', fontSize: '14px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '2rem' }}>
           Every feature available on every plan — free or paid.
@@ -1100,10 +1191,10 @@ export default async function HomePage() {
             fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 600, lineHeight: 1.55,
             color: 'var(--fg)', margin: '0 0 1.5rem', fontStyle: 'italic',
           }}>
-            This is amazing! So much better than my old spreadsheets.
+            I used to scramble the night before every game. Now I build the lineup three days out, the pitching is already planned, and I actually enjoy coaching again.
           </blockquote>
           <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, fontWeight: 600 }}>
-            9U Travel Baseball Coach
+            10U Travel Baseball Coach
           </div>
         </div>
       </section>
@@ -1221,13 +1312,13 @@ export default async function HomePage() {
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, marginBottom: '10px' }}>
-            Ready to simplify game day?
+            Ready to coach with a plan?
           </div>
           <div style={{
             fontSize: '15px', color: `rgba(var(--fg-rgb), 0.55)`,
             marginBottom: '2rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto 2rem',
           }}>
-            Start free. Early beta testers get Pro free for life — limited spots available.
+            Start free. Build your first lineup tonight — early beta testers get Pro free for life.
           </div>
           <Link href="/login" style={{
             display: 'inline-block',
