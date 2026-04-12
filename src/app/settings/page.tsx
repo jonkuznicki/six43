@@ -138,24 +138,18 @@ export default function SettingsPage() {
     setTeamMembers(membersMap)
 
     // Load teams where this user is an accepted staff coach (not owner)
-    const { data: myMemberships, error: membErr } = await supabase
+    const { data: myMemberships } = await supabase
       .from('team_members')
       .select('team_id')
       .eq('user_id', user.id)
       .not('accepted_at', 'is', null)
 
-    if (membErr) console.error('[settings] myMemberships error:', membErr)
-    console.log('[settings] myMemberships:', myMemberships)
-
     if (myMemberships && myMemberships.length > 0) {
       const memberTeamIds = myMemberships.map((m: any) => m.team_id)
-      const { data: mTeams, error: teamsErr } = await supabase
+      const { data: mTeams } = await supabase
         .from('teams')
         .select('id, name, age_group, owner_email')
         .in('id', memberTeamIds)
-
-      if (teamsErr) console.error('[settings] mTeams error:', teamsErr)
-      console.log('[settings] mTeams:', mTeams)
       const staffMap: Record<string, any[]> = {}
       for (const mt of mTeams ?? []) {
         const { data: staff } = await supabase
@@ -876,7 +870,7 @@ export default function SettingsPage() {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 500, flex: 1 }}>
-                        {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
+                        {m.email ?? m.invite_email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
                       </span>
                       <span style={{ fontSize: '10px', color: '#6DB875', fontWeight: 600 }}>Staff</span>
                       {m.user_id === userId && (
