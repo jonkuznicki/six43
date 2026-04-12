@@ -138,18 +138,24 @@ export default function SettingsPage() {
     setTeamMembers(membersMap)
 
     // Load teams where this user is an accepted staff coach (not owner)
-    const { data: myMemberships } = await supabase
+    const { data: myMemberships, error: membErr } = await supabase
       .from('team_members')
       .select('team_id')
       .eq('user_id', user.id)
       .not('accepted_at', 'is', null)
 
+    if (membErr) console.error('[settings] myMemberships error:', membErr)
+    console.log('[settings] myMemberships:', myMemberships)
+
     if (myMemberships && myMemberships.length > 0) {
       const memberTeamIds = myMemberships.map((m: any) => m.team_id)
-      const { data: mTeams } = await supabase
+      const { data: mTeams, error: teamsErr } = await supabase
         .from('teams')
         .select('id, name, age_group, owner_email')
         .in('id', memberTeamIds)
+
+      if (teamsErr) console.error('[settings] mTeams error:', teamsErr)
+      console.log('[settings] mTeams:', mTeams)
       const staffMap: Record<string, any[]> = {}
       for (const mt of mTeams ?? []) {
         const { data: staff } = await supabase
