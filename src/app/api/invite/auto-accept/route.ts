@@ -6,14 +6,25 @@ import { createServerClient } from '../../../../lib/supabase-server'
 // Called after login or email confirmation.
 // Finds any pending invites whose invite_email matches the logged-in user's email
 // and accepts them all. Safe to call multiple times (idempotent).
-export async function POST() {
-  const authClient = await createServerClient()
-  const { data: { user } } = await authClient.auth.getUser()
+export async function POST(req: Request) {
+  const service = createServiceClient()
+  // Prefer an explicit Bearer token (sent right after signInWithPassword before
+  // cookies propagate) but fall back to cookie-based auth (e.g. auth callback).
+  let user: any = null
+  const authHeader = req.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    const { data } = await service.auth.getUser(token)
+    user = data.user
+  } else {
+    const authClient = await createServerClient()
+    const { data } = await authClient.auth.getUser()
+    user = data.user
+  }
+
   if (!user?.email) {
     return NextResponse.json({ accepted: 0 })
   }
-
-  const service = createServiceClient()
 
   // Find all pending invites for this email
   const { data: pending } = await service

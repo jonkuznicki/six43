@@ -24,8 +24,16 @@ function LoginForm() {
     if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      // Auto-accept any pending email invites, then redirect
-      await fetch('/api/invite/auto-accept', { method: 'POST' })
+      // Auto-accept any pending email invites, then redirect.
+      // Pass the access token explicitly — server cookies may not be
+      // populated yet on the request immediately after signInWithPassword.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        await fetch('/api/invite/auto-accept', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}` },
+        })
+      }
       const next = searchParams.get('next')
       router.push(next ?? '/dashboard')
     } else {
