@@ -62,8 +62,10 @@ export default function SettingsPage() {
 
   // Invite / team members (owned teams)
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({})
-  const [generatingInvite, setGeneratingInvite] = useState<string | null>(null)
-  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null)
+  const [inviteFormTeamId, setInviteFormTeamId] = useState<string | null>(null)
+  const [inviteEmailInput, setInviteEmailInput] = useState('')
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const [inviteError, setInviteError] = useState('')
 
   // Teams the current user is a staff coach on (not owner)
   const [memberTeams, setMemberTeams] = useState<any[]>([])
@@ -312,17 +314,30 @@ export default function SettingsPage() {
     setRollingOver(false); setRolloverSeason(null)
   }
 
-  async function createInvite(teamId: string) {
-    setGeneratingInvite(teamId)
+  async function sendInvite(teamId: string) {
+    const email = inviteEmailInput.trim().toLowerCase()
+    if (!email || !email.includes('@')) { setInviteError('Enter a valid email address.'); return }
+    setSendingInvite(true); setInviteError('')
+
+    // Check for duplicate pending invite to this email on this team
+    const existing = (teamMembers[teamId] ?? []).find(
+      m => m.invite_email?.toLowerCase() === email && !m.accepted_at
+    )
+    if (existing) { setInviteError('This email already has a pending invite.'); setSendingInvite(false); return }
+
     const token = crypto.randomUUID()
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('team_members')
-      .insert({ team_id: teamId, invite_token: token, role: 'coach', owner_user_id: userId })
+      .insert({ team_id: teamId, invite_token: token, invite_email: email, role: 'coach', owner_user_id: userId })
       .select().single()
+
+    if (error) { setInviteError('Failed to send invite. Try again.'); setSendingInvite(false); return }
     if (data) {
       setTeamMembers(prev => ({ ...prev, [teamId]: [...(prev[teamId] ?? []), data] }))
     }
-    setGeneratingInvite(null)
+    setInviteEmailInput('')
+    setInviteFormTeamId(null)
+    setSendingInvite(false)
   }
 
   async function revokeInvite(teamId: string, memberId: string) {
@@ -341,13 +356,6 @@ export default function SettingsPage() {
         m.id === memberId ? { ...m, read_only: !current } : m
       ),
     }))
-  }
-
-  async function copyInviteLink(teamId: string, token: string) {
-    const url = `${window.location.origin}/invite/${token}`
-    await navigator.clipboard.writeText(url)
-    setCopiedTeamId(teamId)
-    setTimeout(() => setCopiedTeamId(null), 2000)
   }
 
   async function confirmDeleteSeason() {
@@ -618,16 +626,58 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
                   letterSpacing: '0.08em' }}>Staff</div>
-                <button
-                  onClick={() => createInvite(team.id)}
-                  disabled={generatingInvite === team.id}
-                  style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
-                    border: '0.5px solid var(--border-strong)', background: 'transparent',
-                    color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
-                    opacity: generatingInvite === team.id ? 0.5 : 1 }}>
-                  {generatingInvite === team.id ? 'Generating…' : '+ Invite coach'}
-                </button>
+                {inviteFormTeamId !== team.id && (
+                  <button
+                    onClick={() => { setInviteFormTeamId(team.id); setInviteEmailInput(''); setInviteError('') }}
+                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+                      border: '0.5px solid var(--border-strong)', background: 'transparent',
+                      color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer' }}>
+                    + Invite coach
+                  </button>
+                )}
               </div>
+
+              {/* Invite email form */}
+              {inviteFormTeamId === team.id && (
+                <div style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '8px',
+                  background: 'var(--bg-input)', border: '0.5px solid var(--border-md)' }}>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
+                    Enter the coach's email address. They'll be added to the team when they sign in.
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="email"
+                      value={inviteEmailInput}
+                      onChange={e => { setInviteEmailInput(e.target.value); setInviteError('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') sendInvite(team.id) }}
+                      placeholder="coach@example.com"
+                      autoFocus
+                      style={{ flex: 1, padding: '7px 10px', borderRadius: '5px', fontSize: '13px',
+                        border: '0.5px solid var(--border-md)', background: 'var(--bg)',
+                        color: 'var(--fg)', outline: 'none' }}
+                    />
+                    <button
+                      onClick={() => sendInvite(team.id)}
+                      disabled={sendingInvite}
+                      style={{ fontSize: '12px', padding: '7px 12px', borderRadius: '5px', border: 'none',
+                        background: 'var(--accent)', color: 'var(--accent-text)',
+                        cursor: sendingInvite ? 'not-allowed' : 'pointer', fontWeight: 600,
+                        opacity: sendingInvite ? 0.7 : 1, flexShrink: 0 }}>
+                      {sendingInvite ? '…' : 'Add'}
+                    </button>
+                    <button
+                      onClick={() => { setInviteFormTeamId(null); setInviteError('') }}
+                      style={{ fontSize: '12px', padding: '7px 10px', borderRadius: '5px',
+                        border: '0.5px solid var(--border-strong)', background: 'transparent',
+                        color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer', flexShrink: 0 }}>
+                      Cancel
+                    </button>
+                  </div>
+                  {inviteError && (
+                    <div style={{ fontSize: '11px', color: '#E87060', marginTop: '5px' }}>{inviteError}</div>
+                  )}
+                </div>
+              )}
 
               {/* Owner row — always shown first */}
               <div style={{
@@ -726,19 +776,15 @@ export default function SettingsPage() {
                             border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`,
-                                fontStyle: 'italic', flex: 1 }}>
-                                Invite not yet accepted
-                              </span>
-                              <button
-                                onClick={() => copyInviteLink(team.id, m.invite_token)}
-                                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
-                                  border: 'none',
-                                  background: copiedTeamId === team.id ? 'rgba(45,106,53,0.2)' : 'var(--accent)',
-                                  color: copiedTeamId === team.id ? '#6DB875' : 'var(--accent-text)',
-                                  cursor: 'pointer', flexShrink: 0 }}>
-                                {copiedTeamId === team.id ? 'Copied!' : 'Copy link'}
-                              </button>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
+                                  {m.invite_email ?? 'Invited coach'}
+                                </span>
+                                <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)`,
+                                  marginLeft: '6px', fontStyle: 'italic' }}>
+                                  hasn't signed in yet
+                                </span>
+                              </div>
                               <button
                                 onClick={() => revokeInvite(team.id, m.id)}
                                 style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '../../lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [signupDone, setSignupDone] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -22,8 +23,11 @@ export default function LoginPage() {
 
     if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setError(error.message); setLoading(false) }
-      else router.push('/dashboard')
+      if (error) { setError(error.message); setLoading(false); return }
+      // Auto-accept any pending email invites, then redirect
+      await fetch('/api/invite/auto-accept', { method: 'POST' })
+      const next = searchParams.get('next')
+      router.push(next ?? '/dashboard')
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
