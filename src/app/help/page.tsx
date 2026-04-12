@@ -213,13 +213,16 @@ export default function HelpPage() {
           Yes — go to Settings and add additional teams. You can switch between them on the Games page using the team selector at the top.
         </Q>
         <Q q="Can multiple coaches share access?">
-          Yes — go to <strong>Settings → Staff tab</strong> and tap <strong>+ Invite coach</strong>. This generates a unique invite link. Copy it and send it to your assistant coach — when they open the link and log in, they'll be added to your team as Staff.
+          Yes — go to <strong>Settings → Staff tab</strong> and tap <strong>+ Invite coach</strong>. Enter their email address and tap Send. They'll receive an email notification with a link to sign in. If they already have a Six43 account, they're added to the team immediately. If not, they'll be added automatically the first time they sign in.
         </Q>
         <Q q="What is the difference between Admin and Staff?">
           The coach who created the team is the <strong>Admin</strong> — they have full control including inviting coaches, managing the roster, and editing lineups. <strong>Staff</strong> coaches are invited assistants. By default they can edit lineups and the roster. You can switch any staff coach to <strong>View only</strong> in the Staff tab, which lets them see everything but not make changes.
         </Q>
         <Q q="How do I see who has accepted my invite?">
-          In the Staff tab, accepted coaches appear under <strong>Active</strong> with their email address and a Staff badge. Invites not yet accepted appear under <strong>Pending</strong> — you can copy the link again to resend it, or revoke it if it's no longer needed.
+          In the Staff tab, accepted coaches appear under <strong>Active</strong> with their email address and a Staff badge. Invites not yet accepted appear under <strong>Pending</strong>. You can revoke a pending invite at any time — just tap Remove next to the name.
+        </Q>
+        <Q q="A coach I invited says they don't see the team.">
+          Ask them to sign in to Six43 and go to Settings — the team will appear under the <strong>Staff tab → Teams you coach</strong>. The dashboard will also show the team once they're signed in. If they still don't see it, try removing and re-inviting them from the Staff tab.
         </Q>
         <Q q="Can a staff coach see who else is on the team?">
           Yes — when a staff coach opens Settings, they see a <strong>Teams you coach</strong> section under the Staff tab. It lists the team Admin and all other accepted staff coaches, along with each person's permission level.
@@ -234,7 +237,7 @@ export default function HelpPage() {
           In the desktop lineup editor, use the − / + buttons in the top bar next to the innings count. You can also set a default innings-per-game when you create or edit a season in Settings.
         </Q>
         <Q q="I need help with something not listed here.">
-          <span>Email us at <a href="mailto:support@six43.app" style={{ color: 'var(--accent)' }}>support@six43.app</a> or open an issue on GitHub.</span>
+          <span>Email us at <a href="mailto:support@six43.com" style={{ color: 'var(--accent)' }}>support@six43.com</a> or open an issue on GitHub.</span>
         </Q>
       </Section>
     </main>

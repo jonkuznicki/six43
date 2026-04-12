@@ -38,7 +38,7 @@ const FEATURES = [
   { icon: '✦',  title: 'AI player evaluations',   body: 'Add notes throughout the season. At end-of-year, generate a personalized report for each player\'s family in one tap.' },
   { icon: '🔄', title: 'GameChanger sync',         body: 'Paste your webcal link once and your full schedule imports. Check for updates any time — reschedules sync automatically.' },
   { icon: '📐', title: 'Depth chart',              body: 'Rank players at every position and track who can\'t play certain spots. Always current, always accessible.' },
-  { icon: '🔗', title: 'Share with your staff',    body: 'Invite assistant coaches with full edit or read-only access. Everyone sees the same lineup and the same plan.' },
+  { icon: '🔗', title: 'Invite coaching staff',     body: 'Add assistant coaches by email. They get instant access to the roster, schedule, and lineups — with full edit or view-only permissions.' },
   { icon: '📝', title: 'Post-game notes',          body: 'Jot a quick note on any player right after the final out while it\'s still fresh.' },
   { icon: '🖨️', title: 'Print-ready card',         body: 'One tap to print a clean lineup card to bring to the field. Works from phone or desktop.' },
   { icon: '📱', title: 'Works everywhere',         body: 'Plan on your laptop the night before. Coach from your phone in the dugout. Same data, always in sync.' },
@@ -941,7 +941,97 @@ export default async function HomePage() {
       {/* ── Divider ── */}
       <div className="mkt-divider" />
 
-      {/* ── Spotlight 4: Tournament planning ── */}
+      {/* ── Spotlight 4: Coaching staff ── */}
+      <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
+        <div className="mkt-spotlight">
+          {/* Visual: staff card mock */}
+          <div className="mkt-spotlight-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '14px', padding: '20px', width: '100%', maxWidth: '300px',
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '12px' }}>Coaching Staff</div>
+
+              {/* Admin row */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 12px', borderRadius: '8px',
+                background: 'rgba(128,176,232,0.07)', border: '0.5px solid rgba(128,176,232,0.2)',
+                marginBottom: '6px',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600 }}>joncoach@email.com</div>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#80B0E8' }}>Admin</span>
+              </div>
+
+              {/* Active staff */}
+              <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.25)`, margin: '10px 0 6px' }}>Active · 2</div>
+              {[
+                { email: 'assistant1@email.com', perm: 'Can edit' },
+                { email: 'assistant2@email.com', perm: 'View only' },
+              ].map((m, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '9px 12px', borderRadius: '8px',
+                  background: 'var(--bg-card-alt)', border: '0.5px solid var(--border)',
+                  marginBottom: '6px',
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500 }}>{m.email}</div>
+                  </div>
+                  <span style={{ fontSize: '10px', fontWeight: 600, color: '#6DB875' }}>Staff</span>
+                </div>
+              ))}
+
+              {/* Invite row */}
+              <div style={{ marginTop: '10px', display: 'flex', gap: '6px' }}>
+                <div style={{
+                  flex: 1, padding: '8px 10px', borderRadius: '6px',
+                  background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
+                  fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`,
+                }}>coach@email.com</div>
+                <div style={{
+                  padding: '8px 12px', borderRadius: '6px',
+                  background: 'var(--accent)', color: 'var(--accent-text)',
+                  fontSize: '11px', fontWeight: 700,
+                }}>Send</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mkt-spotlight-text">
+            <div style={{
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'var(--accent)', marginBottom: '12px',
+            }}>Coaching staff</div>
+            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
+              Bring your whole<br />coaching staff along.
+            </h2>
+            <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
+              Enter an email address and your assistant coach is added to the team instantly — no link sharing, no workarounds. Everyone sees the same schedule, roster, and lineups in real time.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                'Invite coaches by email — they get notified automatically',
+                'Existing Six43 users get access the moment you add them',
+                'Set edit or view-only permissions per coach',
+                'See who has accepted and manage staff from the Settings tab',
+              ].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <span style={{ color: '#6DB875', fontSize: '13px', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.7)` }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ── */}
+      <div className="mkt-divider" />
+
+      {/* ── Spotlight 5: Tournament planning ── */}
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight reverse">
           {/* Visual: tournament view mock */}
