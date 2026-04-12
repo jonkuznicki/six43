@@ -154,7 +154,7 @@ export default function SettingsPage() {
       for (const mt of mTeams ?? []) {
         const { data: staff } = await supabase
           .from('team_members')
-          .select('id, user_id, email, accepted_at, read_only, role')
+          .select('id, user_id, email, invite_email, accepted_at, read_only, role')
           .eq('team_id', mt.id)
           .not('accepted_at', 'is', null)
           .order('created_at')
