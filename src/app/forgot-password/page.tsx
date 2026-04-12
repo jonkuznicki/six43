@@ -30,70 +30,97 @@ export default function ForgotPasswordPage() {
 
   return (
     <main style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'sans-serif', background: '#0B1F3A',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'sans-serif',
+      background: 'var(--bg)',
+      padding: '1rem',
     }}>
       <div style={{
-        background: 'white', padding: '2rem', borderRadius: '12px',
-        width: '100%', maxWidth: '380px',
+        background: 'var(--bg2)',
+        border: '0.5px solid var(--border)',
+        padding: '2rem',
+        borderRadius: '14px',
+        width: '100%',
+        maxWidth: '380px',
       }}>
-        <h1 style={{ marginBottom: '0.25rem', fontSize: '28px' }}>
-          Six<span style={{ color: '#E8A020' }}>43</span>
-        </h1>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, marginBottom: '4px' }}>
+            Six<span style={{ color: 'var(--accent)' }}>43</span>
+          </div>
+          <p style={{ color: `rgba(var(--fg-rgb), 0.45)`, fontSize: '13px', margin: 0 }}>
+            {submitted ? 'Check your email' : 'Reset your password'}
+          </p>
+        </div>
 
         {submitted ? (
           <>
-            <p style={{ color: '#444', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-              Check your email — we sent a password reset link to <strong>{email}</strong>.
+            <p style={{ color: `rgba(var(--fg-rgb), 0.65)`, fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+              We sent a password reset link to <strong style={{ color: 'var(--fg)' }}>{email}</strong>. Click the link in that email to choose a new password.
             </p>
             <Link href="/login" style={{
-              display: 'block', textAlign: 'center', padding: '11px',
-              background: '#E8A020', color: '#0B1F3A', borderRadius: '6px',
+              display: 'block', textAlign: 'center', padding: '12px',
+              background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: '6px',
               fontWeight: 700, fontSize: '14px', textDecoration: 'none',
             }}>
               Back to sign in
             </Link>
           </>
         ) : (
-          <>
-            <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '14px' }}>
-              Enter your email and we'll send you a reset link.
-            </p>
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#444' }}>
-                  Email
-                </label>
-                <input
-                  type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  required autoFocus
-                  style={{
-                    width: '100%', padding: '10px', border: '1px solid #ddd',
-                    borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              {error && (
-                <p style={{ color: 'red', fontSize: '13px', marginBottom: '1rem' }}>{error}</p>
-              )}
-
-              <button type="submit" disabled={loading} style={{
-                width: '100%', padding: '12px', background: '#E8A020',
-                color: '#0B1F3A', border: 'none', borderRadius: '6px',
-                fontSize: '15px', fontWeight: 'bold',
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{
+                display: 'block', fontSize: '11px', marginBottom: '4px',
+                color: `rgba(var(--fg-rgb), 0.4)`, textTransform: 'uppercase', letterSpacing: '0.06em',
               }}>
-                {loading ? 'Sending…' : 'Send reset link'}
-              </button>
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+                autoComplete="email"
+                style={{
+                  width: '100%', padding: '10px 12px',
+                  border: '0.5px solid var(--border-md)',
+                  borderRadius: '6px', fontSize: '14px',
+                  background: 'var(--bg-input)', color: 'var(--fg)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
 
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <Link href="/login" style={{ fontSize: '13px', color: '#666', textDecoration: 'none' }}>
-                  Back to sign in
-                </Link>
+            {error && (
+              <div style={{
+                fontSize: '12px', color: '#E87060',
+                background: 'rgba(192,57,43,0.1)', border: '0.5px solid rgba(192,57,43,0.25)',
+                borderRadius: '6px', padding: '8px 12px', marginBottom: '12px',
+              }}>
+                {error}
               </div>
-            </form>
-          </>
+            )}
+
+            <button type="submit" disabled={loading} style={{
+              width: '100%', padding: '12px',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              border: 'none', borderRadius: '6px',
+              fontSize: '14px', fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+            }}>
+              {loading ? '…' : 'Send reset link'}
+            </button>
+
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <Link href="/login" style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none' }}>
+                Back to sign in
+              </Link>
+            </div>
+          </form>
         )}
       </div>
     </main>
