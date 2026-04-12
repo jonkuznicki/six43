@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         </div>
       `
       await resend.emails.send({
-        from: 'Six43 <noreply@six43.app>',
+        from: 'Six43 <noreply@six43.com>',
         to: normalizedEmail,
         subject,
         html: bodyHtml,
