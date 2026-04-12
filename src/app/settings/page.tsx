@@ -162,6 +162,10 @@ export default function SettingsPage() {
       }
       setMemberTeams(mTeams ?? [])
       setMemberTeamStaff(staffMap)
+      // If user has no owned teams, default to the coaches tab
+      if ((teamRows ?? []).length === 0 && (mTeams ?? []).length > 0) {
+        setTab('coaches')
+      }
     }
 
     setLoading(false)
@@ -728,7 +732,7 @@ export default function SettingsPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
-                                  {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
+                                  {m.email ?? m.invite_email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
                                 </span>
                                 <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '6px', fontWeight: 600 }}>
                                   Staff
