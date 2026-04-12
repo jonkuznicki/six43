@@ -175,6 +175,25 @@ export default function HelpPage() {
         </Q>
       </Section>
 
+      {/* ── Player evaluations & notes ── */}
+      <Section title="Player evaluations & notes">
+        <Q q="Where do I find player evaluations?">
+          Go to <strong>Roster</strong> (tap the Roster tab in the bottom nav) and switch to the <strong>Evaluations</strong> tab. Each player has a Notes button that opens their evaluation sheet.
+        </Q>
+        <Q q="How do I add a note from a game?">
+          The fastest way is right from the game detail page. After a game, open it from the Games list and tap any player's name in the lineup — a note sheet slides up. Write your note while it's fresh, tap <strong>Save note</strong>, and it's logged under that player with the game's date. Tap <strong>View in Roster →</strong> to see all their notes.
+        </Q>
+        <Q q="What are skill scores?">
+          In the Evaluations tab, each player has five skill sliders — Hitting, Fielding, Arm, Speed, and Coachability — rated 1–5. Tap a number to set or update the score. Scores are saved instantly and are used when generating evaluation reports.
+        </Q>
+        <Q q="What is an evaluation report?">
+          At the end of the season, tap <strong>✦ Report</strong> next to a player in the Evaluations tab. Six43 uses your skill scores and all the notes you've logged to generate a personalized, parent-friendly summary you can share with the family. It reads naturally and focuses on growth and encouragement.
+        </Q>
+        <Q q="Are notes tied to a season?">
+          Yes — notes are stored with both the player and the active season, so each season starts fresh. Previous seasons' notes are preserved in history but won't appear in the current Evaluations view.
+        </Q>
+      </Section>
+
       {/* ── Playing time ── */}
       <Section title="Playing time & fairness">
         <Q q="What is the Playing Time page?">
@@ -194,7 +213,16 @@ export default function HelpPage() {
           Yes — go to Settings and add additional teams. You can switch between them on the Games page using the team selector at the top.
         </Q>
         <Q q="Can multiple coaches share access?">
-          Yes — go to Settings and use the <strong>Invite a coach</strong> option to share access to your team with another email address.
+          Yes — go to <strong>Settings → Staff tab</strong> and tap <strong>+ Invite coach</strong>. This generates a unique invite link. Copy it and send it to your assistant coach — when they open the link and log in, they'll be added to your team as Staff.
+        </Q>
+        <Q q="What is the difference between Admin and Staff?">
+          The coach who created the team is the <strong>Admin</strong> — they have full control including inviting coaches, managing the roster, and editing lineups. <strong>Staff</strong> coaches are invited assistants. By default they can edit lineups and the roster. You can switch any staff coach to <strong>View only</strong> in the Staff tab, which lets them see everything but not make changes.
+        </Q>
+        <Q q="How do I see who has accepted my invite?">
+          In the Staff tab, accepted coaches appear under <strong>Active</strong> with their email address and a Staff badge. Invites not yet accepted appear under <strong>Pending</strong> — you can copy the link again to resend it, or revoke it if it's no longer needed.
+        </Q>
+        <Q q="Can a staff coach see who else is on the team?">
+          Yes — when a staff coach opens Settings, they see a <strong>Teams you coach</strong> section under the Staff tab. It lists the team Admin and all other accepted staff coaches, along with each person's permission level.
         </Q>
         <Q q="Can I print the lineup card?">
           Yes — from the desktop lineup editor, click <strong>Print</strong> in the top bar. This opens a printer-friendly view. You can also open a <strong>Mobile view</strong> from the same bar which works well on a phone at the field.
