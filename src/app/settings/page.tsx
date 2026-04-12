@@ -319,21 +319,21 @@ export default function SettingsPage() {
     if (!email || !email.includes('@')) { setInviteError('Enter a valid email address.'); return }
     setSendingInvite(true); setInviteError('')
 
-    // Check for duplicate pending invite to this email on this team
-    const existing = (teamMembers[teamId] ?? []).find(
-      m => m.invite_email?.toLowerCase() === email && !m.accepted_at
-    )
-    if (existing) { setInviteError('This email already has a pending invite.'); setSendingInvite(false); return }
+    const res = await fetch('/api/invite/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamId, email }),
+    })
+    const json = await res.json()
 
-    const token = crypto.randomUUID()
-    const { data, error } = await supabase
-      .from('team_members')
-      .insert({ team_id: teamId, invite_token: token, invite_email: email, role: 'coach', owner_user_id: userId })
-      .select().single()
+    if (!res.ok) {
+      setInviteError(json.error ?? 'Failed to send invite. Try again.')
+      setSendingInvite(false)
+      return
+    }
 
-    if (error) { setInviteError('Failed to send invite. Try again.'); setSendingInvite(false); return }
-    if (data) {
-      setTeamMembers(prev => ({ ...prev, [teamId]: [...(prev[teamId] ?? []), data] }))
+    if (json.member) {
+      setTeamMembers(prev => ({ ...prev, [teamId]: [...(prev[teamId] ?? []), json.member] }))
     }
     setInviteEmailInput('')
     setInviteFormTeamId(null)
