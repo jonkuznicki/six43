@@ -655,74 +655,112 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Invited staff coaches */}
-              {(teamMembers[team.id] ?? []).map((m: any) => (
-                <div key={m.id} style={{
-                  padding: '8px 10px', marginBottom: '4px',
-                  background: 'var(--bg-card-alt)',
-                  border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {m.accepted_at ? (
-                        <div>
-                          <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
-                            {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
-                          </span>
-                          <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '6px', fontWeight: 600 }}>
-                            Staff
-                          </span>
+              {/* Active staff coaches */}
+              {(() => {
+                const all = teamMembers[team.id] ?? []
+                const active = all.filter((m: any) => m.accepted_at)
+                const pending = all.filter((m: any) => !m.accepted_at)
+                return (
+                  <>
+                    {active.length > 0 && (
+                      <>
+                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)`,
+                          textTransform: 'uppercase', letterSpacing: '0.07em',
+                          marginTop: '10px', marginBottom: '4px' }}>
+                          Active · {active.length}
                         </div>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)`, fontStyle: 'italic' }}>
-                          Pending invite
-                        </span>
-                      )}
-                    </div>
-                    {!m.accepted_at && (
-                      <button
-                        onClick={() => copyInviteLink(team.id, m.invite_token)}
-                        style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
-                          border: 'none',
-                          background: copiedTeamId === team.id ? 'rgba(45,106,53,0.2)' : 'var(--accent)',
-                          color: copiedTeamId === team.id ? '#6DB875' : 'var(--accent-text)',
-                          cursor: 'pointer', flexShrink: 0 }}>
-                        {copiedTeamId === team.id ? 'Copied!' : 'Copy link'}
-                      </button>
+                        {active.map((m: any) => (
+                          <div key={m.id} style={{
+                            padding: '8px 10px', marginBottom: '4px',
+                            background: 'var(--bg-card-alt)',
+                            border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
+                                  {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '6px', fontWeight: 600 }}>
+                                  Staff
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => revokeInvite(team.id, m.id)}
+                                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
+                                  border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
+                                  color: 'rgba(232,100,80,0.7)', cursor: 'pointer', flexShrink: 0 }}>
+                                Remove
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                              <button
+                                onClick={() => toggleReadOnly(team.id, m.id, m.read_only ?? false)}
+                                style={{
+                                  fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px',
+                                  cursor: 'pointer', border: 'none',
+                                  background: m.read_only ? 'rgba(232,160,32,0.15)' : 'rgba(45,106,53,0.15)',
+                                  color: m.read_only ? '#E8A020' : '#6DB875',
+                                }}>
+                                {m.read_only ? 'View only' : 'Can edit'}
+                              </button>
+                              <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>
+                                {m.read_only ? 'Can view lineups but not make changes' : 'Can edit lineups and roster'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
                     )}
-                    <button
-                      onClick={() => revokeInvite(team.id, m.id)}
-                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
-                        border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
-                        color: 'rgba(232,100,80,0.7)', cursor: 'pointer', flexShrink: 0 }}>
-                      {m.accepted_at ? 'Remove' : 'Revoke'}
-                    </button>
-                  </div>
-                  {m.accepted_at && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                      <button
-                        onClick={() => toggleReadOnly(team.id, m.id, m.read_only ?? false)}
-                        style={{
-                          fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px',
-                          cursor: 'pointer', border: 'none',
-                          background: m.read_only ? 'rgba(232,160,32,0.15)' : 'rgba(45,106,53,0.15)',
-                          color: m.read_only ? '#E8A020' : '#6DB875',
-                        }}>
-                        {m.read_only ? 'View only' : 'Can edit'}
-                      </button>
-                      <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>
-                        {m.read_only ? 'Can view lineups but not make changes' : 'Can edit lineups and roster'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
 
-              {(teamMembers[team.id] ?? []).length === 0 && (
-                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, fontStyle: 'italic', marginTop: '4px' }}>
-                  No staff invited yet.
-                </div>
-              )}
+                    {pending.length > 0 && (
+                      <>
+                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)`,
+                          textTransform: 'uppercase', letterSpacing: '0.07em',
+                          marginTop: '10px', marginBottom: '4px' }}>
+                          Pending · {pending.length}
+                        </div>
+                        {pending.map((m: any) => (
+                          <div key={m.id} style={{
+                            padding: '8px 10px', marginBottom: '4px',
+                            background: 'var(--bg-card-alt)',
+                            border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`,
+                                fontStyle: 'italic', flex: 1 }}>
+                                Invite not yet accepted
+                              </span>
+                              <button
+                                onClick={() => copyInviteLink(team.id, m.invite_token)}
+                                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
+                                  border: 'none',
+                                  background: copiedTeamId === team.id ? 'rgba(45,106,53,0.2)' : 'var(--accent)',
+                                  color: copiedTeamId === team.id ? '#6DB875' : 'var(--accent-text)',
+                                  cursor: 'pointer', flexShrink: 0 }}>
+                                {copiedTeamId === team.id ? 'Copied!' : 'Copy link'}
+                              </button>
+                              <button
+                                onClick={() => revokeInvite(team.id, m.id)}
+                                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px',
+                                  border: '0.5px solid rgba(192,57,43,0.3)', background: 'transparent',
+                                  color: 'rgba(232,100,80,0.7)', cursor: 'pointer', flexShrink: 0 }}>
+                                Revoke
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {all.length === 0 && (
+                      <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`,
+                        fontStyle: 'italic', marginTop: '4px' }}>
+                        No staff invited yet.
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
           )}
