@@ -1,4 +1,5 @@
 import { createServerClient } from '../../lib/supabase-server'
+import { createServiceClient } from '../../lib/supabase-service'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
@@ -48,6 +49,25 @@ export default async function Dashboard({
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Auto-accept any pending email invites for this user.
+  // Runs on every dashboard load so existing users who were invited
+  // after their last sign-in get accepted without needing to sign out/in.
+  if (user.email) {
+    const service = createServiceClient()
+    const { data: pending } = await service
+      .from('team_members')
+      .select('id')
+      .eq('invite_email', user.email)
+      .is('accepted_at', null)
+    if (pending && pending.length > 0) {
+      await service.from('team_members').update({
+        user_id: user.id,
+        accepted_at: new Date().toISOString(),
+        email: user.email,
+      }).in('id', pending.map((r: any) => r.id))
+    }
+  }
 
   const { data: allTeams } = await supabase
     .from('teams')

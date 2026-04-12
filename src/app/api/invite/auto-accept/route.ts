@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '../../../../lib/supabase-service'
 import { createServerClient } from '../../../../lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 
 // POST /api/invite/auto-accept
 // Called after login or email confirmation.
@@ -14,7 +15,14 @@ export async function POST(req: Request) {
   const authHeader = req.headers.get('Authorization')
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
-    const { data } = await service.auth.getUser(token)
+    // Use a fresh anon client initialized with the user's JWT — more reliable
+    // than calling getUser(token) on the service-role client.
+    const userClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } }
+    )
+    const { data } = await userClient.auth.getUser()
     user = data.user
   } else {
     const authClient = await createServerClient()
