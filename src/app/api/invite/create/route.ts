@@ -72,7 +72,10 @@ export async function POST(req: Request) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: 'Failed to create invite.' }, { status: 500 })
+    if (error) {
+      console.error('[invite/create] insert (existing user):', error)
+      return NextResponse.json({ error: error.message ?? 'Failed to create invite.' }, { status: 500 })
+    }
     member = data
     autoAccepted = true
   } else {
@@ -89,7 +92,10 @@ export async function POST(req: Request) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: 'Failed to create invite.' }, { status: 500 })
+    if (error) {
+      console.error('[invite/create] insert (new user):', error)
+      return NextResponse.json({ error: error.message ?? 'Failed to create invite.' }, { status: 500 })
+    }
     member = data
   }
 
