@@ -60,10 +60,14 @@ export default function SettingsPage() {
   const [plan, setPlan] = useState<'free' | 'pro'>('free')
   const [gameCount, setGameCount] = useState(0)
 
-  // Invite / team members
+  // Invite / team members (owned teams)
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({})
   const [generatingInvite, setGeneratingInvite] = useState<string | null>(null)
   const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null)
+
+  // Teams the current user is a staff coach on (not owner)
+  const [memberTeams, setMemberTeams] = useState<any[]>([])
+  const [memberTeamStaff, setMemberTeamStaff] = useState<Record<string, any[]>>({})
 
   const [tab, setTab] = useState<string>('team')
 
@@ -122,9 +126,42 @@ export default function SettingsPage() {
         .from('team_members').select('*').eq('team_id', team.id).order('created_at')
       allTeams.push({ ...team, seasons: seasons ?? [] })
       membersMap[team.id] = members ?? []
+
+      // Keep owner_email in sync on the team row
+      if (team.owner_email !== user.email) {
+        await supabase.from('teams').update({ owner_email: user.email }).eq('id', team.id)
+      }
     }
     setTeams(allTeams)
     setTeamMembers(membersMap)
+
+    // Load teams where this user is an accepted staff coach (not owner)
+    const { data: myMemberships } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .not('accepted_at', 'is', null)
+
+    if (myMemberships && myMemberships.length > 0) {
+      const memberTeamIds = myMemberships.map((m: any) => m.team_id)
+      const { data: mTeams } = await supabase
+        .from('teams')
+        .select('id, name, age_group, owner_email')
+        .in('id', memberTeamIds)
+      const staffMap: Record<string, any[]> = {}
+      for (const mt of mTeams ?? []) {
+        const { data: staff } = await supabase
+          .from('team_members')
+          .select('id, user_id, email, accepted_at, read_only, role')
+          .eq('team_id', mt.id)
+          .not('accepted_at', 'is', null)
+          .order('created_at')
+        staffMap[mt.id] = staff ?? []
+      }
+      setMemberTeams(mTeams ?? [])
+      setMemberTeamStaff(staffMap)
+    }
+
     setLoading(false)
   }
 
@@ -351,7 +388,7 @@ export default function SettingsPage() {
         {([
           { id: 'team', label: 'Team' },
           { id: 'season', label: 'Season' },
-          { id: 'coaches', label: 'Coaches' },
+          { id: 'coaches', label: 'Staff' },
           { id: 'account', label: 'Account' },
         ]).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -416,6 +453,7 @@ export default function SettingsPage() {
         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
           textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)` }}>
           {tab === 'team' ? 'Teams' : tab === 'season' ? 'Seasons' : 'Coaching Staff'}
+
         </div>
         {tab === 'team' && (
         <button onClick={() => { setTeamForm(BLANK_TEAM); setTeamError('') }} style={{
@@ -573,13 +611,13 @@ export default function SettingsPage() {
           </div>
           )}
 
-          {/* ── COACHES / INVITES — coaches tab only ── */}
+          {/* ── STAFF / INVITES — coaches tab only ── */}
           {tab === 'coaches' && (
           <div style={{ padding: '10px 16px 14px' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-                  letterSpacing: '0.08em' }}>Coaches</div>
+                  letterSpacing: '0.08em' }}>Staff</div>
                 <button
                   onClick={() => createInvite(team.id)}
                   disabled={generatingInvite === team.id}
@@ -591,12 +629,33 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {(teamMembers[team.id] ?? []).length === 0 && (
-                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, fontStyle: 'italic' }}>
-                  No coaches invited yet.
+              {/* Owner row — always shown first */}
+              <div style={{
+                padding: '8px 10px', marginBottom: '4px',
+                background: 'rgba(59,109,177,0.08)',
+                border: '0.5px solid rgba(59,109,177,0.2)', borderRadius: '6px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
+                      {userEmail}
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#80B0E8', marginLeft: '6px', fontWeight: 700 }}>
+                      Admin
+                    </span>
+                    <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginLeft: '4px' }}>
+                      · You
+                    </span>
+                  </div>
                 </div>
-              )}
+                <div style={{ marginTop: '4px' }}>
+                  <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>
+                    Can edit lineups and roster
+                  </span>
+                </div>
+              </div>
 
+              {/* Invited staff coaches */}
               {(teamMembers[team.id] ?? []).map((m: any) => (
                 <div key={m.id} style={{
                   padding: '8px 10px', marginBottom: '4px',
@@ -611,7 +670,7 @@ export default function SettingsPage() {
                             {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
                           </span>
                           <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '6px', fontWeight: 600 }}>
-                            Active
+                            Staff
                           </span>
                         </div>
                       ) : (
@@ -658,11 +717,88 @@ export default function SettingsPage() {
                   )}
                 </div>
               ))}
+
+              {(teamMembers[team.id] ?? []).length === 0 && (
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.3)`, fontStyle: 'italic', marginTop: '4px' }}>
+                  No staff invited yet.
+                </div>
+              )}
             </div>
           </div>
           )}
         </div>
       ))}
+
+      {/* ── STAFF VIEW for coaches (teams where user is a staff member, not owner) ── */}
+      {tab === 'coaches' && memberTeams.length > 0 && (
+        <div style={{ marginTop: teams.length > 0 ? '2rem' : 0 }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+            marginBottom: '12px' }}>
+            Teams you coach
+          </div>
+          {memberTeams.map((mt: any) => (
+            <div key={mt.id} style={{
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '12px', marginBottom: '16px', overflow: 'hidden',
+            }}>
+              <div style={{ padding: '12px 16px', borderBottom: '0.5px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '16px', fontWeight: 700 }}>{mt.name}</div>
+                {mt.age_group && (
+                  <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                    {mt.age_group}
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: '10px 16px 14px' }}>
+                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`,
+                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                  Staff
+                </div>
+
+                {/* Team admin (owner) */}
+                {mt.owner_email && (
+                  <div style={{
+                    padding: '8px 10px', marginBottom: '4px',
+                    background: 'rgba(59,109,177,0.08)',
+                    border: '0.5px solid rgba(59,109,177,0.2)', borderRadius: '6px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500 }}>{mt.owner_email}</span>
+                      <span style={{ fontSize: '10px', color: '#80B0E8', fontWeight: 700 }}>Admin</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '3px' }}>
+                      Can edit lineups and roster
+                    </div>
+                  </div>
+                )}
+
+                {/* Accepted staff coaches */}
+                {(memberTeamStaff[mt.id] ?? []).map((m: any) => (
+                  <div key={m.id} style={{
+                    padding: '8px 10px', marginBottom: '4px',
+                    background: 'var(--bg-card-alt)',
+                    border: '0.5px solid var(--border-subtle)', borderRadius: '6px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500, flex: 1 }}>
+                        {m.email ?? `Coach ${m.user_id?.slice(0, 8)}…`}
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#6DB875', fontWeight: 600 }}>Staff</span>
+                      {m.user_id === userId && (
+                        <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>· You</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginTop: '3px' }}>
+                      {m.read_only ? 'View only · Cannot edit lineups' : 'Can edit lineups and roster'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Inactive teams */}
       {teams.filter(t => t.is_active === false).length > 0 && (
