@@ -72,7 +72,6 @@ export async function POST(req: Request) {
     .update({
       user_id: user.id,
       accepted_at: new Date().toISOString(),
-      email: user.email,
     })
     .in('id', toAccept.map((r: any) => r.id))
 

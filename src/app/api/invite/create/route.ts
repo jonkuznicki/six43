@@ -67,7 +67,6 @@ export async function POST(req: Request) {
         owner_user_id: user.id,
         user_id: existingUserId,
         accepted_at: now,
-        email: normalizedEmail,
       })
       .select()
       .single()

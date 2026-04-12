@@ -64,7 +64,6 @@ export default async function Dashboard({
       await service.from('team_members').update({
         user_id: user.id,
         accepted_at: new Date().toISOString(),
-        email: user.email,
       }).in('id', pending.map((r: any) => r.id))
     }
   }
