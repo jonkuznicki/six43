@@ -1437,11 +1437,11 @@ export default async function HomePage() {
         </div>
         <div>
           Questions or feedback?{' '}
-          <a href="mailto:jonkuznicki@gmail.com?subject=Six43 feedback" style={{
+          <a href="mailto:support@six43.com?subject=Six43 feedback" style={{
             color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
             borderBottom: '0.5px solid rgba(var(--fg-rgb), 0.2)',
           }}>
-            jonkuznicki@gmail.com
+            support@six43.com
           </a>
         </div>
       </footer>
