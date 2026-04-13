@@ -46,18 +46,17 @@ export default function ExchangeCardLayout({ game, activeSlots, teamName }: {
 
       {/* ── HEADER ── */}
       <div style={{
-        background: NAVY,
+        background: '#fff',
+        borderBottom: `2px solid ${NAVY}`,
         padding: '12px 16px 11px',
-        WebkitPrintColorAdjust: 'exact',
-        printColorAdjust: 'exact',
-      } as React.CSSProperties}>
+      }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '10px', marginBottom: metaParts.length ? '8px' : '0',
         }}>
           <div style={{ textAlign: 'right', flex: 1 }}>
             <span style={{
-              fontSize: '20px', fontWeight: 900, color: '#fff',
+              fontSize: '20px', fontWeight: 900, color: NAVY,
               letterSpacing: '-0.5px', lineHeight: 1,
             }}>
               {teamName.toUpperCase()}
@@ -65,17 +64,15 @@ export default function ExchangeCardLayout({ game, activeSlots, teamName }: {
           </div>
           <div style={{
             fontSize: '10px', fontWeight: 800, color: NAVY,
-            background: GOLD, padding: '3px 8px',
+            border: `1.5px solid ${NAVY}`, padding: '3px 8px',
             borderRadius: '3px', flexShrink: 0,
             letterSpacing: '0.06em',
-            WebkitPrintColorAdjust: 'exact',
-            printColorAdjust: 'exact',
-          } as React.CSSProperties}>
+          }}>
             VS
           </div>
           <div style={{ textAlign: 'left', flex: 1 }}>
             <span style={{
-              fontSize: '20px', fontWeight: 900, color: 'rgba(255,255,255,0.72)',
+              fontSize: '20px', fontWeight: 900, color: '#555',
               letterSpacing: '-0.5px', lineHeight: 1,
             }}>
               {opponent.toUpperCase()}
@@ -85,8 +82,8 @@ export default function ExchangeCardLayout({ game, activeSlots, teamName }: {
         {metaParts.length > 0 && (
           <div style={{
             textAlign: 'center',
-            fontSize: '10px', color: 'rgba(255,255,255,0.6)',
-            borderTop: '0.5px solid rgba(255,255,255,0.2)',
+            fontSize: '10px', color: '#666',
+            borderTop: '0.5px solid #ddd',
             paddingTop: '8px',
             letterSpacing: '0.04em',
           }}>

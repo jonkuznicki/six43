@@ -108,7 +108,7 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
           {innings.map(i => <col key={i} />)}
         </colgroup>
         <thead>
-          <tr style={{ background: NAVY, color: '#fff' }}>
+          <tr style={{ background: '#fff', color: NAVY, borderBottom: `2px solid ${NAVY}` }}>
             <th style={hdr}>#</th>
             <th style={hdr}>№</th>
             <th style={{ ...hdr, textAlign: 'left', paddingLeft: '8px' }}>Player</th>
@@ -198,12 +198,12 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
           <col style={{ width: '30px' }} />
         </colgroup>
         <thead>
-          <tr style={{ background: NAVY, color: '#fff' }}>
+          <tr style={{ background: '#fff', color: NAVY, borderBottom: `2px solid ${NAVY}` }}>
             <th style={{ ...hdr, textAlign: 'left', paddingLeft: '8px' }}>Team</th>
             {innings.map(i => (
               <th key={i} style={{ ...hdr, fontSize: '13px' }}>{i + 1}</th>
             ))}
-            <th style={{ ...hdr, borderLeft: `2px solid rgba(255,255,255,0.25)` }}>R</th>
+            <th style={{ ...hdr, borderLeft: `2px solid ${NAVY}` }}>R</th>
             <th style={hdr}>H</th>
             <th style={hdr}>E</th>
           </tr>
@@ -235,23 +235,24 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
 
       {/* ── SIX43 FOOTER BRAND ── */}
       <div style={{
-        background: NAVY,
+        background: '#fff',
+        border: `1.5px solid ${NAVY}`,
         borderRadius: '6px',
-        padding: '10px 16px',
+        padding: '8px 16px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
           <div>
-            <span style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-1.5px', color: '#fff' }}>Six</span>
-            <span style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-1.5px', color: GOLD }}>43</span>
+            <span style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-1.5px', color: NAVY }}>Six</span>
+            <span style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-1.5px', color: GOLD }}>43</span>
           </div>
-          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+          <span style={{ fontSize: '11px', color: '#999', letterSpacing: '0.04em' }}>
             Lineup Builder
           </span>
         </div>
-        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>
+        <div style={{ fontSize: '10px', color: '#aaa', textAlign: 'right' }}>
           <div>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
         </div>
       </div>
@@ -268,7 +269,7 @@ const hdr: React.CSSProperties = {
   textAlign: 'center',
   fontSize: '11px',
   fontWeight: 700,
-  border: '1px solid rgba(255,255,255,0.15)',
+  border: '1px solid #ddd',
   height: ROW_H,
   boxSizing: 'border-box',
 }
