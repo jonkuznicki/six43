@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   const { data: existingUserId } = await service.rpc('get_user_id_by_email', { user_email: normalizedEmail })
 
   const token = crypto.randomUUID()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://six43.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://six43.com'
   const adminName = user.email ?? 'Your team admin'
   const teamName = team.name
 

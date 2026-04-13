@@ -106,7 +106,7 @@ function BrowserMockup({ children, caption }: { children: React.ReactNode; capti
             padding: '3px 10px', fontSize: '10px', color: 'rgba(255,255,255,0.25)',
             textAlign: 'center', maxWidth: '160px', margin: '0 auto',
           }}>
-            six43.app
+            six43.com
           </div>
         </div>
         {children}
@@ -417,7 +417,7 @@ function BrowserMockupLight({ children, caption }: { children: React.ReactNode; 
             padding: '3px 10px', fontSize: '10px', color: 'rgba(0,0,0,0.4)',
             textAlign: 'center', maxWidth: '160px', margin: '0 auto',
           }}>
-            six43.app
+            six43.com
           </div>
         </div>
         {children}

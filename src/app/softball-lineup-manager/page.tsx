@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Softball Lineup Manager — Six43',
     description: 'Lineup management app for youth softball coaches. Build fair lineups, track playing time, and manage your pitchers.',
-    url: 'https://six43.app/softball-lineup-manager',
+    url: 'https://six43.com/softball-lineup-manager',
   },
-  alternates: { canonical: 'https://six43.app/softball-lineup-manager' },
+  alternates: { canonical: 'https://six43.com/softball-lineup-manager' },
 }
 
 export default function SoftballLineupManager() {

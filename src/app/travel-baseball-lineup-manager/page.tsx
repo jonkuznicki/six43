@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Travel Baseball Lineup Manager — Six43',
     description: 'The lineup manager built for travel baseball coaches. Track playing time, manage pitch counts, plan your rotation, and build fair lineups.',
-    url: 'https://six43.app/travel-baseball-lineup-manager',
+    url: 'https://six43.com/travel-baseball-lineup-manager',
   },
-  alternates: { canonical: 'https://six43.app/travel-baseball-lineup-manager' },
+  alternates: { canonical: 'https://six43.com/travel-baseball-lineup-manager' },
 }
 
 const FEATURES = [

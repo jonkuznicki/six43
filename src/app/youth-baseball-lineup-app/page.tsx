@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Youth Baseball Lineup App — Six43',
     description: 'Free youth baseball lineup app for coaches. Build fair lineups, track playing time for every kid, and manage your pitchers.',
-    url: 'https://six43.app/youth-baseball-lineup-app',
+    url: 'https://six43.com/youth-baseball-lineup-app',
   },
-  alternates: { canonical: 'https://six43.app/youth-baseball-lineup-app' },
+  alternates: { canonical: 'https://six43.com/youth-baseball-lineup-app' },
 }
 
 export default function YouthBaseballLineupApp() {

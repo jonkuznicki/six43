@@ -79,7 +79,7 @@ export default function Sidebar() {
           textDecoration: 'none',
         }}>
           <span style={{ fontSize: '14px' }}>←</span>
-          <span>Back to six43.app</span>
+          <span>Back to six43.com</span>
         </Link>
       </div>
     </aside>
