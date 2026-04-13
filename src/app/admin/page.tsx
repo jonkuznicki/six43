@@ -252,7 +252,7 @@ export default function AdminPage() {
       {/* User list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {visible.map(user => {
-          const isAtLimit = user.plan === 'free' && user.game_count >= 3
+          const isAtLimit = user.plan === 'free' && user.game_count >= 10
           return (
             <div key={user.id} style={{
               background: 'var(--bg-card)',
