@@ -174,7 +174,10 @@ export async function GET(request: Request) {
     } else {
       matchedDbIds.add(dbMatch.id)
       const dateChanged = dbMatch.game_date !== icalGame.game_date
-      const timeChanged = (dbMatch.game_time ?? null) !== (icalGame.game_time ?? null)
+      // Normalize to HH:MM before comparing — Postgres returns "HH:MM:SS" but the
+      // iCal parser produces "HH:MM", so without slicing every timed game shows as changed.
+      const toHHMM = (t: string | null) => t ? t.slice(0, 5) : null
+      const timeChanged = toHHMM(dbMatch.game_time) !== toHHMM(icalGame.game_time)
       if (dateChanged || timeChanged) {
         changes.push({
           type: 'changed',
