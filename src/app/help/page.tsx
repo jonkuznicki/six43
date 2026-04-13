@@ -200,7 +200,7 @@ export default function HelpPage() {
           It shows a season-to-date breakdown of how many innings each player has spent at each position — pitcher, catcher, infield, outfield, and bench. This helps you spot if anyone is consistently over- or under-played at any position.
         </Q>
         <Q q="What is the innings target?">
-          You can set a target number of fielding innings per player in the Roster. The Playing Time page flags anyone who is tracking below their target.
+          It's a season-long goal you set per player — for example, "I want Tommy to play at least 30 fielding innings this season." Set it on each player's row in the Roster. On the Playing Time page, each player with a target shows a progress bar (<strong>actual / target</strong>) so you can see at a glance who is on track and who needs more time across upcoming games. Players behind their target get an amber highlight.
         </Q>
         <Q q="How is the bench fairness color calculated?">
           In the lineup editor, each player's bench innings are compared to the expected bench innings (total bench slots ÷ active players × game length). Green means at or below expectation, amber means slightly over, red means significantly over.
