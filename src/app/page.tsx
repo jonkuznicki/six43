@@ -743,7 +743,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>
-              3 games free · beta testers get Pro free · no credit card
+              10 games free · beta testers get Pro free · no credit card
             </div>
           </div>
         </div>
@@ -1329,7 +1329,7 @@ export default async function HomePage() {
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>Free</div>
             <div style={{ fontSize: '32px', fontWeight: 800, marginBottom: '2px' }}>$0</div>
             <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.5rem' }}>
-              3 games · no credit card required
+              10 games · no credit card required
             </div>
             {['All features included', 'Lineup builder', 'Playing time tracking', 'Pitching planner', 'Depth chart', 'Share & print lineups'].map((f, i) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>

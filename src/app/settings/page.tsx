@@ -1276,8 +1276,8 @@ export default function SettingsPage() {
               </div>
               {plan === 'free' && (
                 <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)` }}>
-                  {gameCount} of 3 games used · <span style={{ color: gameCount >= 3 ? '#E87060' : 'inherit' }}>
-                    {3 - gameCount} remaining
+                  {gameCount} of 10 games used · <span style={{ color: gameCount >= 10 ? '#E87060' : 'inherit' }}>
+                    {10 - gameCount} remaining
                   </span>
                 </div>
               )}

@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 const LOCATIONS = ['Home', 'Away', 'Neutral']
 
-const FREE_GAME_LIMIT = 3
+const FREE_GAME_LIMIT = 10
 
 export default function NewGamePage() {
   const supabase = createClient()

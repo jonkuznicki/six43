@@ -148,7 +148,7 @@ export default function AdminPage() {
   // Summary stats
   const weekAgo = Date.now() - 7 * 86400000
   const newThisWeek = users.filter(u => new Date(u.created_at).getTime() > weekAgo).length
-  const atLimit = users.filter(u => u.plan === 'free' && u.game_count >= 3)
+  const atLimit = users.filter(u => u.plan === 'free' && u.game_count >= 10)
   const proCount = users.filter(u => u.plan === 'pro').length
   const neverLoggedIn = users.filter(u => !u.last_sign_in_at || u.last_sign_in_at === u.created_at)
   const inactive30 = users.filter(u => {
@@ -160,7 +160,7 @@ export default function AdminPage() {
   const visible = users.filter(u => {
     const matchSearch = u.email.toLowerCase().includes(search.toLowerCase())
     if (!matchSearch) return false
-    if (filter === 'at-limit') return u.plan === 'free' && u.game_count >= 3
+    if (filter === 'at-limit') return u.plan === 'free' && u.game_count >= 10
     if (filter === 'pro') return u.plan === 'pro'
     if (filter === 'inactive') return Date.now() - new Date(u.last_sign_in_at ?? u.created_at).getTime() > 30 * 86400000
     return true
@@ -217,7 +217,7 @@ export default function AdminPage() {
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <StatCard label="Total users" value={users.length} sub={`+${newThisWeek} this week`} />
         <StatCard label="Pro" value={proCount} sub={users.length ? `${Math.round(proCount / users.length * 100)}% of users` : undefined} />
-        <StatCard label="At limit" value={atLimit.length} sub="free · 3 games used" accent={atLimit.length > 0} />
+        <StatCard label="At limit" value={atLimit.length} sub="free · 10 games used" accent={atLimit.length > 0} />
         <StatCard label="Inactive 30d" value={inactive30.length} sub="no recent login" />
       </div>
 
@@ -291,7 +291,7 @@ export default function AdminPage() {
                       color: isAtLimit ? '#6DB875' : user.game_count > 0 ? `rgba(var(--fg-rgb), 0.5)` : `rgba(var(--fg-rgb), 0.25)`,
                     }}>
                       {user.game_count} game{user.game_count !== 1 ? 's' : ''}
-                      {isAtLimit ? ' · at limit' : user.plan === 'free' ? ` / 3 free` : ''}
+                      {isAtLimit ? ' · at limit' : user.plan === 'free' ? ` / 10 free` : ''}
                     </span>
                   </div>
 

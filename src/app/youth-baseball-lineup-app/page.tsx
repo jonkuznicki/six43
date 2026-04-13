@@ -71,7 +71,7 @@ export default function YouthBaseballLineupApp() {
             Try it free
           </Link>
           <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)`, display: 'flex', alignItems: 'center' }}>
-            No credit card · 3 games free
+            No credit card · 10 games free
           </div>
         </div>
 

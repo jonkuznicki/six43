@@ -65,8 +65,8 @@ export async function GET() {
 
   // Sort: at-limit free users first (hottest leads), then pro, then rest by join date
   users.sort((a, b) => {
-    const aAtLimit = a.plan === 'free' && a.game_count >= 3
-    const bAtLimit = b.plan === 'free' && b.game_count >= 3
+    const aAtLimit = a.plan === 'free' && a.game_count >= 10
+    const bAtLimit = b.plan === 'free' && b.game_count >= 10
     if (aAtLimit !== bAtLimit) return aAtLimit ? -1 : 1
     if (a.plan !== b.plan) return a.plan === 'pro' ? -1 : 1
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
