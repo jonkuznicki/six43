@@ -89,8 +89,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const updatedActive = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     setSlots(prev => [...updatedActive, ...prev.filter(s => s.availability === 'absent')])
 
-    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[swapIdx].id)
-    await supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[idx].id)
+    await supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[swapIdx].id)
+    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id)
   }
 
   // ── DRAG & DROP ────────────────────────────────────────────

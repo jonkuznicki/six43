@@ -476,8 +476,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     const next = [...updated, ...slotsRef.current.filter(s => s.availability === 'absent')]
     setSlots(next)
-    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[swap].id)
-    await supabase.from('lineup_slots').update({ batting_order: swap + 1 }).eq('id', reordered[idx].id)
+    await supabase.from('lineup_slots').update({ batting_order: swap + 1 }).eq('id', reordered[swap].id)
+    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id)
   }
 
   async function handleDrop(targetId: string) {
