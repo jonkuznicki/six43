@@ -1435,7 +1435,7 @@ export default async function HomePage() {
         <div style={{ marginBottom: '8px' }}>
           Six<span style={{ color: 'var(--accent)', opacity: 0.6 }}>43</span> · Built for youth baseball coaches
         </div>
-        <div>
+        <div style={{ marginBottom: '6px' }}>
           Questions or feedback?{' '}
           <a href="mailto:support@six43.com?subject=Six43 feedback" style={{
             color: `rgba(var(--fg-rgb), 0.45)`, textDecoration: 'none',
@@ -1443,6 +1443,14 @@ export default async function HomePage() {
           }}>
             support@six43.com
           </a>
+        </div>
+        <div>
+          <Link href="/privacy" style={{
+            color: `rgba(var(--fg-rgb), 0.3)`, textDecoration: 'none',
+            borderBottom: '0.5px solid rgba(var(--fg-rgb), 0.15)',
+          }}>
+            Privacy Policy
+          </Link>
         </div>
       </footer>
 
