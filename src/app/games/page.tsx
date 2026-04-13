@@ -19,17 +19,17 @@ export default async function GamesPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: allTeams } = await supabase
-    .from('teams')
-    .select('id, name, is_active')
-    .order('created_at')
+  // Fetch teams and the selected-team cookie in parallel
+  const [{ data: allTeams }, cookieStore] = await Promise.all([
+    supabase.from('teams').select('id, name, is_active').order('created_at'),
+    cookies(),
+  ])
 
   const teams = (allTeams ?? []).filter(t => t.is_active !== false)
 
   // Brand-new user with no teams — send them through the setup wizard
   if (teams.length === 0) redirect('/setup')
 
-  const cookieStore = await cookies()
   const cookieTeamId = cookieStore.get('selected_team_id')?.value ?? null
 
   const selectedTeamId =
@@ -48,28 +48,29 @@ export default async function GamesPage({
     .eq('is_active', true)
     .maybeSingle() : { data: null }
 
-  const { data: games } = season ? await supabase
-    .from('games')
-    .select('*')
-    .eq('season_id', season.id)
-    .order('game_date', { ascending: true })
-    .order('game_type', { ascending: true, nullsFirst: false })
-    .order('game_time', { ascending: true, nullsFirst: false }) : { data: [] }
-
-  const { data: tournaments } = season ? await supabase
-    .from('tournaments')
-    .select('id, name, start_date, end_date')
-    .eq('season_id', season.id) : { data: [] }
+  // Fetch games, tournaments, and player count in parallel — all only need season.id
+  const [
+    { data: games },
+    { data: tournaments },
+    { count: playerCount },
+  ] = await Promise.all([
+    season
+      ? supabase.from('games').select('*').eq('season_id', season.id)
+          .order('game_date', { ascending: true })
+          .order('game_type', { ascending: true, nullsFirst: false })
+          .order('game_time', { ascending: true, nullsFirst: false })
+      : Promise.resolve({ data: [] as any[], error: null }),
+    season
+      ? supabase.from('tournaments').select('id, name, start_date, end_date').eq('season_id', season.id)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    season
+      ? supabase.from('players').select('id', { count: 'exact', head: true }).eq('season_id', season.id).eq('status', 'active')
+      : Promise.resolve({ count: 0, data: null, error: null }),
+  ])
 
   const tournamentMap: Record<string, any> = Object.fromEntries(
     (tournaments ?? []).map((t: any) => [t.id, t])
   )
-
-  const { count: playerCount } = season ? await supabase
-    .from('players')
-    .select('id', { count: 'exact', head: true })
-    .eq('season_id', season.id)
-    .eq('status', 'active') : { count: 0 }
 
   const allGames = games ?? []
   const today = new Date().toISOString().split('T')[0]
@@ -78,24 +79,25 @@ export default async function GamesPage({
 
   // Dashboard summary card data
   const nextGame = firstUpcomingIdx >= 0 ? allGames[firstUpcomingIdx] : null
-
-  const { count: lineupSlotCount } = nextGame ? await supabase
-    .from('lineup_slots')
-    .select('id', { count: 'exact', head: true })
-    .eq('game_id', nextGame.id) : { count: 0 }
-
-  const lineupIsSet = (lineupSlotCount ?? 0) > 0
-
-  // Pitchers from the last 3 final games
   const recentFinalGames = allGames
     .filter(g => g.status === 'final' && g.game_date < today)
     .slice(-3)
 
-  const { data: recentPitchSlots } = recentFinalGames.length > 0 ? await supabase
-    .from('lineup_slots')
-    .select('player_id, pitch_count, game_id')
-    .in('game_id', recentFinalGames.map(g => g.id))
-    .gt('pitch_count', 0) : { data: [] }
+  // Fetch lineup slot count and recent pitch slots in parallel
+  const [
+    { count: lineupSlotCount },
+    { data: recentPitchSlots },
+  ] = await Promise.all([
+    nextGame
+      ? supabase.from('lineup_slots').select('id', { count: 'exact', head: true }).eq('game_id', nextGame.id)
+      : Promise.resolve({ count: 0, data: null, error: null }),
+    recentFinalGames.length > 0
+      ? supabase.from('lineup_slots').select('player_id, pitch_count, game_id')
+          .in('game_id', recentFinalGames.map(g => g.id)).gt('pitch_count', 0)
+      : Promise.resolve({ data: [] as any[], error: null }),
+  ])
+
+  const lineupIsSet = (lineupSlotCount ?? 0) > 0
 
   // Get unique pitcher player IDs and their most recent game date
   const pitcherGameMap: Record<string, string> = {}

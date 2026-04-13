@@ -11,21 +11,15 @@ export default async function PrintPage({ params }: { params: { id: string } }) 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: game } = await supabase
-    .from('games')
-    .select('*, season:seasons(team:teams(name))')
-    .eq('id', params.id)
-    .single()
+  const [{ data: game }, { data: slots }] = await Promise.all([
+    supabase.from('games').select('*, season:seasons(team:teams(name))').eq('id', params.id).single(),
+    supabase.from('lineup_slots').select('*, player:players(first_name, last_name, jersey_number)')
+      .eq('game_id', params.id).order('batting_order', { ascending: true, nullsFirst: false }),
+  ])
 
   if (!game) redirect('/games')
 
   const teamName: string = (game as any)?.season?.team?.name ?? 'Us'
-
-  const { data: slots } = await supabase
-    .from('lineup_slots')
-    .select('*, player:players(first_name, last_name, jersey_number)')
-    .eq('game_id', params.id)
-    .order('batting_order', { ascending: true, nullsFirst: false })
 
   const inningCount = game.innings_played ?? 6
   const innings = Array.from({ length: inningCount }, (_, i) => i)
