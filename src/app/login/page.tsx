@@ -12,6 +12,8 @@ function LoginForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [signupDone, setSignupDone] = useState(false)
+  const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [sendingMagicLink, setSendingMagicLink] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -46,10 +48,24 @@ function LoginForm() {
     }
   }
 
+  async function sendMagicLink() {
+    if (!email || !email.includes('@')) { setError('Enter your email address first.'); return }
+    setSendingMagicLink(true)
+    setError('')
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (error) { setError(error.message); setSendingMagicLink(false); return }
+    setMagicLinkSent(true)
+    setSendingMagicLink(false)
+  }
+
   function switchMode(m: 'signin' | 'signup') {
     setMode(m)
     setError('')
     setSignupDone(false)
+    setMagicLinkSent(false)
   }
 
   return (
@@ -180,6 +196,25 @@ function LoginForm() {
             >
               {loading ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
             </button>
+
+            {mode === 'signin' && (
+              magicLinkSent ? (
+                <div style={{ marginTop: '12px', fontSize: '13px', color: '#6DB875', textAlign: 'center', padding: '10px', background: 'rgba(45,106,53,0.1)', borderRadius: '6px', border: '0.5px solid rgba(109,184,117,0.25)' }}>
+                  ✓ Check your email for a sign-in link
+                </div>
+              ) : (
+                <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={sendMagicLink}
+                    disabled={sendingMagicLink}
+                    style={{ background: 'none', border: 'none', fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  >
+                    {sendingMagicLink ? '…' : 'Send me a sign-in link instead'}
+                  </button>
+                </div>
+              )
+            )}
           </form>
         )}
       </div>

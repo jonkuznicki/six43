@@ -53,6 +53,7 @@ export async function GET() {
   const users = authData.users.map(u => ({
     id: u.id,
     email: u.email ?? '',
+    display_name: (u.user_metadata as any)?.display_name ?? null,
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at ?? null,
     plan: planMap[u.id]?.plan ?? 'free',

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 type UserRow = {
   id: string
   email: string
+  display_name: string | null
   created_at: string
   last_sign_in_at: string | null
   plan: 'free' | 'pro'
@@ -54,6 +55,8 @@ export default function AdminPage() {
   const [notesDraft, setNotesDraft] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'at-limit' | 'pro' | 'inactive'>('all')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [actionMsg, setActionMsg] = useState('')
 
   useEffect(() => { init() }, [])
 
@@ -92,6 +95,34 @@ export default function AdminPage() {
     setSaving(null)
     setNotesFor(null)
     setNotesDraft('')
+  }
+
+  async function resetPassword(userId: string, email: string) {
+    setSaving(userId + '-reset')
+    const res = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, email }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { setSaveError(body.error ?? 'Failed to send reset email'); setSaving(null); return }
+    setActionMsg(`Reset email sent to ${email}`)
+    setTimeout(() => setActionMsg(''), 3000)
+    setSaving(null)
+  }
+
+  async function deleteUser(userId: string) {
+    setSaving(userId + '-delete')
+    const res = await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { setSaveError(body.error ?? 'Failed to delete user'); setSaving(null); return }
+    setUsers(prev => prev.filter(u => u.id !== userId))
+    setConfirmDelete(null)
+    setSaving(null)
   }
 
   async function setBeta(userId: string, betaFeatures: boolean) {
@@ -158,6 +189,17 @@ export default function AdminPage() {
         <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Users</h1>
       </div>
 
+      {/* Success banner */}
+      {actionMsg && (
+        <div style={{
+          fontSize: '13px', color: '#6DB875',
+          background: 'rgba(45,106,53,0.12)', border: '0.5px solid rgba(109,184,117,0.3)',
+          borderRadius: '8px', padding: '12px 14px', marginBottom: '1.25rem',
+        }}>
+          {actionMsg}
+        </div>
+      )}
+
       {/* Error banner */}
       {saveError && (
         <div style={{
@@ -220,14 +262,21 @@ export default function AdminPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  {/* Email + mailto */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 500, wordBreak: 'break-all' }}>{user.email}</span>
+                  {/* Name + email + mailto */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {user.display_name || user.email}
+                    </span>
                     <a href={`mailto:${user.email}`} title="Send email" style={{
                       fontSize: '14px', textDecoration: 'none', opacity: 0.4,
                       flexShrink: 0, lineHeight: 1,
                     }}>✉</a>
                   </div>
+                  {user.display_name && (
+                    <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '4px' }}>
+                      {user.email}
+                    </div>
+                  )}
 
                   {/* Stats row */}
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -251,7 +300,7 @@ export default function AdminPage() {
                       {user.plan_notes}
                     </div>
                   )}
-                  <div style={{ marginTop: '8px' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => setBeta(user.id, !user.beta_features)}
                       disabled={saving === user.id + '-beta'}
@@ -265,6 +314,48 @@ export default function AdminPage() {
                     >
                       {saving === user.id + '-beta' ? '…' : user.beta_features ? '🔬 Beta on' : 'Beta off'}
                     </button>
+                    <button
+                      onClick={() => resetPassword(user.id, user.email)}
+                      disabled={saving === user.id + '-reset'}
+                      style={{
+                        fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px',
+                        background: 'transparent', color: `rgba(var(--fg-rgb), 0.4)`,
+                        border: '0.5px solid var(--border)', cursor: 'pointer',
+                      }}
+                    >
+                      {saving === user.id + '-reset' ? '…' : '↺ Reset pw'}
+                    </button>
+                    {confirmDelete === user.id ? (
+                      <>
+                        <button
+                          onClick={() => deleteUser(user.id)}
+                          disabled={saving === user.id + '-delete'}
+                          style={{
+                            fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                            background: 'rgba(232,100,80,0.15)', color: '#E87060',
+                            border: '0.5px solid rgba(232,100,80,0.4)', cursor: 'pointer',
+                          }}
+                        >
+                          {saving === user.id + '-delete' ? '…' : 'Confirm delete'}
+                        </button>
+                        <button onClick={() => setConfirmDelete(null)} style={{
+                          fontSize: '11px', padding: '3px 10px', borderRadius: '20px',
+                          background: 'transparent', color: `rgba(var(--fg-rgb), 0.35)`,
+                          border: '0.5px solid var(--border)', cursor: 'pointer',
+                        }}>Cancel</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(user.id)}
+                        style={{
+                          fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px',
+                          background: 'transparent', color: `rgba(var(--fg-rgb), 0.3)`,
+                          border: '0.5px solid var(--border)', cursor: 'pointer',
+                        }}
+                      >
+                        ✕ Delete
+                      </button>
+                    )}
                   </div>
                 </div>
 

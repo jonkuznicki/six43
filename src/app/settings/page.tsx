@@ -52,11 +52,20 @@ export default function SettingsPage() {
   const [deleteSeason, setDeleteSeason] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [displayName, setDisplayName] = useState('')
+  const [displayNameDraft, setDisplayNameDraft] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [savingName, setSavingName] = useState(false)
+
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' })
   const [pwError, setPwError] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwSuccess, setPwSuccess] = useState(false)
+
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [plan, setPlan] = useState<'free' | 'pro'>('free')
   const [gameCount, setGameCount] = useState(0)
 
@@ -80,6 +89,27 @@ export default function SettingsPage() {
     router.push('/login')
   }
 
+  async function saveDisplayName() {
+    setSavingName(true)
+    const { error } = await supabase.auth.updateUser({ data: { display_name: displayNameDraft.trim() } })
+    if (!error) {
+      setDisplayName(displayNameDraft.trim())
+      setEditingName(false)
+    }
+    setSavingName(false)
+  }
+
+  async function deleteAccount() {
+    setDeletingAccount(true)
+    const res = await fetch('/api/account/delete', { method: 'POST' })
+    if (res.ok) {
+      await supabase.auth.signOut()
+      router.push('/')
+    } else {
+      setDeletingAccount(false)
+    }
+  }
+
   async function changePassword() {
     if (!pwForm.newPassword) { setPwError('Password is required.'); return }
     if (pwForm.newPassword.length < 6) { setPwError('Password must be at least 6 characters.'); return }
@@ -98,6 +128,9 @@ export default function SettingsPage() {
     if (!user) return
     setUserEmail(user.email ?? '')
     setUserId(user.id)
+    const name = user.user_metadata?.display_name ?? ''
+    setDisplayName(name)
+    setDisplayNameDraft(name)
 
     // Plan
     const { data: planRow } = await supabase.from('user_plans').select('plan').maybeSingle()
@@ -1278,6 +1311,39 @@ export default function SettingsPage() {
           background: 'var(--bg-card)', border: '0.5px solid var(--border)',
           borderRadius: '12px', overflow: 'hidden',
         }}>
+          {/* Display name row */}
+          <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
+              Display name
+            </div>
+            {editingName ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={displayNameDraft}
+                  onChange={e => setDisplayNameDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveDisplayName(); if (e.key === 'Escape') setEditingName(false) }}
+                  placeholder="Your name"
+                  autoFocus
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px' }}
+                />
+                <button onClick={saveDisplayName} disabled={savingName} style={{ padding: '7px 14px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                  {savingName ? '…' : 'Save'}
+                </button>
+                <button onClick={() => { setEditingName(false); setDisplayNameDraft(displayName) }} style={{ padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border)', background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 500, color: displayName ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.3)` }}>
+                  {displayName || 'Not set'}
+                </span>
+                <button onClick={() => setEditingName(true)} style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
           {/* Email row */}
           <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border-subtle)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1298,7 +1364,7 @@ export default function SettingsPage() {
             Change password
           </button>
           {/* Feedback row */}
-          <a href="mailto:jonkuznicki@gmail.com?subject=Six43 feedback" style={{
+          <a href="mailto:support@six43.com?subject=Six43 feedback" style={{
             display: 'block', width: '100%', padding: '13px 16px', background: 'transparent',
             borderBottom: '0.5px solid var(--border-subtle)',
             textAlign: 'left', fontSize: '13px', color: `rgba(var(--fg-rgb), 0.6)`,
@@ -1309,8 +1375,16 @@ export default function SettingsPage() {
           {/* Sign out row */}
           <button onClick={signOut} style={{ width: '100%', padding: '13px 16px', background: 'transparent',
             border: 'none', textAlign: 'left', fontSize: '13px',
-            color: 'rgba(232,100,80,0.8)', cursor: 'pointer', fontWeight: 500 }}>
+            color: 'rgba(232,100,80,0.8)', cursor: 'pointer', fontWeight: 500,
+            borderBottom: '0.5px solid var(--border-subtle)' }}>
             Sign out
+          </button>
+          {/* Delete account row */}
+          <button onClick={() => { setShowDeleteAccount(true); setDeleteConfirmText('') }}
+            style={{ width: '100%', padding: '13px 16px', background: 'transparent',
+              border: 'none', textAlign: 'left', fontSize: '13px',
+              color: `rgba(var(--fg-rgb), 0.3)`, cursor: 'pointer' }}>
+            Delete account
           </button>
         </div>
       </div>
@@ -1348,6 +1422,42 @@ export default function SettingsPage() {
               </div>
             </>
           )}
+        </BottomSheet>
+      )}
+
+      {/* ── DELETE ACCOUNT ── */}
+      {showDeleteAccount && (
+        <BottomSheet onClose={() => setShowDeleteAccount(false)}>
+          <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px', color: '#E87060' }}>Delete account</div>
+          <p style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.6)`, lineHeight: 1.6, marginBottom: '16px' }}>
+            This permanently deletes your account, all teams, seasons, rosters, and lineups. This cannot be undone.
+          </p>
+          <p style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '8px' }}>
+            Type <strong style={{ color: 'var(--fg)' }}>DELETE</strong> to confirm.
+          </p>
+          <input
+            value={deleteConfirmText}
+            onChange={e => setDeleteConfirmText(e.target.value)}
+            placeholder="DELETE"
+            autoFocus
+            style={{ ...inputStyle, marginBottom: '16px', width: '100%', boxSizing: 'border-box' as const }}
+          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowDeleteAccount(false)} style={cancelBtnStyle}>Cancel</button>
+            <button
+              onClick={deleteAccount}
+              disabled={deletingAccount || deleteConfirmText !== 'DELETE'}
+              style={{
+                flex: 1, padding: '11px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: '13px',
+                background: deleteConfirmText === 'DELETE' ? '#E87060' : `rgba(var(--fg-rgb), 0.1)`,
+                color: deleteConfirmText === 'DELETE' ? '#fff' : `rgba(var(--fg-rgb), 0.3)`,
+                opacity: deletingAccount ? 0.7 : 1,
+              }}
+            >
+              {deletingAccount ? 'Deleting…' : 'Delete my account'}
+            </button>
+          </div>
         </BottomSheet>
       )}
     </main>
