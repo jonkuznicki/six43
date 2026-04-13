@@ -38,7 +38,7 @@ export default async function TournamentPage({ params }: { params: { id: string 
     .from('games')
     .select('*')
     .eq('tournament_id', params.id)
-    .order('game_type', { ascending: true, nullsFirst: false })
+    .order('game_type', { ascending: false, nullsFirst: false })
     .order('game_date', { ascending: true })
     .order('game_time', { ascending: true, nullsFirst: false })
 

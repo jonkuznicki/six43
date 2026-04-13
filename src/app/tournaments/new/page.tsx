@@ -72,6 +72,18 @@ export default function NewTournamentPage() {
     setSlots(prev => prev.filter(s => s.localId !== localId))
   }
 
+  function moveSlot(localId: string, dir: 'up' | 'down') {
+    setSlots(prev => {
+      const idx = prev.findIndex(s => s.localId === localId)
+      if (idx < 0) return prev
+      const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= prev.length) return prev
+      const next = [...prev]
+      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+      return next
+    })
+  }
+
   async function save() {
     if (!name.trim())         { setError('Tournament name is required.'); return }
     if (!startDate || !endDate) { setError('Start and end dates are required.'); return }
@@ -109,6 +121,7 @@ export default function NewTournamentPage() {
       if (gErr) { setError(gErr.message); setSaving(false); return }
     }
 
+    router.refresh()
     router.push(`/tournaments/${tournament.id}`)
   }
 
@@ -178,7 +191,7 @@ export default function NewTournamentPage() {
             textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
             Game slots
           </div>
-          {slots.map(slot => (
+          {slots.map((slot, slotIdx) => (
             <div key={slot.localId} style={{
               background: 'var(--bg-card)', borderRadius: '10px', padding: '12px',
               marginBottom: '8px',
@@ -194,10 +207,24 @@ export default function NewTournamentPage() {
                 }}>
                   {slot.game_type === 'pool_play' ? 'Pool Play' : 'Bracket'}
                 </span>
-                <button onClick={() => removeSlot(slot.localId)} style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '18px', lineHeight: 1, padding: '0 2px',
-                }}>×</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <button onClick={() => moveSlot(slot.localId, 'up')} disabled={slotIdx === 0}
+                    style={{
+                      background: 'transparent', border: 'none', cursor: slotIdx === 0 ? 'default' : 'pointer',
+                      color: slotIdx === 0 ? `rgba(var(--fg-rgb), 0.15)` : `rgba(var(--fg-rgb), 0.4)`,
+                      fontSize: '14px', lineHeight: 1, padding: '2px 5px',
+                    }}>↑</button>
+                  <button onClick={() => moveSlot(slot.localId, 'down')} disabled={slotIdx === slots.length - 1}
+                    style={{
+                      background: 'transparent', border: 'none', cursor: slotIdx === slots.length - 1 ? 'default' : 'pointer',
+                      color: slotIdx === slots.length - 1 ? `rgba(var(--fg-rgb), 0.15)` : `rgba(var(--fg-rgb), 0.4)`,
+                      fontSize: '14px', lineHeight: 1, padding: '2px 5px',
+                    }}>↓</button>
+                  <button onClick={() => removeSlot(slot.localId)} style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '18px', lineHeight: 1, padding: '0 2px', marginLeft: '4px',
+                  }}>×</button>
+                </div>
               </div>
 
               <Field label="Label">
