@@ -14,9 +14,12 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
 
-  // Supabase delivers the recovery token via URL hash — we need to
-  // let the client SDK pick it up before rendering the form.
   useEffect(() => {
+    // If we arrived via /auth/callback the session is already established — show form immediately.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+    // Also handle the hash-based recovery flow as a fallback.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setReady(true)
     })
