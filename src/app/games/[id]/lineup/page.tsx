@@ -46,6 +46,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [copyGameId, setCopyGameId] = useState<string>('')
   const [copyMode, setCopyMode] = useState<'full' | 'order'>('full')
   const [copying, setCopying] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [teamName, setTeamName] = useState<string | undefined>(undefined)
   const [teamPositions, setTeamPositions] = useState<string[]>(
     ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
@@ -89,8 +90,11 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const updatedActive = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     setSlots(prev => [...updatedActive, ...prev.filter(s => s.availability === 'absent')])
 
-    await supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[swapIdx].id)
-    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id)
+    const [r1, r2] = await Promise.all([
+      supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[swapIdx].id),
+      supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id),
+    ])
+    if (r1.error || r2.error) setSaveError('Could not save batting order. You may not have permission to edit this lineup.')
   }
 
   // ── DRAG & DROP ────────────────────────────────────────────
@@ -108,9 +112,10 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     setSlots(prev => [...updated, ...prev.filter(s => s.availability === 'absent')])
     setDragSlotId(null)
-    for (const s of updated) {
-      await supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id)
-    }
+    const results = await Promise.all(
+      updated.map(s => supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id))
+    )
+    if (results.some(r => r.error)) setSaveError('Could not save batting order. You may not have permission to edit this lineup.')
   }
 
   // ── AVAILABILITY ───────────────────────────────────────────
@@ -345,6 +350,22 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
               Done
             </Link>
           </div>
+
+          {/* Save error banner */}
+          {saveError && (
+            <div style={{
+              background: 'rgba(232,112,96,0.12)', border: '0.5px solid rgba(232,112,96,0.5)',
+              borderRadius: '8px', padding: '10px 12px', marginBottom: '10px',
+              fontSize: '13px', color: '#E87060', lineHeight: 1.5,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+            }}>
+              <span>{saveError}</span>
+              <button onClick={() => setSaveError(null)} style={{
+                background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+                fontSize: '16px', lineHeight: 1, padding: '0 2px', flexShrink: 0,
+              }}>×</button>
+            </div>
+          )}
 
           {/* Toolbar */}
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
