@@ -2,6 +2,7 @@ import { createServerClient } from '../../../lib/supabase-server'
 import { createServiceClient } from '../../../lib/supabase-service'
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { addToAudience } from '../../../lib/resend-audience'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -69,6 +70,8 @@ export async function GET(request: Request) {
         } catch {
           // Don't block the redirect if the notification fails
         }
+        // Add to Resend Audience for future broadcasts
+        await addToAudience(user.email)
       }
     }
   }

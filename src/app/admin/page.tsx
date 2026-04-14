@@ -57,10 +57,9 @@ export default function AdminPage() {
   const [filter, setFilter] = useState<'all' | 'at-limit' | 'pro' | 'inactive'>('all')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState('')
-  const [broadcastState, setBroadcastState] = useState<'idle' | 'previewing' | 'sending' | 'done' | 'error'>('idle')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ recipientCount: number; recipients: string[]; subject: string } | null>(null)
-  const [broadcastResult, setBroadcastResult] = useState<{ sent: number; failed: number } | null>(null)
-  const [broadcastError, setBroadcastError] = useState('')
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
+  const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; total: number } | null>(null)
+  const [syncError, setSyncError] = useState('')
 
   useEffect(() => { init() }, [])
 
@@ -129,33 +128,14 @@ export default function AdminPage() {
     setSaving(null)
   }
 
-  async function previewBroadcast() {
-    setBroadcastState('previewing')
-    setBroadcastError('')
-    const res = await fetch('/api/admin/broadcast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dryRun: true }),
-    })
+  async function syncAudience() {
+    setSyncState('syncing')
+    setSyncError('')
+    const res = await fetch('/api/admin/sync-audience', { method: 'POST' })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setBroadcastError(data.error ?? 'Preview failed'); setBroadcastState('error'); return }
-    setBroadcastPreview(data)
-    setBroadcastState('idle')
-  }
-
-  async function sendBroadcast() {
-    if (!broadcastPreview) return
-    setBroadcastState('sending')
-    setBroadcastError('')
-    const res = await fetch('/api/admin/broadcast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dryRun: false }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setBroadcastError(data.error ?? 'Send failed'); setBroadcastState('error'); return }
-    setBroadcastResult(data)
-    setBroadcastState('done')
+    if (!res.ok) { setSyncError(data.error ?? 'Sync failed'); setSyncState('error'); return }
+    setSyncResult(data)
+    setSyncState('done')
   }
 
   async function setBeta(userId: string, betaFeatures: boolean) {
@@ -477,66 +457,40 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* ── BROADCAST ── */}
+      {/* ── RESEND AUDIENCE SYNC ── */}
       <div style={{ marginTop: '2rem', background: 'var(--bg-card)', border: '0.5px solid var(--border-md)', borderRadius: '12px', padding: '20px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Email broadcast</div>
-        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '14px' }}>
-          Sends the email defined in <code style={{ fontSize: '11px', background: 'var(--bg)', padding: '1px 5px', borderRadius: '4px' }}>src/lib/email-templates/broadcast.ts</code> to all {users.length} users.
+        <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Resend Audience sync</div>
+        <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '14px', lineHeight: 1.6 }}>
+          Syncs all {users.length} users to your Resend Audience so you can send broadcasts from the{' '}
+          <a href="https://resend.com/broadcasts" target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--accent)', textDecoration: 'none' }}>Resend dashboard</a>.
+          New signups are added automatically — run this once to backfill existing users.
         </div>
 
-        {broadcastError && (
-          <div style={{ fontSize: '12px', color: '#E87060', marginBottom: '10px' }}>{broadcastError}</div>
+        {syncError && (
+          <div style={{ fontSize: '12px', color: '#E87060', marginBottom: '10px' }}>{syncError}</div>
         )}
 
-        {broadcastState === 'done' && broadcastResult && (
+        {syncState === 'done' && syncResult && (
           <div style={{ fontSize: '13px', color: '#6DB875', marginBottom: '10px', fontWeight: 600 }}>
-            Sent {broadcastResult.sent} emails{broadcastResult.failed > 0 ? ` · ${broadcastResult.failed} failed` : ' ✓'}
-          </div>
-        )}
-
-        {broadcastPreview && broadcastState !== 'done' && (
-          <div style={{ background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '12px', fontSize: '12px' }}>
-            <div style={{ fontWeight: 700, marginBottom: '4px' }}>Subject: {broadcastPreview.subject}</div>
-            <div style={{ color: `rgba(var(--fg-rgb), 0.5)`, marginBottom: '8px' }}>{broadcastPreview.recipientCount} recipients</div>
-            <div style={{ maxHeight: '80px', overflowY: 'auto', color: `rgba(var(--fg-rgb), 0.45)`, lineHeight: 1.5 }}>
-              {broadcastPreview.recipients.join(', ')}
-            </div>
+            Synced {syncResult.synced} of {syncResult.total} users ✓
+            {syncResult.failed > 0 && <span style={{ color: '#E87060', fontWeight: 400 }}> · {syncResult.failed} failed</span>}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          {broadcastState !== 'done' && (
-            <button
-              onClick={previewBroadcast}
-              disabled={broadcastState === 'previewing' || broadcastState === 'sending'}
-              style={{
-                padding: '9px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                border: '0.5px solid var(--border-md)', background: 'transparent',
-                color: `rgba(var(--fg-rgb), 0.6)`, cursor: 'pointer',
-              }}
-            >
-              {broadcastState === 'previewing' ? 'Loading…' : 'Preview recipients'}
-            </button>
-          )}
-          {broadcastPreview && broadcastState !== 'done' && (
-            <button
-              onClick={sendBroadcast}
-              disabled={broadcastState === 'sending'}
-              style={{
-                padding: '9px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700,
-                border: 'none', background: '#E87060', color: '#fff', cursor: broadcastState === 'sending' ? 'not-allowed' : 'pointer',
-                opacity: broadcastState === 'sending' ? 0.7 : 1,
-              }}
-            >
-              {broadcastState === 'sending' ? 'Sending…' : `Send to ${broadcastPreview.recipientCount} users`}
-            </button>
-          )}
-          {broadcastState === 'done' && (
-            <button onClick={() => { setBroadcastState('idle'); setBroadcastPreview(null); setBroadcastResult(null) }}
-              style={{ padding: '9px 16px', borderRadius: '6px', fontSize: '12px', border: '0.5px solid var(--border-md)', background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer' }}>
-              Reset
-            </button>
-          )}
+          <button
+            onClick={syncAudience}
+            disabled={syncState === 'syncing'}
+            style={{
+              padding: '9px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: 700,
+              border: 'none', background: 'var(--accent)', color: 'var(--accent-text)',
+              cursor: syncState === 'syncing' ? 'not-allowed' : 'pointer',
+              opacity: syncState === 'syncing' ? 0.7 : 1,
+            }}
+          >
+            {syncState === 'syncing' ? 'Syncing…' : syncState === 'done' ? 'Sync again' : `Sync ${users.length} users to Resend`}
+          </button>
         </div>
       </div>
     </main>
