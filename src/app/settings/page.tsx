@@ -173,7 +173,7 @@ export default function SettingsPage() {
     // Load teams where this user is an accepted staff coach (not owner)
     const { data: myMemberships } = await supabase
       .from('team_members')
-      .select('team_id')
+      .select('team_id, read_only')
       .eq('user_id', user.id)
       .not('accepted_at', 'is', null)
 
@@ -184,6 +184,7 @@ export default function SettingsPage() {
         .select('id, name, age_group, owner_email')
         .in('id', memberTeamIds)
       const staffMap: Record<string, any[]> = {}
+      const mTeamsWithSeasons: any[] = []
       for (const mt of mTeams ?? []) {
         const { data: staff } = await supabase
           .from('team_members')
@@ -192,13 +193,16 @@ export default function SettingsPage() {
           .not('accepted_at', 'is', null)
           .order('created_at')
         staffMap[mt.id] = staff ?? []
+        const { data: mtSeasons } = await supabase
+          .from('seasons')
+          .select('id, name, is_active, innings_per_game, start_date, end_date')
+          .eq('team_id', mt.id)
+          .order('created_at', { ascending: false })
+        const myMem = myMemberships.find((m: any) => m.team_id === mt.id)
+        mTeamsWithSeasons.push({ ...mt, seasons: mtSeasons ?? [], myReadOnly: myMem?.read_only ?? false })
       }
-      setMemberTeams(mTeams ?? [])
+      setMemberTeams(mTeamsWithSeasons)
       setMemberTeamStaff(staffMap)
-      // If user has no owned teams, default to the coaches tab
-      if ((teamRows ?? []).length === 0 && (mTeams ?? []).length > 0) {
-        setTab('coaches')
-      }
     }
 
     setLoading(false)
@@ -508,7 +512,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {teams.length === 0 && (
+      {teams.length === 0 && memberTeams.length === 0 && (
         <div style={{ textAlign: 'center', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '4rem', fontSize: '14px' }}>
           No teams yet. Add your first team to get started.
         </div>
@@ -916,6 +920,96 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Member teams on Team / Season tabs ── */}
+      {(tab === 'team' || tab === 'season') && memberTeams.length > 0 && (
+        <div style={{ marginTop: teams.length > 0 ? '2rem' : 0 }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+            marginBottom: '6px' }}>
+            Teams you coach
+          </div>
+          <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '12px', lineHeight: 1.5 }}>
+            You&apos;re a staff coach on {memberTeams.length === 1 ? 'this team' : 'these teams'}. Contact the team admin to make changes.
+          </div>
+          {memberTeams.map((mt: any) => (
+            <div key={mt.id} style={{
+              background: 'var(--bg-card)',
+              border: '0.5px solid var(--border)',
+              borderRadius: '12px', marginBottom: '16px', overflow: 'hidden',
+              opacity: 0.65,
+            }}>
+              {/* Team header */}
+              <div style={{ padding: '13px 16px', borderBottom: '0.5px solid var(--border-subtle)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 700 }}>{mt.name}</div>
+                  {mt.age_group && (
+                    <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                      {mt.age_group}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '20px',
+                    background: 'rgba(109,184,117,0.12)', color: '#6DB875',
+                    border: '0.5px solid rgba(109,184,117,0.3)',
+                  }}>Staff</span>
+                  <span style={{
+                    fontSize: '10px', padding: '3px 9px', borderRadius: '20px',
+                    background: 'var(--bg-input)', color: `rgba(var(--fg-rgb), 0.4)`,
+                    border: '0.5px solid var(--border)',
+                  }}>{mt.myReadOnly ? 'View only' : 'Can edit'}</span>
+                </div>
+              </div>
+
+              {/* Seasons — season tab only */}
+              {tab === 'season' && (
+                <div style={{ padding: '10px 16px 14px' }}>
+                  {mt.seasons.length === 0 && (
+                    <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.3)` }}>No seasons.</div>
+                  )}
+                  {mt.seasons.map((season: any) => (
+                    <div key={season.id} style={{
+                      padding: '9px 10px', marginBottom: '4px',
+                      background: season.is_active ? 'rgba(45,106,53,0.10)' : 'var(--bg-card-alt)',
+                      border: season.is_active ? '0.5px solid rgba(45,106,53,0.25)' : '0.5px solid var(--border-subtle)',
+                      borderRadius: '6px',
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '14px', fontWeight: 500 }}>{season.name}</div>
+                        <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '2px' }}>
+                          {season.innings_per_game} inn/game
+                          {season.start_date ? `  ·  ${season.start_date}` : ''}
+                          {season.end_date ? ` – ${season.end_date}` : ''}
+                        </div>
+                      </div>
+                      {season.is_active && (
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                          background: 'rgba(45,106,53,0.15)', color: '#6DB875',
+                          border: '0.5px solid rgba(45,106,53,0.3)', flexShrink: 0,
+                        }}>Active</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Team tab — just a note */}
+              {tab === 'team' && (
+                <div style={{ padding: '10px 16px 12px' }}>
+                  <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.35)` }}>
+                    Admin: {mt.owner_email}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
