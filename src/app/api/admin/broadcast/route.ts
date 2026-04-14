@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
   for (let i = 0; i < emails.length; i += BATCH) {
     const batch = emails.slice(i, i + BATCH).map(to => ({
-      from: 'Jon at Six43 <jon@six43.com>',
+      from: 'Jon at Six43 <support@six43.com>',
       to,
       subject: payload.subject,
       html,
