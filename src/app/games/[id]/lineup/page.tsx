@@ -51,6 +51,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [teamPositions, setTeamPositions] = useState<string[]>(
     ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
   )
+  const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
+  const [dcWarning, setDcWarning] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -73,6 +75,16 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       .eq('game_id', params.id)
       .order('batting_order', { ascending: true, nullsFirst: false })
     setSlots(slotData ?? [])
+
+    if (gameData?.season_id) {
+      const { data: dcRows } = await supabase
+        .from('depth_chart')
+        .select('player_id, position')
+        .eq('season_id', gameData.season_id)
+        .eq('restricted', true)
+      setRestrictedSet(new Set((dcRows ?? []).map((r: any) => `${r.player_id}::${r.position}`)))
+    }
+
     setLoading(false)
   }
 
@@ -224,6 +236,11 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) return
 
+    if (newPos && newPos !== 'Bench' && restrictedSet.has(`${slot.player_id}::${newPos}`)) {
+      const name = slot.player?.first_name ?? 'This player'
+      setDcWarning(`${name} is marked "should not play" at ${newPos} in the Depth Chart.`)
+    }
+
     setSlots(prev => {
       const next = prev.map(s => ({ ...s, inning_positions: [...s.inning_positions] }))
       if (newPos && newPos !== 'Bench') {
@@ -362,6 +379,22 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
               <span>{saveError}</span>
               <button onClick={() => setSaveError(null)} style={{
                 background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+                fontSize: '16px', lineHeight: 1, padding: '0 2px', flexShrink: 0,
+              }}>×</button>
+            </div>
+          )}
+
+          {/* Depth chart restriction warning */}
+          {dcWarning && (
+            <div style={{
+              background: 'rgba(232,160,32,0.12)', border: '0.5px solid rgba(232,160,32,0.4)',
+              borderRadius: '8px', padding: '10px 12px', marginBottom: '10px',
+              fontSize: '13px', color: '#E8A020', lineHeight: 1.5,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+            }}>
+              <span>⚠ {dcWarning}</span>
+              <button onClick={() => setDcWarning(null)} style={{
+                background: 'none', border: 'none', color: '#E8A020', cursor: 'pointer',
                 fontSize: '16px', lineHeight: 1, padding: '0 2px', flexShrink: 0,
               }}>×</button>
             </div>

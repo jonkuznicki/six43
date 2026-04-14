@@ -379,24 +379,6 @@ export default function RosterPage() {
           fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
           textDecoration: 'none',
         }}>‹ Settings</Link>
-        <Link href="/depth-chart" style={{
-          fontSize: '13px', fontWeight: 600, padding: '6px 14px', borderRadius: '6px',
-          border: '0.5px solid var(--border-md)',
-          background: 'var(--bg-card)',
-          color: `rgba(var(--fg-rgb), 0.6)`,
-          textDecoration: 'none',
-        }}>Depth Chart</Link>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Roster</h1>
-          {(teamName || seasonName) && (
-            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-              {teamName}{seasonName ? ` · ${seasonName}` : ''}
-            </div>
-          )}
-        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {rosterView === 'players' && active.length > 1 && (
             <button onClick={() => setReorderMode(m => !m)} style={{
@@ -428,21 +410,35 @@ export default function RosterPage() {
         </div>
       </div>
 
-      {/* View toggle */}
-      {players.length > 0 && (
-        <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: '6px', padding: '2px', gap: '2px', marginBottom: '1.25rem' }}>
-          {(['players', 'evaluations'] as const).map(v => (
-            <button key={v} onClick={() => setRosterView(v)} style={{
-              flex: 1, padding: '5px 10px', borderRadius: '4px', border: 'none',
-              background: rosterView === v ? 'var(--accent)' : 'transparent',
-              color: rosterView === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.5)`,
-              fontSize: '12px', fontWeight: rosterView === v ? 700 : 400, cursor: 'pointer',
-            }}>
-              {v === 'players' ? 'Players' : 'Evaluations'}
-            </button>
-          ))}
-        </div>
-      )}
+      <div style={{ marginBottom: '1rem' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Roster</h1>
+        {(teamName || seasonName) && (
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+            {teamName}{seasonName ? ` · ${seasonName}` : ''}
+          </div>
+        )}
+      </div>
+
+      {/* View toggle — always visible, includes Depth Chart */}
+      <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: '6px', padding: '2px', gap: '2px', marginBottom: '1.25rem' }}>
+        {(['players', 'evaluations'] as const).map(v => (
+          <button key={v} onClick={() => setRosterView(v)} style={{
+            flex: 1, padding: '5px 10px', borderRadius: '4px', border: 'none',
+            background: rosterView === v ? 'var(--accent)' : 'transparent',
+            color: rosterView === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.5)`,
+            fontSize: '12px', fontWeight: rosterView === v ? 700 : 400, cursor: 'pointer',
+          }}>
+            {v === 'players' ? 'Players' : 'Evaluations'}
+          </button>
+        ))}
+        <Link href="/depth-chart" style={{
+          flex: 1, padding: '5px 10px', borderRadius: '4px',
+          background: 'transparent',
+          color: `rgba(var(--fg-rgb), 0.5)`,
+          fontSize: '12px', fontWeight: 400, textDecoration: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>Depth Chart</Link>
+      </div>
 
       {!seasonId && (
         <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`, textAlign: 'center', marginTop: '3rem' }}>

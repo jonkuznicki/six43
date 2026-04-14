@@ -86,6 +86,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
   const [readOnly, setReadOnly]         = useState(false)
+  const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
+  const [dcWarning, setDcWarning]       = useState<string | null>(null)
   const [showPlayerNotes, setShowPlayerNotes] = useState(false)
   const [playerNoteInputs, setPlayerNoteInputs] = useState<Record<string, string>>({})
   const [savingPlayerNotes, setSavingPlayerNotes] = useState(false)
@@ -337,6 +339,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
     }
 
+    // Load depth chart restrictions for warning display
+    if (gameData?.season_id) {
+      const { data: dcRows } = await supabase
+        .from('depth_chart')
+        .select('player_id, position')
+        .eq('season_id', gameData.season_id)
+        .eq('restricted', true)
+      setRestrictedSet(new Set((dcRows ?? []).map((r: any) => `${r.player_id}::${r.position}`)))
+    }
+
     setLoading(false)
   }
 
@@ -360,6 +372,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   }
 
   function assignPosition(slotId: string, ii: number, newPos: string | null) {
+    if (newPos && newPos !== 'Bench') {
+      const slot = slotsRef.current.find(s => s.id === slotId)
+      if (slot && restrictedSet.has(`${slot.player_id}::${newPos}`)) {
+        const name = slot.player?.first_name ?? 'This player'
+        setDcWarning(`${name} is marked "should not play" at ${newPos} in the Depth Chart.`)
+      }
+    }
     const next = slotsRef.current.map(s => ({
       ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
     }))
@@ -935,6 +954,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             style={{ border: 'none', background: 'transparent', cursor: 'pointer',
               color: `rgba(var(--fg-rgb),0.35)`, fontSize: 16, padding: '0 4px', flexShrink: 0 }}
           >×</button>
+        </div>
+      )}
+
+      {/* ─── DEPTH CHART RESTRICTION WARNING ─── */}
+      {dcWarning && (
+        <div style={{
+          background: 'rgba(232,160,32,0.09)', borderBottom: '1px solid rgba(232,160,32,0.3)',
+          padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 13, color: GOLD }}>⚠ {dcWarning}</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setDcWarning(null)} style={{
+            background: 'none', border: 'none', color: GOLD, cursor: 'pointer',
+            fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0,
+          }}>×</button>
         </div>
       )}
 
