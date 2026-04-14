@@ -58,7 +58,7 @@ function DiamondChart({ row, compact = false }: { row: StatRow; compact?: boolea
     { key: 'innings_p',  label: 'P',  fx: 0.500, fy: 0.672, color: '#E8C060' },
     { key: 'innings_c',  label: 'C',  fx: 0.500, fy: 0.935, color: '#E090B0' },
     { key: 'innings_1b', label: '1B', fx: 0.810, fy: 0.624, color: '#80B0E8' },
-    { key: 'innings_2b', label: '2B', fx: 0.500, fy: 0.255, color: '#80B0E8' },
+    { key: 'innings_2b', label: '2B', fx: 0.655, fy: 0.420, color: '#80B0E8' },
     { key: 'innings_ss', label: 'SS', fx: 0.332, fy: 0.488, color: '#80B0E8' },
     { key: 'innings_3b', label: '3B', fx: 0.190, fy: 0.624, color: '#80B0E8' },
     { key: 'innings_lf', label: 'LF', fx: 0.118, fy: 0.208, color: '#6DB875' },
