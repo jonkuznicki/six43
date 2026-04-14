@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const { dryRun = true, ...payload } = body as BroadcastPayload & { dryRun?: boolean }
+  const { dryRun = true, recipients, ...payload } = body as BroadcastPayload & { dryRun?: boolean; recipients?: string[] }
 
   const { html, text } = buildBroadcastEmail(payload)
 
@@ -30,13 +30,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'RESEND_API_KEY not set' }, { status: 500 })
   }
 
-  const service = createServiceClient()
-  const { data: authData, error: authError } = await service.auth.admin.listUsers({ perPage: 1000 })
-  if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
+  let emails: string[]
 
-  const emails = (authData.users ?? [])
-    .map(u => u.email)
-    .filter((e): e is string => !!e)
+  if (recipients && recipients.length > 0) {
+    emails = recipients.filter((e): e is string => !!e)
+  } else {
+    // Fall back to all users if no recipients list provided
+    const service = createServiceClient()
+    const { data: authData, error: authError } = await service.auth.admin.listUsers({ perPage: 1000 })
+    if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
+    emails = (authData.users ?? []).map(u => u.email).filter((e): e is string => !!e)
+  }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
   const BATCH = 100

@@ -55,6 +55,7 @@ export default function AdminPage() {
   const [notesDraft, setNotesDraft] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'at-limit' | 'pro' | 'inactive'>('all')
+  const [sort, setSort] = useState<'last_active' | 'newest' | 'games'>('last_active')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState('')
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -78,6 +79,8 @@ export default function AdminPage() {
   const [broadcastState, setBroadcastState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const [broadcastResult, setBroadcastResult] = useState<{ sent: number; failed: number } | null>(null)
   const [broadcastError, setBroadcastError] = useState('')
+  const [recipientMode, setRecipientMode] = useState<'all' | 'free' | 'pro' | 'at-limit' | 'inactive' | 'custom'>('all')
+  const [customRecipients, setCustomRecipients] = useState<Set<string>>(new Set())
 
   useEffect(() => { init() }, [])
 
@@ -182,10 +185,11 @@ export default function AdminPage() {
   async function sendBroadcast() {
     setBroadcastState('sending')
     setBroadcastError('')
+    const recipients = broadcastRecipients.map(u => u.email)
     const res = await fetch('/api/admin/broadcast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...compose, features, dryRun: false }),
+      body: JSON.stringify({ ...compose, features, dryRun: false, recipients }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setBroadcastError(data.error ?? 'Send failed'); setBroadcastState('error'); return }
@@ -224,15 +228,40 @@ export default function AdminPage() {
     return Date.now() - new Date(u.last_sign_in_at).getTime() > 30 * 86400000
   })
 
-  // Filter + search
-  const visible = users.filter(u => {
-    const matchSearch = u.email.toLowerCase().includes(search.toLowerCase())
-    if (!matchSearch) return false
-    if (filter === 'at-limit') return u.plan === 'free' && u.game_count >= 10
-    if (filter === 'pro') return u.plan === 'pro'
-    if (filter === 'inactive') return Date.now() - new Date(u.last_sign_in_at ?? u.created_at).getTime() > 30 * 86400000
-    return true
-  })
+  function isInactive(u: UserRow) {
+    if (!u.last_sign_in_at) return true
+    return Date.now() - new Date(u.last_sign_in_at).getTime() > 30 * 86400000
+  }
+
+  // Filter + search + sort
+  const visible = users
+    .filter(u => {
+      const matchSearch = !search || u.email.toLowerCase().includes(search.toLowerCase())
+      if (!matchSearch) return false
+      if (filter === 'at-limit') return u.plan === 'free' && u.game_count >= 10
+      if (filter === 'pro') return u.plan === 'pro'
+      if (filter === 'inactive') return isInactive(u)
+      return true
+    })
+    .sort((a, b) => {
+      if (sort === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (sort === 'games') return b.game_count - a.game_count
+      // last_active: sort by last_sign_in_at, nulls last
+      const aTime = a.last_sign_in_at ? new Date(a.last_sign_in_at).getTime() : 0
+      const bTime = b.last_sign_in_at ? new Date(b.last_sign_in_at).getTime() : 0
+      return bTime - aTime
+    })
+
+  // Broadcast recipient list derived from recipientMode
+  const broadcastRecipients = recipientMode === 'custom'
+    ? users.filter(u => customRecipients.has(u.id))
+    : users.filter(u => {
+        if (recipientMode === 'free') return u.plan === 'free'
+        if (recipientMode === 'pro') return u.plan === 'pro'
+        if (recipientMode === 'at-limit') return u.plan === 'free' && u.game_count >= 10
+        if (recipientMode === 'inactive') return isInactive(u)
+        return true // 'all'
+      })
 
   if (!authorized || loading) return (
     <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
@@ -290,7 +319,7 @@ export default function AdminPage() {
       </div>
 
       {/* Search + filter */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -314,6 +343,24 @@ export default function AdminPage() {
              f === 'pro' ? `Pro (${proCount})` :
              `Inactive (${inactive30.length})`}
           </button>
+        ))}
+      </div>
+
+      {/* Sort */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '1.25rem', alignItems: 'center' }}>
+        <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, fontWeight: 600, marginRight: '2px' }}>Sort:</span>
+        {([
+          { key: 'last_active', label: 'Last active' },
+          { key: 'newest',      label: 'Newest' },
+          { key: 'games',       label: 'Most games' },
+        ] as const).map(({ key, label }) => (
+          <button key={key} onClick={() => setSort(key)} style={{
+            padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+            cursor: 'pointer', border: '0.5px solid',
+            borderColor: sort === key ? 'rgba(232,160,32,0.4)' : 'var(--border)',
+            background: sort === key ? 'rgba(232,160,32,0.1)' : 'transparent',
+            color: sort === key ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.45)`,
+          }}>{label}</button>
         ))}
       </div>
 
@@ -665,18 +712,84 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Recipient targeting */}
+            <div style={{ marginTop: '16px', padding: '14px', background: 'var(--bg)', border: '0.5px solid var(--border-md)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>Recipients</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                {([
+                  { key: 'all',      label: `All (${users.length})` },
+                  { key: 'free',     label: `Free (${users.filter(u => u.plan === 'free').length})` },
+                  { key: 'pro',      label: `Pro (${proCount})` },
+                  { key: 'at-limit', label: `At limit (${atLimit.length})` },
+                  { key: 'inactive', label: `Inactive (${inactive30.length})` },
+                  { key: 'custom',   label: 'Custom…' },
+                ] as const).map(({ key, label }) => (
+                  <button key={key} onClick={() => setRecipientMode(key)} style={{
+                    padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                    cursor: 'pointer', border: '0.5px solid',
+                    borderColor: recipientMode === key ? 'rgba(232,160,32,0.4)' : 'var(--border)',
+                    background: recipientMode === key ? 'rgba(232,160,32,0.1)' : 'transparent',
+                    color: recipientMode === key ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.5)`,
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {recipientMode === 'custom' && (
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '0.5px solid var(--border)', borderRadius: '6px', marginBottom: '10px' }}>
+                  {users.map(u => (
+                    <label key={u.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px',
+                      borderBottom: '0.5px solid var(--border)', cursor: 'pointer',
+                      fontSize: '12px', color: 'var(--fg)',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={customRecipients.has(u.id)}
+                        onChange={e => {
+                          setCustomRecipients(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(u.id)
+                            else next.delete(u.id)
+                            return next
+                          })
+                        }}
+                        style={{ accentColor: 'var(--accent)', flexShrink: 0 }}
+                      />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.display_name ? `${u.display_name} — ` : ''}{u.email}
+                      </span>
+                      <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)`, flexShrink: 0 }}>
+                        {u.plan.toUpperCase()} · {u.game_count}g
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                Sending to <strong style={{ color: 'var(--fg)' }}>{broadcastRecipients.length} recipient{broadcastRecipients.length !== 1 ? 's' : ''}</strong>
+                {recipientMode === 'custom' && broadcastRecipients.length === 0 && (
+                  <span style={{ color: '#E87060' }}> — select at least one recipient</span>
+                )}
+              </div>
+            </div>
+
             {previewHtml && broadcastState !== 'done' && (
               <div style={{ marginTop: '12px', padding: '14px', background: 'rgba(232,112,96,0.06)', border: '0.5px solid rgba(232,112,96,0.25)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '10px' }}>
-                  This will send to <strong>{users.length} users</strong>. Double-check the preview above before sending.
+                  Double-check the preview above before sending.
                 </div>
-                <button onClick={sendBroadcast} disabled={broadcastState === 'sending'} style={{
-                  padding: '10px 20px', borderRadius: '6px', fontSize: '13px', fontWeight: 700,
-                  border: 'none', background: '#E87060', color: '#fff',
-                  cursor: broadcastState === 'sending' ? 'not-allowed' : 'pointer',
-                  opacity: broadcastState === 'sending' ? 0.7 : 1,
-                }}>
-                  {broadcastState === 'sending' ? 'Sending…' : `Send to ${users.length} users`}
+                <button
+                  onClick={sendBroadcast}
+                  disabled={broadcastState === 'sending' || broadcastRecipients.length === 0}
+                  style={{
+                    padding: '10px 20px', borderRadius: '6px', fontSize: '13px', fontWeight: 700,
+                    border: 'none', background: '#E87060', color: '#fff',
+                    cursor: (broadcastState === 'sending' || broadcastRecipients.length === 0) ? 'not-allowed' : 'pointer',
+                    opacity: (broadcastState === 'sending' || broadcastRecipients.length === 0) ? 0.5 : 1,
+                  }}
+                >
+                  {broadcastState === 'sending' ? 'Sending…' : `Send to ${broadcastRecipients.length} recipient${broadcastRecipients.length !== 1 ? 's' : ''}`}
                 </button>
               </div>
             )}
