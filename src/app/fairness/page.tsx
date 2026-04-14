@@ -49,6 +49,142 @@ function BenchBar({ pct: p }: { pct: number }) {
   )
 }
 
+// ── Baseball diamond heat-map ─────────────────────────────────────────────────
+function DiamondChart({ row, compact = false }: { row: StatRow; compact?: boolean }) {
+  const W = compact ? 130 : 256
+  const H = Math.round(W * 0.92)
+
+  const positions = [
+    { key: 'innings_p',  label: 'P',  fx: 0.500, fy: 0.672, color: '#E8C060' },
+    { key: 'innings_c',  label: 'C',  fx: 0.500, fy: 0.935, color: '#E090B0' },
+    { key: 'innings_1b', label: '1B', fx: 0.810, fy: 0.624, color: '#80B0E8' },
+    { key: 'innings_2b', label: '2B', fx: 0.500, fy: 0.255, color: '#80B0E8' },
+    { key: 'innings_ss', label: 'SS', fx: 0.332, fy: 0.488, color: '#80B0E8' },
+    { key: 'innings_3b', label: '3B', fx: 0.190, fy: 0.624, color: '#80B0E8' },
+    { key: 'innings_lf', label: 'LF', fx: 0.118, fy: 0.208, color: '#6DB875' },
+    { key: 'innings_cf', label: 'CF', fx: 0.500, fy: 0.068, color: '#6DB875' },
+    { key: 'innings_rf', label: 'RF', fx: 0.882, fy: 0.208, color: '#6DB875' },
+    { key: 'innings_lc', label: 'LC', fx: 0.295, fy: 0.105, color: '#6DB875' },
+    { key: 'innings_rc', label: 'RC', fx: 0.705, fy: 0.105, color: '#6DB875' },
+  ] as const
+
+  const counts = positions.map(p => (row[p.key as keyof StatRow] as number | undefined) ?? 0)
+  // Only show LC/RC if the team uses them
+  const usesLC = counts[9] > 0
+  const usesRC = counts[10] > 0
+  const visiblePositions = positions.filter((_, i) =>
+    i < 9 || (i === 9 && usesLC) || (i === 10 && usesRC)
+  )
+  const visibleCounts = counts.filter((_, i) =>
+    i < 9 || (i === 9 && usesLC) || (i === 10 && usesRC)
+  )
+
+  const max = Math.max(...visibleCounts, 1)
+  const baseR = compact ? 7.5 : 13
+
+  const hX = 0.500 * W, hY = 0.935 * H
+  const fX = 0.810 * W, fY = 0.624 * H
+  const sX = 0.500 * W, sY = 0.255 * H
+  const tX = 0.190 * W, tY = 0.624 * H
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: `${W}px`, display: 'block' }}>
+      {/* Outfield fill */}
+      <path d={`M ${0.07*W} ${0.50*H} Q ${0.50*W} ${-0.14*H} ${0.93*W} ${0.50*H} Z`}
+        style={{ fill: 'rgba(109,184,117,0.07)' }} />
+      {/* Infield diamond */}
+      <polygon points={`${hX},${hY} ${fX},${fY} ${sX},${sY} ${tX},${tY}`}
+        style={{ fill: 'rgba(232,160,32,0.05)', stroke: 'rgba(232,160,32,0.2)', strokeWidth: 0.75 }} />
+      {/* Foul lines */}
+      <line x1={hX} y1={hY} x2={0.04*W} y2={0.09*H} style={{ stroke: 'rgba(255,255,255,0.07)', strokeWidth: 1 }} />
+      <line x1={hX} y1={hY} x2={0.96*W} y2={0.09*H} style={{ stroke: 'rgba(255,255,255,0.07)', strokeWidth: 1 }} />
+      {/* Position nodes */}
+      {visiblePositions.map((p, i) => {
+        const count = visibleCounts[i]
+        const intensity = count / max
+        const cx = p.fx * W
+        const cy = p.fy * H
+        const r = count > 0 ? baseR * (0.6 + intensity * 0.55) : baseR * 0.48
+        const fillOp = count > 0 ? 0.10 + intensity * 0.58 : 0.04
+        const strokeOp = count > 0 ? 0.40 + intensity * 0.60 : 0.12
+        return (
+          <g key={p.label}>
+            {count > 0 && (
+              <circle cx={cx} cy={cy} r={r + (compact ? 5 : 8)}
+                style={{ fill: p.color, fillOpacity: intensity * 0.09 }} />
+            )}
+            <circle cx={cx} cy={cy} r={r}
+              style={{ fill: p.color, fillOpacity: fillOp, stroke: p.color, strokeWidth: compact ? 1 : 1.5, strokeOpacity: strokeOp }} />
+            {!compact && (
+              <text x={cx} y={cy - r - 3} textAnchor="middle"
+                style={{ fontSize: '7.5px', fontWeight: 700, fill: p.color, fillOpacity: Math.min(1, strokeOp + 0.1) }}>
+                {p.label}
+              </text>
+            )}
+            <text x={cx} y={cy + (compact ? 2.5 : 3.5)} textAnchor="middle"
+              style={{ fontSize: compact ? '6.5px' : '8.5px', fontWeight: 800, fill: p.color, fillOpacity: count > 0 ? 0.92 : 0.18 }}>
+              {count > 0 ? count : (compact ? '' : p.label)}
+            </text>
+            {compact && count === 0 && (
+              <text x={cx} y={cy + 2.5} textAnchor="middle"
+                style={{ fontSize: '5.5px', fontWeight: 700, fill: p.color, fillOpacity: 0.18 }}>
+                {p.label}
+              </text>
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ── Stacked position-distribution bar ────────────────────────────────────────
+function PositionBar({ row }: { row: StatRow }) {
+  const total = row.innings_all
+  if (!total) return null
+  const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
+  const segments = [
+    { label: 'P',      val: row.innings_p ?? 0,         color: '#E8C060' },
+    { label: 'C',      val: row.innings_c ?? 0,         color: '#E090B0' },
+    { label: 'Infield',val: infieldInn,                  color: '#80B0E8' },
+    { label: 'Outfield',val: row.innings_outfield ?? 0, color: '#6DB875' },
+    { label: 'Bench',  val: row.innings_bench ?? 0,     color: 'rgba(150,150,160,0.45)' },
+  ].filter(s => s.val > 0)
+  return (
+    <div style={{ display: 'flex', height: '7px', borderRadius: '4px', overflow: 'hidden', gap: '1px' }}>
+      {segments.map(s => (
+        <div key={s.label}
+          title={`${s.label}: ${s.val} inn (${Math.round(s.val/total*100)}%)`}
+          style={{ flex: s.val, background: s.color, minWidth: '2px', transition: 'flex 0.4s' }} />
+      ))}
+    </div>
+  )
+}
+
+// ── Legend for the position bar ───────────────────────────────────────────────
+function PositionBarLegend({ row }: { row: StatRow }) {
+  const total = row.innings_all
+  if (!total) return null
+  const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
+  const items = [
+    { label: 'P',  val: row.innings_p ?? 0,         color: '#E8C060' },
+    { label: 'C',  val: row.innings_c ?? 0,         color: '#E090B0' },
+    { label: 'IF', val: infieldInn,                  color: '#80B0E8' },
+    { label: 'OF', val: row.innings_outfield ?? 0,  color: '#6DB875' },
+    { label: 'B',  val: row.innings_bench ?? 0,     color: 'rgba(150,150,160,0.55)' },
+  ].filter(s => s.val > 0)
+  return (
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '5px' }}>
+      {items.map(s => (
+        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <div style={{ width: '7px', height: '7px', borderRadius: '2px', background: s.color, flexShrink: 0 }} />
+          <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.5)` }}>{s.label} {s.val}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 type SortKey = 'name' | 'bench_pct' | 'innings_total' | 'innings_infield' | 'innings_outfield' | 'innings_bench'
 
 export default function FairnessPage() {
@@ -442,27 +578,10 @@ export default function FairnessPage() {
                       )
                     })()}
 
-                    {/* Key KPIs */}
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                      {[
-                        { label: 'Bench', value: `${benchPctVal}%`, color: benchColor },
-                        { label: 'Pitcher', value: row.innings_p, color: '#E8C060' },
-                        { label: 'Infield %', value: `${infieldPct}%`, color: '#80B0E8' },
-                        { label: 'Catcher', value: row.innings_c, color: '#E090B0' },
-                        { label: 'Total', value: row.innings_all, color: `rgba(var(--fg-rgb), 0.55)` },
-                      ].map(kpi => (
-                        <div key={kpi.label} style={{
-                          flex: 1, background: 'var(--bg-input)', borderRadius: '6px',
-                          padding: '5px 4px', textAlign: 'center',
-                        }}>
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: kpi.color }}>
-                            {kpi.value}
-                          </div>
-                          <div style={{ fontSize: '8px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            {kpi.label}
-                          </div>
-                        </div>
-                      ))}
+                    {/* Position distribution bar */}
+                    <div style={{ marginTop: '8px' }}>
+                      <PositionBar row={row} />
+                      <PositionBarLegend row={row} />
                     </div>
                   </div>
                 )
@@ -472,74 +591,54 @@ export default function FairnessPage() {
 
           {/* ── POSITIONS VIEW ── */}
           {view === 'positions' && (
-            <div style={{ overflowX: 'auto' }}>
-              {/* Table header */}
+            <div>
+              <p style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '14px', lineHeight: 1.5 }}>
+                Tap any player to see their full position breakdown on the field.
+              </p>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `20px 120px repeat(${POS_COLS.length}, 34px) 40px 40px`,
-                gap: '2px', marginBottom: '4px', paddingBottom: '6px',
-                borderBottom: '0.5px solid var(--border)',
-                minWidth: '420px',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '8px',
               }}>
-                <div />
-                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.35)` }}>Player</div>
-                {POS_COLS.map(p => (
-                  <div key={p} style={{
-                    fontSize: '9px', fontWeight: 700, textAlign: 'center',
-                    color: p === 'OF' ? '#6DB875' : (POS_COLORS[p] ?? `rgba(var(--fg-rgb), 0.4)`),
-                  }}>{p}</div>
-                ))}
-                <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'center' }}>Fld</div>
-                <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)`, textAlign: 'center' }}>B%</div>
-              </div>
-
-              {sorted.map((row, idx) => {
-                const benchPctVal = Math.round(row.bench_pct * 100)
-                const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
-                const ofTotal = OF_POS.reduce((sum, p) => {
-                  const key = `innings_${p.toLowerCase()}` as keyof StatRow
-                  return sum + ((row[key] as number) ?? 0)
-                }, 0)
-                return (
-                  <div key={row.player_id} style={{
-                    display: 'grid',
-                    gridTemplateColumns: `20px 120px repeat(${POS_COLS.length}, 34px) 40px 40px`,
-                    gap: '2px',
-                    background: idx % 2 === 0 ? 'var(--bg-card-alt)' : 'transparent',
-                    borderRadius: '4px', padding: '3px 0',
-                    minWidth: '420px',
-                    alignItems: 'center',
-                  }}>
-                    <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)`, textAlign: 'right', paddingRight: '4px' }}>
-                      {row.jersey_number}
-                    </div>
-                    <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.first_name[0]}. {row.last_name}
-                    </div>
-                    {INFIELD.map(p => {
-                      const key = `innings_${p.toLowerCase()}` as keyof StatRow
-                      const count = (row[key] as number) ?? 0
-                      return (
-                        <div key={p} style={{ textAlign: 'center', fontSize: '12px', fontWeight: count > 0 ? 700 : 400,
-                          color: count > 0 ? (POS_COLORS[p] ?? 'var(--fg)') : `rgba(var(--fg-rgb), 0.12)` }}>
-                          {count > 0 ? count : '·'}
+                {sorted.map(row => {
+                  const benchPctVal = Math.round(row.bench_pct * 100)
+                  const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
+                  return (
+                    <div
+                      key={row.player_id}
+                      onClick={() => openPlayer(row)}
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '0.5px solid var(--border)',
+                        borderRadius: '10px', padding: '10px 8px',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s',
+                      }}
+                    >
+                      {/* Name + bench % */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '4px' }}>
+                            #{row.jersey_number}
+                          </span>
+                          <span style={{ fontSize: '12px', fontWeight: 700 }}>
+                            {row.first_name[0]}. {row.last_name}
+                          </span>
                         </div>
-                      )
-                    })}
-                    {/* Grouped OF column */}
-                    <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: ofTotal > 0 ? 700 : 400,
-                      color: ofTotal > 0 ? '#6DB875' : `rgba(var(--fg-rgb), 0.12)` }}>
-                      {ofTotal > 0 ? ofTotal : '·'}
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: benchColor }}>
+                          {benchPctVal}%B
+                        </span>
+                      </div>
+                      {/* Mini diamond */}
+                      <DiamondChart row={row} compact />
+                      {/* Position bar */}
+                      <div style={{ marginTop: '6px' }}>
+                        <PositionBar row={row} />
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 600, color: `rgba(var(--fg-rgb), 0.6)` }}>
-                      {row.innings_total}
-                    </div>
-                    <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 700, color: benchColor }}>
-                      {benchPctVal}%
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           )}
         </>
@@ -571,6 +670,33 @@ export default function FairnessPage() {
                 background: 'transparent', border: 'none', fontSize: '20px',
                 color: `rgba(var(--fg-rgb), 0.35)`, cursor: 'pointer', padding: '4px',
               }}>✕</button>
+            </div>
+
+            {/* Diamond heat map */}
+            <div style={{ padding: '1rem 1.25rem 0.5rem', borderBottom: '0.5px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
+                Position heat map — season to date
+              </div>
+              <div style={{ maxWidth: '260px', margin: '0 auto' }}>
+                <DiamondChart row={selectedPlayer} />
+              </div>
+              {/* Bench + total pills */}
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'P', val: selectedPlayer.innings_p, color: '#E8C060' },
+                  { label: 'C', val: selectedPlayer.innings_c, color: '#E090B0' },
+                  { label: 'IF', val: (selectedPlayer.innings_1b??0)+(selectedPlayer.innings_2b??0)+(selectedPlayer.innings_ss??0)+(selectedPlayer.innings_3b??0), color: '#80B0E8' },
+                  { label: 'OF', val: selectedPlayer.innings_outfield, color: '#6DB875' },
+                  { label: 'Bench', val: selectedPlayer.innings_bench, color: '#E87060' },
+                ].filter(x => x.val > 0).map(x => (
+                  <div key={x.label} style={{
+                    fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                    background: `${x.color}18`, border: `0.5px solid ${x.color}44`, color: x.color,
+                  }}>
+                    {x.label} {x.val}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Bench by inning */}
