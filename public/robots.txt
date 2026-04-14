@@ -1,0 +1,31 @@
+User-agent: *
+Allow: /$
+Allow: /youth-baseball-lineup-app
+Allow: /softball-lineup-manager
+Allow: /travel-baseball-lineup-manager
+Allow: /help
+Allow: /privacy
+Allow: /login
+Allow: /sitemap.xml
+
+# Block authenticated app routes — not useful in search results
+Disallow: /dashboard
+Disallow: /games
+Disallow: /roster
+Disallow: /settings
+Disallow: /fairness
+Disallow: /pitching
+Disallow: /depth-chart
+Disallow: /schedule
+Disallow: /today
+Disallow: /tournaments
+Disallow: /share
+Disallow: /invite
+Disallow: /setup
+Disallow: /admin
+Disallow: /auth
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /api
+
+Sitemap: https://six43.com/sitemap.xml
