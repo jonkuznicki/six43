@@ -89,9 +89,6 @@ function DiamondChart({ row, compact = false }: { row: StatRow; compact?: boolea
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: `${W}px`, display: 'block' }}>
-      {/* Outfield fill */}
-      <path d={`M ${0.07*W} ${0.50*H} Q ${0.50*W} ${-0.14*H} ${0.93*W} ${0.50*H} Z`}
-        style={{ fill: 'rgba(109,184,117,0.07)' }} />
       {/* Infield diamond */}
       <polygon points={`${hX},${hY} ${fX},${fY} ${sX},${sY} ${tX},${tY}`}
         style={{ fill: 'rgba(232,160,32,0.05)', stroke: 'rgba(232,160,32,0.2)', strokeWidth: 0.75 }} />
