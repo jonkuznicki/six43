@@ -61,6 +61,24 @@ export default function AdminPage() {
   const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; total: number } | null>(null)
   const [syncError, setSyncError] = useState('')
 
+  // Broadcast compose
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [compose, setCompose] = useState({
+    subject:   '',
+    preheader: '',
+    headline:  '',
+    intro:     '',
+    ctaLabel:  'Open Six43',
+    ctaUrl:    'https://six43.com/dashboard',
+    signoff:   '— Jon at Six43',
+  })
+  const [features, setFeatures] = useState<{ id: string; icon: string; title: string; body: string }[]>([])
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewing, setPreviewing] = useState(false)
+  const [broadcastState, setBroadcastState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+  const [broadcastResult, setBroadcastResult] = useState<{ sent: number; failed: number } | null>(null)
+  const [broadcastError, setBroadcastError] = useState('')
+
   useEffect(() => { init() }, [])
 
   async function init() {
@@ -136,6 +154,43 @@ export default function AdminPage() {
     if (!res.ok) { setSyncError(data.error ?? 'Sync failed'); setSyncState('error'); return }
     setSyncResult(data)
     setSyncState('done')
+  }
+
+  function addFeature() {
+    setFeatures(prev => [...prev, { id: crypto.randomUUID(), icon: '⚾', title: '', body: '' }])
+  }
+  function updateFeature(id: string, patch: Partial<{ icon: string; title: string; body: string }>) {
+    setFeatures(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
+  }
+  function removeFeature(id: string) {
+    setFeatures(prev => prev.filter(f => f.id !== id))
+  }
+
+  async function previewBroadcast() {
+    setPreviewing(true)
+    const res = await fetch('/api/admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...compose, features, dryRun: true }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setPreviewing(false)
+    if (!res.ok) { setBroadcastError(data.error ?? 'Preview failed'); return }
+    setPreviewHtml(data.html)
+  }
+
+  async function sendBroadcast() {
+    setBroadcastState('sending')
+    setBroadcastError('')
+    const res = await fetch('/api/admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...compose, features, dryRun: false }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setBroadcastError(data.error ?? 'Send failed'); setBroadcastState('error'); return }
+    setBroadcastResult(data)
+    setBroadcastState('done')
   }
 
   async function setBeta(userId: string, betaFeatures: boolean) {
@@ -492,6 +547,153 @@ export default function AdminPage() {
             {syncState === 'syncing' ? 'Syncing…' : syncState === 'done' ? 'Sync again' : `Sync ${users.length} users to Resend`}
           </button>
         </div>
+      </div>
+
+      {/* ── EMAIL COMPOSE ── */}
+      <div style={{ marginTop: '1rem', marginBottom: '3rem', background: 'var(--bg-card)', border: '0.5px solid var(--border-md)', borderRadius: '12px', overflow: 'hidden' }}>
+        <button onClick={() => setComposeOpen(o => !o)} style={{
+          width: '100%', padding: '16px 20px', background: 'transparent', border: 'none',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+        }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--fg)' }}>Compose broadcast email</span>
+          <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>{composeOpen ? '▲ collapse' : '▼ expand'}</span>
+        </button>
+
+        {composeOpen && (
+          <div style={{ padding: '0 20px 24px', borderTop: '0.5px solid var(--border)' }}>
+
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[
+                { key: 'subject',   label: 'Subject line *',      placeholder: "What's new in Six43" },
+                { key: 'preheader', label: 'Preview text',        placeholder: 'Short text shown in inbox before opening' },
+                { key: 'headline',  label: 'Headline *',          placeholder: 'Your season, fully organized.' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '5px' }}>{label}</div>
+                  <input
+                    value={(compose as any)[key]}
+                    onChange={e => setCompose(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '5px' }}>Intro paragraph *</div>
+                <textarea
+                  value={compose.intro}
+                  onChange={e => setCompose(p => ({ ...p, intro: e.target.value }))}
+                  placeholder="Here's a quick look at what Six43 can do..."
+                  rows={3}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'sans-serif' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '8px' }}>Feature highlights (optional)</div>
+                {features.map(f => (
+                  <div key={f.id} style={{ background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                      <input
+                        value={f.icon} onChange={e => updateFeature(f.id, { icon: e.target.value })}
+                        placeholder="⚾"
+                        style={{ width: '44px', padding: '7px 8px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '16px', textAlign: 'center', boxSizing: 'border-box' }}
+                      />
+                      <input
+                        value={f.title} onChange={e => updateFeature(f.id, { title: e.target.value })}
+                        placeholder="Feature title"
+                        style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', fontWeight: 600, boxSizing: 'border-box' }}
+                      />
+                      <button onClick={() => removeFeature(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '18px', padding: '0 2px', flexShrink: 0 }}>×</button>
+                    </div>
+                    <textarea
+                      value={f.body} onChange={e => updateFeature(f.id, { body: e.target.value })}
+                      placeholder="One sentence describing this feature..."
+                      rows={2}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'sans-serif' }}
+                    />
+                  </div>
+                ))}
+                <button onClick={addFeature} style={{
+                  width: '100%', padding: '8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                  border: '0.5px dashed var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer',
+                }}>+ Add feature row</button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '5px' }}>Button label *</div>
+                  <input value={compose.ctaLabel} onChange={e => setCompose(p => ({ ...p, ctaLabel: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '5px' }}>Button URL *</div>
+                  <input value={compose.ctaUrl} onChange={e => setCompose(p => ({ ...p, ctaUrl: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, marginBottom: '5px' }}>Sign-off (optional)</div>
+                <input value={compose.signoff} onChange={e => setCompose(p => ({ ...p, signoff: e.target.value }))}
+                  placeholder="— Jon at Six43"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button onClick={previewBroadcast} disabled={previewing || !compose.subject || !compose.headline} style={{
+                padding: '9px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                border: '0.5px solid var(--border-md)', background: 'transparent',
+                color: `rgba(var(--fg-rgb), 0.6)`, cursor: 'pointer',
+                opacity: (!compose.subject || !compose.headline) ? 0.4 : 1,
+              }}>
+                {previewing ? 'Building preview…' : '👁 Preview email'}
+              </button>
+              {broadcastError && <span style={{ fontSize: '12px', color: '#E87060' }}>{broadcastError}</span>}
+            </div>
+
+            {previewHtml && (
+              <div style={{ marginTop: '12px', border: '0.5px solid var(--border-md)', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ padding: '8px 12px', background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: `rgba(var(--fg-rgb), 0.45)`, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Email preview</span>
+                  <span style={{ fontWeight: 600, color: 'var(--fg)' }}>Subject: {compose.subject}</span>
+                </div>
+                <iframe srcDoc={previewHtml} style={{ width: '100%', height: '600px', border: 'none', background: '#fff' }} title="Email preview" />
+              </div>
+            )}
+
+            {previewHtml && broadcastState !== 'done' && (
+              <div style={{ marginTop: '12px', padding: '14px', background: 'rgba(232,112,96,0.06)', border: '0.5px solid rgba(232,112,96,0.25)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '10px' }}>
+                  This will send to <strong>{users.length} users</strong>. Double-check the preview above before sending.
+                </div>
+                <button onClick={sendBroadcast} disabled={broadcastState === 'sending'} style={{
+                  padding: '10px 20px', borderRadius: '6px', fontSize: '13px', fontWeight: 700,
+                  border: 'none', background: '#E87060', color: '#fff',
+                  cursor: broadcastState === 'sending' ? 'not-allowed' : 'pointer',
+                  opacity: broadcastState === 'sending' ? 0.7 : 1,
+                }}>
+                  {broadcastState === 'sending' ? 'Sending…' : `Send to ${users.length} users`}
+                </button>
+              </div>
+            )}
+
+            {broadcastState === 'done' && broadcastResult && (
+              <div style={{ marginTop: '12px', fontSize: '13px', color: '#6DB875', fontWeight: 600 }}>
+                Sent {broadcastResult.sent} emails ✓
+                {broadcastResult.failed > 0 && <span style={{ color: '#E87060', fontWeight: 400 }}> · {broadcastResult.failed} failed</span>}
+                <button onClick={() => { setBroadcastState('idle'); setBroadcastResult(null); setPreviewHtml('') }}
+                  style={{ marginLeft: '12px', fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Compose another
+                </button>
+              </div>
+            )}
+
+          </div>
+        )}
       </div>
     </main>
   )
