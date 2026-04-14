@@ -237,7 +237,7 @@ export default function HelpPage() {
           In the desktop lineup editor, use the − / + buttons in the top bar next to the innings count. You can also set a default innings-per-game when you create or edit a season in Settings.
         </Q>
         <Q q="I need help with something not listed here.">
-          <span>Email us at <a href="mailto:support@six43.com" style={{ color: 'var(--accent)' }}>support@six43.com</a> or open an issue on GitHub.</span>
+          <span>Email us at <a href="mailto:support@six43.com" style={{ color: 'var(--accent)' }}>support@six43.com</a> and we'll get back to you.</span>
         </Q>
       </Section>
     </main>
