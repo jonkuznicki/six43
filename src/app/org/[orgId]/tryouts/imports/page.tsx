@@ -27,6 +27,7 @@ interface Season {
 
 const TYPE_OPTIONS = [
   { value: 'registration',  label: 'Registration',       hint: 'Player sign-up export (xlsx/csv)' },
+  { value: 'gc_stats',      label: 'GameChanger Stats',  hint: 'Batting/pitching stats export (csv)' },
   { value: 'coach_eval',    label: 'Coach Evaluations',  hint: 'End-of-season coach eval sheet (xlsx)' },
   { value: 'tryout_scores', label: 'Tryout Scores',      hint: 'Tryout results file (xlsx/csv)' },
 ]
@@ -90,13 +91,14 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     formData.append('file', file)
     formData.append('orgId', params.orgId)
     formData.append('seasonId', seasonId)
-    if (uploadType === 'coach_eval') {
+    if (uploadType === 'coach_eval' || uploadType === 'gc_stats') {
       formData.append('seasonYear', seasonYear)
     }
 
     const endpoint =
       uploadType === 'registration'  ? '/api/tryouts/imports/registration'  :
       uploadType === 'coach_eval'    ? '/api/tryouts/imports/coach-eval'    :
+      uploadType === 'gc_stats'      ? '/api/tryouts/imports/gc-stats'      :
                                        '/api/tryouts/imports/tryout-scores'
 
     const res = await fetch(endpoint, { method: 'POST', body: formData })
@@ -171,11 +173,11 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
             </select>
           </div>
 
-          {/* Eval year — only for coach_eval */}
-          {uploadType === 'coach_eval' && (
+          {/* Stats year — for coach_eval and gc_stats */}
+          {(uploadType === 'coach_eval' || uploadType === 'gc_stats') && (
             <div>
               <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Year being evaluated
+                {uploadType === 'gc_stats' ? 'Stats season year' : 'Year being evaluated'}
               </label>
               <input
                 type="text" value={seasonYear}

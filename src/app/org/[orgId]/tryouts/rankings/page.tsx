@@ -28,8 +28,16 @@ interface CoachEval {
 }
 
 interface GcStat {
-  player_id: string
-  stats:     Record<string, number | string> | null
+  player_id:   string
+  avg:         number | null
+  obp:         number | null
+  slg:         number | null
+  ops:         number | null
+  era:         number | null
+  whip:        number | null
+  games_played: number | null
+  ip:          number | null
+  season_year: string
 }
 
 interface ScoreConfig {
@@ -47,9 +55,12 @@ interface RankedPlayer {
   player:         Player
   tryoutAvg:      number | null
   coachEvalAvg:   number | null
+  gcScore:        number | null   // normalized 0-5 from GC stats
+  gcStat:         GcStat | null   // raw for display
   combinedScore:  number | null
   scoreCount:     number
   evalCount:      number
+  hasGc:          boolean
   assignedTeam:   string | null
 }
 
@@ -73,16 +84,19 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
   const [players,     setPlayers]     = useState<Player[]>([])
   const [tryoutScores, setTryoutScores] = useState<TryoutScore[]>([])
   const [coachEvals,  setCoachEvals]  = useState<CoachEval[]>([])
+  const [gcStats,     setGcStats]     = useState<GcStat[]>([])
   const [teams,       setTeams]       = useState<Team[]>([])
-  const [assignments, setAssignments] = useState<Record<string, string>>({})  // playerId → teamId
+  const [assignments, setAssignments] = useState<Record<string, string>>({})
   const [scoreConfig, setScoreConfig] = useState<ScoreConfig[]>([])
   const [evalConfig,  setEvalConfig]  = useState<EvalConfig[]>([])
   const [loading,     setLoading]     = useState(true)
   const [ageFilter,   setAgeFilter]   = useState('all')
-  const [sortBy,      setSortBy]      = useState<'combined' | 'tryout' | 'eval' | 'name'>('combined')
-  const [assigning,   setAssigning]   = useState<string | null>(null)  // playerId
-  const [tryoutWeight, setTryoutWeight] = useState(0.6)
-  const [showWeights,  setShowWeights] = useState(false)
+  const [sortBy,      setSortBy]      = useState<'combined' | 'tryout' | 'eval' | 'gc' | 'name'>('combined')
+  const [assigning,   setAssigning]   = useState<string | null>(null)
+  const [tryoutWeight,  setTryoutWeight]  = useState(0.5)
+  const [evalWeight,    setEvalWeight]    = useState(0.3)
+  const [gcWeight,      setGcWeight]      = useState(0.2)
+  const [showWeights,   setShowWeights]   = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -102,6 +116,7 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
       { data: assignData },
       { data: scoreCfg },
       { data: evalCfg },
+      { data: gcData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, jersey_number, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true)
@@ -118,11 +133,15 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
         .eq('org_id', params.orgId).eq('is_active', true).order('sort_order'),
       supabase.from('tryout_coach_eval_config').select('field_key, label')
         .eq('org_id', params.orgId).eq('is_active', true).order('sort_order'),
+      supabase.from('tryout_gc_stats')
+        .select('player_id, avg, obp, slg, ops, era, whip, games_played, ip, season_year')
+        .eq('org_id', params.orgId),
     ])
 
     setPlayers(playerData ?? [])
     setTryoutScores(scoreData ?? [])
     setCoachEvals(evalData ?? [])
+    setGcStats(gcData ?? [])
     setTeams(teamData ?? [])
     setScoreConfig((scoreCfg ?? []).map((c: any) => ({ key: c.category_key, label: c.label, weight: c.weight })))
     setEvalConfig((evalCfg ?? []).map((c: any) => ({ key: c.field_key, label: c.label })))
@@ -151,11 +170,10 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
   }
 
   const ranked = useMemo((): RankedPlayer[] => {
-    const evalWeight = 1 - tryoutWeight
-
     return players.map(player => {
       const playerScores = tryoutScores.filter(s => s.player_id === player.id && s.tryout_score != null)
       const playerEvals  = coachEvals.filter(e => e.player_id === player.id)
+      const stat         = gcStats.find(g => g.player_id === player.id) ?? null
 
       // Average tryout score across evaluators
       const tryoutAvg = playerScores.length > 0
@@ -175,50 +193,84 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
         }
       }
 
-      // Combined weighted score (both or just tryout)
+      // GC score: normalize batting (OPS) and pitching (ERA/WHIP) to 0-5 scale
+      let gcScore: number | null = null
+      if (stat) {
+        // OPS: 0 = 0, 1.200 = 5 (elite OPS ≈ 1.000+)
+        const opsScore = stat.ops != null ? Math.min(5, (stat.ops / 1.2) * 5) : null
+        // ERA: 0 = 5, 4.00 = 0 (lower is better)
+        const eraScore = stat.era != null ? Math.max(0, 5 - (stat.era / 4.0) * 5) : null
+        // WHIP: 0 = 5, 1.30 = 2.5, 2.60+ = 0
+        const whipScore = stat.whip != null ? Math.max(0, 5 - (stat.whip / 1.3) * 5) : null
+
+        const pitchComponents = [eraScore, whipScore].filter((v): v is number => v != null)
+        const pitchScore = pitchComponents.length > 0
+          ? pitchComponents.reduce((a, b) => a + b, 0) / pitchComponents.length
+          : null
+
+        if (opsScore != null && pitchScore != null && stat.ip != null && stat.ip > 0) {
+          // Two-way player: weight batting 60%, pitching 40%
+          gcScore = opsScore * 0.6 + pitchScore * 0.4
+        } else if (opsScore != null) {
+          gcScore = opsScore
+        } else if (pitchScore != null) {
+          gcScore = pitchScore
+        }
+      }
+
+      // Combined score: normalize weights among whichever components are available
       let combinedScore: number | null = null
-      if (tryoutAvg != null && coachEvalAvg != null) {
-        // Both components present — weight them
-        // Normalize coach eval from 1-5 scale to 1-5 (same as tryout score)
-        combinedScore = tryoutAvg * tryoutWeight + coachEvalAvg * evalWeight
-      } else if (tryoutAvg != null) {
-        combinedScore = tryoutAvg
-      } else if (coachEvalAvg != null) {
-        combinedScore = coachEvalAvg
+      const components: Array<[number, number]> = []
+      if (tryoutAvg    != null) components.push([tryoutAvg,    tryoutWeight])
+      if (coachEvalAvg != null) components.push([coachEvalAvg, evalWeight])
+      if (gcScore      != null) components.push([gcScore,      gcWeight])
+
+      if (components.length > 0) {
+        const totalW = components.reduce((sum, [, w]) => sum + w, 0)
+        combinedScore = components.reduce((sum, [score, w]) => sum + score * (w / totalW), 0)
       }
 
       return {
         player,
         tryoutAvg,
         coachEvalAvg,
+        gcScore,
+        gcStat:  stat,
         combinedScore,
         scoreCount: playerScores.length,
         evalCount:  playerEvals.length,
+        hasGc:      gcScore != null,
         assignedTeam: assignments[player.id] ?? null,
       }
     })
-  }, [players, tryoutScores, coachEvals, evalConfig, tryoutWeight, assignments])
+  }, [players, tryoutScores, coachEvals, gcStats, evalConfig, tryoutWeight, evalWeight, gcWeight, assignments])
 
   const filtered = useMemo(() => {
     let list = ranked
     if (ageFilter !== 'all') list = list.filter(r => r.player.age_group === ageFilter)
     return list.sort((a, b) => {
-      if (sortBy === 'name') return `${a.player.last_name}${a.player.first_name}`.localeCompare(`${b.player.last_name}${b.player.first_name}`)
-      if (sortBy === 'tryout') return (b.tryoutAvg ?? -1) - (a.tryoutAvg ?? -1)
+      if (sortBy === 'name')   return `${a.player.last_name}${a.player.first_name}`.localeCompare(`${b.player.last_name}${b.player.first_name}`)
+      if (sortBy === 'tryout') return (b.tryoutAvg    ?? -1) - (a.tryoutAvg    ?? -1)
       if (sortBy === 'eval')   return (b.coachEvalAvg ?? -1) - (a.coachEvalAvg ?? -1)
+      if (sortBy === 'gc')     return (b.gcScore       ?? -1) - (a.gcScore       ?? -1)
       return (b.combinedScore ?? -1) - (a.combinedScore ?? -1)
     })
   }, [ranked, ageFilter, sortBy])
 
   function exportCsv() {
     const rows = [
-      ['Name', 'Age Group', 'Jersey', 'Tryout Score', 'Coach Eval', 'Combined', 'Scores', 'Evals', 'Team'],
+      ['Name', 'Age Group', 'Jersey', 'Prior Team', 'Tryout Score', 'Coach Eval', 'GC Score', 'OPS', 'ERA', 'WHIP', 'Combined', 'Scores', 'Evals', 'Team'],
       ...filtered.map(r => [
         `${r.player.first_name} ${r.player.last_name}`,
         r.player.age_group,
         r.player.jersey_number ?? '',
+        r.player.prior_team ?? '',
         r.tryoutAvg?.toFixed(2) ?? '',
         r.coachEvalAvg?.toFixed(2) ?? '',
+        r.gcScore?.toFixed(2) ?? '',
+        r.gcStat?.ops?.toFixed(3) ?? '',
+        r.gcStat?.era?.toFixed(2) ?? '',
+        r.gcStat?.whip?.toFixed(2) ?? '',
         r.combinedScore?.toFixed(2) ?? '',
         String(r.scoreCount),
         String(r.evalCount),
@@ -274,22 +326,36 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
       </div>
 
       {/* Weight controls */}
-      {showWeights && (
-        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '0.75rem' }}>Score weighting</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: '12px', color: s.muted }}>Tryout score</label>
-            <input type="range" min={0} max={100} value={Math.round(tryoutWeight * 100)}
-              onChange={e => setTryoutWeight(Number(e.target.value) / 100)}
-              style={{ width: '160px' }} />
-            <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '36px' }}>{Math.round(tryoutWeight * 100)}%</span>
-            <span style={{ fontSize: '12px', color: s.dim }}>Coach eval: {Math.round((1 - tryoutWeight) * 100)}%</span>
+      {showWeights && (() => {
+        const totalW = tryoutWeight + evalWeight + gcWeight || 1
+        const tPct = Math.round((tryoutWeight / totalW) * 100)
+        const ePct = Math.round((evalWeight   / totalW) * 100)
+        const gPct = 100 - tPct - ePct
+        return (
+          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '0.75rem' }}>Score weighting</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {([
+                { label: 'Tryout',     val: tryoutWeight, set: setTryoutWeight, pct: tPct },
+                { label: 'Coach eval', val: evalWeight,   set: setEvalWeight,   pct: ePct },
+                { label: 'GC stats',   val: gcWeight,     set: setGcWeight,     pct: gPct },
+              ] as const).map(({ label, val, set, pct }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '12px', color: s.muted, width: '76px', flexShrink: 0 }}>{label}</span>
+                  <input type="range" min={0} max={100} value={Math.round(val * 100)}
+                    onChange={e => set(Number(e.target.value) / 100)}
+                    style={{ width: '140px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', fontWeight: 700, minWidth: '32px' }}>{Math.round(val * 100)}</span>
+                  <span style={{ fontSize: '11px', color: s.dim }}>→ {pct}% of combined</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: s.dim, marginTop: '8px' }}>
+              Weights are normalized among available data. If a player has no GC stats, tryout + eval fill 100%.
+            </div>
           </div>
-          <div style={{ fontSize: '11px', color: s.dim, marginTop: '6px' }}>
-            Only applies when both scores are present. Otherwise uses whichever is available.
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
@@ -330,7 +396,7 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '11px', color: s.dim }}>Sort:</span>
-          {(['combined', 'tryout', 'eval', 'name'] as const).map(opt => (
+          {(['combined', 'tryout', 'eval', 'gc', 'name'] as const).map(opt => (
             <button key={opt} onClick={() => setSortBy(opt)} style={{
               padding: '4px 10px', borderRadius: '5px', border: '0.5px solid',
               borderColor: sortBy === opt ? 'var(--accent)' : 'var(--border-md)',
@@ -380,6 +446,7 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
                   <div style={{ fontSize: '11px', color: s.dim, marginTop: '1px' }}>
                     {row.scoreCount > 0 ? `${row.scoreCount} tryout score${row.scoreCount !== 1 ? 's' : ''}` : 'No tryout scores'}
                     {row.evalCount > 0 ? ` · ${row.evalCount} coach eval${row.evalCount !== 1 ? 's' : ''}` : ''}
+                    {row.hasGc ? ` · GC ${row.gcStat?.season_year ?? ''}` : ''}
                   </div>
                 </div>
 
@@ -395,6 +462,20 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '14px', fontWeight: 800 }}>{row.coachEvalAvg.toFixed(2)}</div>
                       <div style={{ fontSize: '10px', color: s.dim }}>eval</div>
+                    </div>
+                  )}
+                  {row.gcStat != null && (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 800 }}>
+                        {row.gcStat.ops != null
+                          ? row.gcStat.ops.toFixed(3)
+                          : row.gcStat.era != null
+                            ? row.gcStat.era.toFixed(2)
+                            : '—'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: s.dim }}>
+                        {row.gcStat.ops != null ? 'OPS' : row.gcStat.era != null ? 'ERA' : 'GC'}
+                      </div>
                     </div>
                   )}
                   {row.combinedScore != null && (
