@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { href: 'coach-evals',label: 'Coach Evals',     icon: '📝', desc: 'End-of-season evaluations from coaches' },
   { href: 'rankings',   label: 'Rankings',        icon: '🏆', desc: 'Combined scores, order players, assign to teams' },
   { href: 'teams',      label: 'Teams & Rosters', icon: '⚾', desc: 'Create teams and view final rosters' },
+  { href: 'seasons',    label: 'Seasons',         icon: '📅', desc: 'Manage seasons and age groups' },
   { href: 'members',    label: 'Members',         icon: '🔑', desc: 'Invite coaches and evaluators' },
   { href: 'imports',    label: 'Imports',         icon: '↑',  desc: 'Registration and GameChanger stats' },
 ]
@@ -88,10 +89,14 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
           {org?.name ?? 'Organization'}
         </div>
         <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '4px' }}>Tryouts</h1>
-        {season && (
-          <div style={{ fontSize: '13px', color: s.muted }}>
+        {season ? (
+          <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: s.muted, textDecoration: 'none' }}>
             {season.label} · {season.age_groups.join(', ')}
-          </div>
+          </Link>
+        ) : (
+          <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+            ⚠ No active season — set one up →
+          </Link>
         )}
       </div>
 
