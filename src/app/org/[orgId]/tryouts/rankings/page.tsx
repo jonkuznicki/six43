@@ -65,9 +65,10 @@ interface RankedPlayer {
 }
 
 interface Season {
-  id:         string
-  label:      string
-  age_groups: string[]
+  id:                     string
+  label:                  string
+  age_groups:             string[]
+  rankings_share_token:   string | null
 }
 
 interface Team {
@@ -97,14 +98,18 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
   const [evalWeight,    setEvalWeight]    = useState(0.3)
   const [gcWeight,      setGcWeight]      = useState(0.2)
   const [showWeights,   setShowWeights]   = useState(false)
+  const [shareToken,    setShareToken]    = useState<string | null>(null)
+  const [sharingBusy,   setSharingBusy]   = useState(false)
+  const [shareCopied,   setShareCopied]   = useState(false)
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const { data: seasonData } = await supabase
-      .from('tryout_seasons').select('id, label, age_groups')
+      .from('tryout_seasons').select('id, label, age_groups, rankings_share_token')
       .eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
     setSeason(seasonData)
+    setShareToken(seasonData?.rankings_share_token ?? null)
 
     if (!seasonData) { setLoading(false); return }
 
@@ -287,6 +292,46 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
     URL.revokeObjectURL(url)
   }
 
+  async function handleShare() {
+    if (!season) return
+    setSharingBusy(true)
+    if (shareToken) {
+      // Already have a token — just copy the link
+      const url = `${window.location.origin}/tryouts/rankings/${shareToken}`
+      await navigator.clipboard.writeText(url)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+      setSharingBusy(false)
+      return
+    }
+    const res = await fetch('/api/tryouts/rankings-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seasonId: season.id, orgId: params.orgId, action: 'generate' }),
+    })
+    const json = await res.json()
+    if (json.token) {
+      setShareToken(json.token)
+      const url = `${window.location.origin}/tryouts/rankings/${json.token}`
+      await navigator.clipboard.writeText(url)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    }
+    setSharingBusy(false)
+  }
+
+  async function revokeShare() {
+    if (!season || !shareToken) return
+    setSharingBusy(true)
+    await fetch('/api/tryouts/rankings-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seasonId: season.id, orgId: params.orgId, action: 'revoke' }),
+    })
+    setShareToken(null)
+    setSharingBusy(false)
+  }
+
   const ageGroupTeams = (ag: string) => teams.filter(t => t.age_group === ag || t.age_group === 'all')
 
   const s = {
@@ -310,7 +355,7 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
           <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Rankings</h1>
           {season && <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>}
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={() => setShowWeights(v => !v)} style={{
             padding: '7px 14px', borderRadius: '6px',
             border: `0.5px solid ${showWeights ? 'var(--accent)' : 'var(--border-md)'}`,
@@ -318,6 +363,22 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
             color: showWeights ? 'var(--accent)' : s.muted,
             fontSize: '12px', cursor: 'pointer',
           }}>⚖ Weights</button>
+          <button onClick={handleShare} disabled={sharingBusy} style={{
+            padding: '7px 14px', borderRadius: '6px',
+            border: `0.5px solid ${shareToken ? 'rgba(109,184,117,0.5)' : 'var(--border-md)'}`,
+            background: shareToken ? 'rgba(109,184,117,0.1)' : 'var(--bg-input)',
+            color: shareToken ? '#6DB875' : s.muted,
+            fontSize: '12px', cursor: sharingBusy ? 'not-allowed' : 'pointer',
+          }}>
+            {shareCopied ? '✓ Copied!' : shareToken ? '⎋ Copy link' : '⎋ Share'}
+          </button>
+          {shareToken && (
+            <button onClick={revokeShare} disabled={sharingBusy} style={{
+              padding: '7px 14px', borderRadius: '6px', border: '0.5px solid rgba(232,112,96,0.4)',
+              background: 'rgba(232,112,96,0.08)', color: '#E87060',
+              fontSize: '12px', cursor: sharingBusy ? 'not-allowed' : 'pointer',
+            }}>Revoke</button>
+          )}
           <button onClick={exportCsv} style={{
             padding: '7px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
