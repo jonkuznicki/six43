@@ -125,7 +125,7 @@ export default function ScoringPage({ params }: { params: { orgId: string; sessi
       { data: sessionData },
       { data: memberData },
     ] = await Promise.all([
-      supabase.from('tryout_sessions').select('id, label, age_group, status').eq('id', params.sessionId).single(),
+      supabase.from('tryout_sessions').select('id, label, age_group, status, season_id').eq('id', params.sessionId).single(),
       user ? supabase.from('tryout_org_members').select('name, email').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
@@ -148,17 +148,16 @@ export default function ScoringPage({ params }: { params: { orgId: string; sessi
     // Load scoring config
     const { data: configData } = await supabase
       .from('tryout_scoring_config')
-      .select('category_key, label, weight, optional')
-      .eq('org_id', params.orgId)
-      .eq('is_active', true)
+      .select('category, label, weight, is_optional')
+      .eq('season_id', sessionData.season_id)
       .order('sort_order')
 
     if (configData && configData.length > 0) {
       setFields(configData.map((c: any) => ({
-        key:      c.category_key,
+        key:      c.category,
         label:    c.label,
         weight:   c.weight,
-        optional: c.optional,
+        optional: c.is_optional,
       })))
     }
 

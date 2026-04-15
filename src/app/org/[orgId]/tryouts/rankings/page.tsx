@@ -134,10 +134,10 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
         .eq('org_id', params.orgId).eq('season_id', seasonData.id).eq('is_active', true),
       supabase.from('tryout_team_assignments').select('player_id, team_id')
         .eq('season_id', seasonData.id),
-      supabase.from('tryout_scoring_config').select('category_key, label, weight')
-        .eq('org_id', params.orgId).eq('is_active', true).order('sort_order'),
+      supabase.from('tryout_scoring_config').select('category, label, weight')
+        .eq('season_id', seasonData.id).order('sort_order'),
       supabase.from('tryout_coach_eval_config').select('field_key, label')
-        .eq('org_id', params.orgId).eq('is_active', true).order('sort_order'),
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id).order('sort_order'),
       supabase.from('tryout_gc_stats')
         .select('player_id, avg, obp, slg, ops, era, whip, games_played, ip, season_year')
         .eq('org_id', params.orgId),
@@ -148,7 +148,7 @@ export default function RankingsPage({ params }: { params: { orgId: string } }) 
     setCoachEvals(evalData ?? [])
     setGcStats(gcData ?? [])
     setTeams(teamData ?? [])
-    setScoreConfig((scoreCfg ?? []).map((c: any) => ({ key: c.category_key, label: c.label, weight: c.weight })))
+    setScoreConfig((scoreCfg ?? []).map((c: any) => ({ key: c.category, label: c.label, weight: c.weight })))
     setEvalConfig((evalCfg ?? []).map((c: any) => ({ key: c.field_key, label: c.label })))
 
     const assignMap: Record<string, string> = {}

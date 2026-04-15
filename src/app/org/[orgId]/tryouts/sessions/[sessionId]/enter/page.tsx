@@ -50,7 +50,7 @@ export default function BulkEnterPage({ params }: { params: { orgId: string; ses
 
   async function loadData() {
     const { data: sessionData } = await supabase
-      .from('tryout_sessions').select('id, label, age_group, status')
+      .from('tryout_sessions').select('id, label, age_group, status, season_id')
       .eq('id', params.sessionId).single()
     setSession(sessionData)
 
@@ -67,8 +67,8 @@ export default function BulkEnterPage({ params }: { params: { orgId: string; ses
         .eq('age_group', sessionData.age_group)
         .order('last_name').order('first_name'),
       supabase.from('tryout_scoring_config')
-        .select('category_key, label, optional, sort_order')
-        .eq('org_id', params.orgId).eq('is_active', true)
+        .select('category, label, is_optional, sort_order')
+        .eq('season_id', sessionData.season_id)
         .order('sort_order'),
       supabase.from('tryout_scores')
         .select('player_id, scores, comments, evaluator_name')
@@ -76,7 +76,7 @@ export default function BulkEnterPage({ params }: { params: { orgId: string; ses
     ])
 
     const parsedFields: ScoreField[] = (fieldData ?? []).map((f: any) => ({
-      key: f.category_key, label: f.label, optional: f.optional, sort_order: f.sort_order,
+      key: f.category, label: f.label, optional: f.is_optional, sort_order: f.sort_order,
     }))
     setFields(parsedFields)
     setPlayers(playerData ?? [])

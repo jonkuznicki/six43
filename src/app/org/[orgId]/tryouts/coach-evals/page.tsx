@@ -78,7 +78,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     ] = await Promise.all([
       supabase.from('tryout_seasons').select('id, label, year, age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).eq('is_active', true).order('sort_order'),
+      supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).order('sort_order'),
     ])
 
     setSeason(seasonData)
