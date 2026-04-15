@@ -194,21 +194,20 @@ export async function POST(req: NextRequest) {
   // For auto-matched rows: add an alias confirming the match.
   // Actual new-player creation for unresolved/suggested happens after review.
   if (newCount > 0 && candidatePool.length === 0) {
-    const newPlayers = matchReport
-      .filter(r => r.status === 'new')
-      .map(r => ({
-        org_id:       orgId,
-        first_name:   r.createPayload.firstName,
-        last_name:    r.createPayload.lastName,
-        dob:          r.createPayload.dob,
-        age_group:    r.createPayload.ageGroup,
-        parent_email: r.createPayload.parentEmail,
-        parent_phone: r.createPayload.parentPhone,
-        grade:        r.createPayload.grade,
-        school:       r.createPayload.school,
-        prior_org:    r.createPayload.priorOrg,
-        prior_team:   r.createPayload.priorTeam,
-      }))
+    const newRows = matchReport.filter(r => r.status === 'new')
+    const newPlayers = newRows.map(r => ({
+      org_id:       orgId,
+      first_name:   r.createPayload.firstName,
+      last_name:    r.createPayload.lastName,
+      dob:          r.createPayload.dob,
+      age_group:    r.createPayload.ageGroup,
+      parent_email: r.createPayload.parentEmail,
+      parent_phone: r.createPayload.parentPhone,
+      grade:        r.createPayload.grade,
+      school:       r.createPayload.school,
+      prior_org:    r.createPayload.priorOrg,
+      prior_team:   r.createPayload.priorTeam,
+    }))
 
     const { data: createdPlayers } = await supabase
       .from('tryout_players')
@@ -228,6 +227,29 @@ export async function POST(req: NextRequest) {
         import_job_id: job.id,
       }))
       await supabase.from('tryout_player_aliases').insert(aliases)
+
+      // Write registration staging for newly created players
+      if (seasonId) {
+        const stagingRows = createdPlayers.map((p: any, i: number) => {
+          const row = newRows[i]
+          return {
+            player_id:     p.id,
+            org_id:        orgId,
+            season_id:     seasonId,
+            import_job_id: job.id,
+            age_group:     row.createPayload.ageGroup,
+            prior_team:    row.createPayload.priorTeam,
+            parent_email:  row.createPayload.parentEmail,
+            parent_phone:  row.createPayload.parentPhone,
+            dob:           row.createPayload.dob,
+            grade:         row.createPayload.grade,
+            school:        row.createPayload.school,
+            prior_org:     row.createPayload.priorOrg,
+          }
+        })
+        await supabase.from('tryout_registration_staging')
+          .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+      }
     }
 
     // Mark job complete if everything was new (first import)
@@ -239,6 +261,27 @@ export async function POST(req: NextRequest) {
         completed_at: new Date().toISOString(),
       })
       .eq('id', job.id)
+  }
+
+  // Write registration staging for auto-matched rows
+  const autoMatchedRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
+  if (autoMatchedRows.length > 0 && seasonId) {
+    const stagingRows = autoMatchedRows.map(r => ({
+      player_id:     r.resolvedPlayerId,
+      org_id:        orgId,
+      season_id:     seasonId,
+      import_job_id: job.id,
+      age_group:     r.createPayload.ageGroup,
+      prior_team:    r.createPayload.priorTeam,
+      parent_email:  r.createPayload.parentEmail,
+      parent_phone:  r.createPayload.parentPhone,
+      dob:           r.createPayload.dob,
+      grade:         r.createPayload.grade,
+      school:        r.createPayload.school,
+      prior_org:     r.createPayload.priorOrg,
+    }))
+    await supabase.from('tryout_registration_staging')
+      .upsert(stagingRows, { onConflict: 'player_id,season_id' })
   }
 
   // ── Audit log ────────────────────────────────────────────────────────────

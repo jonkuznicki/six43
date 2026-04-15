@@ -120,6 +120,20 @@ export async function POST(req: NextRequest) {
     ))
   }
 
+  // Write roster staging for auto-matched rows
+  if (autoRows.length > 0 && seasonId) {
+    const stagingRows = autoRows.map(r => ({
+      player_id:     r.resolvedPlayerId,
+      org_id:        orgId,
+      season_id:     seasonId,
+      import_job_id: null as null,  // set after job creation below
+      team_name:     r.teamName,
+      jersey_number: r.jerseyNumber ?? null,
+    }))
+    await supabase.from('tryout_roster_staging')
+      .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+  }
+
   const { data: job } = await supabase.from('tryout_import_jobs').insert({
     org_id:          orgId,
     season_id:       seasonId ?? null,

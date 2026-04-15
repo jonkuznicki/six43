@@ -24,6 +24,7 @@ interface Stats {
 
 const NAV_ITEMS = [
   { href: 'players',    label: 'Players',         icon: '👥', desc: 'Registered players and identity management' },
+  { href: 'data-hub',   label: 'Data Hub',        icon: '⊞',  desc: 'Review all sources, resolve conflicts, set tryout age groups' },
   { href: 'sessions',   label: 'Tryout Sessions', icon: '📋', desc: 'Create sessions, assign evaluators, score' },
   { href: 'coach-evals',label: 'Coach Evals',     icon: '📝', desc: 'End-of-season evaluations from coaches' },
   { href: 'rankings',   label: 'Rankings',        icon: '🏆', desc: 'Combined scores, order players, assign to teams' },

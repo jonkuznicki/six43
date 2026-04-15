@@ -110,6 +110,24 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
     import_job_id: job.id,
   })
 
+  // Write registration staging if this is a registration import
+  if (job.type === 'registration' && job.season_id && payload) {
+    await supabase.from('tryout_registration_staging').upsert({
+      player_id:     playerId,
+      org_id:        job.org_id,
+      season_id:     job.season_id,
+      import_job_id: job.id,
+      age_group:     payload.ageGroup,
+      prior_team:    payload.priorTeam,
+      parent_email:  payload.parentEmail,
+      parent_phone:  payload.parentPhone,
+      dob:           payload.dob,
+      grade:         payload.grade,
+      school:        payload.school,
+      prior_org:     payload.priorOrg,
+    }, { onConflict: 'player_id,season_id' })
+  }
+
   // Update the row in match_report
   const updatedReport = report.map((r: any) =>
     r.rowIndex === row.rowIndex
@@ -164,6 +182,24 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
       ? { ...r, status: 'auto', resolvedPlayerId: newPlayer.id, confidence: 1.0, matchReason: 'new player created' }
       : r
   )
+
+  // Write registration staging if this is a registration import
+  if (job.type === 'registration' && job.season_id && payload) {
+    await supabase.from('tryout_registration_staging').upsert({
+      player_id:     newPlayer.id,
+      org_id:        job.org_id,
+      season_id:     job.season_id,
+      import_job_id: job.id,
+      age_group:     payload.ageGroup,
+      prior_team:    payload.priorTeam,
+      parent_email:  payload.parentEmail,
+      parent_phone:  payload.parentPhone,
+      dob:           payload.dob,
+      grade:         payload.grade,
+      school:        payload.school,
+      prior_org:     payload.priorOrg,
+    }, { onConflict: 'player_id,season_id' })
+  }
 
   await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Created new player: ${payload.firstName} ${payload.lastName}` })
 
