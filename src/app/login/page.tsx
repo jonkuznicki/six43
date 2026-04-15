@@ -37,7 +37,26 @@ function LoginForm() {
         })
       }
       const next = searchParams.get('next')
-      router.push(next ?? '/dashboard')
+      if (next) { router.push(next); return }
+
+      // Check if user has a tryout org membership — if so, redirect there
+      const { data: tryoutMember } = await supabase
+        .from('tryout_org_members')
+        .select('org_id, role')
+        .eq('is_active', true)
+        .order('invited_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (tryoutMember) {
+        const suffix =
+          tryoutMember.role === 'head_coach' ? '/coach-evals' :
+          tryoutMember.role === 'evaluator'  ? '/sessions'    : ''
+        router.push(`/org/${tryoutMember.org_id}/tryouts${suffix}`)
+        return
+      }
+
+      router.push('/dashboard')
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,

@@ -15,9 +15,10 @@ export async function GET(request: Request) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Auto-accept any pending email invites for this user
     if (user?.email) {
       const service = createServiceClient()
+
+      // Auto-accept pending team invites
       const { data: pending } = await service
         .from('team_members')
         .select('id, team_id')
@@ -32,6 +33,20 @@ export async function GET(request: Request) {
             accepted_at: new Date().toISOString(),
           })
           .in('id', pending.map((r: any) => r.id))
+      }
+
+      // Auto-accept pending tryout org member invites
+      const { data: tryoutPending } = await service
+        .from('tryout_org_members')
+        .select('id')
+        .eq('email', user.email)
+        .eq('is_active', false)
+
+      if (tryoutPending && tryoutPending.length > 0) {
+        await service
+          .from('tryout_org_members')
+          .update({ user_id: user.id, is_active: true })
+          .in('id', tryoutPending.map((r: any) => r.id))
       }
     }
 
