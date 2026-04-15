@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { href: 'sessions',   label: 'Tryout Sessions', icon: '📋', desc: 'Create sessions, assign evaluators, score' },
   { href: 'coach-evals',label: 'Coach Evals',     icon: '📝', desc: 'End-of-season evaluations from coaches' },
   { href: 'rankings',   label: 'Rankings',        icon: '🏆', desc: 'Combined scores, order players, assign to teams' },
+  { href: 'readiness',  label: 'Readiness',       icon: '✓',  desc: 'Pre-placement checklist — all data sources' },
   { href: 'teams',      label: 'Teams & Rosters', icon: '⚾', desc: 'Create teams and view final rosters' },
   { href: 'scoring',    label: 'Scoring Setup',   icon: '⚙',  desc: 'Tryout categories, weights, and eval rubric' },
   { href: 'seasons',    label: 'Seasons',         icon: '📅', desc: 'Manage seasons and age groups' },

@@ -230,6 +230,20 @@ export default function SessionDetailPage({ params }: { params: { orgId: string;
               fontSize: '13px', fontWeight: 700, cursor: 'pointer',
             }}>Re-open</button>
           )}
+          <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}/checkin`} style={{
+            padding: '8px 16px', borderRadius: '6px',
+            border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted,
+            fontSize: '13px', fontWeight: 600, textDecoration: 'none',
+            display: 'inline-block',
+          }}>Check in players</Link>
+          <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}/roster`} style={{
+            padding: '8px 16px', borderRadius: '6px',
+            border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted,
+            fontSize: '13px', fontWeight: 600, textDecoration: 'none',
+            display: 'inline-block',
+          }}>Print roster</Link>
           <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}/enter`} style={{
             padding: '8px 16px', borderRadius: '6px',
             border: '0.5px solid var(--border-md)',

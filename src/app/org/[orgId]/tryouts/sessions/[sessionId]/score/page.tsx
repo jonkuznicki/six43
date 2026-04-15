@@ -1,558 +1,468 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '../../../../../../../lib/supabase'
-import Link from 'next/link'
+import { computeTryoutScore, ScoringCategory } from '../../../../../../../lib/tryouts/computeScore'
 
-interface Player {
-  id:         string
-  first_name: string
-  last_name:  string
-  age_group:  string
-  jersey_number: string | null
-}
-
-interface ScoreField {
-  key:      string
-  label:    string
-  weight:   number
-  optional: boolean
+interface Checkin {
+  id: string; tryout_number: number; player_id: string | null
+  is_write_in: boolean; write_in_name: string | null
+  player?: { first_name: string; last_name: string; prior_team: string | null }
 }
 
 interface Session {
-  id:        string
-  label:     string
-  age_group: string
-  status:    string
+  id: string; label: string; age_group: string; season_id: string; status: string
 }
 
-interface PendingScore {
-  player_id:  string
-  session_id: string
-  org_id:     string
-  scores:     Record<string, number>
-  comments:   string
-  savedAt:    number
-}
+const SCALE_LABEL = '5 = Exceptional · 4 = Above age · 3 = Age appropriate · 2 = Below age · 1 = Needs work'
 
-const STORAGE_KEY_PREFIX = 'tryout_score_queue_'
-
-function storageKey(sessionId: string) {
-  return `${STORAGE_KEY_PREFIX}${sessionId}`
-}
-
-function loadQueue(sessionId: string): Record<string, PendingScore> {
-  try {
-    const raw = localStorage.getItem(storageKey(sessionId))
-    return raw ? JSON.parse(raw) : {}
-  } catch { return {} }
-}
-
-function saveQueue(sessionId: string, queue: Record<string, PendingScore>) {
-  try {
-    localStorage.setItem(storageKey(sessionId), JSON.stringify(queue))
-  } catch {}
-}
-
-function clearPlayerFromQueue(sessionId: string, playerId: string) {
-  const q = loadQueue(sessionId)
-  delete q[playerId]
-  saveQueue(sessionId, q)
-}
-
-// Default Hudson Baseball scoring fields — will be replaced by config from DB
-const DEFAULT_FIELDS: ScoreField[] = [
-  { key: 'speed',       label: 'Speed / Running',  weight: 0.11, optional: false },
-  { key: 'ground_balls',label: 'Ground Balls',      weight: 0.11, optional: false },
-  { key: 'fly_balls',   label: 'Fly Balls',         weight: 0.11, optional: false },
-  { key: 'hitting',     label: 'Hitting',           weight: 0.17, optional: false },
-  { key: 'pitching',    label: 'Pitching',          weight: 0.17, optional: true },
-  { key: 'catching',    label: 'Catching',          weight: 0.33, optional: true },
-]
-
-function computeScore(scores: Record<string, number>, fields: ScoreField[]): number | null {
-  const required = fields.filter(f => !f.optional)
-  if (required.some(f => scores[f.key] == null)) return null
-
-  let totalWeight = 0
-  let weightedSum = 0
-  for (const f of fields) {
-    if (scores[f.key] != null) {
-      totalWeight  += f.weight
-      weightedSum  += scores[f.key] * f.weight
-    }
-  }
-  if (totalWeight === 0) return null
-  return weightedSum / totalWeight
-}
-
-export default function ScoringPage({ params }: { params: { orgId: string; sessionId: string } }) {
+export default function EvaluatorScorePage({ params }: { params: { orgId: string; sessionId: string } }) {
   const supabase = createClient()
 
   const [session,       setSession]       = useState<Session | null>(null)
-  const [players,       setPlayers]       = useState<Player[]>([])
-  const [fields,        setFields]        = useState<ScoreField[]>(DEFAULT_FIELDS)
-  const [currentIndex,  setCurrentIndex]  = useState(0)
-  const [scores,        setScores]        = useState<Record<string, number>>({})
-  const [comments,      setComments]      = useState('')
-  const [saving,        setSaving]        = useState(false)
-  const [savedSet,      setSavedSet]      = useState<Set<string>>(new Set())
-  const [offline,       setOffline]       = useState(false)
-  const [flushingQueue, setFlushingQueue] = useState(false)
-  const [loading,       setLoading]       = useState(true)
-  const [evaluatorName, setEvaluatorName] = useState<string>('')
+  const [categories,    setCategories]    = useState<ScoringCategory[]>([])
+  const [checkins,      setCheckins]      = useState<Checkin[]>([])
+  const [currentIdx,    setCurrentIdx]    = useState(0)
+  const [scores,        setScores]        = useState<Record<string, Record<string, number | null>>>({})
+  const [naFlags,       setNaFlags]       = useState<Record<string, Set<string>>>({}) // checkinId → Set of optional category keys
+  const [comments,      setComments]      = useState<Record<string, string>>({})
+  const [evaluatorName, setEvaluatorName] = useState('')
+  const [evaluatorId,   setEvaluatorId]   = useState<string | null>(null)
   const [namePrompt,    setNamePrompt]    = useState(false)
-  const [nameInput,     setNameInput]     = useState('')
-  const [existingScores, setExistingScores] = useState<Set<string>>(new Set())
+  const [loading,       setLoading]       = useState(true)
+  const [saving,        setSaving]        = useState(false)
+  const [savedAt,       setSavedAt]       = useState<Date | null>(null)
+  const [offline,       setOffline]       = useState(false)
+  const [jumpInput,     setJumpInput]     = useState('')
+  const [showComment,   setShowComment]   = useState<Record<string, boolean>>({})
+  const [done,          setDone]          = useState(false)
+
+  // Write-in modal
+  const [showWriteIn,   setShowWriteIn]   = useState(false)
+  const [wiName,        setWiName]        = useState('')
+  const [wiAge,         setWiAge]         = useState('')
+
+  const offlineQueue = useRef<any[]>([])
 
   useEffect(() => {
-    loadData()
-    window.addEventListener('online',  handleOnline)
-    window.addEventListener('offline', handleOffline)
+    window.addEventListener('online', () => { setOffline(false); flushQueue() })
+    window.addEventListener('offline', () => setOffline(true))
     return () => {
-      window.removeEventListener('online',  handleOnline)
-      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', () => setOffline(false))
+      window.removeEventListener('offline', () => setOffline(true))
     }
   }, [])
 
-  function handleOnline()  { setOffline(false); flushOfflineQueue() }
-  function handleOffline() { setOffline(true) }
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
+    if (user) setEvaluatorId(user.id)
 
-    const [
-      { data: sessionData },
-      { data: memberData },
-    ] = await Promise.all([
-      supabase.from('tryout_sessions').select('id, label, age_group, status, season_id').eq('id', params.sessionId).single(),
+    const { data: sess } = await supabase
+      .from('tryout_sessions').select('id, label, age_group, season_id, status')
+      .eq('id', params.sessionId).single()
+    setSession(sess)
+    if (!sess) { setLoading(false); return }
+
+    const [{ data: catData }, { data: checkinData }, memberResult] = await Promise.all([
+      supabase.from('tryout_scoring_config')
+        .select('category, label, weight, is_optional, subcategories, sort_order')
+        .eq('season_id', sess.season_id).order('sort_order'),
+      supabase.from('tryout_checkins')
+        .select('id, tryout_number, player_id, is_write_in, write_in_name, tryout_players(first_name, last_name, prior_team)')
+        .eq('session_id', params.sessionId).order('tryout_number'),
       user ? supabase.from('tryout_org_members').select('name, email').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
-    setSession(sessionData)
+    setCategories((catData ?? []).map((c: any) => ({
+      category: c.category, label: c.label, weight: c.weight,
+      is_optional: c.is_optional, subcategories: c.subcategories ?? [],
+    })))
 
-    // Set evaluator name
-    const savedName = localStorage.getItem(`tryout_eval_name_${params.orgId}`) ?? ''
-    if (memberData?.name) {
-      setEvaluatorName(memberData.name)
-    } else if (memberData?.email) {
-      setEvaluatorName(memberData.email)
-    } else if (savedName) {
-      setEvaluatorName(savedName)
-    } else {
-      setNamePrompt(true)
-    }
+    const enrichedCheckins = (checkinData ?? []).map((c: any) => ({
+      id: c.id, tryout_number: c.tryout_number, player_id: c.player_id,
+      is_write_in: c.is_write_in, write_in_name: c.write_in_name,
+      player: c.tryout_players ?? null,
+    }))
+    setCheckins(enrichedCheckins)
 
-    if (!sessionData) { setLoading(false); return }
-
-    // Load scoring config
-    const { data: configData } = await supabase
-      .from('tryout_scoring_config')
-      .select('category, label, weight, is_optional')
-      .eq('season_id', sessionData.season_id)
-      .order('sort_order')
-
-    if (configData && configData.length > 0) {
-      setFields(configData.map((c: any) => ({
-        key:      c.category,
-        label:    c.label,
-        weight:   c.weight,
-        optional: c.is_optional,
-      })))
-    }
-
-    // Load players for this age group
-    const { data: playerData } = await supabase
-      .from('tryout_players')
-      .select('id, first_name, last_name, age_group, jersey_number')
-      .eq('org_id', params.orgId)
-      .eq('is_active', true)
-      .eq('age_group', sessionData.age_group)
-      .order('last_name').order('first_name')
-
-    setPlayers(playerData ?? [])
-
-    // Load already-submitted scores for this session (by this user/evaluator)
+    // Load existing scores for this evaluator
     if (user) {
-      const { data: scoreData } = await supabase
-        .from('tryout_scores')
-        .select('player_id')
-        .eq('session_id', params.sessionId)
-        .eq('evaluator_id', user.id)
-      setExistingScores(new Set((scoreData ?? []).map((s: any) => s.player_id)))
+      const { data: existingScores } = await supabase
+        .from('tryout_scores').select('player_id, scores, comments')
+        .eq('session_id', params.sessionId).eq('evaluator_id', user.id)
+
+      const scoreMap: typeof scores = {}
+      const commentMap: typeof comments = {}
+      for (const sc of (existingScores ?? [])) {
+        scoreMap[sc.player_id] = sc.scores ?? {}
+        commentMap[sc.player_id] = sc.comments ?? ''
+      }
+      setScores(scoreMap)
+      setComments(commentMap)
     }
 
-    // Restore any offline queue
-    const queue = loadQueue(params.sessionId)
-    const queuedIds = new Set(Object.keys(queue))
-    if (queuedIds.size > 0) setSavedSet(prev => new Set(Array.from(prev).concat(Array.from(queuedIds))))
+    // Evaluator name
+    const member = memberResult.data
+    const saved  = localStorage.getItem(`tryout_eval_name_${params.orgId}`)
+    if (member?.name) setEvaluatorName(member.name)
+    else if (member?.email) setEvaluatorName(member.email)
+    else if (saved) setEvaluatorName(saved)
+    else setNamePrompt(true)
 
     setLoading(false)
   }
 
-  function setNameAndContinue() {
-    const name = nameInput.trim()
-    if (!name) return
-    setEvaluatorName(name)
-    localStorage.setItem(`tryout_eval_name_${params.orgId}`, name)
-    setNamePrompt(false)
+  const current = checkins[currentIdx]
+
+  function playerName(c: Checkin) {
+    if (c.is_write_in) return c.write_in_name ?? 'Write-in'
+    return c.player ? `${c.player.first_name} ${c.player.last_name}` : 'Unknown'
   }
 
-  const currentPlayer = players[currentIndex] ?? null
-
-  // Load saved scores for current player from queue
-  useEffect(() => {
-    if (!currentPlayer) return
-    const queue = loadQueue(params.sessionId)
-    const saved = queue[currentPlayer.id]
-    if (saved) {
-      setScores(saved.scores)
-      setComments(saved.comments)
-    } else {
-      setScores({})
-      setComments('')
-    }
-  }, [currentIndex, currentPlayer?.id])
-
-  function setScore(key: string, value: number) {
-    setScores(prev => ({ ...prev, [key]: value }))
+  function isNa(checkinId: string, catKey: string): boolean {
+    return naFlags[checkinId]?.has(catKey) ?? false
   }
 
-  function clearScore(key: string) {
-    setScores(prev => { const next = { ...prev }; delete next[key]; return next })
+  function toggleNa(checkinId: string, catKey: string) {
+    setNaFlags(prev => {
+      const set = new Set(prev[checkinId] ?? [])
+      if (set.has(catKey)) set.delete(catKey)
+      else { set.add(catKey); clearCategoryScores(checkinId, catKey) }
+      return { ...prev, [checkinId]: set }
+    })
   }
 
-  const computed = computeScore(scores, fields)
+  function clearCategoryScores(checkinId: string, catKey: string) {
+    const cat = categories.find(c => c.category === catKey)
+    if (!cat || !current?.player_id) return
+    const pid = current.player_id
+    setScores(prev => {
+      const playerScores = { ...(prev[pid] ?? {}) }
+      for (const sub of cat.subcategories) { playerScores[sub.key] = null }
+      return { ...prev, [pid]: playerScores }
+    })
+  }
 
-  async function saveAndNext(goNext: boolean) {
-    if (!currentPlayer || !session) return
+  function setScore(playerId: string, subKey: string, val: number) {
+    setScores(prev => ({
+      ...prev,
+      [playerId]: { ...(prev[playerId] ?? {}), [subKey]: val },
+    }))
+  }
+
+  async function saveCurrentAndAdvance() {
+    if (!current || !evaluatorId) return
     setSaving(true)
-
-    const payload = {
-      player_id:      currentPlayer.id,
-      session_id:     params.sessionId,
-      org_id:         params.orgId,
-      scores,
-      comments:       comments.trim(),
-      savedAt:        Date.now(),
-    }
-
-    // Always save to local queue first (offline-safe)
-    const queue = loadQueue(params.sessionId)
-    queue[currentPlayer.id] = payload
-    saveQueue(params.sessionId, queue)
-
-    const online = navigator.onLine
-    if (online) {
-      const { data: { user } } = await supabase.auth.getUser()
-      const tryoutScore = computed
-
-      const { error } = await supabase.from('tryout_scores').upsert({
-        player_id:      currentPlayer.id,
-        session_id:     params.sessionId,
-        org_id:         params.orgId,
-        evaluator_id:   user?.id ?? 'anon',
-        evaluator_name: evaluatorName || 'Evaluator',
-        scores,
-        tryout_score:   tryoutScore,
-        comments:       comments.trim() || null,
-        submitted_at:   new Date().toISOString(),
-      }, { onConflict: 'player_id,session_id,evaluator_id' })
-
-      if (!error) {
-        clearPlayerFromQueue(params.sessionId, currentPlayer.id)
-        setSavedSet(prev => new Set(Array.from(prev).concat(currentPlayer.id)))
-        setExistingScores(prev => new Set(Array.from(prev).concat(currentPlayer.id)))
-      }
-    } else {
-      // Saved to local queue
-      setSavedSet(prev => new Set(Array.from(prev).concat(currentPlayer.id)))
-    }
-
-    setSaving(false)
-
-    if (goNext && currentIndex < players.length - 1) {
-      setCurrentIndex(i => i + 1)
-    }
-  }
-
-  async function flushOfflineQueue() {
-    const queue = loadQueue(params.sessionId)
-    const entries = Object.entries(queue)
-    if (entries.length === 0) return
-    setFlushingQueue(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    for (const [playerId, payload] of entries) {
-      const allScores = payload.scores
-      const tryoutScore = computeScore(allScores, fields)
-      const { error } = await supabase.from('tryout_scores').upsert({
+    const playerId = current.player_id
+    if (playerId) {
+      const playerScores = scores[playerId] ?? {}
+      const tryoutScore  = computeTryoutScore(playerScores, categories)
+      const record = {
         player_id:      playerId,
         session_id:     params.sessionId,
         org_id:         params.orgId,
-        evaluator_id:   user?.id ?? 'anon',
-        evaluator_name: evaluatorName || 'Evaluator',
-        scores:         allScores,
+        evaluator_id:   evaluatorId,
+        evaluator_name: evaluatorName,
+        scores:         playerScores,
         tryout_score:   tryoutScore,
-        comments:       payload.comments || null,
+        comments:       comments[playerId] ?? null,
         submitted_at:   new Date().toISOString(),
-      }, { onConflict: 'player_id,session_id,evaluator_id' })
+      }
 
-      if (!error) {
-        clearPlayerFromQueue(params.sessionId, playerId)
-        setSavedSet(prev => new Set(Array.from(prev).concat(playerId)))
-        setExistingScores(prev => new Set(Array.from(prev).concat(playerId)))
+      if (!offline) {
+        await supabase.from('tryout_scores').upsert(record, { onConflict: 'player_id,session_id,evaluator_id' })
+        setSavedAt(new Date())
+      } else {
+        offlineQueue.current.push(record)
+        localStorage.setItem(`tryout_queue_${params.sessionId}`, JSON.stringify(offlineQueue.current))
+        setSavedAt(new Date())
       }
     }
-    setFlushingQueue(false)
+    setSaving(false)
+
+    // Find next unsaved player
+    const nextUnsaved = checkins.findIndex((c, i) =>
+      i > currentIdx && c.player_id && !scores[c.player_id]
+    )
+    if (nextUnsaved >= 0) {
+      setCurrentIdx(nextUnsaved)
+    } else if (currentIdx < checkins.length - 1) {
+      setCurrentIdx(currentIdx + 1)
+    } else {
+      setDone(true)
+    }
   }
 
-  const s = {
-    muted: `rgba(var(--fg-rgb), 0.55)` as const,
-    dim:   `rgba(var(--fg-rgb), 0.35)` as const,
+  async function flushQueue() {
+    for (const record of offlineQueue.current) {
+      await supabase.from('tryout_scores').upsert(record, { onConflict: 'player_id,session_id,evaluator_id' })
+    }
+    offlineQueue.current = []
+    localStorage.removeItem(`tryout_queue_${params.sessionId}`)
   }
+
+  function jumpTo(numStr: string) {
+    const num = parseInt(numStr)
+    if (isNaN(num)) return
+    const idx = checkins.findIndex(c => c.tryout_number === num)
+    if (idx >= 0) { setCurrentIdx(idx); setJumpInput('') }
+  }
+
+  async function addWriteIn() {
+    if (!wiName.trim()) return
+    const maxNum = checkins.length > 0 ? Math.max(...checkins.map(c => c.tryout_number)) : 0
+    const { data } = await supabase.from('tryout_checkins').insert({
+      session_id: params.sessionId, tryout_number: maxNum + 1,
+      is_write_in: true, write_in_name: wiName.trim(),
+      write_in_age_group: wiAge.trim() || session?.age_group,
+    }).select('id, tryout_number, player_id, is_write_in, write_in_name').single()
+    if (data) setCheckins(prev => [...prev, { ...data, player: undefined }])
+    setWiName(''); setWiAge(''); setShowWriteIn(false)
+  }
+
+  const scoredCount = checkins.filter(c => c.player_id && scores[c.player_id] && Object.values(scores[c.player_id]).some(v => v != null)).length
+
+  const s = { muted: `rgba(var(--fg-rgb),0.55)`, dim: `rgba(var(--fg-rgb),0.35)` }
 
   if (loading) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      Loading…
-    </main>
-  )
-
-  // Name prompt overlay
-  if (namePrompt) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '16px', padding: '2rem', maxWidth: '360px', width: '100%' }}>
-        <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '6px' }}>Who are you?</div>
-        <div style={{ fontSize: '13px', color: s.muted, marginBottom: '1.5rem' }}>Your name will appear on each evaluation you submit.</div>
-        <input
-          type="text"
-          value={nameInput}
-          onChange={e => setNameInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && setNameAndContinue()}
-          placeholder="Your name"
-          autoFocus
-          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '8px', padding: '12px 14px', fontSize: '16px', color: 'var(--fg)', marginBottom: '12px' }}
-        />
-        <button onClick={setNameAndContinue} disabled={!nameInput.trim()} style={{
-          width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
-          background: 'var(--accent)', color: 'var(--accent-text)',
-          fontSize: '15px', fontWeight: 700, cursor: 'pointer',
-          opacity: nameInput.trim() ? 1 : 0.5,
-        }}>Start scoring</button>
-      </div>
-    </main>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</main>
   )
 
   if (!session) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      Session not found.
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Session not found.</main>
+  )
+
+  // Name prompt
+  if (namePrompt) return (
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+      <div style={{ maxWidth: '320px', width: '100%' }}>
+        <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '8px' }}>Who are you?</div>
+        <div style={{ fontSize: '13px', color: s.muted, marginBottom: '16px' }}>Enter your name so your scores are attributed correctly.</div>
+        <input autoFocus value={evaluatorName} onChange={e => setEvaluatorName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && evaluatorName.trim()) { localStorage.setItem(`tryout_eval_name_${params.orgId}`, evaluatorName.trim()); setNamePrompt(false) } }}
+          placeholder="Your name"
+          style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '7px', padding: '10px 12px', fontSize: '15px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '12px' }}
+        />
+        <button onClick={() => { localStorage.setItem(`tryout_eval_name_${params.orgId}`, evaluatorName.trim()); setNamePrompt(false) }} disabled={!evaluatorName.trim()} style={{
+          width: '100%', padding: '11px', borderRadius: '7px', border: 'none',
+          background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+        }}>Start Scoring</button>
+      </div>
     </main>
   )
 
-  if (players.length === 0) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ fontSize: '16px', fontWeight: 700 }}>No players found</div>
-      <div style={{ fontSize: '14px', color: s.muted, textAlign: 'center' }}>No players are registered for the {session.age_group} age group yet.</div>
-      <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}`} style={{ fontSize: '13px', color: s.dim }}>‹ Back to session</Link>
+  // No checkins
+  if (checkins.length === 0) return (
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', padding: '2rem', textAlign: 'center' }}>
+      <div style={{ fontSize: '32px' }}>📋</div>
+      <div style={{ fontSize: '18px', fontWeight: 700 }}>No players checked in</div>
+      <div style={{ fontSize: '14px', color: s.muted }}>The admin needs to check in players before scoring can begin.</div>
     </main>
   )
 
-  // All players scored
-  const allDone = players.every(p => savedSet.has(p.id) || existingScores.has(p.id))
-
-  if (allDone && currentIndex >= players.length) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', flexDirection: 'column', gap: '1.5rem', textAlign: 'center' }}>
-      <div style={{ fontSize: '40px' }}>✓</div>
-      <div style={{ fontSize: '20px', fontWeight: 800 }}>All players scored!</div>
-      <div style={{ fontSize: '14px', color: s.muted }}>{session.label} · {session.age_group}</div>
-      {offline && (
-        <div style={{ fontSize: '13px', padding: '10px 16px', borderRadius: '8px', background: 'rgba(232,160,32,0.1)', color: '#E8A020', border: '0.5px solid rgba(232,160,32,0.3)' }}>
-          Scores saved locally. They will sync when you're back online.
-        </div>
-      )}
-      <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}`} style={{
-        padding: '12px 28px', borderRadius: '8px', background: 'var(--accent)',
-        color: 'var(--accent-text)', fontSize: '15px', fontWeight: 700, textDecoration: 'none',
-      }}>Back to session</Link>
+  // Done screen
+  if (done) return (
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', padding: '2rem', textAlign: 'center' }}>
+      <div style={{ fontSize: '48px' }}>✓</div>
+      <div style={{ fontSize: '22px', fontWeight: 800 }}>All done!</div>
+      <div style={{ fontSize: '14px', color: s.muted }}>{scoredCount} of {checkins.length} players scored.</div>
+      <button onClick={() => { setDone(false); setCurrentIdx(0) }} style={{
+        padding: '10px 24px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
+        background: 'var(--bg-input)', color: s.muted, fontSize: '14px', cursor: 'pointer',
+      }}>Review scores</button>
     </main>
   )
 
-  const scoredCount = players.filter(p => savedSet.has(p.id) || existingScores.has(p.id)).length
-  const isScored    = currentPlayer ? (savedSet.has(currentPlayer.id) || existingScores.has(currentPlayer.id)) : false
-  const hasRequiredScores = fields.filter(f => !f.optional).every(f => scores[f.key] != null)
+  if (!current) return null
+
+  const playerId    = current.player_id
+  const playerScore = playerId ? (scores[playerId] ?? {}) : {}
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto', padding: '0 0 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto', paddingBottom: '120px' }}>
 
-      {/* Top bar */}
-      <div style={{ padding: '12px 16px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 10 }}>
-        <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', flexShrink: 0 }}>‹ Back</Link>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700 }}>{session.label} · {session.age_group}</div>
-          <div style={{ fontSize: '11px', color: s.dim }}>{scoredCount} / {players.length} scored</div>
-        </div>
-        <div style={{ fontSize: '11px', color: offline ? '#E8A020' : '#6DB875', fontWeight: 700, flexShrink: 0 }}>
-          {offline ? 'Offline' : 'Online'}
-        </div>
-      </div>
-
-      {/* Offline sync banner */}
-      {!offline && flushingQueue && (
-        <div style={{ padding: '8px 16px', background: 'rgba(109,184,117,0.12)', borderBottom: '0.5px solid rgba(109,184,117,0.3)', fontSize: '12px', color: '#6DB875', textAlign: 'center' }}>
-          Syncing offline scores…
+      {/* Offline banner */}
+      {offline && (
+        <div style={{ background: '#E8A020', color: 'white', textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: 600 }}>
+          Offline — scores will sync when reconnected
         </div>
       )}
 
-      {/* Player navigator */}
-      <div style={{ padding: '12px 16px', display: 'flex', gap: '6px', overflowX: 'auto', borderBottom: '0.5px solid var(--border)' }}>
-        {players.map((p, i) => {
-          const done = savedSet.has(p.id) || existingScores.has(p.id)
-          const active = i === currentIndex
-          return (
-            <button key={p.id} onClick={() => setCurrentIndex(i)} style={{
-              flexShrink: 0,
-              width: '36px', height: '36px', borderRadius: '50%',
-              border: active ? '2px solid var(--accent)' : done ? '2px solid #6DB875' : '1.5px solid var(--border-md)',
-              background: active ? 'rgba(232,160,32,0.12)' : done ? 'rgba(109,184,117,0.12)' : 'var(--bg-input)',
-              color: active ? 'var(--accent)' : done ? '#6DB875' : s.muted,
-              fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {p.jersey_number ?? (i + 1)}
-            </button>
-          )
-        })}
+      {/* Session header */}
+      <div style={{ padding: '14px 16px 10px', borderBottom: '0.5px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '12px', color: s.muted, fontWeight: 600 }}>{session.age_group} · {session.label}</div>
+            <div style={{ fontSize: '13px', color: s.dim }}>Evaluator: {evaluatorName}</div>
+          </div>
+          <div style={{ fontSize: '13px', color: s.dim, fontWeight: 700 }}>
+            {scoredCount}/{checkins.length}
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{ marginTop: '8px', height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ width: `${checkins.length > 0 ? (scoredCount / checkins.length) * 100 : 0}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+        </div>
       </div>
 
-      {/* Current player */}
-      {currentPlayer && (
-        <div style={{ padding: '16px 16px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div>
-              <div style={{ fontSize: '22px', fontWeight: 800 }}>{currentPlayer.first_name} {currentPlayer.last_name}</div>
-              <div style={{ fontSize: '13px', color: s.muted }}>
-                {currentPlayer.age_group}
-                {currentPlayer.jersey_number ? ` · #${currentPlayer.jersey_number}` : ''}
-              </div>
-            </div>
-            {isScored && (
-              <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(109,184,117,0.12)', color: '#6DB875', fontWeight: 700 }}>
-                Scored
-              </span>
-            )}
-          </div>
+      {/* Player header */}
+      <div style={{ padding: '14px 16px 12px', background: 'rgba(var(--fg-rgb),0.03)', borderBottom: '0.5px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent)' }}>#{current.tryout_number}</span>
+          <span style={{ fontSize: '18px', fontWeight: 700 }}>{playerName(current)}</span>
+        </div>
+        {current.player?.prior_team && (
+          <div style={{ fontSize: '12px', color: '#40A0E8', marginTop: '2px' }}>↩ {current.player.prior_team}</div>
+        )}
+        {current.is_write_in && (
+          <div style={{ fontSize: '12px', color: 'var(--accent)' }}>Write-in player</div>
+        )}
+      </div>
 
-          {/* Score fields */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-            {fields.map(field => (
-              <div key={field.key}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600 }}>
-                    {field.label}
-                    {field.optional && <span style={{ fontSize: '11px', color: s.dim, fontWeight: 400, marginLeft: '4px' }}>(optional)</span>}
+      {/* Rating scale reminder */}
+      <div style={{ padding: '8px 16px', background: 'rgba(var(--fg-rgb),0.02)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim }}>
+        {SCALE_LABEL}
+      </div>
+
+      {/* Scoring */}
+      <div style={{ padding: '16px' }}>
+        {categories.map(cat => {
+          const na = playerId ? isNa(current.id, cat.category) : false
+          return (
+            <div key={cat.category} style={{ marginBottom: '20px' }}>
+              {/* Category header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: s.muted }}>
+                  {cat.label}
+                </div>
+                {cat.is_optional && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: na ? 'var(--accent)' : s.dim, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={na}
+                      onChange={() => playerId && toggleNa(current.id, cat.category)}
+                    />
+                    N/A
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {scores[field.key] != null && (
-                      <button onClick={() => clearScore(field.key)} style={{
-                        fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer', padding: '0',
-                      }}>clear</button>
-                    )}
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: scores[field.key] != null ? 'var(--accent)' : s.dim, minWidth: '16px', textAlign: 'right' }}>
-                      {scores[field.key] ?? '–'}
-                    </span>
-                  </div>
-                </div>
-                {/* 1–5 tap buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {[1, 2, 3, 4, 5].map(v => (
-                    <button key={v} onClick={() => setScore(field.key, v)} style={{
-                      flex: 1, padding: '14px 0', borderRadius: '8px',
-                      border: scores[field.key] === v
-                        ? '2px solid var(--accent)'
-                        : '1.5px solid var(--border-md)',
-                      background: scores[field.key] === v
-                        ? 'rgba(232,160,32,0.15)'
-                        : 'var(--bg-input)',
-                      color: scores[field.key] === v ? 'var(--accent)' : s.muted,
-                      fontSize: '16px', fontWeight: 800, cursor: 'pointer',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}>{v}</button>
-                  ))}
-                </div>
+                )}
               </div>
-            ))}
-          </div>
 
-          {/* Computed score preview */}
-          {computed != null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.25)', marginBottom: '12px' }}>
-              <span style={{ fontSize: '13px', color: s.muted }}>Tryout score</span>
-              <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent)', marginLeft: 'auto' }}>{computed.toFixed(2)}</span>
+              {!na && cat.subcategories.map(sub => {
+                const val = playerId ? (playerScore[sub.key] ?? null) : null
+                return (
+                  <div key={sub.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '14px', minWidth: '90px', color: 'var(--fg)' }}>{sub.label}</div>
+                    <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <button key={n} onClick={() => playerId && setScore(playerId, sub.key, n)}
+                          disabled={!playerId}
+                          style={{
+                            flex: 1, minHeight: '48px', borderRadius: '8px',
+                            border: '0.5px solid',
+                            borderColor: val === n ? 'var(--accent)' : 'var(--border-md)',
+                            background: val === n ? 'var(--accent)' : 'var(--bg-input)',
+                            color: val === n ? 'var(--accent-text)' : 'var(--fg)',
+                            fontSize: '16px', fontWeight: val === n ? 800 : 400,
+                            cursor: playerId ? 'pointer' : 'default',
+                          }}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )}
+          )
+        })}
 
-          {/* Comments */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes (optional)</label>
-            <textarea
-              value={comments}
-              onChange={e => setComments(e.target.value)}
-              placeholder="Any observations about this player…"
-              rows={2}
-              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', color: 'var(--fg)', resize: 'vertical', fontFamily: 'sans-serif' }}
+        {/* Comment */}
+        {playerId && (
+          <div style={{ marginTop: '8px' }}>
+            {!showComment[current.id] ? (
+              <button onClick={() => setShowComment(prev => ({ ...prev, [current.id]: true }))} style={{
+                background: 'none', border: '0.5px dashed var(--border-md)',
+                borderRadius: '6px', padding: '8px 16px', width: '100%',
+                color: s.dim, fontSize: '13px', cursor: 'pointer',
+              }}>+ Comment</button>
+            ) : (
+              <textarea
+                value={comments[playerId] ?? ''}
+                onChange={e => setComments(prev => ({ ...prev, [playerId]: e.target.value }))}
+                placeholder="Optional comment about this player…"
+                rows={3}
+                style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '7px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', resize: 'none', boxSizing: 'border-box' }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom navigation — sticky */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--bg)', borderTop: '0.5px solid var(--border)', padding: '12px 16px', maxWidth: '480px', margin: '0 auto' }}>
+        {/* Jump to number */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <span style={{ fontSize: '12px', color: s.dim, flexShrink: 0 }}>Jump to #</span>
+          <input
+            value={jumpInput} onChange={e => setJumpInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && jumpTo(jumpInput)}
+            type="number" min={1} placeholder="—"
+            style={{ width: '64px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '5px 8px', fontSize: '14px', color: 'var(--fg)', textAlign: 'center' }}
+          />
+          <button onClick={() => jumpTo(jumpInput)} style={{
+            padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
+          }}>Go</button>
+          <span style={{ marginLeft: 'auto', fontSize: '12px', color: s.dim }}>
+            {savedAt ? `Saved ${savedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : saving ? 'Saving…' : ''}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0} style={{
+            padding: '12px 20px', borderRadius: '8px', border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted, fontSize: '14px', fontWeight: 600,
+            cursor: currentIdx === 0 ? 'not-allowed' : 'pointer', opacity: currentIdx === 0 ? 0.4 : 1,
+          }}>← Prev</button>
+          <button onClick={saveCurrentAndAdvance} disabled={saving} style={{
+            flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+            background: 'var(--accent)', color: 'var(--accent-text)',
+            fontSize: '15px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
+            {saving ? 'Saving…' : currentIdx < checkins.length - 1 ? 'Save & Next →' : 'Save & Finish ✓'}
+          </button>
+        </div>
+
+        {/* Add write-in */}
+        <button onClick={() => setShowWriteIn(true)} style={{
+          marginTop: '8px', width: '100%', padding: '7px', borderRadius: '6px',
+          border: '0.5px dashed var(--border-md)', background: 'none',
+          color: s.dim, fontSize: '12px', cursor: 'pointer',
+        }}>+ Add Write-In Player</button>
+      </div>
+
+      {/* Write-in modal */}
+      {showWriteIn && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '16px' }}>
+          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '320px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>Add Write-In</div>
+            <input value={wiName} onChange={e => setWiName(e.target.value)} placeholder="Full name" autoFocus
+              style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '14px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '8px' }}
             />
+            <input value={wiAge} onChange={e => setWiAge(e.target.value)} placeholder={`Age group (${session.age_group})`}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '14px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '14px' }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={addWriteIn} disabled={!wiName.trim()} style={{
+                flex: 1, padding: '10px', borderRadius: '6px', border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+              }}>Add</button>
+              <button onClick={() => setShowWriteIn(false)} style={{
+                padding: '10px 16px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+                background: 'transparent', color: s.muted, fontSize: '14px', cursor: 'pointer',
+              }}>Cancel</button>
+            </div>
           </div>
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '8px', paddingBottom: '24px' }}>
-            <button
-              onClick={() => saveAndNext(false)}
-              disabled={saving || !hasRequiredScores}
-              style={{
-                flex: 1, padding: '15px', borderRadius: '10px', border: 'none',
-                background: hasRequiredScores ? 'rgba(109,184,117,0.15)' : 'var(--bg-input)',
-                color: hasRequiredScores ? '#6DB875' : s.dim,
-                fontSize: '15px', fontWeight: 700, cursor: saving || !hasRequiredScores ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.6 : 1,
-              }}
-            >{saving ? 'Saving…' : 'Save'}</button>
-
-            {currentIndex < players.length - 1 && (
-              <button
-                onClick={() => saveAndNext(true)}
-                disabled={saving || !hasRequiredScores}
-                style={{
-                  flex: 2, padding: '15px', borderRadius: '10px', border: 'none',
-                  background: hasRequiredScores ? 'var(--accent)' : 'var(--bg-input)',
-                  color: hasRequiredScores ? 'var(--accent-text)' : s.dim,
-                  fontSize: '15px', fontWeight: 700, cursor: saving || !hasRequiredScores ? 'not-allowed' : 'pointer',
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >{saving ? 'Saving…' : 'Save & Next →'}</button>
-            )}
-
-            {currentIndex === players.length - 1 && (
-              <button
-                onClick={() => saveAndNext(true)}
-                disabled={saving || !hasRequiredScores}
-                style={{
-                  flex: 2, padding: '15px', borderRadius: '10px', border: 'none',
-                  background: hasRequiredScores ? 'var(--accent)' : 'var(--bg-input)',
-                  color: hasRequiredScores ? 'var(--accent-text)' : s.dim,
-                  fontSize: '15px', fontWeight: 700, cursor: saving || !hasRequiredScores ? 'not-allowed' : 'pointer',
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >{saving ? 'Saving…' : 'Save & Finish ✓'}</button>
-            )}
-          </div>
-
-          {/* Skip without scoring */}
-          {currentIndex < players.length - 1 && (
-            <button onClick={() => setCurrentIndex(i => i + 1)} style={{
-              width: '100%', padding: '10px', background: 'none', border: 'none',
-              color: s.dim, fontSize: '13px', cursor: 'pointer', marginTop: '-8px', paddingBottom: '8px',
-            }}>Skip →</button>
-          )}
         </div>
       )}
     </main>

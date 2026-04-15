@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
   const orgId      = formData.get('orgId')      as string | null
   const seasonId   = formData.get('seasonId')   as string | null
   const seasonYear = formData.get('seasonYear') as string | null
+  const teamId     = formData.get('teamId')     as string | null
 
   if (!file)       return NextResponse.json({ error: 'Missing file' },       { status: 400 })
   if (!orgId)      return NextResponse.json({ error: 'Missing orgId' },      { status: 400 })
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!seasonYear) return NextResponse.json({ error: 'Missing seasonYear' }, { status: 400 })
 
   const { data: isMember } = await supabase.rpc('tryout_is_member', {
-    p_org_id: orgId, p_roles: ['org_admin'],
+    p_org_id: orgId, p_roles: ['org_admin', 'head_coach'],
   })
   if (!isMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
     .insert({
       org_id:          orgId,
       season_id:       seasonId,
+      team_id:         teamId ?? null,
       imported_by:     user.id,
       type:            'gc_stats',
       filename:        file.name,
