@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { orgId, email, name, role } = body as { orgId: string; email: string; name?: string; role: string }
+  const { orgId, email, name, role, teamId } = body as { orgId: string; email: string; name?: string; role: string; teamId?: string }
 
   if (!orgId || !email || !role) {
     return NextResponse.json({ error: 'Missing orgId, email, or role' }, { status: 400 })
@@ -71,6 +71,7 @@ export async function POST(req: Request) {
       email:        normalizedEmail,
       name:         name?.trim() || null,
       role,
+      team_id:      teamId || null,
       invited_by:   user.id,
       invite_token: token,
       invited_at:   new Date().toISOString(),
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
       email:        normalizedEmail,
       name:         name?.trim() || null,
       role,
+      team_id:      teamId || null,
       invited_by:   user.id,
       invite_token: token,
       invited_at:   new Date().toISOString(),
