@@ -21,7 +21,7 @@ interface ReportRow {
   normalized?:      string
   ageGroup?:        string
   teamLabel?:       string
-  status:           'auto' | 'suggested' | 'unresolved' | 'new'
+  status:           'auto' | 'suggested' | 'unresolved' | 'new' | 'skipped'
   confidence:       number | null
   matchReason:      string | null
   resolvedPlayerId: string | null
@@ -42,10 +42,11 @@ interface ImportJob {
 }
 
 const STATUS_CONFIG = {
-  auto:       { label: 'Matched',     bg: 'rgba(45,106,53,0.12)',   border: 'rgba(45,106,53,0.35)',   text: '#6DB875', dot: '#6DB875' },
-  new:        { label: 'New player',  bg: 'rgba(59,109,177,0.12)',  border: 'rgba(59,109,177,0.35)',  text: '#80B0E8', dot: '#80B0E8' },
-  suggested:  { label: 'Needs confirm', bg: 'rgba(232,160,32,0.1)', border: 'rgba(232,160,32,0.35)', text: '#E8A020', dot: '#E8A020' },
-  unresolved: { label: 'Unresolved',  bg: 'rgba(232,80,80,0.10)',   border: 'rgba(232,80,80,0.35)',  text: '#E87060', dot: '#E87060' },
+  auto:       { label: 'Matched',       bg: 'rgba(45,106,53,0.12)',   border: 'rgba(45,106,53,0.35)',   text: '#6DB875', dot: '#6DB875' },
+  new:        { label: 'New player',    bg: 'rgba(59,109,177,0.12)',  border: 'rgba(59,109,177,0.35)',  text: '#80B0E8', dot: '#80B0E8' },
+  suggested:  { label: 'Needs confirm', bg: 'rgba(232,160,32,0.1)',   border: 'rgba(232,160,32,0.35)', text: '#E8A020', dot: '#E8A020' },
+  unresolved: { label: 'Unresolved',    bg: 'rgba(232,80,80,0.10)',   border: 'rgba(232,80,80,0.35)',  text: '#E87060', dot: '#E87060' },
+  skipped:    { label: 'Skipped',       bg: 'rgba(var(--fg-rgb),0.04)', border: 'rgba(var(--fg-rgb),0.12)', text: 'rgba(var(--fg-rgb),0.35)', dot: 'rgba(var(--fg-rgb),0.25)' },
 }
 
 export default function ImportReviewPage({
@@ -62,7 +63,7 @@ export default function ImportReviewPage({
   const [filter,   setFilter]   = useState<'all' | 'needs_action' | 'done'>('needs_action')
   const [bulkConfirming, setBulkConfirming] = useState(false)
   // Track locally-resolved rows so UI updates without re-fetching
-  const [localResolutions, setLocalResolutions] = useState<Map<number, { playerId: string; status: 'auto' }>>(new Map())
+  const [localResolutions, setLocalResolutions] = useState<Map<number, { playerId: string | null; status: 'auto' | 'skipped' }>>(new Map())
 
   useEffect(() => { loadJob() }, [])
 
@@ -77,7 +78,8 @@ export default function ImportReviewPage({
   }
 
   function effectiveStatus(row: ReportRow): ReportRow['status'] {
-    return localResolutions.has(row.rowIndex) ? 'auto' : row.status
+    const local = localResolutions.get(row.rowIndex)
+    return local ? local.status : row.status
   }
 
   async function confirmMatch(rowIndex: number, playerId: string) {
@@ -89,6 +91,19 @@ export default function ImportReviewPage({
     })
     if (res.ok) {
       setLocalResolutions(prev => new Map(prev).set(rowIndex, { playerId, status: 'auto' }))
+    }
+    setSaving(null)
+  }
+
+  async function skipRow(rowIndex: number) {
+    setSaving(rowIndex)
+    const res = await fetch(`/api/tryouts/imports/${params.jobId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'skip', rowIndex }),
+    })
+    if (res.ok) {
+      setLocalResolutions(prev => new Map(prev).set(rowIndex, { playerId: null, status: 'skipped' }))
     }
     setSaving(null)
   }
@@ -136,7 +151,7 @@ export default function ImportReviewPage({
 
   const report: ReportRow[] = job.match_report ?? []
 
-  const autoRows       = report.filter(r => effectiveStatus(r) === 'auto' || effectiveStatus(r) === 'new')
+  const autoRows       = report.filter(r => effectiveStatus(r) === 'auto' || effectiveStatus(r) === 'new' || effectiveStatus(r) === 'skipped')
   const suggestedRows  = report.filter(r => effectiveStatus(r) === 'suggested')
   const unresolvedRows = report.filter(r => effectiveStatus(r) === 'unresolved')
 
@@ -315,13 +330,22 @@ export default function ImportReviewPage({
                       </button>
                     </div>
                   ))}
-                  <button onClick={() => createNew(row.rowIndex)} disabled={isSaving} style={{
-                    fontSize: '12px', color: s.muted, background: 'none', border: 'none',
-                    cursor: isSaving ? 'default' : 'pointer', padding: '4px 0', textAlign: 'left',
-                    textDecoration: 'underline',
-                  }}>
-                    None of these — create as new player
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingTop: '2px' }}>
+                    <button onClick={() => createNew(row.rowIndex)} disabled={isSaving} style={{
+                      fontSize: '12px', color: s.muted, background: 'none', border: 'none',
+                      cursor: isSaving ? 'default' : 'pointer', padding: '4px 0', textAlign: 'left',
+                      textDecoration: 'underline',
+                    }}>
+                      None of these — create as new player
+                    </button>
+                    <button onClick={() => skipRow(row.rowIndex)} disabled={isSaving} style={{
+                      fontSize: '12px', color: s.dim, background: 'none', border: 'none',
+                      cursor: isSaving ? 'default' : 'pointer', padding: '4px 0', textAlign: 'left',
+                      textDecoration: 'underline',
+                    }}>
+                      Skip — not a player
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -360,14 +384,22 @@ export default function ImportReviewPage({
                       ))}
                     </div>
                   )}
-                  <button onClick={() => createNew(row.rowIndex)} disabled={isSaving} style={{
-                    fontSize: '13px', fontWeight: 700, padding: '8px 16px', borderRadius: '6px',
-                    border: '0.5px solid var(--border-md)', background: 'var(--bg-card)',
-                    color: `rgba(var(--fg-rgb),0.7)`, cursor: isSaving ? 'default' : 'pointer',
-                    alignSelf: 'flex-start',
-                  }}>
-                    {isSaving ? 'Creating…' : '+ Create as new player'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button onClick={() => createNew(row.rowIndex)} disabled={isSaving} style={{
+                      fontSize: '13px', fontWeight: 700, padding: '8px 16px', borderRadius: '6px',
+                      border: '0.5px solid var(--border-md)', background: 'var(--bg-card)',
+                      color: `rgba(var(--fg-rgb),0.7)`, cursor: isSaving ? 'default' : 'pointer',
+                    }}>
+                      {isSaving ? 'Creating…' : '+ Create as new player'}
+                    </button>
+                    <button onClick={() => skipRow(row.rowIndex)} disabled={isSaving} style={{
+                      fontSize: '12px', color: s.dim, background: 'none', border: 'none',
+                      cursor: isSaving ? 'default' : 'pointer', padding: '4px 0',
+                      textDecoration: 'underline',
+                    }}>
+                      Skip — not a player
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

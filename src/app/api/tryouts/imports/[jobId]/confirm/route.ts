@@ -49,7 +49,7 @@ export async function POST(
   if (!isMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json() as {
-    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested'
+    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested' | 'skip'
     rowIndex?: number
     playerId?: string
   }
@@ -70,6 +70,10 @@ export async function POST(
 
   if (body.action === 'create_new') {
     return createNewPlayer({ supabase, job, report, row, userId: user.id })
+  }
+
+  if (body.action === 'skip') {
+    return skipRow({ supabase, job, report, row, userId: user.id })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
@@ -208,10 +212,21 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
   return NextResponse.json({ ok: true, confirmed: results.length })
 }
 
+async function skipRow({ supabase, job, report, row, userId }: any) {
+  const updatedReport = report.map((r: any) =>
+    r.rowIndex === row.rowIndex
+      ? { ...r, status: 'skipped', resolvedPlayerId: null, matchReason: 'skipped — not a player' }
+      : r
+  )
+  await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Skipped row: ${row.rawName}` })
+  return NextResponse.json({ ok: true })
+}
+
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
 async function updateJobReport({ supabase, jobId, report, userId, orgId, action }: any) {
   const remaining = report.filter((r: any) => r.status === 'unresolved' || r.status === 'suggested').length
+  // skipped rows are considered resolved for job status purposes
   const status = remaining === 0 ? 'complete' : 'needs_review'
 
   await supabase
