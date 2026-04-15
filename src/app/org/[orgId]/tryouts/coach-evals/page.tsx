@@ -78,20 +78,26 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       { data: seasonData },
       { data: memberData },
       { data: fieldData },
+      { data: orgData },
     ] = await Promise.all([
       supabase.from('tryout_seasons').select('id, label, year, age_groups, eval_share_token').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).order('sort_order'),
+      user ? supabase.from('tryout_orgs').select('admin_user_id').eq('id', params.orgId).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
     setSeason(seasonData)
     setShareToken(seasonData?.eval_share_token ?? null)
     setFields((fieldData ?? []).map((f: any) => ({ key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order })))
 
+    const isOrgCreator = !!(user && orgData?.admin_user_id === user.id)
     if (memberData) {
       setMyMemberId(memberData.id)
       setMyName(memberData.name ?? memberData.email ?? '')
-      setIsAdmin(memberData.role === 'org_admin')
+      setIsAdmin(memberData.role === 'org_admin' || isOrgCreator)
+    } else if (isOrgCreator) {
+      setMyName(user?.email ?? '')
+      setIsAdmin(true)
     }
 
     if (!seasonData) { setLoading(false); return }
