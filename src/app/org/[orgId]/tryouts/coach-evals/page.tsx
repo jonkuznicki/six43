@@ -5,15 +5,14 @@ import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 
 interface CoachEval {
-  id:          string
-  player_id:   string
-  coach_id:    string
-  coach_name:  string | null
-  prior_team:  string | null
-  season_year: number
-  status:      'draft' | 'submitted'
-  scores:      Record<string, number> | null
-  comments:    string | null
+  id:           string
+  player_id:    string
+  coach_name:   string | null
+  team_label:   string | null
+  season_year:  string
+  status:       'draft' | 'submitted'
+  scores:       Record<string, number> | null
+  comments:     string | null
   submitted_at: string | null
   player_name?: string
 }
@@ -34,10 +33,11 @@ interface EvalField {
 }
 
 interface Season {
-  id:         string
-  label:      string
-  year:       number
-  age_groups: string[]
+  id:               string
+  label:            string
+  year:             number
+  age_groups:       string[]
+  eval_share_token: string | null
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -65,6 +65,9 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [isAdmin,     setIsAdmin]     = useState(false)
   const [viewAll,     setViewAll]     = useState(false)
   const [evalYear,    setEvalYear]    = useState(new Date().getFullYear() - 1)
+  const [shareToken,  setShareToken]  = useState<string | null>(null)
+  const [shareBusy,   setShareBusy]   = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -76,12 +79,13 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       { data: memberData },
       { data: fieldData },
     ] = await Promise.all([
-      supabase.from('tryout_seasons').select('id, label, year, age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
+      supabase.from('tryout_seasons').select('id, label, year, age_groups, eval_share_token').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).order('sort_order'),
     ])
 
     setSeason(seasonData)
+    setShareToken(seasonData?.eval_share_token ?? null)
     setFields((fieldData ?? []).map((f: any) => ({ key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order })))
 
     if (memberData) {
@@ -93,7 +97,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     if (!seasonData) { setLoading(false); return }
 
     const [{ data: evalData }, { data: playerData }] = await Promise.all([
-      supabase.from('tryout_coach_evals').select('id, player_id, coach_id, coach_name, prior_team, season_year, status, scores, comments, submitted_at')
+      supabase.from('tryout_coach_evals').select('id, player_id, coach_name, team_label, season_year, status, scores, comments, submitted_at')
         .eq('org_id', params.orgId)
         .order('submitted_at', { ascending: false }),
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, prior_team')
@@ -114,10 +118,8 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     return false
   }).filter(p => ageFilter === 'all' || p.age_group === ageFilter)
 
-  // Map player_id → eval by current user
-  const myEvalMap = new Map(
-    evals.filter(e => e.coach_id === myMemberId).map(e => [e.player_id, e])
-  )
+  // Map player_id → most recent eval
+  const myEvalMap = new Map(evals.map(e => [e.player_id, e]))
 
   function openEval(playerId: string) {
     const existing = myEvalMap.get(playerId)
@@ -132,6 +134,26 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setComments('')
   }
 
+  async function handleShare(action: 'generate' | 'revoke') {
+    if (!season) return
+    setShareBusy(true)
+    const res = await fetch('/api/tryouts/eval-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seasonId: season.id, orgId: params.orgId, action }),
+    })
+    const data = await res.json()
+    setShareToken(data.token ?? null)
+    setShareBusy(false)
+  }
+
+  function copyShareLink() {
+    if (!shareToken) return
+    navigator.clipboard.writeText(`${window.location.origin}/tryouts/eval/${shareToken}`)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
+
   async function saveEval(submit: boolean) {
     if (!activeEval || !season) return
     const player = players.find(p => p.id === activeEval)
@@ -143,10 +165,9 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       org_id:      params.orgId,
       season_id:   season.id,
       player_id:   activeEval,
-      coach_id:    myMemberId,
       coach_name:  myName,
-      prior_team:  player.prior_team,
-      season_year: evalYear,
+      team_label:  player.prior_team ?? '',
+      season_year: String(evalYear),
       scores,
       comments:    comments.trim() || null,
       status:      submit ? 'submitted' : 'draft',
@@ -292,16 +313,45 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
   // All submitted evals (admin view)
   const submittedEvals  = evals.filter(e => e.status === 'submitted')
-  const draftEvals      = evals.filter(e => e.status === 'draft' && e.coach_id === myMemberId)
+  const draftEvals      = evals.filter(e => e.status === 'draft')
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '820px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Coach Evaluations</h1>
-        {season && <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Coach Evaluations</h1>
+          {season && <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>}
+        </div>
       </div>
+
+      {/* Share eval form — admin only */}
+      {isAdmin && season && (
+        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Coach eval form link</div>
+          <div style={{ fontSize: '12px', color: s.muted, marginBottom: '12px' }}>
+            Send this link to coaches — they select their team, rate their players, and submit without needing an account.
+          </div>
+          {shareToken ? (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <code style={{ fontSize: '11px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '5px 10px', color: s.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {typeof window !== 'undefined' ? `${window.location.origin}/tryouts/eval/${shareToken}` : `/tryouts/eval/${shareToken}`}
+              </code>
+              <button onClick={copyShareLink} style={{ padding: '6px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: shareCopied ? 'rgba(109,184,117,0.12)' : 'var(--bg-input)', color: shareCopied ? '#6DB875' : s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                {shareCopied ? '✓ Copied' : '⎘ Copy'}
+              </button>
+              <button onClick={() => handleShare('revoke')} disabled={shareBusy} style={{ padding: '6px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}>
+                Revoke
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => handleShare('generate')} disabled={shareBusy} style={{ padding: '8px 18px', borderRadius: '7px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: shareBusy ? 0.6 : 1 }}>
+              {shareBusy ? 'Generating…' : 'Generate eval form link'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       {(submittedEvals.length > 0 || draftEvals.length > 0) && (
@@ -418,7 +468,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                   <div style={{ fontSize: '12px', color: s.dim }}>
                     by {ev.coach_name ?? 'Unknown coach'}
                     {ev.submitted_at ? ` · ${new Date(ev.submitted_at).toLocaleDateString()}` : ''}
-                    {ev.prior_team ? ` · ${ev.prior_team}` : ''}
+                    {ev.team_label ? ` · ${ev.team_label}` : ''}
                   </div>
                 </div>
                 <button onClick={() => openEval(ev.player_id)} style={{

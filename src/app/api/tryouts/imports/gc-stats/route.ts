@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   // Load existing players
   const { data: existingPlayers } = await supabase
     .from('tryout_players')
-    .select('id, first_name, last_name, dob, age_group, parent_email, jersey_number')
+    .select('id, first_name, last_name, dob, age_group, parent_email, jersey_number, prior_team')
     .eq('org_id', orgId).eq('is_active', true)
 
   if (!existingPlayers?.length) {

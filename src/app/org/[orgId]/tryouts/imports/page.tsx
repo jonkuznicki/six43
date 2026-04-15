@@ -27,6 +27,7 @@ interface Season {
 
 const TYPE_OPTIONS = [
   { value: 'registration',  label: 'Registration',       hint: 'Player sign-up export (xlsx/csv)' },
+  { value: 'roster',        label: 'Team Roster',        hint: 'Current team assignments (First Name, Last Name, DOB, Team, Jersey #)' },
   { value: 'gc_stats',      label: 'GameChanger Stats',  hint: 'Batting/pitching stats export (csv)' },
   { value: 'coach_eval',    label: 'Coach Evaluations',  hint: 'End-of-season coach eval sheet (xlsx)' },
   { value: 'tryout_scores', label: 'Tryout Scores',      hint: 'Tryout results file (xlsx/csv)' },
@@ -97,6 +98,7 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
 
     const endpoint =
       uploadType === 'registration'  ? '/api/tryouts/imports/registration'  :
+      uploadType === 'roster'        ? '/api/tryouts/imports/roster'        :
       uploadType === 'coach_eval'    ? '/api/tryouts/imports/coach-eval'    :
       uploadType === 'gc_stats'      ? '/api/tryouts/imports/gc-stats'      :
                                        '/api/tryouts/imports/tryout-scores'
