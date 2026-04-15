@@ -42,17 +42,20 @@ function LoginForm() {
       // Check if user has a tryout org membership — if so, redirect there
       const { data: tryoutMember } = await supabase
         .from('tryout_org_members')
-        .select('org_id, role')
+        .select('org_id, role, team_id')
         .eq('is_active', true)
         .order('invited_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (tryoutMember) {
-        const suffix =
-          tryoutMember.role === 'head_coach' ? '/coach-evals' :
-          tryoutMember.role === 'evaluator'  ? '/sessions'    : ''
-        router.push(`/org/${tryoutMember.org_id}/tryouts${suffix}`)
+        if (tryoutMember.role === 'head_coach' && tryoutMember.team_id) {
+          router.push(`/org/${tryoutMember.org_id}/tryouts/coach/${tryoutMember.team_id}`)
+        } else if (tryoutMember.role === 'evaluator') {
+          router.push(`/org/${tryoutMember.org_id}/tryouts/sessions`)
+        } else {
+          router.push(`/org/${tryoutMember.org_id}/tryouts`)
+        }
         return
       }
 
