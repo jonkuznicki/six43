@@ -10,10 +10,9 @@ interface Player {
   last_name:    string
   age_group:    string
   dob:          string | null
-  jersey_number: string | null
   parent_email: string | null
-  parent_name:  string | null
-  phone:        string | null
+  parent_phone: string | null
+  prior_team:   string | null
   is_active:    boolean
   created_at:   string
   _scoreCount?: number
@@ -47,7 +46,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
     setSeason(seasonData)
 
     const { data: playerData } = await supabase
-      .from('tryout_players').select('id, first_name, last_name, age_group, dob, jersey_number, parent_email, parent_name, phone, is_active, created_at')
+      .from('tryout_players').select('id, first_name, last_name, age_group, dob, parent_email, parent_phone, prior_team, is_active, created_at')
       .eq('org_id', params.orgId)
       .order('last_name').order('first_name')
 
@@ -76,7 +75,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
       list = list.filter(p =>
         `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
         (p.parent_email ?? '').toLowerCase().includes(q) ||
-        (p.jersey_number ?? '').includes(q)
+        (p.prior_team ?? '').toLowerCase().includes(q)
       )
     }
     return list
@@ -241,8 +240,8 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontWeight: 700, fontSize: '14px' }}>{player.first_name} {player.last_name}</span>
                       <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', color: s.muted, fontWeight: 600 }}>{player.age_group}</span>
-                      {player.jersey_number && (
-                        <span style={{ fontSize: '11px', color: s.dim }}>#{player.jersey_number}</span>
+                      {player.prior_team && (
+                        <span style={{ fontSize: '11px', color: s.dim }}>{player.prior_team}</span>
                       )}
                     </div>
                     {player.parent_email && (
@@ -270,14 +269,14 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
                         {new Date(player.dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                     )}
-                    {player.parent_name && (
-                      <div><span style={{ color: s.dim, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parent</span>{' '}{player.parent_name}</div>
-                    )}
                     {player.parent_email && (
                       <div><span style={{ color: s.dim, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</span>{' '}{player.parent_email}</div>
                     )}
-                    {player.phone && (
-                      <div><span style={{ color: s.dim, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phone</span>{' '}{player.phone}</div>
+                    {player.parent_phone && (
+                      <div><span style={{ color: s.dim, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phone</span>{' '}{player.parent_phone}</div>
+                    )}
+                    {player.prior_team && (
+                      <div><span style={{ color: s.dim, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prior team</span>{' '}{player.prior_team}</div>
                     )}
                     <div style={{ marginTop: '4px', fontSize: '11px', color: s.dim }}>
                       Added {new Date(player.created_at).toLocaleDateString()}
