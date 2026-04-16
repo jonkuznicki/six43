@@ -254,6 +254,21 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
   const s = { muted: `rgba(var(--fg-rgb),0.55)`, dim: `rgba(var(--fg-rgb),0.35)` }
 
+  // Solid backgrounds for form controls so selects render correctly in dark
+  // mode across all browsers (transparent rgba backgrounds can show white
+  // native control backgrounds, making light text invisible).
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg2)', color: 'var(--fg)',
+    border: '0.5px solid var(--border-md)', borderRadius: '8px',
+    padding: '10px 12px', fontSize: '15px',
+    width: '100%', boxSizing: 'border-box',
+    appearance: 'none', WebkitAppearance: 'none',
+  }
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: 'pointer',
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) return (
@@ -307,7 +322,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
           <select
             value={selectedTeam}
             onChange={e => setSelectedTeam(e.target.value)}
-            style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '8px', padding: '10px 12px', fontSize: '15px', color: selectedTeam ? 'var(--fg)' : s.muted }}
+            style={selectStyle}
           >
             <option value="">Select your team…</option>
             {sortedTeams.map(t => (
@@ -328,7 +343,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
             value={coachName}
             onChange={e => setCoachName(e.target.value)}
             placeholder="Coach Smith"
-            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '8px', padding: '10px 12px', fontSize: '15px', color: 'var(--fg)' }}
+            style={inputStyle}
           />
         </div>
       </div>
@@ -461,10 +476,12 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                                     value={val ?? ''}
                                     onChange={e => setScore(player.id, field.field_key, e.target.value ? parseInt(e.target.value) : null)}
                                     style={{
-                                      width: '100%', background: 'var(--bg-input)',
+                                      width: '100%', background: 'var(--bg2)',
                                       border: `0.5px solid ${val == null ? 'var(--border-md)' : val >= 4 ? 'rgba(109,184,117,0.5)' : val === 3 ? 'rgba(232,160,32,0.5)' : 'rgba(232,112,96,0.5)'}`,
                                       borderRadius: '6px', padding: '6px 8px', fontSize: '13px',
-                                      color: val == null ? s.muted : 'var(--fg)',
+                                      color: 'var(--fg)',
+                                      appearance: 'none', WebkitAppearance: 'none',
+                                      cursor: 'pointer',
                                     }}
                                   >
                                     <option value="">—</option>
