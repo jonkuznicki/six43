@@ -42,6 +42,7 @@ const EVAL_SECTIONS = [
   { key: 'fielding_hitting',   label: 'Fielding & Hitting' },
   { key: 'pitching_catching',  label: 'Pitching & Catching' },
   { key: 'intangibles',        label: 'Intangibles' },
+  { key: 'athleticism',        label: 'Athleticism' },
 ]
 
 function slugify(s: string) {
@@ -258,6 +259,20 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
       }
     })
 
+    // Pre-validate: check for duplicate field_key values before hitting the DB
+    const keysSeen = new Set<string>()
+    const dupes: string[] = []
+    for (const f of toSave) {
+      if (!f.field_key) continue
+      if (keysSeen.has(f.field_key)) dupes.push(f.field_key)
+      else keysSeen.add(f.field_key)
+    }
+    if (dupes.length > 0) {
+      setEvalMsg(`Duplicate field name: "${dupes[0]}" is used more than once. Give each field a unique name (e.g. add a number like "Pitching 2").`)
+      setSavingEval(false)
+      return
+    }
+
     await supabase.from('tryout_coach_eval_config')
       .delete().eq('org_id', params.orgId).eq('season_id', season.id)
 
@@ -274,7 +289,14 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
     const { error } = await supabase.from('tryout_coach_eval_config').insert(inserts)
     if (error) {
-      setEvalMsg(`Error: ${error.message}`)
+      // Detect unique-constraint violations and show a user-friendly message
+      if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+        const keyMatch = error.message.match(/\(field_key\)=\(([^)]+)\)/)
+        const keyName  = keyMatch?.[1] ?? 'a field'
+        setEvalMsg(`Name conflict: the key "${keyName}" is already in use. Rename the duplicate field or choose a different name.`)
+      } else {
+        setEvalMsg(`Error: ${error.message}`)
+      }
     } else {
       setEvalMsg('Saved.')
       await loadData()

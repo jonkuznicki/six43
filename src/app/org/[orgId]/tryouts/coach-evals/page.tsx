@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 
@@ -45,6 +45,26 @@ const SECTION_LABELS: Record<string, string> = {
   fielding_hitting:  'Fielding & Hitting',
   pitching_catching: 'Pitching & Catching',
   intangibles:       'Intangibles',
+  athleticism:       'Athleticism',
+}
+
+const SECTION_SHORT: Record<string, string> = {
+  fielding_hitting:  'F & H',
+  pitching_catching: 'P & C',
+  intangibles:       'Intang.',
+  athleticism:       'Ath.',
+}
+
+function computeSectionScore(
+  scores: Record<string, number | null>,
+  fields: EvalField[],
+  sectionKey: string,
+): number | null {
+  const eligible = fields.filter(f => f.section === sectionKey && f.weight > 0 && scores[f.key] != null)
+  if (eligible.length === 0) return null
+  const wSum   = eligible.reduce((s, f) => s + f.weight, 0)
+  const wScore = eligible.reduce((s, f) => s + (scores[f.key]! * f.weight), 0)
+  return Math.round(wScore / wSum * 100) / 100
 }
 
 function computeScore(scores: Record<string, number | null>, fields: EvalField[]): number | null {
@@ -100,8 +120,12 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [shareBusy,   setShareBusy]   = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
 
-  // Cell picker (fixed-position popover)
-  const [picker, setPicker] = useState<{ playerId: string; fieldKey: string; x: number; y: number } | null>(null)
+  // Keyboard-driven cell selection
+  const [selected, setSelected] = useState<{ rowIdx: number; colIdx: number } | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
+  const histIdxRef = useRef(0)
+
   // Column fill picker
   const [colFill, setColFill] = useState<string | null>(null)
   // Row fill picker
@@ -109,37 +133,41 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
   useEffect(() => { loadData() }, [])
 
-  // Close picker on click outside
-  useEffect(() => {
-    if (!picker) return
-    function handler(e: MouseEvent) {
-      const t = e.target as HTMLElement
-      if (!t.closest('[data-picker]') && !t.closest('[data-cell]')) setPicker(null)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [picker])
-
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
 
     const [
       { data: seasonData },
       { data: memberData },
-      { data: fieldData },
       { data: orgData },
     ] = await Promise.all([
       supabase.from('tryout_seasons').select('id, label, year, age_groups, eval_share_token').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).order('sort_order'),
       user ? supabase.from('tryout_orgs').select('admin_user_id').eq('id', params.orgId).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
     setSeason(seasonData)
     setShareToken(seasonData?.eval_share_token ?? null)
 
-    const loadedFields: EvalField[] = (fieldData ?? []).map((f: any) => ({
-      key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: 1,
+    // Try fetching with weight column; fall back without it if column not yet migrated
+    let rawFields: any[] | null = null
+    const { data: fd1, error: fe1 } = await supabase
+      .from('tryout_coach_eval_config')
+      .select('field_key, label, section, sort_order, weight')
+      .eq('org_id', params.orgId).order('sort_order')
+    if (fe1) {
+      const { data: fd2 } = await supabase
+        .from('tryout_coach_eval_config')
+        .select('field_key, label, section, sort_order')
+        .eq('org_id', params.orgId).order('sort_order')
+      rawFields = fd2
+    } else {
+      rawFields = fd1
+    }
+
+    const loadedFields: EvalField[] = (rawFields ?? []).map((f: any) => ({
+      key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order,
+      weight: f.weight ?? 1,
     }))
     setFields(loadedFields)
 
@@ -196,10 +224,45 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setLoading(false)
   }
 
-  function setScore(playerId: string, fieldKey: string, value: number | null) {
-    setGridScores(prev => ({ ...prev, [playerId]: { ...prev[playerId], [fieldKey]: value } }))
+  function pushHistory(next: Record<string, Record<string, number | null>>) {
+    historyRef.current = historyRef.current.slice(0, histIdxRef.current + 1)
+    historyRef.current.push(next)
+    histIdxRef.current = historyRef.current.length - 1
+  }
+
+  function commitScore(playerId: string, fieldKey: string, value: number | null) {
+    setGridScores(prev => {
+      const next = { ...prev, [playerId]: { ...(prev[playerId] ?? {}), [fieldKey]: value } }
+      pushHistory(next)
+      return next
+    })
     setDirty(prev => new Set(prev).add(playerId))
-    setPicker(null)
+  }
+
+  function undo() {
+    if (histIdxRef.current <= 0) return
+    histIdxRef.current--
+    setGridScores(historyRef.current[histIdxRef.current])
+  }
+
+  function redo() {
+    if (histIdxRef.current >= historyRef.current.length - 1) return
+    histIdxRef.current++
+    setGridScores(historyRef.current[histIdxRef.current])
+  }
+
+  function moveSelected(dRow: number, dCol: number, numRows: number, numCols: number) {
+    setSelected(prev => {
+      if (!prev) return prev
+      let { rowIdx, colIdx } = prev
+      colIdx += dCol
+      rowIdx += dRow
+      if (colIdx >= numCols) { colIdx = 0; rowIdx++ }
+      if (colIdx < 0)        { colIdx = numCols - 1; rowIdx-- }
+      rowIdx = Math.max(0, Math.min(numRows - 1, rowIdx))
+      colIdx = Math.max(0, Math.min(numCols - 1, colIdx))
+      return { rowIdx, colIdx }
+    })
   }
 
   function fillColumn(fieldKey: string, value: number, visiblePlayerIds: string[]) {
@@ -210,6 +273,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
           next[pid] = { ...(next[pid] ?? {}), [fieldKey]: value }
         }
       }
+      pushHistory(next)
       return next
     })
     setDirty(prev => {
@@ -227,10 +291,41 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       for (const f of fields) {
         if ((cur[f.key] ?? null) == null) patch[f.key] = value
       }
-      return { ...prev, [playerId]: { ...cur, ...patch } }
+      const next = { ...prev, [playerId]: { ...cur, ...patch } }
+      pushHistory(next)
+      return next
     })
     setDirty(prev => new Set(prev).add(playerId))
     setRowFill(null)
+  }
+
+  function handleGridKeyDown(e: React.KeyboardEvent, numRows: number, numCols: number, fp: Player[]) {
+    if (!selected) return
+    const player = fp[selected.rowIdx]
+    const field  = fields[selected.colIdx]
+    if (!player || !field) return
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return }
+
+    if (e.key >= '1' && e.key <= '5') {
+      e.preventDefault()
+      commitScore(player.id, field.key, parseInt(e.key))
+      moveSelected(0, 1, numRows, numCols)
+      return
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      commitScore(player.id, field.key, null)
+      return
+    }
+    if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
+    if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
+    if (e.key === 'Escape')     { setSelected(null); return }
   }
 
   async function saveAll() {
@@ -280,6 +375,8 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   }
 
   const sections = Array.from(new Set(fields.map(f => f.section)))
+  // Sections that have at least one weighted field — get their own score column
+  const scoredSections = sections.filter(sec => fields.some(f => f.section === sec && f.weight > 0))
 
   const filteredPlayers = players.filter(p => {
     if (search && !`${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase())) return false
@@ -300,7 +397,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const filteredIds = filteredPlayers.map(p => p.id)
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '1400px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
       {/* Header */}
@@ -416,7 +513,15 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
       {/* Grid */}
       {fields.length > 0 && (
-        <div style={{ overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', position: 'relative' }}>
+        <div
+          ref={gridRef}
+          tabIndex={0}
+          onKeyDown={e => handleGridKeyDown(e, filteredPlayers.length, fields.length, filteredPlayers)}
+          style={{ outline: 'none', overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', position: 'relative' }}
+        >
+          <div style={{ fontSize: '11px', color: s.dim, padding: '6px 12px 4px', borderBottom: '0.5px solid var(--border)', background: 'var(--bg-card)', display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <span>Click a cell to select · type <strong>1–5</strong> · <strong>Tab</strong>/arrows to move · <strong>Del</strong> to clear · <strong>Ctrl+Z</strong>/<strong>Y</strong> undo/redo</span>
+          </div>
           <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
             <thead>
               {/* ── Section label row ── */}
@@ -435,7 +540,16 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     }}>{SECTION_LABELS[section] ?? section}</th>
                   )
                 })}
-                {/* Score + Status + Fill headers */}
+                {/* Section score group + Score + Status + Fill headers */}
+                {scoredSections.length > 0 && (
+                  <th colSpan={scoredSections.length} style={{
+                    padding: '6px 8px', textAlign: 'center',
+                    background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
+                    borderLeft: '1px solid var(--border)',
+                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em',
+                    textTransform: 'uppercase', color: s.muted, whiteSpace: 'nowrap',
+                  }}>Section Scores</th>
+                )}
                 <th colSpan={3} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
               </tr>
 
@@ -487,7 +601,19 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                   )
                 })}
 
-                {/* Score */}
+                {/* Per-section score columns */}
+                {scoredSections.map((sec, i) => (
+                  <th key={`sechdr_${sec}`} style={{
+                    padding: '8px 6px', textAlign: 'center',
+                    background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
+                    borderLeft: i === 0 ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.08)',
+                    fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap', minWidth: '56px',
+                  }}>
+                    {SECTION_SHORT[sec] ?? sec}
+                  </th>
+                ))}
+
+                {/* Overall score */}
                 <th style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap', minWidth: '60px' }}>Score</th>
                 {/* Status */}
                 <th style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap' }}>Status</th>
@@ -535,27 +661,28 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
                     {/* Score cells */}
                     {fields.map((field, fi) => {
-                      const val         = pScores[field.key] ?? null
-                      const isFirstSec  = fi === 0 || fields[fi - 1].section !== field.section
-                      const isPickerCell = picker?.playerId === player.id && picker?.fieldKey === field.key
+                      const val        = pScores[field.key] ?? null
+                      const isFirstSec = fi === 0 || fields[fi - 1].section !== field.section
+                      const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
                       return (
                         <td key={field.key}
-                          data-cell="1"
-                          onClick={e => {
-                            if (isPickerCell) { setPicker(null); return }
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                            setPicker({ playerId: player.id, fieldKey: field.key, x: rect.left, y: rect.bottom + 4 })
+                          onClick={() => {
+                            setSelected({ rowIdx: pi, colIdx: fi })
                             setColFill(null)
                             setRowFill(null)
+                            gridRef.current?.focus()
                           }}
                           style={{
                             padding: '5px 4px',
                             borderBottom: '0.5px solid var(--border)',
                             borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                             textAlign: 'center', cursor: 'pointer',
-                            background: isPickerCell ? 'rgba(var(--fg-rgb),0.08)' : cellBg(val),
+                            background: isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
+                            outline: isSelected ? '2px solid rgba(80,160,232,0.7)' : 'none',
+                            outlineOffset: '-2px',
                             userSelect: 'none',
+                            position: 'relative',
                           }}
                         >
                           <span style={{
@@ -568,7 +695,23 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       )
                     })}
 
-                    {/* Computed score */}
+                    {/* Per-section scores */}
+                    {scoredSections.map((sec, i) => {
+                      const secScore = computeSectionScore(pScores, fields, sec)
+                      return (
+                        <td key={`sec_${sec}`} style={{
+                          padding: '5px 6px', borderBottom: '0.5px solid var(--border)',
+                          borderLeft: i === 0 ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
+                          textAlign: 'center', fontSize: '12px', fontWeight: 700,
+                          color: secScore != null ? scoreColor(secScore) : s.dim,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {secScore != null ? secScore.toFixed(2) : '—'}
+                        </td>
+                      )
+                    })}
+
+                    {/* Overall computed score */}
                     <td style={{ padding: '5px 8px', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontWeight: 800, fontSize: '13px', color: computed != null ? scoreColor(computed) : s.dim, whiteSpace: 'nowrap' }}>
                       {computed != null ? computed.toFixed(2) : '—'}
                     </td>
@@ -596,7 +739,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                             style={{ width: '22px', height: '22px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', cursor: 'pointer', padding: 0 }}>×</button>
                         </div>
                       ) : (
-                        <button onClick={() => { setRowFill(player.id); setColFill(null); setPicker(null) }}
+                        <button onClick={() => { setRowFill(player.id); setColFill(null) }}
                           style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer', whiteSpace: 'nowrap' }}
                           title="Fill empty fields for this player">fill →</button>
                       )}
@@ -609,39 +752,6 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
         </div>
       )}
 
-      {/* Floating cell picker */}
-      {picker && (() => {
-        const val = gridScores[picker.playerId]?.[picker.fieldKey] ?? null
-        return (
-          <div data-picker="1" style={{
-            position: 'fixed',
-            top:  picker.y,
-            left: Math.min(picker.x, window.innerWidth - 220),
-            zIndex: 1000,
-            background: 'var(--bg-card)',
-            border: '0.5px solid var(--border-md)',
-            borderRadius: '8px',
-            padding: '6px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-            display: 'flex', gap: '4px', alignItems: 'center',
-          }}>
-            {[1,2,3,4,5].map(v => (
-              <button key={v} onClick={() => setScore(picker.playerId, picker.fieldKey, v)}
-                style={{
-                  width: '36px', height: '36px', borderRadius: '6px', border: 'none',
-                  background: val === v ? 'var(--accent)' : 'var(--bg-input)',
-                  color: val === v ? 'var(--accent-text)' : 'var(--fg)',
-                  fontSize: '15px', fontWeight: 800, cursor: 'pointer',
-                  outline: val === v ? 'none' : '0.5px solid var(--border-md)',
-                }}>{v}</button>
-            ))}
-            {val != null && (
-              <button onClick={() => setScore(picker.playerId, picker.fieldKey, null)}
-                style={{ width: '32px', height: '36px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '14px', cursor: 'pointer', marginLeft: '2px' }}>×</button>
-            )}
-          </div>
-        )
-      })()}
     </main>
   )
 }

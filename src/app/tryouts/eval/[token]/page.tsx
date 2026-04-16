@@ -26,6 +26,7 @@ const SECTION_LABELS: Record<string, string> = {
   fielding_hitting:  'Fielding & Hitting',
   pitching_catching: 'Pitching & Catching (optional)',
   intangibles:       'Intangibles',
+  athleticism:       'Athleticism',
 }
 
 function teamSortKey(t: string): number {
@@ -87,6 +88,9 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const [lastSaved,     setLastSaved]     = useState<Date | null>(null)
   const [hasDraft,      setHasDraft]      = useState(false)
 
+  // Team lock — prevents coaches from browsing/editing other teams' evals
+  const [teamLocked, setTeamLocked] = useState(false)
+
   // Grid cell picker (floating)
   const [cellPicker, setCellPicker] = useState<{ playerId: string; fieldKey: string; x: number; y: number } | null>(null)
   // Column fill
@@ -103,6 +107,21 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         setLoading(false)
       })
   }, [])
+
+  // Restore team claim from localStorage when form loads
+  useEffect(() => {
+    if (!formData) return
+    try {
+      const raw = localStorage.getItem(`eval_claim_${params.token}`)
+      if (!raw) return
+      const claim = JSON.parse(raw)
+      if (claim.team && formData.teams.includes(claim.team)) {
+        setSelectedTeam(claim.team)
+        if (claim.coachName) setCoachName(claim.coachName)
+        setTeamLocked(true)
+      }
+    } catch { /* ignore */ }
+  }, [formData])
 
   // Auto-save scores to localStorage whenever they change (score step only)
   useEffect(() => {
@@ -133,6 +152,33 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [cellPicker])
+
+  function claimTeam() {
+    // Lock this browser session to the selected team
+    try {
+      localStorage.setItem(`eval_claim_${params.token}`, JSON.stringify({
+        team: selectedTeam, coachName, claimedAt: new Date().toISOString(),
+      }))
+    } catch { /* ignore */ }
+    setTeamLocked(true)
+    setStep('score')
+  }
+
+  function clearClaim() {
+    try {
+      localStorage.removeItem(`eval_claim_${params.token}`)
+      // Also clear any draft for this team
+      localStorage.removeItem(`eval_draft_${params.token}_${selectedTeam}`)
+    } catch { /* ignore */ }
+    setTeamLocked(false)
+    setSelectedTeam('')
+    setCoachName('')
+    setContactEmail('')
+    setScores({})
+    setPlayerComments({})
+    setOverallNotes('')
+    setHasDraft(false)
+  }
 
   function resumeDraft() {
     if (!selectedTeam) return
@@ -186,7 +232,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
   const sections = useMemo(() => {
     if (!formData) return []
-    const order = ['fielding_hitting', 'pitching_catching', 'intangibles']
+    const order = ['fielding_hitting', 'pitching_catching', 'intangibles', 'athleticism']
     const bySection: Record<string, EvalField[]> = {}
     for (const f of formData.eval_config) {
       if (!bySection[f.section]) bySection[f.section] = []
@@ -278,6 +324,11 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
       return
     }
 
+    // Clear the localStorage claim and draft on successful submission
+    try {
+      localStorage.removeItem(`eval_claim_${params.token}`)
+      localStorage.removeItem(`eval_draft_${params.token}_${selectedTeam}`)
+    } catch { /* ignore */ }
     setStep('submitted')
     setSubmitting(false)
   }
@@ -540,31 +591,57 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         Rate each player on your roster. Scores are 1–5 per skill.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '2rem' }}>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your team</label>
-          <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} style={selectStyle}>
-            <option value="">Select your team…</option>
-            {sortedTeams.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          {selectedTeam && (
-            <div style={{ fontSize: '12px', color: s.muted, marginTop: '5px' }}>
-              {teamPlayers.length} player{teamPlayers.length !== 1 ? 's' : ''} on this roster
+      {/* Team locked banner */}
+      {teamLocked && (
+        <div style={{
+          padding: '14px 16px', marginBottom: '1.5rem',
+          background: 'rgba(109,184,117,0.1)', border: '0.5px solid rgba(109,184,117,0.3)',
+          borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 800 }}>{selectedTeam}</div>
+            <div style={{ fontSize: '12px', color: s.muted, marginTop: '2px' }}>
+              This browser is set to evaluate <strong>{selectedTeam}</strong>.
             </div>
-          )}
+          </div>
+          <button
+            onClick={clearClaim}
+            style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer', flexShrink: 0 }}
+          >
+            Not your team? Start over
+          </button>
         </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '2rem' }}>
+        {!teamLocked && (
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your team</label>
+            <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} style={selectStyle}>
+              <option value="">Select your team…</option>
+              {sortedTeams.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            {selectedTeam && (
+              <div style={{ fontSize: '12px', color: s.muted, marginTop: '5px' }}>
+                {teamPlayers.length} player{teamPlayers.length !== 1 ? 's' : ''} on this roster
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your name</label>
           <input type="text" value={coachName} onChange={e => setCoachName(e.target.value)} placeholder="Coach Smith" style={inputStyle} />
         </div>
 
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>
-            Your email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional — used to save progress so you can return later)</span>
-          </label>
-          <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="coach@example.com" style={inputStyle} />
-        </div>
+        {!teamLocked && (
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>
+              Your email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional — used to save progress so you can return later)</span>
+            </label>
+            <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="coach@example.com" style={inputStyle} />
+          </div>
+        )}
       </div>
 
       {/* Resume banner */}
@@ -581,7 +658,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
       )}
 
       <button
-        onClick={() => setStep('score')}
+        onClick={claimTeam}
         disabled={!selectedTeam || !coachName.trim() || teamPlayers.length === 0}
         style={{
           width: '100%', padding: '14px', borderRadius: '8px', border: 'none',
