@@ -89,6 +89,30 @@ html[data-theme="light"] {
   }
 }
 
+/* ── Standalone eval form (public coach link) ── */
+/* Hides all Six43 chrome so the page is a clean org-branded experience */
+body.eval-standalone .sidebar,
+body.eval-standalone .app-header,
+body.eval-standalone .bottom-nav  { display: none !important; }
+body.eval-standalone .app-content { margin-left: 0 !important; }
+
+/* Light theme token overrides for the eval form */
+body.eval-standalone {
+  --bg:            #ffffff;
+  --bg2:           #f8fafc;
+  --bg-card:       #f8fafc;
+  --fg:            #1a202c;
+  --fg-rgb:        26, 32, 44;
+  --accent:        #1a365d;
+  --accent-text:   #ffffff;
+  --border:        #e2e8f0;
+  --border-md:     #cbd5e0;
+  --border-subtle: #edf2f7;
+  --bg-input:      #ffffff;
+  background: #ffffff;
+  color-scheme: light;
+}
+
 /* ── Marketing page responsive ── */
 .mkt-outer    { max-width: 680px; margin: 0 auto; }
 .mkt-wide     { max-width: 680px; margin: 0 auto; }

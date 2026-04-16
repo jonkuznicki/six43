@@ -15,6 +15,7 @@ interface EvalField {
 }
 
 interface FormData {
+  org_name:             string
   season:               { id: string; label: string; year: number }
   teams:                string[]
   players:              EvalPlayer[]
@@ -101,6 +102,12 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const [colFillKey,  setColFillKey]  = useState<string | null>(null)
   // Row fill (expanded comment row)
   const [expandedComment, setExpandedComment] = useState<string | null>(null)
+
+  // Hide Six43 chrome — this is a standalone org-branded page
+  useEffect(() => {
+    document.body.classList.add('eval-standalone')
+    return () => document.body.classList.remove('eval-standalone')
+  }, [])
 
   useEffect(() => {
     supabase.rpc('tryout_eval_form_data_by_token', { p_token: params.token })
@@ -639,9 +646,9 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   if (step === 'identify') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '560px', margin: '0 auto', padding: '3rem 1.5rem' }}>
       <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>
-        Coach Evaluation
+        {formData.org_name ?? 'Coach Evaluation'}
       </div>
-      <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{formData.season.label}</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{formData.season.label} — Player Evaluations</h1>
       <p style={{ fontSize: '13px', color: s.muted, marginBottom: '2rem' }}>
         Rate each player on your roster. Scores are 1–5 per skill.
       </p>
@@ -969,44 +976,56 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
           ref={gridRef}
           tabIndex={0}
           onKeyDown={e => handleGridKeyDown(e, teamPlayers.length, allFields.length)}
-          style={{ outline: 'none', overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', marginBottom: '1.5rem' }}
+          style={{ outline: 'none', overflow: 'auto', maxHeight: 'calc(100vh - 130px)', borderRadius: '10px', border: '0.5px solid var(--border)', marginBottom: '1.5rem' }}
         >
-          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb),0.4)`, padding: '5px 12px 4px', borderBottom: '0.5px solid var(--border)', background: 'var(--bg-card)' }}>
-            Click a cell · type <strong>1–5</strong> · <strong>Tab</strong>/arrows to move · <strong>Del</strong> to clear · <strong>Ctrl+Z</strong>/<strong>Y</strong> undo/redo
-          </div>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
+          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '12px' }}>
             <thead>
-              {/* Section header row */}
+              {/* ── Section header row — sticky at top:0 ── */}
               <tr>
-                <th colSpan={2} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', padding: 0 }} />
+                {/* Sticky corner (section row) */}
+                <th style={{
+                  position: 'sticky', top: 0, left: 0, zIndex: 4,
+                  background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
+                  width: '160px', minWidth: '160px', padding: 0,
+                }} />
                 {sections.map(sec => (
                   <th key={sec.key} colSpan={sec.fields.length} style={{
+                    position: 'sticky', top: 0, zIndex: 2,
                     padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)',
                     borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)',
                     fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em',
-                    textTransform: 'uppercase', color: s.muted, whiteSpace: 'nowrap',
+                    textTransform: 'uppercase', color: s.muted,
+                    whiteSpace: 'normal', lineHeight: 1.3,
                   }}>{sec.label}</th>
                 ))}
-                <th colSpan={3} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
+                {/* Notes + N/A columns */}
+                <th colSpan={2} style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
               </tr>
-              {/* Column headers */}
+              {/* ── Column label row — sticky below section row ── */}
               <tr>
-                <th style={{ padding: '6px 12px', textAlign: 'left', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, position: 'sticky', left: 0, zIndex: 3, whiteSpace: 'nowrap', boxShadow: '2px 0 4px rgba(0,0,0,0.06)', minWidth: '160px' }}>Player</th>
-                <th style={{ padding: '6px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap' }}>Age</th>
+                {/* Sticky player name corner */}
+                <th style={{
+                  position: 'sticky', top: '29px', left: 0, zIndex: 4,
+                  padding: '5px 10px', textAlign: 'left', background: 'var(--bg-card)',
+                  borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 700,
+                  color: s.muted, whiteSpace: 'nowrap', boxShadow: '2px 0 4px rgba(0,0,0,0.06)',
+                  width: '160px', minWidth: '160px',
+                }}>Player</th>
                 {allFields.map((field, fi) => {
                   const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
                   return (
                     <th key={field.field_key} style={{
-                      padding: '4px 4px 6px', textAlign: 'center', verticalAlign: 'bottom',
+                      position: 'sticky', top: '29px', zIndex: 2,
+                      padding: '3px 2px 5px', textAlign: 'center', verticalAlign: 'bottom',
                       background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
                       borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
-                      minWidth: '50px', maxWidth: '62px',
+                      width: '52px', minWidth: '52px', maxWidth: '52px',
                     }}>
-                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '68px', overflow: 'hidden', fontSize: '10px', fontWeight: 600, color: s.muted, textAlign: 'left', paddingBottom: '4px' }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '64px', overflow: 'hidden', fontSize: '10px', fontWeight: 600, color: s.muted, textAlign: 'left', paddingBottom: '2px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {field.label}
                       </div>
                       {colFillKey === field.field_key ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', marginTop: '3px' }}>
                           {[1,2,3,4,5].map(v => (
                             <button key={v} onClick={() => {
                               setScores(prev => {
@@ -1021,27 +1040,27 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                                 return next
                               })
                               setColFillKey(null)
-                            }} style={{ width: '28px', height: '20px', borderRadius: '3px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>{v}</button>
+                            }} style={{ width: '26px', height: '18px', borderRadius: '3px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>{v}</button>
                           ))}
-                          <button onClick={() => setColFillKey(null)} style={{ width: '28px', height: '16px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '10px', cursor: 'pointer', padding: 0 }}>×</button>
+                          <button onClick={() => setColFillKey(null)} style={{ width: '26px', height: '14px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '10px', cursor: 'pointer', padding: 0 }}>×</button>
                         </div>
                       ) : (
                         <button onClick={() => { setColFillKey(field.field_key); setSelected(null) }}
-                          style={{ marginTop: '4px', fontSize: '9px', padding: '2px 4px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
+                          style={{ marginTop: '2px', fontSize: '9px', padding: '1px 3px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
                           title={`Fill empty "${field.label}" cells`}>fill ↓</button>
                       )}
                     </th>
                   )
                 })}
-                <th style={{ padding: '6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap' }}>Score</th>
-                <th style={{ padding: '6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap' }}>Notes</th>
-                <th style={{ padding: '6px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', minWidth: '44px' }} />
+                {/* Notes header */}
+                <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap', width: '60px' }}>Notes</th>
+                {/* N/A header */}
+                <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 4px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', width: '50px' }} />
               </tr>
             </thead>
             <tbody>
               {teamPlayers.map((player, pi) => {
                 const ps = scores[player.id] ?? {}
-                const computed = computePlayerScore(ps, allFields)
                 const required = sections.filter(sec => !sec.is_optional).flatMap(sec => sec.fields)
                 const complete = required.every(f => ps[f.field_key] != null || isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''))
                 const rowBg = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
@@ -1053,16 +1072,16 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                     <tr key={player.id}>
                       {/* Sticky player name */}
                       <td style={{
-                        padding: '5px 12px', fontWeight: 700, fontSize: '13px', whiteSpace: 'nowrap',
+                        padding: '3px 10px', fontWeight: 700, fontSize: '12px', whiteSpace: 'nowrap',
                         position: 'sticky', left: 0, zIndex: 1, background: rowBg,
                         borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)',
-                        borderLeft: complete ? '2px solid #6DB875' : '2px solid transparent',
-                        boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
+                        borderLeft: complete ? '3px solid #2f855a' : '3px solid transparent',
+                        boxShadow: '2px 0 6px rgba(0,0,0,0.08)',
+                        width: '160px', minWidth: '160px',
                       }}>
                         {player.first_name} {player.last_name}
-                        {complete && <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '5px' }}>✓</span>}
+                        {complete && <span style={{ fontSize: '9px', color: '#2f855a', marginLeft: '4px' }}>✓</span>}
                       </td>
-                      <td style={{ padding: '5px 8px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', background: rowBg }}>{player.age_group}</td>
 
                       {/* Score cells */}
                       {allFields.map((field, fi) => {
@@ -1080,16 +1099,17 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                               gridRef.current?.focus()
                             }}
                             style={{
-                              padding: '5px 3px',
+                              padding: '3px 2px',
                               borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)',
                               borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                               textAlign: 'center',
                               cursor: na ? 'default' : 'pointer',
-                              background: isSelected ? 'rgba(80,160,232,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val),
-                              outline: isSelected ? '2px solid rgba(80,160,232,0.7)' : 'none',
+                              background: isSelected ? 'rgba(26,54,93,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val),
+                              outline: isSelected ? '2px solid rgba(26,54,93,0.7)' : 'none',
                               outlineOffset: '-2px',
                               position: 'relative',
                               userSelect: 'none',
+                              width: '52px', minWidth: '52px',
                             }}
                           >
                             <span style={{ fontSize: '13px', fontWeight: val != null ? 700 : 400, color: na ? s.dim : val != null ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
@@ -1099,28 +1119,24 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                         )
                       })}
 
-                      {/* Computed score */}
-                      <td style={{ padding: '5px 8px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontWeight: 800, fontSize: '13px', color: computed != null ? 'var(--fg)' : s.dim }}>
-                        {computed != null ? computed.toFixed(2) : '—'}
-                      </td>
-
                       {/* Comments indicator */}
-                      <td style={{ padding: '5px 6px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', textAlign: 'center' }}>
+                      <td style={{ padding: '3px 5px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', width: '60px' }}>
                         <button onClick={() => setExpandedComment(commentOpen ? null : player.id)} style={{
-                          fontSize: '11px', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
+                          fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
                           border: `0.5px solid ${commentOpen || hasComment ? 'var(--accent)' : 'var(--border-md)'}`,
-                          background: commentOpen ? 'rgba(232,160,32,0.1)' : 'transparent',
+                          background: commentOpen ? 'rgba(26,54,93,0.08)' : 'transparent',
                           color: commentOpen || hasComment ? 'var(--accent)' : s.dim,
                           fontWeight: hasComment ? 700 : 400,
-                        }}>{hasComment ? '📝' : '+'} notes</button>
+                          whiteSpace: 'nowrap',
+                        }}>{hasComment ? '✎' : '+'}</button>
                       </td>
 
                       {/* N/A checkboxes for optional sections */}
-                      <td style={{ padding: '5px 6px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim }}>
+                      <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim, width: '50px' }}>
                         {sections.filter(sec => sec.is_optional).map(sec => (
                           <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
                             <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
-                            <span>{sec.key === 'pitching_catching' ? 'P/C N/A' : 'N/A'}</span>
+                            <span style={{ fontSize: '9px' }}>N/A</span>
                           </label>
                         ))}
                       </td>
@@ -1129,7 +1145,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                     {/* Expanded comment row */}
                     {commentOpen && (
                       <tr key={`${player.id}_comment`}>
-                        <td colSpan={3 + allFields.length + 3} style={{ padding: '8px 12px 12px 12px', borderBottom: '0.5px solid var(--border)', background: rowBg }}>
+                        <td colSpan={1 + allFields.length + 2} style={{ padding: '6px 12px 10px 12px', borderBottom: '0.5px solid var(--border)', background: rowBg }}>
                           <textarea
                             autoFocus
                             value={playerComments[player.id] ?? ''}
