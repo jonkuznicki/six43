@@ -11,7 +11,7 @@ interface EvalPlayer {
 
 interface EvalField {
   field_key: string; label: string; section: string
-  is_optional: boolean; sort_order: number
+  is_optional: boolean; sort_order: number; weight: number
 }
 
 interface FormData {
@@ -40,6 +40,17 @@ function scoreColor(v: number | null): string {
   if (v === 3) return 'rgba(80,160,232,0.18)'
   if (v === 2) return 'rgba(232,140,40,0.2)'
   return 'rgba(232,80,80,0.22)'
+}
+
+function computePlayerScore(
+  playerScores: Record<string, number | null>,
+  fields: EvalField[]
+): number | null {
+  const eligible = fields.filter(f => f.weight > 0 && playerScores[f.field_key] != null)
+  if (eligible.length === 0) return null
+  const wSum   = eligible.reduce((s, f) => s + f.weight, 0)
+  const wScore = eligible.reduce((s, f) => s + (playerScores[f.field_key]! * f.weight), 0)
+  return Math.round(wScore / wSum * 100) / 100
 }
 
 export default function PublicEvalPage({ params }: { params: { token: string } }) {
@@ -736,7 +747,23 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{player.first_name} {player.last_name}</span>
                     <span style={{ fontSize: '11px', color: s.dim, marginLeft: '8px' }}>{player.age_group}</span>
                   </div>
-                  {complete && <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓ Complete</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {(() => {
+                      const cs = computePlayerScore(playerScores, allFields)
+                      return cs != null ? (
+                        <span style={{
+                          fontSize: '12px', fontWeight: 700,
+                          padding: '3px 9px', borderRadius: '20px',
+                          background: scoreColor(Math.round(cs)),
+                          border: '0.5px solid rgba(var(--fg-rgb),0.1)',
+                          color: 'var(--fg)',
+                        }}>
+                          {cs.toFixed(2)}
+                        </span>
+                      ) : null
+                    })()}
+                    {complete && <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓ Complete</span>}
+                  </div>
                 </div>
 
                 {/* Sections */}
@@ -764,29 +791,40 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                         {na ? (
                           <div style={{ fontSize: '12px', color: s.dim, fontStyle: 'italic' }}>Not applicable for this player</div>
                         ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {section.fields.map(field => {
                               const val = playerScores[field.field_key] ?? null
                               return (
-                                <div key={field.field_key} style={{ minWidth: '140px', flex: '1 1 140px' }}>
-                                  <div style={{ fontSize: '11px', color: s.dim, marginBottom: '3px' }}>{field.label}</div>
-                                  <select
-                                    value={val ?? ''}
-                                    onChange={e => setScore(player.id, field.field_key, e.target.value ? parseInt(e.target.value) : null)}
-                                    style={{
-                                      width: '100%', background: val != null ? scoreColor(val) : 'var(--bg2)',
-                                      border: `0.5px solid ${val == null ? 'var(--border-md)' : val >= 4 ? 'rgba(109,184,117,0.5)' : val === 3 ? 'rgba(80,160,232,0.4)' : 'rgba(232,112,96,0.5)'}`,
-                                      borderRadius: '6px', padding: '6px 8px', fontSize: '13px',
-                                      color: 'var(--fg)',
-                                      appearance: 'none', WebkitAppearance: 'none',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    <option value="">—</option>
+                                <div key={field.field_key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ fontSize: '12px', color: s.muted, minWidth: '120px', flex: '0 0 auto' }}>{field.label}</div>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
                                     {[1, 2, 3, 4, 5].map(n => (
-                                      <option key={n} value={n}>{n}</option>
+                                      <button
+                                        key={n}
+                                        onClick={() => setScore(player.id, field.field_key, val === n ? null : n)}
+                                        style={{
+                                          width: '36px', height: '30px', borderRadius: '6px',
+                                          border: `1.5px solid ${val === n ? 'transparent' : 'rgba(var(--fg-rgb),0.12)'}`,
+                                          background: val === n ? scoreColor(n) : 'transparent',
+                                          color: 'var(--fg)', fontWeight: val === n ? 700 : 400,
+                                          fontSize: '13px', cursor: 'pointer',
+                                          opacity: val != null && val !== n ? 0.4 : 1,
+                                          transition: 'opacity 0.1s, background 0.1s',
+                                        }}
+                                      >{n}</button>
                                     ))}
-                                  </select>
+                                    {val != null && (
+                                      <button
+                                        onClick={() => setScore(player.id, field.field_key, null)}
+                                        title="Clear"
+                                        style={{
+                                          width: '24px', height: '30px', borderRadius: '6px',
+                                          border: 'none', background: 'none',
+                                          color: s.dim, fontSize: '14px', cursor: 'pointer',
+                                        }}
+                                      >×</button>
+                                    )}
+                                  </div>
                                 </div>
                               )
                             })}

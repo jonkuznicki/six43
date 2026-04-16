@@ -30,6 +30,7 @@ interface EvalField {
   label:       string
   is_optional: boolean
   sort_order:  number
+  weight:      number   // multiplier in computed score; 0 = excluded
 }
 
 interface Season {
@@ -79,7 +80,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         .eq('season_id', seasonData.id)
         .order('sort_order'),
       supabase.from('tryout_coach_eval_config')
-        .select('id, section, field_key, label, is_optional, sort_order')
+        .select('id, section, field_key, label, is_optional, sort_order, weight')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('sort_order'),
     ])
@@ -104,6 +105,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         label:       f.label,
         is_optional: f.is_optional,
         sort_order:  f.sort_order,
+        weight:      f.weight ?? 1.0,
       }))
     )
     setLoading(false)
@@ -213,9 +215,11 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
   function addEvalField(section: string) {
     const sectionFields = evalFields.filter(f => f.section === section)
+    const defaultWeight = section === 'pitching_catching' ? 0 : 1.0
     setEvalFields(prev => [...prev, {
       id: null, section, field_key: '', label: '',
       is_optional: false, sort_order: sectionFields.length + 1,
+      weight: defaultWeight,
     }])
   }
 
@@ -265,6 +269,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
       label:       f.label,
       is_optional: f.is_optional,
       sort_order:  f.sort_order,
+      weight:      f.weight,
     }))
 
     const { error } = await supabase.from('tryout_coach_eval_config').insert(inserts)
@@ -454,7 +459,9 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         <div style={{ marginBottom: '0.75rem' }}>
           <div style={{ fontSize: '15px', fontWeight: 700 }}>Coach Evaluations</div>
           <div style={{ fontSize: '12px', color: s.dim, marginTop: '2px' }}>
-            Fields coaches score on the 1–5 scale when submitting end-of-season evals
+            Fields coaches score on the 1–5 scale when submitting end-of-season evals.
+            The <strong style={{ color: 'var(--fg)' }}>Weight</strong> column controls each field's contribution to the computed score —
+            set to <strong style={{ color: 'var(--fg)' }}>0</strong> to exclude it. Pitching &amp; Catching fields default to 0.
           </div>
         </div>
 
@@ -494,6 +501,19 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
                           {field.field_key && (
                             <span style={{ fontSize: '10px', color: s.dim, minWidth: '80px' }}>{field.field_key}</span>
                           )}
+                          {/* Weight */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                            <span style={{ fontSize: '10px', color: s.dim }}>wt</span>
+                            <input
+                              type="number" min={0} max={10} step={0.5}
+                              value={field.weight}
+                              onChange={e => updateEval(idx, { weight: parseFloat(e.target.value) || 0 })}
+                              style={{ ...inputStyle, width: '46px', textAlign: 'right', padding: '4px 6px', fontSize: '12px',
+                                color: field.weight === 0 ? s.dim : 'var(--fg)',
+                              }}
+                              title="Weight in computed score. Set to 0 to exclude."
+                            />
+                          </div>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: s.muted, cursor: 'pointer', flexShrink: 0 }}>
                             <input type="checkbox" checked={field.is_optional} onChange={e => updateEval(idx, { is_optional: e.target.checked })} />
                             opt.
