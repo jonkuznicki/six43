@@ -39,6 +39,7 @@ interface EvalMeta {
   status:       'draft' | 'submitted'
   coach_name:   string | null
   submitted_at: string | null
+  comments:     string | null
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -131,6 +132,12 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   // Row fill picker
   const [rowFill, setRowFill] = useState<string | null>(null)
 
+  // Sorting
+  const [sortConfig, setSortConfig] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null)
+
+  // Expanded notes row
+  const [expandedNote, setExpandedNote] = useState<string | null>(null)
+
   // Team eval tokens (per-team unique links)
   const [teamTokens,   setTeamTokens]   = useState<Record<string, string>>({}) // team_label → token uuid
   const [tokenBusy,    setTokenBusy]    = useState<string | null>(null)         // team_label currently generating
@@ -189,7 +196,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
     const [{ data: evalData }, { data: playerData }] = await Promise.all([
       supabase.from('tryout_coach_evals')
-        .select('player_id, coach_name, team_label, season_year, status, scores, submitted_at')
+        .select('player_id, coach_name, team_label, season_year, status, scores, comments, submitted_at')
         .eq('org_id', params.orgId)
         .order('submitted_at', { ascending: false }),
       supabase.from('tryout_players')
@@ -204,7 +211,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     const meta: Record<string, EvalMeta> = {}
     for (const ev of (evalData ?? [])) {
       scores[ev.player_id] = ev.scores ?? {}
-      meta[ev.player_id] = { status: ev.status, coach_name: ev.coach_name, submitted_at: ev.submitted_at }
+      meta[ev.player_id] = { status: ev.status, coach_name: ev.coach_name, submitted_at: ev.submitted_at, comments: ev.comments ?? null }
     }
     for (const p of (playerData ?? [])) {
       if (!scores[p.id]) scores[p.id] = {}
@@ -418,12 +425,53 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   // Sections that have at least one weighted field — get their own score column
   const scoredSections = sections.filter(sec => fields.some(f => f.section === sec && f.weight > 0))
 
+  function toggleSort(col: string) {
+    setSortConfig(prev =>
+      prev?.col === col
+        ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { col, dir: 'asc' }
+    )
+  }
+
+  function sortIndicator(col: string) {
+    if (sortConfig?.col !== col) return <span style={{ opacity: 0.25, fontSize: '9px', marginLeft: '3px' }}>↕</span>
+    return <span style={{ fontSize: '9px', marginLeft: '3px' }}>{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>
+  }
+
   const filteredPlayers = players.filter(p => {
     if (search && !`${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase())) return false
     if (ageFilter !== 'all' && p.age_group !== ageFilter) return false
     if (teamFilter && !(p.prior_team ?? '').toLowerCase().includes(teamFilter.toLowerCase())) return false
     return true
   })
+
+  const sortedFilteredPlayers = sortConfig ? [...filteredPlayers].sort((a, b) => {
+    const dir = sortConfig.dir === 'asc' ? 1 : -1
+    const col = sortConfig.col
+    if (col === 'name') return dir * (`${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
+    if (col === 'age')  return dir * (a.age_group ?? '').localeCompare(b.age_group ?? '')
+    if (col === 'team') return dir * ((a.prior_team ?? '').localeCompare(b.prior_team ?? ''))
+    if (col === 'score') {
+      const sa = computeScore(gridScores[a.id] ?? {}, fields) ?? -1
+      const sb = computeScore(gridScores[b.id] ?? {}, fields) ?? -1
+      return dir * (sa - sb)
+    }
+    if (col === 'status') {
+      const sa = evalMeta[a.id]?.status ?? ''
+      const sb = evalMeta[b.id]?.status ?? ''
+      return dir * sa.localeCompare(sb)
+    }
+    if (col.startsWith('sec_')) {
+      const sec = col.slice(4)
+      const sa = computeSectionScore(gridScores[a.id] ?? {}, fields, sec) ?? -1
+      const sb = computeSectionScore(gridScores[b.id] ?? {}, fields, sec) ?? -1
+      return dir * (sa - sb)
+    }
+    // field key
+    const va = gridScores[a.id]?.[col] ?? -1
+    const vb = gridScores[b.id]?.[col] ?? -1
+    return dir * (va - vb)
+  }) : filteredPlayers
 
   const s = {
     muted: `rgba(var(--fg-rgb), 0.55)` as const,
@@ -434,7 +482,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</main>
   )
 
-  const filteredIds = filteredPlayers.map(p => p.id)
+  const filteredIds = sortedFilteredPlayers.map(p => p.id)
 
   return (
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
@@ -590,7 +638,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
             }}>{ag === 'all' ? 'All ages' : ag}</button>
           ))}
         </div>
-        <span style={{ fontSize: '12px', color: s.dim, marginLeft: 'auto' }}>{filteredPlayers.length} players</span>
+        <span style={{ fontSize: '12px', color: s.dim, marginLeft: 'auto' }}>{sortedFilteredPlayers.length} players</span>
       </div>
 
       {/* No fields configured */}
@@ -605,7 +653,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
         <div
           ref={gridRef}
           tabIndex={0}
-          onKeyDown={e => handleGridKeyDown(e, filteredPlayers.length, fields.length, filteredPlayers)}
+          onKeyDown={e => handleGridKeyDown(e, sortedFilteredPlayers.length, fields.length, sortedFilteredPlayers)}
           style={{ outline: 'none', overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', position: 'relative' }}
         >
           <div style={{ fontSize: '11px', color: s.dim, padding: '6px 12px 4px', borderBottom: '0.5px solid var(--border)', background: 'var(--bg-card)', display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -639,36 +687,37 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     textTransform: 'uppercase', color: s.muted, whiteSpace: 'nowrap',
                   }}>Section Scores</th>
                 )}
-                <th colSpan={3} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
+                <th colSpan={4} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
               </tr>
 
               {/* ── Column label row ── */}
               <tr>
                 {/* Sticky player column */}
-                <th style={{
+                <th onClick={() => toggleSort('name')} style={{
                   padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap',
                   background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
                   position: 'sticky', left: 0, zIndex: 3,
                   fontSize: '11px', fontWeight: 700, color: s.muted,
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.06)',
-                }}>Player</th>
-                <th style={{ padding: '8px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap' }}>Age</th>
-                <th style={{ padding: '8px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap', minWidth: '100px' }}>Prior Team</th>
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.06)', cursor: 'pointer', userSelect: 'none',
+                }}>Player{sortIndicator('name')}</th>
+                <th onClick={() => toggleSort('age')} style={{ padding: '8px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>Age{sortIndicator('age')}</th>
+                <th onClick={() => toggleSort('team')} style={{ padding: '8px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}>Prior Team{sortIndicator('team')}</th>
 
                 {fields.map((field, fi) => {
                   const isFirstInSection = fi === 0 || fields[fi - 1].section !== field.section
                   return (
-                    <th key={field.key} style={{
+                    <th key={field.key} onClick={() => toggleSort(field.key)} style={{
                       padding: '4px 4px 6px', textAlign: 'center', verticalAlign: 'bottom',
                       background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
                       borderLeft: isFirstInSection ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
-                      minWidth: '52px', maxWidth: '64px',
+                      minWidth: '52px', maxWidth: '64px', cursor: 'pointer', userSelect: 'none',
                     }}>
                       {/* Rotated label */}
                       <div style={{
                         writingMode: 'vertical-rl', transform: 'rotate(180deg)',
                         height: '72px', overflow: 'hidden',
-                        fontSize: '10px', fontWeight: 600, color: s.muted,
+                        fontSize: '10px', fontWeight: sortConfig?.col === field.key ? 800 : 600,
+                        color: sortConfig?.col === field.key ? 'var(--accent)' : s.muted,
                         textAlign: 'left', paddingBottom: '4px',
                       }}>{field.label}</div>
 
@@ -692,47 +741,54 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
                 {/* Per-section score columns */}
                 {scoredSections.map((sec, i) => (
-                  <th key={`sechdr_${sec}`} style={{
+                  <th key={`sechdr_${sec}`} onClick={() => toggleSort(`sec_${sec}`)} style={{
                     padding: '8px 6px', textAlign: 'center',
                     background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
                     borderLeft: i === 0 ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.08)',
-                    fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap', minWidth: '56px',
+                    fontSize: '11px', fontWeight: 700,
+                    color: sortConfig?.col === `sec_${sec}` ? 'var(--accent)' : s.muted,
+                    whiteSpace: 'nowrap', minWidth: '56px', cursor: 'pointer', userSelect: 'none',
                   }}>
-                    {SECTION_SHORT[sec] ?? sec}
+                    {SECTION_SHORT[sec] ?? sec}{sortIndicator(`sec_${sec}`)}
                   </th>
                 ))}
 
                 {/* Overall score */}
-                <th style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap', minWidth: '60px' }}>Score</th>
+                <th onClick={() => toggleSort('score')} style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', fontWeight: 700, color: sortConfig?.col === 'score' ? 'var(--accent)' : s.muted, whiteSpace: 'nowrap', minWidth: '60px', cursor: 'pointer', userSelect: 'none' }}>Score{sortIndicator('score')}</th>
                 {/* Status */}
-                <th style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap' }}>Status</th>
+                <th onClick={() => toggleSort('status')} style={{ padding: '8px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>Status{sortIndicator('status')}</th>
+                {/* Notes */}
+                <th style={{ padding: '8px 6px', textAlign: 'left', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 600, color: s.dim, whiteSpace: 'nowrap', minWidth: '160px' }}>Notes</th>
                 {/* Row fill */}
                 <th style={{ padding: '8px 6px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', minWidth: '48px' }} />
               </tr>
             </thead>
 
             <tbody>
-              {filteredPlayers.length === 0 && (
+              {sortedFilteredPlayers.length === 0 && (
                 <tr>
-                  <td colSpan={3 + fields.length + 3} style={{ padding: '2.5rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
+                  <td colSpan={3 + fields.length + scoredSections.length + 4} style={{ padding: '2.5rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
                     No players match your filters.
                   </td>
                 </tr>
               )}
 
-              {filteredPlayers.map((player, pi) => {
-                const pScores  = gridScores[player.id] ?? {}
-                const computed = computeScore(pScores, fields)
-                const meta     = evalMeta[player.id]
-                const isDirty  = dirty.has(player.id)
-                const rowBg    = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
+              {sortedFilteredPlayers.map((player, pi) => {
+                const pScores    = gridScores[player.id] ?? {}
+                const computed  = computeScore(pScores, fields)
+                const meta      = evalMeta[player.id]
+                const isDirty   = dirty.has(player.id)
+                const rowBg     = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
+                const note      = meta?.comments ?? null
+                const noteOpen  = expandedNote === player.id
 
                 return (
+                  <>
                   <tr key={player.id}>
                     {/* Player name — sticky */}
                     <td style={{
                       padding: '5px 12px',
-                      borderBottom: '0.5px solid var(--border)',
+                      borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)',
                       borderLeft: isDirty ? '2px solid var(--accent)' : '2px solid transparent',
                       fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
                       position: 'sticky', left: 0, zIndex: 1,
@@ -741,10 +797,10 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     }}>
                       {player.first_name} {player.last_name}
                     </td>
-                    <td style={{ padding: '5px 8px', borderBottom: '0.5px solid var(--border)', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', background: rowBg }}>
+                    <td style={{ padding: '5px 8px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', background: rowBg }}>
                       {player.age_group}
                     </td>
-                    <td style={{ padding: '5px 8px', borderBottom: '0.5px solid var(--border)', color: s.dim, fontSize: '11px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: rowBg }}>
+                    <td style={{ padding: '5px 8px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', color: s.dim, fontSize: '11px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: rowBg }}>
                       {player.prior_team ?? '—'}
                     </td>
 
@@ -764,7 +820,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                           }}
                           style={{
                             padding: '5px 4px',
-                            borderBottom: '0.5px solid var(--border)',
+                            borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)',
                             borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                             textAlign: 'center', cursor: 'pointer',
                             background: isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
@@ -789,7 +845,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       const secScore = computeSectionScore(pScores, fields, sec)
                       return (
                         <td key={`sec_${sec}`} style={{
-                          padding: '5px 6px', borderBottom: '0.5px solid var(--border)',
+                          padding: '5px 6px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)',
                           borderLeft: i === 0 ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                           textAlign: 'center', fontSize: '12px', fontWeight: 700,
                           color: secScore != null ? scoreColor(secScore) : s.dim,
@@ -801,12 +857,12 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     })}
 
                     {/* Overall computed score */}
-                    <td style={{ padding: '5px 8px', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontWeight: 800, fontSize: '13px', color: computed != null ? scoreColor(computed) : s.dim, whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '5px 8px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontWeight: 800, fontSize: '13px', color: computed != null ? scoreColor(computed) : s.dim, whiteSpace: 'nowrap' }}>
                       {computed != null ? computed.toFixed(2) : '—'}
                     </td>
 
                     {/* Status badge */}
-                    <td style={{ padding: '5px 6px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
+                    <td style={{ padding: '5px 6px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', textAlign: 'center' }}>
                       {meta ? (
                         <span style={{
                           fontSize: '10px', padding: '2px 7px', borderRadius: '20px', fontWeight: 700, whiteSpace: 'nowrap',
@@ -816,8 +872,21 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       ) : <span style={{ fontSize: '11px', color: s.dim }}>—</span>}
                     </td>
 
+                    {/* Notes cell */}
+                    <td style={{ padding: '4px 8px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '0.5px solid var(--border)', minWidth: '160px', maxWidth: '260px' }}>
+                      {note ? (
+                        <button onClick={() => setExpandedNote(noteOpen ? null : player.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                          <span style={{ fontSize: '12px', color: noteOpen ? 'var(--fg)' : s.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
+                            {note}
+                          </span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: s.dim, fontStyle: 'italic' }}>—</span>
+                      )}
+                    </td>
+
                     {/* Row fill */}
-                    <td style={{ padding: '4px 6px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
+                    <td style={{ padding: '4px 6px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', textAlign: 'center' }}>
                       {rowFill === player.id ? (
                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
                           {[1,2,3,4,5].map(v => (
@@ -834,6 +903,17 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       )}
                     </td>
                   </tr>
+
+                  {/* Expanded notes row */}
+                  {noteOpen && note && (
+                    <tr key={`${player.id}_note`}>
+                      <td colSpan={3 + fields.length + scoredSections.length + 4} style={{ padding: '8px 16px 12px 16px', borderBottom: '0.5px solid var(--border)', background: rowBg }}>
+                        <div style={{ fontSize: '12px', color: s.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxWidth: '800px' }}>{note}</div>
+                        <button onClick={() => setExpandedNote(null)} style={{ marginTop: '6px', fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>↑ collapse</button>
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 )
               })}
             </tbody>
