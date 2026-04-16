@@ -61,8 +61,10 @@ export interface GcParseResult {
 
 // ── Column name aliases ──────────────────────────────────────────────────────
 
-const NAME_COLS    = ['player', 'name', 'player name', 'full name', 'athlete']
-const JERSEY_COLS  = ['#', 'no', 'no.', 'num', 'number', 'jersey', 'jersey #', 'jersey no']
+const NAME_COLS       = ['player', 'name', 'player name', 'full name', 'athlete']
+const FIRST_NAME_COLS = ['first', 'first name', 'firstname']
+const LAST_NAME_COLS  = ['last', 'last name', 'lastname', 'surname']
+const JERSEY_COLS     = ['#', 'no', 'no.', 'num', 'number', 'jersey', 'jersey #', 'jersey no']
 
 const BATTING_MAP: Record<string, string> = {
   'g': 'g', 'gp': 'g', 'games': 'g',
@@ -131,13 +133,25 @@ function isNameCol(h: string): boolean {
   return NAME_COLS.includes(normalizeHeader(h))
 }
 
+function isFirstNameCol(h: string): boolean {
+  return FIRST_NAME_COLS.includes(normalizeHeader(h))
+}
+
+function isLastNameCol(h: string): boolean {
+  return LAST_NAME_COLS.includes(normalizeHeader(h))
+}
+
 function isJerseyCol(h: string): boolean {
   return JERSEY_COLS.includes(normalizeHeader(h))
 }
 
 function isHeaderRow(row: string[]): boolean {
   const lower = row.map(c => normalizeHeader(c))
-  return lower.some(c => NAME_COLS.includes(c))
+  // Single combined name column: Player, Name, Athlete, Player Name, Full Name
+  if (lower.some(c => NAME_COLS.includes(c))) return true
+  // Split name columns: Last + First (GameChanger combined export)
+  if (lower.some(c => LAST_NAME_COLS.includes(c)) && lower.some(c => FIRST_NAME_COLS.includes(c))) return true
+  return false
 }
 
 function isPitchingHeader(cols: string[]): boolean {
@@ -192,25 +206,40 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
   const result: GcStatsRow[] = []
 
   for (const section of sections) {
-    const headers = rows[section.headerIdx].map(normalizeHeader)
+    const rawHeaders = rows[section.headerIdx]
+    const headers    = rawHeaders.map(normalizeHeader)
 
-    // Find name and jersey column indices
-    const nameIdx   = headers.findIndex(isNameCol)
+    // Detect split-name format (Last + First columns) vs combined (Player/Name)
+    const firstIdx  = headers.findIndex(isFirstNameCol)
+    const lastIdx   = headers.findIndex(isLastNameCol)
+    const splitName = firstIdx !== -1 && lastIdx !== -1
+
+    const nameIdx   = splitName ? -1 : headers.findIndex(isNameCol)
     const jerseyIdx = headers.findIndex(isJerseyCol)
 
-    if (nameIdx === -1) {
+    if (!splitName && nameIdx === -1) {
       errors.push(`Section at row ${section.headerIdx + 1}: couldn't find Player/Name column.`)
       continue
     }
 
-    // Build column mapping for stats
+    // Build column mapping for stats — for combined exports apply both maps
+    // (first occurrence of a key wins, so batting stats before pitching are preferred)
     const statMap: Record<number, string> = {}
-    const colDict = section.type === 'pitching' ? PITCHING_MAP : BATTING_MAP
+    const seenStatKeys = new Set<string>()
+    const colDicts = section.type === 'pitching'
+      ? [PITCHING_MAP, BATTING_MAP]
+      : [BATTING_MAP, PITCHING_MAP]
 
     for (let ci = 0; ci < headers.length; ci++) {
-      if (ci === nameIdx || ci === jerseyIdx) continue
-      const mapped = colDict[headers[ci]]
-      if (mapped) statMap[ci] = mapped
+      if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
+      for (const dict of colDicts) {
+        const mapped = dict[headers[ci]]
+        if (mapped && !seenStatKeys.has(mapped)) {
+          statMap[ci] = mapped
+          seenStatKeys.add(mapped)
+          break
+        }
+      }
     }
 
     // Determine where this section's data ends (blank row or next header)
@@ -224,7 +253,11 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
     // Parse data rows
     for (let ri = section.headerIdx + 1; ri < endIdx; ri++) {
       const row = rows[ri]
-      const rawName = row[nameIdx]?.trim()
+
+      const rawName = splitName
+        ? [row[firstIdx]?.trim(), row[lastIdx]?.trim()].filter(Boolean).join(' ')
+        : row[nameIdx]?.trim()
+
       if (!rawName || rawName.toLowerCase() === 'total' || rawName.toLowerCase() === 'totals') continue
 
       const jerseyNumber = jerseyIdx >= 0 ? (row[jerseyIdx]?.trim() || null) : null
