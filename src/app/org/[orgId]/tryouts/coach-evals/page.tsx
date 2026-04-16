@@ -131,6 +131,11 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   // Row fill picker
   const [rowFill, setRowFill] = useState<string | null>(null)
 
+  // Team eval tokens (per-team unique links)
+  const [teamTokens,   setTeamTokens]   = useState<Record<string, string>>({}) // team_label → token uuid
+  const [tokenBusy,    setTokenBusy]    = useState<string | null>(null)         // team_label currently generating
+  const [copiedTeam,   setCopiedTeam]   = useState<string | null>(null)
+
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
@@ -220,6 +225,20 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setSubmissions(Array.from(subMap.entries()).map(([team, v]) => ({
       team_label: team, coach_name: v.coach, submitted_at: v.at, player_count: v.count,
     })).sort((a, b) => (b.submitted_at ?? '').localeCompare(a.submitted_at ?? '')))
+
+    // Load existing team tokens if season is available
+    if (seasonData) {
+      const { data: tokenRows } = await supabase
+        .from('tryout_eval_team_tokens')
+        .select('team_label, token')
+        .eq('org_id', params.orgId)
+        .eq('season_id', seasonData.id)
+      if (tokenRows) {
+        const map: Record<string, string> = {}
+        for (const row of tokenRows) map[row.team_label] = row.token
+        setTeamTokens(map)
+      }
+    }
 
     setLoading(false)
   }
@@ -374,6 +393,27 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setTimeout(() => setShareCopied(false), 2000)
   }
 
+  async function generateTeamToken(teamLabel: string, regenerate: boolean) {
+    if (!season) return
+    setTokenBusy(teamLabel)
+    const fn = regenerate ? 'tryout_regenerate_team_eval_token' : 'tryout_upsert_team_eval_token'
+    const { data } = await supabase.rpc(fn, {
+      p_org_id:     params.orgId,
+      p_season_id:  season.id,
+      p_team_label: teamLabel,
+    })
+    if (data) setTeamTokens(prev => ({ ...prev, [teamLabel]: data }))
+    setTokenBusy(null)
+  }
+
+  function copyTeamLink(teamLabel: string) {
+    const token = teamTokens[teamLabel]
+    if (!token) return
+    navigator.clipboard.writeText(`${window.location.origin}/tryouts/eval/team/${token}`)
+    setCopiedTeam(teamLabel)
+    setTimeout(() => setCopiedTeam(null), 2000)
+  }
+
   const sections = Array.from(new Set(fields.map(f => f.section)))
   // Sections that have at least one weighted field — get their own score column
   const scoredSections = sections.filter(sec => fields.some(f => f.section === sec && f.weight > 0))
@@ -453,6 +493,55 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
           )}
         </div>
       )}
+
+      {/* Team eval links — admin only */}
+      {isAdmin && season && (() => {
+        const teams = Array.from(new Set(players.map(p => p.prior_team).filter(Boolean) as string[]))
+          .sort((a, b) => {
+            const na = parseInt(a.match(/^(\d+)/)?.[1] ?? '999')
+            const nb = parseInt(b.match(/^(\d+)/)?.[1] ?? '999')
+            return na !== nb ? na - nb : a.localeCompare(b)
+          })
+        if (teams.length === 0) return null
+        return (
+          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Team eval links</div>
+            <div style={{ fontSize: '12px', color: s.muted, marginBottom: '12px' }}>
+              Each team gets a unique link that locks the form to their roster. Copy and send directly to the coach.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {teams.map(team => {
+                const token = teamTokens[team]
+                const isBusy = tokenBusy === team
+                const isCopied = copiedTeam === team
+                const link = token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/tryouts/eval/team/${token}` : null
+                return (
+                  <div key={team} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-card-alt)', border: '0.5px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '90px' }}>{team}</span>
+                    {link ? (
+                      <>
+                        <code style={{ fontSize: '11px', color: s.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '4px', padding: '3px 8px' }}>
+                          {link}
+                        </code>
+                        <button onClick={() => copyTeamLink(team)} style={{ padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: isCopied ? 'rgba(109,184,117,0.12)' : 'var(--bg-input)', color: isCopied ? '#6DB875' : s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                          {isCopied ? '✓ Copied' : '⎘ Copy'}
+                        </button>
+                        <button onClick={() => generateTeamToken(team, true)} disabled={isBusy} style={{ padding: '5px 10px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', cursor: 'pointer', flexShrink: 0, opacity: isBusy ? 0.5 : 1 }}>
+                          {isBusy ? '…' : '↺ New link'}
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => generateTeamToken(team, false)} disabled={isBusy} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: isBusy ? 0.6 : 1 }}>
+                        {isBusy ? 'Generating…' : 'Generate link'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Submission summary */}
       {submissions.length > 0 && (
