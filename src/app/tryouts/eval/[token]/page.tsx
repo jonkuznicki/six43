@@ -949,7 +949,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
       </div>
 
-      <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '1.5rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '1300px', margin: '0 auto', padding: `1.5rem 1.5rem ${selected !== null ? '130px' : '6rem'}` }}>
         {/* Scale + XLS tools row */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', fontSize: '11px' }}>
@@ -993,8 +993,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                     position: 'sticky', top: 0, zIndex: 2,
                     padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)',
                     borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)',
-                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em',
-                    textTransform: 'uppercase', color: s.muted,
+                    fontSize: '10px', fontWeight: 800, letterSpacing: '0.07em',
+                    textTransform: 'uppercase', color: 'var(--accent)',
                     whiteSpace: 'normal', lineHeight: 1.3,
                   }}>{sec.label}</th>
                 ))}
@@ -1021,7 +1021,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                       borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                       width: '52px', minWidth: '52px', maxWidth: '52px',
                     }}>
-                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '64px', overflow: 'hidden', fontSize: '10px', fontWeight: 600, color: s.muted, textAlign: 'left', paddingBottom: '2px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '64px', overflow: 'hidden', fontSize: '10px', fontWeight: 700, color: 'var(--fg)', textAlign: 'left', paddingBottom: '2px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {field.label}
                       </div>
                       {colFillKey === field.field_key ? (
@@ -1200,6 +1200,67 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
       </div>
 
+      {/* ── Mobile / touch score bar ──────────────────────────────────────── */}
+      {/* Shown when a cell is selected; primary input method on phones/tablets */}
+      {selected !== null && (() => {
+        const player = teamPlayers[selected.rowIdx]
+        const field  = allFields[selected.colIdx]
+        if (!player || !field) return null
+        const val = scores[player.id]?.[field.field_key] ?? null
+        const na  = isNa(player.id, sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? '')
+        return (
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+            background: '#1a365d',
+            borderTop: '2px solid #2a4a7d',
+            padding: '10px 16px 14px',
+            display: 'flex', flexDirection: 'column', gap: '8px',
+          }}>
+            {/* Context label */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
+                {player.first_name} {player.last_name} &middot; <em style={{ fontStyle: 'normal', color: 'rgba(255,255,255,0.55)' }}>{field.label}</em>
+              </span>
+              <button
+                onClick={() => setSelected(null)}
+                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '5px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+              >Done</button>
+            </div>
+            {/* Score buttons */}
+            {na ? (
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: '6px 0' }}>N/A for this player</div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                {[1, 2, 3, 4, 5].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => {
+                      if (val === v) {
+                        commitScore(player.id, field.field_key, null)
+                      } else {
+                        commitScore(player.id, field.field_key, v)
+                        moveSelected(0, 1, teamPlayers.length, allFields.length)
+                      }
+                    }}
+                    style={{
+                      flex: 1, height: '48px', borderRadius: '8px', border: 'none',
+                      background: val === v ? '#ffffff' : 'rgba(255,255,255,0.15)',
+                      color: val === v ? '#1a365d' : '#ffffff',
+                      fontSize: '20px', fontWeight: 800, cursor: 'pointer',
+                    }}
+                  >{v}</button>
+                ))}
+                {val != null && (
+                  <button
+                    onClick={() => commitScore(player.id, field.field_key, null)}
+                    style={{ width: '44px', height: '48px', borderRadius: '8px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '18px', cursor: 'pointer', flexShrink: 0 }}
+                  >×</button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </main>
   )
 }
