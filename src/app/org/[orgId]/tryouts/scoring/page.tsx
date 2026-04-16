@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { GC_STAT_DEFS } from '../../../../../lib/tryouts/gcStatDefs'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,12 @@ interface Season {
   label: string
 }
 
+interface GcStatConfig {
+  stat_key:  string
+  included:  boolean
+  weight:    number
+}
+
 const EVAL_SECTIONS = [
   { key: 'fielding_hitting',   label: 'Fielding & Hitting' },
   { key: 'pitching_catching',  label: 'Pitching & Catching' },
@@ -65,6 +72,16 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
   const [tryoutMsg,    setTryoutMsg]    = useState<string | null>(null)
   const [evalMsg,      setEvalMsg]      = useState<string | null>(null)
 
+  // GC stat scoring
+  const [ageGroups,    setAgeGroups]    = useState<string[]>([])
+  const [gcAgeGroup,   setGcAgeGroup]   = useState<string>('')
+  // Map: ageGroup → stat_key → config
+  const [gcConfig,     setGcConfig]     = useState<Record<string, Record<string, GcStatConfig>>>({})
+  const [savingGc,     setSavingGc]     = useState(false)
+  const [gcMsg,        setGcMsg]        = useState<string | null>(null)
+  const [recomputing,  setRecomputing]  = useState(false)
+  const [recomputeMsg, setRecomputeMsg] = useState<string | null>(null)
+
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
@@ -75,7 +92,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: scoreCfg }, { data: evalCfg }] = await Promise.all([
+    const [{ data: scoreCfg }, { data: evalCfg }, { data: gcCfgRows }, { data: playerRows }] = await Promise.all([
       supabase.from('tryout_scoring_config')
         .select('id, category, label, weight, subcategories, is_optional, sort_order')
         .eq('season_id', seasonData.id)
@@ -84,7 +101,41 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         .select('id, section, field_key, label, is_optional, sort_order, weight')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('sort_order'),
+      supabase.from('tryout_gc_scoring_config')
+        .select('age_group, stat_key, included, weight')
+        .eq('org_id', params.orgId)
+        .eq('season_id', seasonData.id),
+      supabase.from('tryout_players')
+        .select('age_group')
+        .eq('org_id', params.orgId)
+        .eq('is_active', true)
+        .not('age_group', 'is', null),
     ])
+
+    // Distinct sorted age groups
+    const groups = Array.from(new Set((playerRows ?? []).map((p: any) => p.age_group as string).filter(Boolean))).sort()
+    setAgeGroups(groups)
+    if (groups.length > 0) setGcAgeGroup(prev => prev || groups[0])
+
+    // Build GC config map: ageGroup → stat_key → config
+    // Start with defaults, overlay with DB rows
+    const cfgMap: Record<string, Record<string, GcStatConfig>> = {}
+    for (const group of groups) {
+      cfgMap[group] = {}
+      for (const def of GC_STAT_DEFS) {
+        cfgMap[group][def.key] = { stat_key: def.key, included: def.defaultIncluded, weight: def.defaultWeight }
+      }
+    }
+    for (const row of gcCfgRows ?? []) {
+      if (!cfgMap[row.age_group]) {
+        cfgMap[row.age_group] = {}
+        for (const def of GC_STAT_DEFS) {
+          cfgMap[row.age_group][def.key] = { stat_key: def.key, included: def.defaultIncluded, weight: def.defaultWeight }
+        }
+      }
+      cfgMap[row.age_group][row.stat_key] = { stat_key: row.stat_key, included: row.included, weight: row.weight }
+    }
+    setGcConfig(cfgMap)
 
     setCategories(
       (scoreCfg ?? []).map((c: any) => ({
@@ -302,6 +353,80 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
       await loadData()
     }
     setSavingEval(false)
+  }
+
+  // ── GC scoring helpers ────────────────────────────────────────────────────
+
+  function updateGcStat(ageGroup: string, statKey: string, patch: Partial<GcStatConfig>) {
+    setGcConfig(prev => ({
+      ...prev,
+      [ageGroup]: {
+        ...prev[ageGroup],
+        [statKey]: { ...(prev[ageGroup]?.[statKey] ?? { stat_key: statKey, included: false, weight: 1.0 }), ...patch },
+      },
+    }))
+  }
+
+  async function saveGcConfig() {
+    if (!season) return
+    setSavingGc(true)
+    setGcMsg(null)
+
+    const rows: Array<{ org_id: string; season_id: string; age_group: string; stat_key: string; included: boolean; weight: number }> = []
+    for (const [ageGroup, statMap] of Object.entries(gcConfig)) {
+      for (const [, cfg] of Object.entries(statMap)) {
+        rows.push({
+          org_id:    params.orgId,
+          season_id: season.id,
+          age_group: ageGroup,
+          stat_key:  cfg.stat_key,
+          included:  cfg.included,
+          weight:    cfg.weight,
+        })
+      }
+    }
+
+    const { error } = await supabase
+      .from('tryout_gc_scoring_config')
+      .upsert(rows, { onConflict: 'org_id,season_id,age_group,stat_key' })
+
+    if (error) {
+      setGcMsg(`Error: ${error.message}`)
+    } else {
+      setGcMsg('Saved.')
+    }
+    setSavingGc(false)
+  }
+
+  async function recomputeGcScores() {
+    if (!season) return
+    setRecomputing(true)
+    setRecomputeMsg(null)
+
+    // Need a season year — fetch from seasons table
+    const { data: seasonData } = await supabase
+      .from('tryout_seasons')
+      .select('year')
+      .eq('id', season.id)
+      .single()
+
+    const seasonYear = seasonData ? String(seasonData.year - 1) : null
+    if (!seasonYear) { setRecomputeMsg('Could not determine season year.'); setRecomputing(false); return }
+
+    const res = await fetch('/api/tryouts/gc-stats/compute-scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId: params.orgId, seasonId: season.id, seasonYear }),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setRecomputeMsg(`Error: ${json.error ?? 'Unknown error'}`)
+    } else if (json.message) {
+      setRecomputeMsg(json.message)
+    } else {
+      setRecomputeMsg(`Done — updated ${json.updated} player scores.`)
+    }
+    setRecomputing(false)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -563,6 +688,105 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
           }}>{savingEval ? 'Saving…' : 'Save Eval Config'}</button>
           {evalMsg && <span style={{ fontSize: '12px', color: evalMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{evalMsg}</span>}
         </div>
+      </div>
+
+      {/* ── GC Stat Scoring ─────────────────────────────────────────────────── */}
+      <div style={{ marginTop: '3rem' }}>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <div style={{ fontSize: '15px', fontWeight: 700 }}>GameChanger Stat Scoring</div>
+          <div style={{ fontSize: '12px', color: s.dim, marginTop: '2px' }}>
+            Configure which GC stats contribute to a player's calculated 1–5 score, per age group.
+            Scores are percentile-ranked within each age group.
+          </div>
+        </div>
+
+        {ageGroups.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
+            No players found. Import registration first.
+          </div>
+        ) : (
+          <>
+            {/* Age group tabs */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              {ageGroups.map(g => (
+                <button key={g} onClick={() => setGcAgeGroup(g)} style={{
+                  padding: '6px 14px', borderRadius: '20px', border: '0.5px solid',
+                  borderColor: gcAgeGroup === g ? 'var(--accent)' : 'var(--border)',
+                  background: gcAgeGroup === g ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+                  color: gcAgeGroup === g ? 'var(--accent)' : s.muted,
+                  fontSize: '12px', fontWeight: gcAgeGroup === g ? 700 : 400,
+                  cursor: 'pointer',
+                }}>{g}</button>
+              ))}
+            </div>
+
+            {/* Stat grid for selected age group */}
+            {gcAgeGroup && gcConfig[gcAgeGroup] && (
+              <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                {(['batting', 'pitching'] as const).map(cat => {
+                  const defs = GC_STAT_DEFS.filter(d => d.category === cat)
+                  return (
+                    <div key={cat}>
+                      <div style={{ padding: '8px 14px', background: 'rgba(var(--fg-rgb),0.03)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        {cat === 'batting' ? 'Batting' : 'Pitching'}
+                      </div>
+                      <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {defs.map(def => {
+                          const cfg = gcConfig[gcAgeGroup]?.[def.key] ?? { stat_key: def.key, included: def.defaultIncluded, weight: def.defaultWeight }
+                          return (
+                            <div key={def.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0' }}>
+                              <input
+                                type="checkbox"
+                                checked={cfg.included}
+                                onChange={e => updateGcStat(gcAgeGroup, def.key, { included: e.target.checked })}
+                              />
+                              <span style={{ flex: 1, fontSize: '13px', color: cfg.included ? 'var(--fg)' : s.dim }}>
+                                {def.label}
+                                {!def.higherBetter && <span style={{ fontSize: '10px', color: s.dim, marginLeft: '4px' }}>(lower=better)</span>}
+                              </span>
+                              <span style={{ fontSize: '10px', color: s.dim, minWidth: '40px' }}>{def.key}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, opacity: cfg.included ? 1 : 0.4 }}>
+                                <span style={{ fontSize: '10px', color: s.dim }}>wt</span>
+                                <input
+                                  type="number" min={0} max={10} step={0.5}
+                                  value={cfg.weight}
+                                  disabled={!cfg.included}
+                                  onChange={e => updateGcStat(gcAgeGroup, def.key, { weight: parseFloat(e.target.value) || 0 })}
+                                  style={{ ...inputStyle, width: '52px', textAlign: 'right', padding: '4px 6px', fontSize: '12px' }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <button onClick={saveGcConfig} disabled={savingGc} style={{
+                padding: '9px 22px', borderRadius: '7px', border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-text)',
+                fontSize: '13px', fontWeight: 700, cursor: savingGc ? 'not-allowed' : 'pointer',
+                opacity: savingGc ? 0.6 : 1,
+              }}>{savingGc ? 'Saving…' : 'Save GC Config'}</button>
+
+              <button onClick={recomputeGcScores} disabled={recomputing} style={{
+                padding: '9px 22px', borderRadius: '7px',
+                border: '0.5px solid var(--border-md)',
+                background: 'var(--bg-input)', color: s.muted,
+                fontSize: '13px', fontWeight: 600, cursor: recomputing ? 'not-allowed' : 'pointer',
+                opacity: recomputing ? 0.6 : 1,
+              }}>{recomputing ? 'Recomputing…' : 'Recompute All Scores'}</button>
+
+              {gcMsg && <span style={{ fontSize: '12px', color: gcMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{gcMsg}</span>}
+              {recomputeMsg && <span style={{ fontSize: '12px', color: recomputeMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{recomputeMsg}</span>}
+            </div>
+          </>
+        )}
       </div>
     </main>
   )

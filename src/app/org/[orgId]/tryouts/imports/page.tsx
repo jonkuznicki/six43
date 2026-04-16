@@ -46,14 +46,17 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
   const router   = useRouter()
   const fileRef  = useRef<HTMLInputElement>(null)
 
-  const [jobs,       setJobs]       = useState<ImportJob[]>([])
-  const [seasons,    setSeasons]    = useState<Season[]>([])
-  const [seasonId,   setSeasonId]   = useState('')
-  const [seasonYear, setSeasonYear] = useState('')
-  const [uploadType, setUploadType] = useState('registration')
-  const [uploading,  setUploading]  = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [loading,    setLoading]    = useState(true)
+  const [jobs,           setJobs]           = useState<ImportJob[]>([])
+  const [seasons,        setSeasons]        = useState<Season[]>([])
+  const [seasonId,       setSeasonId]       = useState('')
+  const [seasonYear,     setSeasonYear]     = useState('')
+  const [uploadType,     setUploadType]     = useState('registration')
+  const [uploading,      setUploading]      = useState(false)
+  const [uploadError,    setUploadError]    = useState<string | null>(null)
+  const [loading,        setLoading]        = useState(true)
+  const [gcTeamOverride, setGcTeamOverride] = useState('')
+  const [priorTeams,     setPriorTeams]     = useState<string[]>([])
+  const [uploadResult,   setUploadResult]   = useState<{ teamLabel: string | null; teamLabelSource: string | null } | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -79,6 +82,17 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
       setSeasonId(s[0].id)
       setSeasonYear(String(s[0].year - 1))  // default eval year = previous year
     }
+
+    // Fetch distinct prior_team values for GC team override dropdown
+    const { data: teamRows } = await supabase
+      .from('tryout_players')
+      .select('prior_team')
+      .eq('org_id', params.orgId)
+      .eq('is_active', true)
+      .not('prior_team', 'is', null)
+    const teams = Array.from(new Set((teamRows ?? []).map((r: any) => r.prior_team as string).filter(Boolean))).sort()
+    setPriorTeams(teams)
+
     setLoading(false)
   }
 
@@ -88,12 +102,16 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     setUploading(true)
     setUploadError(null)
 
+    setUploadResult(null)
     const formData = new FormData()
     formData.append('file', file)
     formData.append('orgId', params.orgId)
     formData.append('seasonId', seasonId)
     if (uploadType === 'coach_eval' || uploadType === 'gc_stats') {
       formData.append('seasonYear', seasonYear)
+    }
+    if (uploadType === 'gc_stats' && gcTeamOverride.trim()) {
+      formData.append('overrideTeamLabel', gcTeamOverride.trim())
     }
 
     const endpoint =
@@ -115,6 +133,11 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
 
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ''
+
+    // Show team label result for GC stats
+    if (uploadType === 'gc_stats') {
+      setUploadResult({ teamLabel: json.teamLabel ?? null, teamLabelSource: json.teamLabelSource ?? null })
+    }
 
     // Navigate directly to review screen if there's anything to review
     if (json.jobId && (json.suggested > 0 || json.unresolved > 0)) {
@@ -193,7 +216,55 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
               />
             </div>
           )}
+
+          {/* Team override for GC stats */}
+          {uploadType === 'gc_stats' && (
+            <div>
+              <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Assign to team
+              </label>
+              {priorTeams.length > 0 ? (
+                <select
+                  value={gcTeamOverride}
+                  onChange={e => setGcTeamOverride(e.target.value)}
+                  style={{
+                    background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
+                    borderRadius: '6px', padding: '7px 12px', fontSize: '13px',
+                    color: gcTeamOverride ? 'var(--fg)' : s.dim, cursor: 'pointer',
+                  }}
+                >
+                  <option value="">Auto-detect</option>
+                  {priorTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text" value={gcTeamOverride}
+                  onChange={e => setGcTeamOverride(e.target.value)}
+                  placeholder="Auto-detect"
+                  style={{
+                    background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
+                    borderRadius: '6px', padding: '7px 12px', fontSize: '13px',
+                    color: 'var(--fg)', width: '160px',
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Team detection result */}
+        {uploadResult && uploadType === 'gc_stats' && (
+          <div style={{ marginBottom: '10px', fontSize: '12px', color: s.muted }}>
+            Team assigned:{' '}
+            <strong style={{ color: 'var(--fg)' }}>{uploadResult.teamLabel ?? '(none detected)'}</strong>
+            {uploadResult.teamLabelSource && (
+              <span style={{ marginLeft: '6px', color: s.dim }}>
+                ({uploadResult.teamLabelSource === 'override' ? 'manually set' :
+                  uploadResult.teamLabelSource === 'file' ? 'from file' : 'from player matches'})
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Type selector */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>

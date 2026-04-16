@@ -10,6 +10,19 @@ import { createServerClient } from '../../../../../lib/supabase-server'
 import { parseGcStatsFile } from '../../../../../lib/tryouts/import/parseGcStats'
 import { resolvePlayer, CandidatePlayer } from '../../../../../lib/tryouts/identityResolver'
 import { normalizeName } from '../../../../../lib/tryouts/nameNormalization'
+import { computeGcScores, GcPlayerStat, GcScoringConfigRow } from '../../../../../lib/tryouts/computeGcScores'
+
+/** Attempt to extract a team name from the filename (before the first underscore, dash, or space) */
+function detectTeamFromFilename(filename: string): string | null {
+  const base = filename.replace(/\.[^.]+$/, '').trim()
+  // Try: first token split by _ - or space, if it looks like a team name (≥3 chars, not just a year)
+  const parts = base.split(/[_\-\s]+/)
+  for (const p of parts) {
+    const cleaned = p.trim()
+    if (cleaned.length >= 3 && !/^\d{4}$/.test(cleaned)) return cleaned
+  }
+  return parts[0] ? parts[0].trim() : null
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient()
@@ -20,11 +33,12 @@ export async function POST(req: NextRequest) {
   try { formData = await req.formData() }
   catch { return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 }) }
 
-  const file       = formData.get('file')       as File   | null
-  const orgId      = formData.get('orgId')      as string | null
-  const seasonId   = formData.get('seasonId')   as string | null
-  const seasonYear = formData.get('seasonYear') as string | null
-  const teamId     = formData.get('teamId')     as string | null
+  const file              = formData.get('file')              as File   | null
+  const orgId             = formData.get('orgId')             as string | null
+  const seasonId          = formData.get('seasonId')          as string | null
+  const seasonYear        = formData.get('seasonYear')        as string | null
+  const teamId            = formData.get('teamId')            as string | null
+  const overrideTeamLabel = (formData.get('overrideTeamLabel') as string | null)?.trim() || null
 
   if (!file)       return NextResponse.json({ error: 'Missing file' },       { status: 400 })
   if (!orgId)      return NextResponse.json({ error: 'Missing orgId' },      { status: 400 })
@@ -65,6 +79,12 @@ export async function POST(req: NextRequest) {
     id: p.id, firstName: p.first_name, lastName: p.last_name,
     dob: p.dob, ageGroup: p.age_group, parentEmail: p.parent_email,
   }))
+
+  // ── Team detection ──────────────────────────────────────────────────────
+  // Priority: 1) admin override  2) embedded team label from file  3) filename heuristic  4) plurality vote from matched players
+  const filenameSuggestedTeam = detectTeamFromFilename(file.name)
+  const resolvedTeamFromFile  = overrideTeamLabel ?? parseResult.teamLabel ?? null
+  // We'll finalize after matching (plurality vote used as fallback)
 
   // Resolve each row — boost confidence if jersey numbers match
   const matchReport = parseResult.rows.map(row => {
@@ -109,6 +129,23 @@ export async function POST(req: NextRequest) {
   const suggestedCount  = matchReport.filter(r => r.status === 'suggested').length
   const unresolvedCount = matchReport.filter(r => r.status === 'unresolved').length
 
+  // ── Plurality vote for team label from matched players' prior_team ───────
+  let finalTeamLabel: string | null = resolvedTeamFromFile
+  if (!finalTeamLabel) {
+    const teamVotes = new Map<string, number>()
+    for (const row of matchReport.filter(r => r.resolvedPlayerId)) {
+      const player = existingPlayers.find((p: any) => p.id === row.resolvedPlayerId)
+      if (player?.prior_team) {
+        teamVotes.set(player.prior_team, (teamVotes.get(player.prior_team) ?? 0) + 1)
+      }
+    }
+    if (teamVotes.size > 0) {
+      finalTeamLabel = Array.from(teamVotes.entries()).sort((a, b) => b[1] - a[1])[0][0]
+    }
+  }
+  // Last resort: use filename suggestion
+  if (!finalTeamLabel) finalTeamLabel = filenameSuggestedTeam
+
   // Write auto-matched stats
   const autoRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
   if (autoRows.length > 0) {
@@ -116,7 +153,7 @@ export async function POST(req: NextRequest) {
       player_id:   r.resolvedPlayerId,
       org_id:      orgId,
       season_year: seasonYear,
-      team_label:  r.teamLabel,
+      team_label:  finalTeamLabel ?? r.teamLabel,
       source:      'gamechanger',
       // Batting
       games_played: r.stats.g   ?? null,
@@ -147,6 +184,51 @@ export async function POST(req: NextRequest) {
 
     await supabase.from('tryout_gc_stats')
       .upsert(upserts, { onConflict: 'player_id,season_year' })
+
+    // ── Compute scores for newly upserted players ──────────────────────────
+    if (seasonId) {
+      const upsertedIds = autoRows.map(r => r.resolvedPlayerId).filter(Boolean)
+
+      const [{ data: scoringCfg }, { data: playerAgeRows }] = await Promise.all([
+        supabase
+          .from('tryout_gc_scoring_config')
+          .select('age_group, stat_key, included, weight')
+          .eq('org_id', orgId)
+          .eq('season_id', seasonId),
+        supabase
+          .from('tryout_players')
+          .select('id, age_group')
+          .in('id', upsertedIds),
+      ])
+
+      if (scoringCfg?.length && playerAgeRows?.length) {
+        const ageGroupById = new Map<string, string | null>(
+          playerAgeRows.map((p: any) => [p.id, p.age_group])
+        )
+        const playerStats: GcPlayerStat[] = autoRows
+          .filter(r => r.resolvedPlayerId)
+          .map(r => ({
+            player_id: r.resolvedPlayerId as string,
+            age_group:  ageGroupById.get(r.resolvedPlayerId as string) ?? null,
+            avg:        r.stats.avg,    obp: r.stats.obp, slg: r.stats.slg, ops: r.stats.ops,
+            rbi:        r.stats.rbi,    r:   r.stats.r,   hr:  r.stats.hr,  sb:  r.stats.sb,
+            bb:         r.stats.bb,     so:  r.stats.so,
+            era:        r.stats.era,    whip:r.stats.whip, ip: r.stats.ip,
+            k_bb:       r.stats.k_bb,   strike_pct: r.stats.strike_pct,
+            w:          r.stats.w,      sv:  r.stats.sv,
+          }))
+
+        const scores = computeGcScores(playerStats, scoringCfg as GcScoringConfigRow[])
+
+        const scoreUpdates = Array.from(scores.entries()).map(([pid, score]) => ({
+          player_id: pid, org_id: orgId, season_year: seasonYear!, gc_computed_score: score,
+        }))
+        if (scoreUpdates.length > 0) {
+          await supabase.from('tryout_gc_stats')
+            .upsert(scoreUpdates, { onConflict: 'player_id,season_year' })
+        }
+      }
+    }
   }
 
   const { data: job } = await supabase
@@ -178,20 +260,21 @@ export async function POST(req: NextRequest) {
     after_val: {
       filename: file.name, rows: matchReport.length,
       auto: autoCount, suggested: suggestedCount, unresolved: unresolvedCount,
-      detectedType: parseResult.detectedType, teamLabel: parseResult.teamLabel,
+      detectedType: parseResult.detectedType, teamLabel: finalTeamLabel,
     },
   })
 
   return NextResponse.json({
-    jobId:       job?.id,
-    rowsTotal:   matchReport.length,
-    auto:        autoCount,
-    suggested:   suggestedCount,
-    unresolved:  unresolvedCount,
-    autoWritten: autoRows.length,
-    detectedType: parseResult.detectedType,
-    teamLabel:   parseResult.teamLabel,
-    parseErrors: parseResult.errors,
+    jobId:             job?.id,
+    rowsTotal:         matchReport.length,
+    auto:              autoCount,
+    suggested:         suggestedCount,
+    unresolved:        unresolvedCount,
+    autoWritten:       autoRows.length,
+    detectedType:      parseResult.detectedType,
+    teamLabel:         finalTeamLabel,
+    teamLabelSource:   overrideTeamLabel ? 'override' : parseResult.teamLabel ? 'file' : finalTeamLabel ? 'players' : null,
+    parseErrors:       parseResult.errors,
     matchReport,
   })
 }
