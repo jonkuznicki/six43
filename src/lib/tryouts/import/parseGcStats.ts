@@ -137,7 +137,7 @@ function isJerseyCol(h: string): boolean {
 
 function isHeaderRow(row: string[]): boolean {
   const lower = row.map(c => normalizeHeader(c))
-  return lower.some(c => ['player', 'name', 'athlete'].includes(c))
+  return lower.some(c => NAME_COLS.includes(c))
 }
 
 function isPitchingHeader(cols: string[]): boolean {
@@ -180,7 +180,8 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
   }
 
   if (sections.length === 0) {
-    errors.push('Could not find a header row with "Player" or "Name" column.')
+    const preview = rows.slice(0, 5).map(r => r.filter(Boolean).join(', ')).filter(Boolean).join(' | ')
+    errors.push(`Could not find a header row with a player name column. First rows: ${preview || '(empty file)'}`)
     return { rows: [], errors, teamLabel, detectedType: 'unknown' }
   }
 
