@@ -9,7 +9,14 @@ interface EvalField {
   label:      string
   section:    string
   sort_order: number
-  weight:     number
+  weight:     number  // defaults to 1 if column not yet migrated
+}
+
+interface Submission {
+  team_label:  string
+  coach_name:  string | null
+  submitted_at: string | null
+  player_count: number
 }
 
 interface Player {
@@ -81,6 +88,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [isAdmin,     setIsAdmin]     = useState(false)
   const [myName,      setMyName]      = useState('')
   const [evalYear,    setEvalYear]    = useState(new Date().getFullYear() - 1)
+  const [submissions, setSubmissions] = useState<Submission[]>([])
 
   // Filters
   const [search,      setSearch]      = useState('')
@@ -123,7 +131,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     ] = await Promise.all([
       supabase.from('tryout_seasons').select('id, label, year, age_groups, eval_share_token').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order, weight').eq('org_id', params.orgId).order('sort_order'),
+      supabase.from('tryout_coach_eval_config').select('field_key, label, section, sort_order').eq('org_id', params.orgId).order('sort_order'),
       user ? supabase.from('tryout_orgs').select('admin_user_id').eq('id', params.orgId).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
@@ -131,7 +139,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setShareToken(seasonData?.eval_share_token ?? null)
 
     const loadedFields: EvalField[] = (fieldData ?? []).map((f: any) => ({
-      key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 0,
+      key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: 1,
     }))
     setFields(loadedFields)
 
@@ -170,6 +178,21 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     }
     setGridScores(scores)
     setEvalMeta(meta)
+
+    // Build submission summary: one row per team that has submitted evals
+    const submittedEvs = (evalData ?? []).filter((e: any) => e.status === 'submitted')
+    const subMap = new Map<string, { coach: string | null; at: string | null; count: number }>()
+    for (const ev of submittedEvs) {
+      const key = ev.team_label ?? 'Unknown'
+      const cur = subMap.get(key) ?? { coach: ev.coach_name, at: ev.submitted_at, count: 0 }
+      cur.count++
+      if (ev.submitted_at && (!cur.at || ev.submitted_at > cur.at)) cur.at = ev.submitted_at
+      subMap.set(key, cur)
+    }
+    setSubmissions(Array.from(subMap.entries()).map(([team, v]) => ({
+      team_label: team, coach_name: v.coach, submitted_at: v.at, player_count: v.count,
+    })).sort((a, b) => (b.submitted_at ?? '').localeCompare(a.submitted_at ?? '')))
+
     setLoading(false)
   }
 
@@ -331,6 +354,33 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
               {shareBusy ? 'Generating…' : 'Generate eval form link'}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Submission summary */}
+      {submissions.length > 0 && (
+        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px' }}>
+            Submissions received
+            <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(109,184,117,0.12)', color: '#6DB875' }}>
+              {submissions.length} team{submissions.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {submissions.map(sub => (
+              <div key={sub.team_label} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '7px 10px', borderRadius: '8px', background: 'rgba(109,184,117,0.06)', border: '0.5px solid rgba(109,184,117,0.2)' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, flex: 1 }}>{sub.team_label}</span>
+                {sub.coach_name && <span style={{ fontSize: '12px', color: s.muted }}>{sub.coach_name}</span>}
+                <span style={{ fontSize: '11px', color: s.dim }}>{sub.player_count} player{sub.player_count !== 1 ? 's' : ''}</span>
+                {sub.submitted_at && (
+                  <span style={{ fontSize: '11px', color: s.dim }}>
+                    {new Date(sub.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+                <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -16,10 +16,14 @@ interface Season {
 }
 interface Stats {
   players:        number
+  playersWithDob: number
+  playersScored:  number
   sessions:       number
   openSessions:   number
   evalsDraft:     number
   evalsSubmitted: number
+  evalTeams:      number
+  regCount:       number
 }
 
 // ── Workflow sections ──────────────────────────────────────────────────────────
@@ -95,18 +99,34 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
     if (seasonData) {
       const [
         { count: players },
+        { count: playersWithDob },
         { count: sessions },
         { count: openSessions },
         { count: evalsDraft },
         { count: evalsSubmitted },
+        { count: regCount },
+        { data: scoredData },
+        { data: evalTeamData },
       ] = await Promise.all([
         supabase.from('tryout_players').select('*', { count: 'exact', head: true }).eq('org_id', params.orgId).eq('is_active', true),
+        supabase.from('tryout_players').select('*', { count: 'exact', head: true }).eq('org_id', params.orgId).eq('is_active', true).not('dob', 'is', null),
         supabase.from('tryout_sessions').select('*', { count: 'exact', head: true }).eq('season_id', seasonData.id),
         supabase.from('tryout_sessions').select('*', { count: 'exact', head: true }).eq('season_id', seasonData.id).eq('status', 'open'),
         supabase.from('tryout_coach_evals').select('*', { count: 'exact', head: true }).eq('org_id', params.orgId).eq('status', 'draft'),
         supabase.from('tryout_coach_evals').select('*', { count: 'exact', head: true }).eq('org_id', params.orgId).eq('status', 'submitted'),
+        supabase.from('tryout_registration_staging').select('*', { count: 'exact', head: true }).eq('org_id', params.orgId).eq('season_id', seasonData.id),
+        supabase.from('tryout_scores').select('player_id').eq('org_id', params.orgId),
+        supabase.from('tryout_coach_evals').select('team_label').eq('org_id', params.orgId).eq('status', 'submitted'),
       ])
-      setStats({ players: players ?? 0, sessions: sessions ?? 0, openSessions: openSessions ?? 0, evalsDraft: evalsDraft ?? 0, evalsSubmitted: evalsSubmitted ?? 0 })
+      const uniqueScored = new Set((scoredData ?? []).map((r: any) => r.player_id)).size
+      const uniqueTeams  = new Set((evalTeamData ?? []).map((r: any) => r.team_label).filter(Boolean)).size
+      setStats({
+        players: players ?? 0, playersWithDob: playersWithDob ?? 0,
+        playersScored: uniqueScored,
+        sessions: sessions ?? 0, openSessions: openSessions ?? 0,
+        evalsDraft: evalsDraft ?? 0, evalsSubmitted: evalsSubmitted ?? 0,
+        evalTeams: uniqueTeams, regCount: regCount ?? 0,
+      })
     }
     setLoading(false)
   }
@@ -155,6 +175,68 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
           </Link>
         )}
       </div>
+
+      {/* Data health widget */}
+      {stats && season && (
+        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '2rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.muted, marginBottom: '12px' }}>
+            Data Health
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+            {([
+              {
+                label: 'Players loaded',
+                value: stats.players, total: stats.players,
+                detail: `${stats.players} registered`,
+                color: '#6DB875', warn: stats.players === 0,
+              },
+              {
+                label: 'DOB coverage',
+                value: stats.playersWithDob, total: stats.players,
+                detail: stats.players > 0 ? `${stats.playersWithDob}/${stats.players} have date of birth` : 'No players yet',
+                color: stats.playersWithDob === stats.players && stats.players > 0 ? '#6DB875' : '#E8A020',
+                warn: stats.players > 0 && stats.playersWithDob < stats.players,
+              },
+              {
+                label: 'Registration data',
+                value: stats.regCount, total: stats.players,
+                detail: `${stats.regCount}/${stats.players} have registration`,
+                color: stats.regCount >= stats.players && stats.players > 0 ? '#6DB875' : '#E8A020',
+                warn: stats.players > 0 && stats.regCount < stats.players,
+              },
+              {
+                label: 'Coach evals submitted',
+                value: stats.evalsSubmitted, total: stats.players,
+                detail: stats.evalTeams > 0
+                  ? `${stats.evalsSubmitted} players · ${stats.evalTeams} team${stats.evalTeams !== 1 ? 's' : ''}`
+                  : 'No submissions yet',
+                color: stats.evalsSubmitted > 0 ? '#6DB875' : s.dim,
+                warn: false,
+              },
+              {
+                label: 'Tryout scores',
+                value: stats.playersScored, total: stats.players,
+                detail: `${stats.playersScored}/${stats.players} players scored`,
+                color: stats.playersScored > 0 ? '#6DB875' : s.dim,
+                warn: false,
+              },
+            ] as const).map(({ label, value, total, detail, color, warn }) => {
+              const pct = total > 0 ? Math.round(value / total * 100) : 0
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: warn ? '#E8A020' : s.muted, minWidth: '160px', fontWeight: warn ? 600 : 400 }}>
+                    {warn && '⚠ '}{label}
+                  </div>
+                  <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.08)', overflow: 'hidden', maxWidth: '200px' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '3px', transition: 'width 0.5s' }} />
+                  </div>
+                  <div style={{ fontSize: '11px', color: s.dim, minWidth: '180px' }}>{detail}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Workflow sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

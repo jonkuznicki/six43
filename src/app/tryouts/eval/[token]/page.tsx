@@ -81,6 +81,19 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const [emailSaving,  setEmailSaving]  = useState(false)
   const [emailSaved,   setEmailSaved]   = useState(false)
 
+  // Save & resume
+  const [contactEmail,  setContactEmail]  = useState('')
+  const [savingDraft,   setSavingDraft]   = useState(false)
+  const [lastSaved,     setLastSaved]     = useState<Date | null>(null)
+  const [hasDraft,      setHasDraft]      = useState(false)
+
+  // Grid cell picker (floating)
+  const [cellPicker, setCellPicker] = useState<{ playerId: string; fieldKey: string; x: number; y: number } | null>(null)
+  // Column fill
+  const [colFillKey,  setColFillKey]  = useState<string | null>(null)
+  // Row fill (expanded comment row)
+  const [expandedComment, setExpandedComment] = useState<string | null>(null)
+
   useEffect(() => {
     supabase.rpc('tryout_eval_form_data_by_token', { p_token: params.token })
       .then(({ data, error }) => {
@@ -90,6 +103,80 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         setLoading(false)
       })
   }, [])
+
+  // Auto-save scores to localStorage whenever they change (score step only)
+  useEffect(() => {
+    if (step !== 'score' || !selectedTeam) return
+    const key = `eval_draft_${params.token}_${selectedTeam}`
+    try {
+      localStorage.setItem(key, JSON.stringify({ coachName, contactEmail, scores, playerComments, overallNotes, savedAt: new Date().toISOString() }))
+    } catch { /* ignore storage errors */ }
+  }, [scores, playerComments, overallNotes, step])
+
+  // Check for draft when team is selected
+  useEffect(() => {
+    if (!selectedTeam) { setHasDraft(false); return }
+    try {
+      const key = `eval_draft_${params.token}_${selectedTeam}`
+      const raw = localStorage.getItem(key)
+      setHasDraft(!!raw)
+    } catch { setHasDraft(false) }
+  }, [selectedTeam])
+
+  // Close cell picker on click outside
+  useEffect(() => {
+    if (!cellPicker) return
+    function handler(e: MouseEvent) {
+      const t = e.target as HTMLElement
+      if (!t.closest('[data-cell-picker]') && !t.closest('[data-grid-cell]')) setCellPicker(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [cellPicker])
+
+  function resumeDraft() {
+    if (!selectedTeam) return
+    try {
+      const key = `eval_draft_${params.token}_${selectedTeam}`
+      const raw = localStorage.getItem(key)
+      if (!raw) return
+      const draft = JSON.parse(raw)
+      if (draft.coachName) setCoachName(draft.coachName)
+      if (draft.contactEmail) setContactEmail(draft.contactEmail)
+      if (draft.scores) setScores(draft.scores)
+      if (draft.playerComments) setPlayerComments(draft.playerComments)
+      if (draft.overallNotes) setOverallNotes(draft.overallNotes)
+      if (draft.savedAt) setLastSaved(new Date(draft.savedAt))
+    } catch { /* ignore */ }
+    setStep('score')
+  }
+
+  async function saveDraft() {
+    if (!coachName.trim() || !selectedTeam) return
+    setSavingDraft(true)
+    // Save to DB (best-effort, doesn't block UI)
+    const playerScores: Record<string, Record<string, number>> = {}
+    const commentMap: Record<string, string> = {}
+    for (const p of teamPlayers) {
+      const ps = scores[p.id] ?? {}
+      const filtered: Record<string, number> = {}
+      for (const [k, v] of Object.entries(ps)) { if (v != null) filtered[k] = v }
+      if (Object.keys(filtered).length > 0) playerScores[p.id] = filtered
+      if (playerComments[p.id]?.trim()) commentMap[p.id] = playerComments[p.id].trim()
+    }
+    try {
+      await supabase.rpc('tryout_save_eval_draft_by_token', {
+        p_token:           params.token,
+        p_team_label:      selectedTeam,
+        p_coach_name:      coachName.trim(),
+        p_player_scores:   playerScores,
+        p_player_comments: commentMap,
+        p_contact_email:   contactEmail.trim() || null,
+      })
+    } catch { /* ignore errors — localStorage is the real backup */ }
+    setLastSaved(new Date())
+    setSavingDraft(false)
+  }
 
   const teamPlayers = useMemo(() =>
     (formData?.players ?? []).filter(p => p.prior_team === selectedTeam)
@@ -471,7 +558,27 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
           <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your name</label>
           <input type="text" value={coachName} onChange={e => setCoachName(e.target.value)} placeholder="Coach Smith" style={inputStyle} />
         </div>
+
+        <div>
+          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>
+            Your email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional — used to save progress so you can return later)</span>
+          </label>
+          <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="coach@example.com" style={inputStyle} />
+        </div>
       </div>
+
+      {/* Resume banner */}
+      {hasDraft && selectedTeam && (
+        <div style={{ padding: '12px 16px', background: 'rgba(80,160,232,0.1)', border: '0.5px solid rgba(80,160,232,0.3)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>In-progress evaluation found</div>
+            <div style={{ fontSize: '12px', color: s.muted, marginTop: '2px' }}>You have unsaved scores for {selectedTeam} in this browser.</div>
+          </div>
+          <button onClick={resumeDraft} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'rgba(80,160,232,0.8)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+            Resume →
+          </button>
+        </div>
+      )}
 
       <button
         onClick={() => setStep('score')}
@@ -670,26 +777,32 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     )
   }
 
-  // ── Step: score ───────────────────────────────────────────────────────────
+  // ── Step: score (grid) ───────────────────────────────────────────────────
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
       {/* Sticky header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: '12px 1.5rem' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: '10px 1.5rem' }}>
+        <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700 }}>{selectedTeam}</div>
             <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <div style={{ fontSize: '12px', color: progress.pct === 100 ? '#6DB875' : s.muted, fontWeight: 600 }}>
               {progress.filled}/{progress.total} complete
             </div>
-            <div style={{ width: '80px', height: '4px', borderRadius: '2px', background: 'var(--border-md)', overflow: 'hidden' }}>
+            <div style={{ width: '70px', height: '4px', borderRadius: '2px', background: 'var(--border-md)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${progress.pct}%`, background: progress.pct === 100 ? '#6DB875' : 'var(--accent)', borderRadius: '2px', transition: 'width 0.3s' }} />
             </div>
+            {lastSaved && <span style={{ fontSize: '11px', color: s.dim }}>Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+            <button onClick={saveDraft} disabled={savingDraft || !coachName.trim()} style={{
+              padding: '6px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg2)', color: s.muted, fontSize: '12px', fontWeight: 600,
+              cursor: savingDraft ? 'default' : 'pointer', opacity: savingDraft ? 0.6 : 1,
+            }}>{savingDraft ? 'Saving…' : '💾 Save progress'}</button>
             <button
               onClick={() => setStep('review')}
-              style={{ padding: '7px 18px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+              style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
             >
               Review →
             </button>
@@ -697,200 +810,256 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
       </div>
 
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.5rem 1.5rem 6rem' }}>
-        {/* XLS tools */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          <button onClick={downloadTemplate} style={{ padding: '7px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            ↓ Download template
-          </button>
-          <label style={{ padding: '7px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            ↑ Upload filled XLS
-            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleXlsUpload} />
-          </label>
-          <span style={{ fontSize: '12px', color: s.dim, alignSelf: 'center' }}>or fill in the form below</span>
+      <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '1.5rem 1.5rem 6rem' }}>
+        {/* Scale + XLS tools row */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', fontSize: '11px' }}>
+            {[
+              { n: 1, label: 'Needs work' }, { n: 2, label: 'Below age' },
+              { n: 3, label: 'Age appropriate' }, { n: 4, label: 'Above age' },
+              { n: 5, label: 'Exceptional' },
+            ].map(({ n, label }) => (
+              <span key={n} style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 600, background: scoreColor(n), border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
+                {n} — {label}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+            <button onClick={downloadTemplate} style={{ padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: s.muted, fontSize: '11px', cursor: 'pointer' }}>↓ XLS</button>
+            <label style={{ padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: s.muted, fontSize: '11px', cursor: 'pointer' }}>
+              ↑ XLS<input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleXlsUpload} />
+            </label>
+          </div>
         </div>
 
-        {/* Scale reminder */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1.5rem', fontSize: '11px' }}>
-          {[
-            { n: 1, label: 'Needs work' },
-            { n: 2, label: 'Below age' },
-            { n: 3, label: 'Age appropriate' },
-            { n: 4, label: 'Above age' },
-            { n: 5, label: 'Exceptional' },
-          ].map(({ n, label }) => (
-            <span key={n} style={{
-              padding: '3px 9px', borderRadius: '20px', fontWeight: 600,
-              background: scoreColor(n), color: 'var(--fg)',
-              border: '0.5px solid rgba(var(--fg-rgb),0.1)',
-            }}>
-              {n} — {label}
-            </span>
-          ))}
-        </div>
-
-        {/* Player cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {teamPlayers.map(player => {
-            const playerScores = scores[player.id] ?? {}
-            const requiredFields = sections.filter(s => !s.is_optional).flatMap(s => s.fields)
-            const complete = requiredFields.every(f => playerScores[f.field_key] != null)
-
-            return (
-              <div key={player.id} style={{
-                background: 'var(--bg-card)', border: `0.5px solid ${complete ? 'rgba(109,184,117,0.35)' : 'var(--border)'}`,
-                borderRadius: '12px', overflow: 'hidden',
-              }}>
-                {/* Player header */}
-                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--border)' }}>
-                  <div>
-                    <span style={{ fontWeight: 700, fontSize: '14px' }}>{player.first_name} {player.last_name}</span>
-                    <span style={{ fontSize: '11px', color: s.dim, marginLeft: '8px' }}>{player.age_group}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {(() => {
-                      const cs = computePlayerScore(playerScores, allFields)
-                      return cs != null ? (
-                        <span style={{
-                          fontSize: '12px', fontWeight: 700,
-                          padding: '3px 9px', borderRadius: '20px',
-                          background: scoreColor(Math.round(cs)),
-                          border: '0.5px solid rgba(var(--fg-rgb),0.1)',
-                          color: 'var(--fg)',
-                        }}>
-                          {cs.toFixed(2)}
-                        </span>
-                      ) : null
-                    })()}
-                    {complete && <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓ Complete</span>}
-                  </div>
-                </div>
-
-                {/* Sections */}
-                <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {sections.map(section => {
-                    const na = isNa(player.id, section.key)
-                    return (
-                      <div key={section.key}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.muted }}>
-                            {section.label}
-                          </div>
-                          {section.is_optional && (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: s.muted, cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={na}
-                                onChange={() => toggleNa(player.id, section.key, section.fields)}
-                              />
-                              N/A
-                            </label>
-                          )}
-                        </div>
-
-                        {na ? (
-                          <div style={{ fontSize: '12px', color: s.dim, fontStyle: 'italic' }}>Not applicable for this player</div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {section.fields.map(field => {
-                              const val = playerScores[field.field_key] ?? null
-                              return (
-                                <div key={field.field_key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <div style={{ fontSize: '12px', color: s.muted, minWidth: '120px', flex: '0 0 auto' }}>{field.label}</div>
-                                  <div style={{ display: 'flex', gap: '4px' }}>
-                                    {[1, 2, 3, 4, 5].map(n => (
-                                      <button
-                                        key={n}
-                                        onClick={() => setScore(player.id, field.field_key, val === n ? null : n)}
-                                        style={{
-                                          width: '36px', height: '30px', borderRadius: '6px',
-                                          border: `1.5px solid ${val === n ? 'transparent' : 'rgba(var(--fg-rgb),0.12)'}`,
-                                          background: val === n ? scoreColor(n) : 'transparent',
-                                          color: 'var(--fg)', fontWeight: val === n ? 700 : 400,
-                                          fontSize: '13px', cursor: 'pointer',
-                                          opacity: val != null && val !== n ? 0.4 : 1,
-                                          transition: 'opacity 0.1s, background 0.1s',
-                                        }}
-                                      >{n}</button>
-                                    ))}
-                                    {val != null && (
-                                      <button
-                                        onClick={() => setScore(player.id, field.field_key, null)}
-                                        title="Clear"
-                                        style={{
-                                          width: '24px', height: '30px', borderRadius: '6px',
-                                          border: 'none', background: 'none',
-                                          color: s.dim, fontSize: '14px', cursor: 'pointer',
-                                        }}
-                                      >×</button>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
+        {/* ── Score grid ── */}
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', marginBottom: '1.5rem' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
+            <thead>
+              {/* Section header row */}
+              <tr>
+                <th colSpan={2} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', padding: 0 }} />
+                {sections.map(sec => (
+                  <th key={sec.key} colSpan={sec.fields.length} style={{
+                    padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)',
+                    borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)',
+                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em',
+                    textTransform: 'uppercase', color: s.muted, whiteSpace: 'nowrap',
+                  }}>{sec.label}</th>
+                ))}
+                <th colSpan={3} style={{ background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
+              </tr>
+              {/* Column headers */}
+              <tr>
+                <th style={{ padding: '6px 12px', textAlign: 'left', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, position: 'sticky', left: 0, zIndex: 3, whiteSpace: 'nowrap', boxShadow: '2px 0 4px rgba(0,0,0,0.06)', minWidth: '160px' }}>Player</th>
+                <th style={{ padding: '6px 8px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap' }}>Age</th>
+                {allFields.map((field, fi) => {
+                  const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
+                  return (
+                    <th key={field.field_key} style={{
+                      padding: '4px 4px 6px', textAlign: 'center', verticalAlign: 'bottom',
+                      background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)',
+                      borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
+                      minWidth: '50px', maxWidth: '62px',
+                    }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '68px', overflow: 'hidden', fontSize: '10px', fontWeight: 600, color: s.muted, textAlign: 'left', paddingBottom: '4px' }}>
+                        {field.label}
                       </div>
-                    )
-                  })}
+                      {colFillKey === field.field_key ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', marginTop: '4px' }}>
+                          {[1,2,3,4,5].map(v => (
+                            <button key={v} onClick={() => {
+                              setScores(prev => {
+                                const next = { ...prev }
+                                for (const p of teamPlayers) {
+                                  if ((next[p.id]?.[field.field_key] ?? null) == null)
+                                    next[p.id] = { ...(next[p.id] ?? {}), [field.field_key]: v }
+                                }
+                                return next
+                              })
+                              setColFillKey(null)
+                            }} style={{ width: '28px', height: '20px', borderRadius: '3px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>{v}</button>
+                          ))}
+                          <button onClick={() => setColFillKey(null)} style={{ width: '28px', height: '16px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '10px', cursor: 'pointer', padding: 0 }}>×</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setColFillKey(field.field_key); setCellPicker(null) }}
+                          style={{ marginTop: '4px', fontSize: '9px', padding: '2px 4px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
+                          title={`Fill empty "${field.label}" cells`}>fill ↓</button>
+                      )}
+                    </th>
+                  )
+                })}
+                <th style={{ padding: '6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', fontWeight: 700, color: s.muted, whiteSpace: 'nowrap' }}>Score</th>
+                <th style={{ padding: '6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap' }}>Notes</th>
+                <th style={{ padding: '6px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', minWidth: '44px' }} />
+              </tr>
+            </thead>
+            <tbody>
+              {teamPlayers.map((player, pi) => {
+                const ps = scores[player.id] ?? {}
+                const computed = computePlayerScore(ps, allFields)
+                const required = sections.filter(sec => !sec.is_optional).flatMap(sec => sec.fields)
+                const complete = required.every(f => ps[f.field_key] != null || isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''))
+                const rowBg = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
+                const hasComment = !!(playerComments[player.id]?.trim())
+                const commentOpen = expandedComment === player.id
 
-                  {/* Per-player comments */}
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.muted, marginBottom: '6px' }}>
-                      Comments
-                    </div>
-                    <textarea
-                      value={playerComments[player.id] ?? ''}
-                      onChange={e => setPlayerComments(prev => ({ ...prev, [player.id]: e.target.value }))}
-                      placeholder="Add notes about this player's strengths, areas to develop, coachability, attitude, etc."
-                      rows={3}
-                      style={textareaStyle}
-                    />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+                return (
+                  <>
+                    <tr key={player.id}>
+                      {/* Sticky player name */}
+                      <td style={{
+                        padding: '5px 12px', fontWeight: 700, fontSize: '13px', whiteSpace: 'nowrap',
+                        position: 'sticky', left: 0, zIndex: 1, background: rowBg,
+                        borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)',
+                        borderLeft: complete ? '2px solid #6DB875' : '2px solid transparent',
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
+                      }}>
+                        {player.first_name} {player.last_name}
+                        {complete && <span style={{ fontSize: '10px', color: '#6DB875', marginLeft: '5px' }}>✓</span>}
+                      </td>
+                      <td style={{ padding: '5px 8px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', background: rowBg }}>{player.age_group}</td>
+
+                      {/* Score cells */}
+                      {allFields.map((field, fi) => {
+                        const val = ps[field.field_key] ?? null
+                        const na = isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? '')
+                        const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
+                        const isActive = cellPicker?.playerId === player.id && cellPicker?.fieldKey === field.field_key
+
+                        return (
+                          <td key={field.field_key}
+                            data-grid-cell="1"
+                            onClick={e => {
+                              if (na) return
+                              if (isActive) { setCellPicker(null); return }
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                              setCellPicker({ playerId: player.id, fieldKey: field.field_key, x: rect.left, y: rect.bottom + 4 })
+                              setColFillKey(null)
+                            }}
+                            style={{
+                              padding: '5px 3px',
+                              borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)',
+                              borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
+                              textAlign: 'center',
+                              cursor: na ? 'default' : 'pointer',
+                              background: isActive ? 'rgba(var(--fg-rgb),0.08)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val),
+                              userSelect: 'none',
+                            }}
+                          >
+                            <span style={{ fontSize: '13px', fontWeight: val != null ? 700 : 400, color: na ? s.dim : val != null ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
+                              {na ? 'N/A' : val ?? '·'}
+                            </span>
+                          </td>
+                        )
+                      })}
+
+                      {/* Computed score */}
+                      <td style={{ padding: '5px 8px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontWeight: 800, fontSize: '13px', color: computed != null ? 'var(--fg)' : s.dim }}>
+                        {computed != null ? computed.toFixed(2) : '—'}
+                      </td>
+
+                      {/* Comments indicator */}
+                      <td style={{ padding: '5px 6px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', textAlign: 'center' }}>
+                        <button onClick={() => setExpandedComment(commentOpen ? null : player.id)} style={{
+                          fontSize: '11px', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
+                          border: `0.5px solid ${commentOpen || hasComment ? 'var(--accent)' : 'var(--border-md)'}`,
+                          background: commentOpen ? 'rgba(232,160,32,0.1)' : 'transparent',
+                          color: commentOpen || hasComment ? 'var(--accent)' : s.dim,
+                          fontWeight: hasComment ? 700 : 400,
+                        }}>{hasComment ? '📝' : '+'} notes</button>
+                      </td>
+
+                      {/* N/A checkboxes for optional sections */}
+                      <td style={{ padding: '5px 6px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim }}>
+                        {sections.filter(sec => sec.is_optional).map(sec => (
+                          <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
+                            <span>{sec.key === 'pitching_catching' ? 'P/C N/A' : 'N/A'}</span>
+                          </label>
+                        ))}
+                      </td>
+                    </tr>
+
+                    {/* Expanded comment row */}
+                    {commentOpen && (
+                      <tr key={`${player.id}_comment`}>
+                        <td colSpan={3 + allFields.length + 3} style={{ padding: '8px 12px 12px 12px', borderBottom: '0.5px solid var(--border)', background: rowBg }}>
+                          <textarea
+                            autoFocus
+                            value={playerComments[player.id] ?? ''}
+                            onChange={e => setPlayerComments(prev => ({ ...prev, [player.id]: e.target.value }))}
+                            placeholder="Strengths, areas to develop, coachability, attitude, improvement this season…"
+                            rows={3}
+                            style={{ ...textareaStyle, fontSize: '12px', borderRadius: '6px' }}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
 
         {/* Overall season notes */}
-        <div style={{ marginTop: '1.5rem', background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem' }}>
+        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Overall season notes</div>
           <div style={{ fontSize: '12px', color: s.muted, marginBottom: '10px' }}>
-            General observations about your team, season highlights, trends, or anything you'd like the board to know.
+            General observations, season highlights, team trends, or anything you'd like the board to know.
           </div>
-          <textarea
-            value={overallNotes}
-            onChange={e => setOverallNotes(e.target.value)}
-            placeholder="e.g. Great group overall — improved significantly in the second half of the season. Several players showed strong leadership. Pitching depth was a challenge but most kids adapted well..."
-            rows={5}
-            style={textareaStyle}
+          <textarea value={overallNotes} onChange={e => setOverallNotes(e.target.value)}
+            placeholder="e.g. Great group overall — improved significantly in the second half. Several players showed strong leadership…"
+            rows={4} style={textareaStyle}
           />
         </div>
 
         {/* Bottom CTA */}
-        <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>Ready to review?</div>
+        <div style={{ padding: '1.25rem', background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>Ready to submit?</div>
           <div style={{ fontSize: '13px', color: s.muted, marginBottom: '1rem' }}>
             {progress.filled} of {progress.total} players fully rated.
             {progress.pct < 100 && ' You can submit with partial scores.'}
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setStep('review')}
-              style={{ padding: '12px 28px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
-            >
+            <button onClick={() => setStep('review')}
+              style={{ padding: '12px 28px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
               Review before submitting →
             </button>
-            <button
-              onClick={() => setStep('identify')}
-              style={{ padding: '12px 16px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer' }}
-            >
+            <button onClick={saveDraft} disabled={savingDraft || !coachName.trim()}
+              style={{ padding: '12px 18px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: s.muted, fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: savingDraft ? 0.6 : 1 }}>
+              {savingDraft ? 'Saving…' : '💾 Save & come back later'}
+            </button>
+            <button onClick={() => setStep('identify')}
+              style={{ padding: '12px 16px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer' }}>
               ← Change team
             </button>
           </div>
         </div>
       </div>
+
+      {/* Floating cell picker */}
+      {cellPicker && (() => {
+        const val = scores[cellPicker.playerId]?.[cellPicker.fieldKey] ?? null
+        return (
+          <div data-cell-picker="1" style={{
+            position: 'fixed', top: cellPicker.y, left: Math.min(cellPicker.x, (typeof window !== 'undefined' ? window.innerWidth : 800) - 230),
+            zIndex: 1000, background: 'var(--bg-card)', border: '0.5px solid var(--border-md)', borderRadius: '8px',
+            padding: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', display: 'flex', gap: '4px', alignItems: 'center',
+          }}>
+            {[1,2,3,4,5].map(v => (
+              <button key={v} onClick={() => { setScore(cellPicker.playerId, cellPicker.fieldKey, v); setCellPicker(null) }}
+                style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', background: val === v ? 'var(--accent)' : scoreColor(v) || 'var(--bg-input)', color: val === v ? 'var(--accent-text)' : 'var(--fg)', fontSize: '15px', fontWeight: 800, cursor: 'pointer', outline: val === v ? 'none' : '0.5px solid var(--border-md)' }}>{v}</button>
+            ))}
+            {val != null && (
+              <button onClick={() => { setScore(cellPicker.playerId, cellPicker.fieldKey, null); setCellPicker(null) }}
+                style={{ width: '30px', height: '36px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '14px', cursor: 'pointer', marginLeft: '2px' }}>×</button>
+            )}
+          </div>
+        )
+      })()}
     </main>
   )
 }
