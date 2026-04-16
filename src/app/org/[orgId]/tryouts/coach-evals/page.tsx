@@ -163,18 +163,20 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
     // Try fetching with weight column; fall back without it if column not yet migrated
     let rawFields: any[] | null = null
-    const { data: fd1, error: fe1 } = await supabase
-      .from('tryout_coach_eval_config')
-      .select('field_key, label, section, sort_order, weight')
-      .eq('org_id', params.orgId).order('sort_order')
-    if (fe1) {
-      const { data: fd2 } = await supabase
+    if (seasonData) {
+      const { data: fd1, error: fe1 } = await supabase
         .from('tryout_coach_eval_config')
-        .select('field_key, label, section, sort_order')
-        .eq('org_id', params.orgId).order('sort_order')
-      rawFields = fd2
-    } else {
-      rawFields = fd1
+        .select('field_key, label, section, sort_order, weight')
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id).order('sort_order')
+      if (fe1) {
+        const { data: fd2 } = await supabase
+          .from('tryout_coach_eval_config')
+          .select('field_key, label, section, sort_order')
+          .eq('org_id', params.orgId).eq('season_id', seasonData.id).order('sort_order')
+        rawFields = fd2
+      } else {
+        rawFields = fd1
+      }
     }
 
     const loadedFields: EvalField[] = (rawFields ?? []).map((f: any) => ({
