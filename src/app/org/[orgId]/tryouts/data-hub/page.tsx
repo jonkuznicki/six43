@@ -10,8 +10,9 @@ interface Player {
   id: string; first_name: string; last_name: string
   age_group: string; tryout_age_group: string | null
   prior_team: string | null; jersey_number: string | null
+  dob: string | null; age_group_override_reason: string | null
 }
-interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string }
+interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
   player_id: string; season_year: string
@@ -22,7 +23,7 @@ interface EvalField { field_key: string; label: string; section: string; sort_or
 interface EvalRow   { player_id: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
 interface ScoreRow  { player_id: string; tryout_score: number|null; evaluator_name: string|null; session_id: string }
 
-type Tab = 'master' | 'registration' | 'roster' | 'gc' | 'evals' | 'scores'
+type Tab = 'master' | 'registration' | 'roster' | 'gc' | 'evals' | 'scores' | 'age'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'master',       label: 'Master' },
@@ -31,7 +32,62 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'gc',           label: 'GC Stats' },
   { key: 'evals',        label: 'Coach Evals' },
   { key: 'scores',       label: 'Tryout Scores' },
+  { key: 'age',          label: 'Age Check' },
 ]
+
+// ── Baseball age helpers ──────────────────────────────────────────────────────
+
+/** Age as of May 1 of the given season year. */
+function calcBaseballAge(dob: string, seasonYear: number): number {
+  const cutoff = new Date(seasonYear, 4, 1) // May 1 (month 0-indexed)
+  const birth  = new Date(dob)
+  let age = cutoff.getFullYear() - birth.getFullYear()
+  const dm = cutoff.getMonth() - birth.getMonth()
+  if (dm < 0 || (dm === 0 && cutoff.getDate() < birth.getDate())) age--
+  return age
+}
+
+/** Parse "10U" → 10, "11u" → 11 */
+function ageGroupMax(ag: string | null): number | null {
+  if (!ag) return null
+  const m = ag.match(/(\d+)/)
+  return m ? parseInt(m[1]) : null
+}
+
+type AgeStatus = 'correct' | 'playing_up' | 'overage' | 'no_dob' | 'no_group'
+
+function calcAgeStatus(dob: string | null, tryoutAgeGroup: string | null, seasonYear: number | null): AgeStatus {
+  if (!dob)        return 'no_dob'
+  if (!seasonYear) return 'no_group'
+  const ba  = calcBaseballAge(dob, seasonYear)
+  const max = ageGroupMax(tryoutAgeGroup)
+  if (max == null) return 'no_group'
+  if (ba === max)  return 'correct'
+  if (ba < max)    return 'playing_up'
+  return 'overage'
+}
+
+const STATUS_LABEL: Record<AgeStatus, string> = {
+  correct:    '✓ Correct',
+  playing_up: '↑ Playing Up',
+  overage:    '⚠ Overage',
+  no_dob:     '? No DOB',
+  no_group:   '? No Group',
+}
+const STATUS_COLOR: Record<AgeStatus, string> = {
+  correct:    'rgba(109,184,117,0.15)',
+  playing_up: 'rgba(232,160,32,0.13)',
+  overage:    'rgba(224,82,82,0.15)',
+  no_dob:     'rgba(var(--fg-rgb),0.08)',
+  no_group:   'rgba(var(--fg-rgb),0.08)',
+}
+const STATUS_TEXT: Record<AgeStatus, string> = {
+  correct:    '#6DB875',
+  playing_up: '#E8A020',
+  overage:    '#e05252',
+  no_dob:     'rgba(var(--fg-rgb),0.5)',
+  no_group:   'rgba(var(--fg-rgb),0.5)',
+}
 
 function nextAgeGroup(ag: string) {
   const m = ag.match(/^(\d+)u$/i)
@@ -62,6 +118,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [evalIds,       setEvalIds]       = useState<Set<string>>(new Set())
   const [scoreIds,      setScoreIds]      = useState<Set<string>>(new Set())
   const [seasonId,      setSeasonId]      = useState<string | null>(null)
+  const [seasonYear,    setSeasonYear]    = useState<number | null>(null)
+  const [seasonAgeGroups, setSeasonAgeGroups] = useState<string[]>([])
   const [loading,       setLoading]       = useState(true)
 
   // Lazy-loaded tab data
@@ -87,6 +145,13 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [localUpdates,  setLocalUpdates]  = useState<Map<string, Partial<Player>>>(new Map())
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Age Check tab state
+  const [ageStatusFilter, setAgeStatusFilter] = useState<AgeStatus | 'all'>('all')
+  const [fixingId,    setFixingId]    = useState<string | null>(null)
+  const [fixGroup,    setFixGroup]    = useState('')
+  const [fixReason,   setFixReason]   = useState('')
+  const [savingFix,   setSavingFix]   = useState(false)
+
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (editingCell && inputRef.current) inputRef.current.focus() }, [editingCell])
 
@@ -97,15 +162,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   }, [tab])
 
   async function loadData() {
-    const { data: seasonData } = await supabase.from('tryout_seasons').select('id').eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
+    const { data: seasonData } = await supabase.from('tryout_seasons').select('id,year,age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
     setSeasonId(seasonData?.id ?? null)
+    setSeasonYear(seasonData?.year ?? null)
+    setSeasonAgeGroups(seasonData?.age_groups ?? [])
 
     const [
       { data: playerData }, { data: regData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
-      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
-      seasonData ? supabase.from('tryout_registration_staging').select('player_id,prior_team,age_group,parent_email,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
+      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
+      seasonData ? supabase.from('tryout_registration_staging').select('player_id,prior_team,age_group,parent_email,imported_at,dob').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
@@ -167,6 +234,23 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setTimeout(() => setSavedCell(c => c === key ? null : c), 1500)
   }
 
+  async function saveFix(pid: string) {
+    setSavingFix(true)
+    const updates = { tryout_age_group: fixGroup || null, age_group_override_reason: fixReason.trim() || null }
+    await supabase.from('tryout_players').update(updates).eq('id', pid)
+    setPlayers(prev => prev.map(p => p.id === pid ? { ...p, ...updates } : p))
+    setLocalUpdates(prev => { const m = new Map(prev); m.set(pid, { ...(m.get(pid) ?? {}), ...updates }); return m })
+    setSavingFix(false)
+    setFixingId(null)
+  }
+
+  function openFix(p: Player) {
+    const dob = p.dob ?? regMap.get(p.id)?.dob ?? null
+    setFixingId(p.id)
+    setFixGroup(p.tryout_age_group ?? (dob && seasonYear ? `${calcBaseballAge(dob, seasonYear)}U` : ''))
+    setFixReason(p.age_group_override_reason ?? '')
+  }
+
   async function autoFillTryoutAgeGroups() {
     setAutoFilling(true)
     const toFill = players.filter(p => !pv(p, 'tryout_age_group') && p.age_group)
@@ -203,6 +287,15 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       return va.localeCompare(vb) * sortDir
     })
   }, [players, ageFilter, search, sortCol, sortDir, localUpdates])
+
+  const ageAlerts = useMemo(() =>
+    players.filter(p => {
+      const dob = p.dob ?? regMap.get(p.id)?.dob ?? null
+      const s = calcAgeStatus(dob, p.tryout_age_group, seasonYear)
+      return s === 'overage' || s === 'no_dob'
+    }).length,
+    [players, regMap, seasonYear]
+  )
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 1 ? -1 : 1)
@@ -265,6 +358,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             gc: gcIds.size,
             evals: evalIds.size,
             scores: scoreIds.size,
+            age: ageAlerts,
           }
           const active = tab === t.key
           return (
@@ -276,7 +370,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               marginBottom: '-0.5px',
             }}>
               {t.label}
-              <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: 400, color: s.dim }}>
+              <span style={{
+                marginLeft: '6px', fontSize: '11px', fontWeight: 400,
+                color: t.key === 'age' && counts[t.key] > 0 ? '#e05252' : s.dim,
+              }}>
                 {counts[t.key]}
               </span>
             </button>
@@ -630,6 +727,184 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               </tbody>
             </table>
             {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No tryout scores recorded yet.</div>}
+          </div>
+        )
+      })()}
+
+      {/* ── Age Check tab ─────────────────────────────────────────────────── */}
+      {!lazyLoading && tab === 'age' && (() => {
+        if (!seasonYear) return (
+          <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>
+            No active season — set one up in <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--accent)' }}>Seasons</Link> first.
+          </div>
+        )
+
+        // Build per-player age check rows
+        const ageRows = filtered.map(p => {
+          const dob = p.dob ?? regMap.get(p.id)?.dob ?? null
+          const ba  = dob ? calcBaseballAge(dob, seasonYear) : null
+          const status = calcAgeStatus(dob, p.tryout_age_group, seasonYear)
+          const correctGroup = ba != null
+            ? (seasonAgeGroups.find(ag => ageGroupMax(ag) === ba) ?? `${ba}U`)
+            : null
+          return { p, dob, ba, status, correctGroup }
+        }).filter(r => ageStatusFilter === 'all' || r.status === ageStatusFilter)
+
+        const counts_by_status = {
+          overage:    filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'overage' }).length,
+          playing_up: filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'playing_up' }).length,
+          correct:    filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'correct' }).length,
+          no_dob:     filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'no_dob' }).length,
+          no_group:   filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'no_group' }).length,
+        }
+
+        return (
+          <div>
+            {/* Explanation */}
+            <div style={{ fontSize: '12px', color: s.muted, marginBottom: '14px', lineHeight: 1.6 }}>
+              <strong>Baseball Age</strong> = age as of May 1, {seasonYear}.
+              Overage players must be moved to the correct group. Playing Up is allowed but flagged for review.
+            </div>
+
+            {/* Status filter chips + counts */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+              {([
+                ['all',        'All',         players.length,              'rgba(var(--fg-rgb),0.1)',  'var(--fg)'  ],
+                ['overage',    '⚠ Overage',   counts_by_status.overage,    'rgba(224,82,82,0.15)',    '#e05252'    ],
+                ['playing_up', '↑ Playing Up', counts_by_status.playing_up, 'rgba(232,160,32,0.13)',   '#E8A020'    ],
+                ['no_dob',     '? No DOB',     counts_by_status.no_dob,     'rgba(var(--fg-rgb),0.08)', s.muted     ],
+                ['correct',    '✓ Correct',    counts_by_status.correct,    'rgba(109,184,117,0.15)', '#6DB875'    ],
+              ] as const).map(([key, label, count, bg, color]) => (
+                <button key={key} onClick={() => setAgeStatusFilter(key as AgeStatus | 'all')} style={{
+                  padding: '5px 12px', borderRadius: '20px', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: ageStatusFilter === key ? 700 : 400,
+                  background: ageStatusFilter === key ? bg : 'var(--bg-input)',
+                  color: ageStatusFilter === key ? color : s.dim,
+                  border: `0.5px solid ${ageStatusFilter === key ? color : 'var(--border-md)'}`,
+                }}>
+                  {label} <span style={{ opacity: 0.7 }}>{count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr>
+                    {['Player', 'Age Group', 'DOB', 'Baseball Age', 'Correct Group', 'Tryout Group', 'Status', 'Override Reason', ''].map(l => (
+                      <th key={l} style={th}>{l}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ageRows.map(({ p, dob, ba, status, correctGroup }, i) => {
+                    const isFix = fixingId === p.id
+                    const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
+                    const tagDisplay = p.tryout_age_group
+
+                    return (
+                      <>
+                        <tr key={p.id} style={{ background: rowBg }}>
+                          <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                          <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
+                          <td style={{ ...td, color: s.muted, fontSize: '12px' }}>
+                            {dob
+                              ? new Date(dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                              : <span style={{ color: '#e05252', fontStyle: 'italic' }}>missing</span>}
+                          </td>
+                          <td style={{ ...td, textAlign: 'center', fontWeight: 700, fontSize: '15px', color: ba != null ? 'var(--fg)' : s.dim }}>
+                            {ba ?? '—'}
+                          </td>
+                          <td style={{ ...td, color: s.muted }}>
+                            {correctGroup
+                              ? <span style={{ fontWeight: 600 }}>{correctGroup}</span>
+                              : <span style={{ opacity: 0.3 }}>—</span>}
+                          </td>
+                          <td style={td}>
+                            {tagDisplay
+                              ? <span style={{ fontWeight: 600 }}>{tagDisplay}</span>
+                              : <span style={{ opacity: 0.3, fontStyle: 'italic' }}>not set</span>}
+                          </td>
+                          <td style={td}>
+                            <span style={{
+                              fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '20px',
+                              background: STATUS_COLOR[status],
+                              color: STATUS_TEXT[status],
+                              whiteSpace: 'nowrap',
+                            }}>{STATUS_LABEL[status]}</span>
+                          </td>
+                          <td style={{ ...td, color: s.dim, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.age_group_override_reason ?? <span style={{ opacity: 0.25 }}>—</span>}
+                          </td>
+                          <td style={td}>
+                            <button onClick={() => isFix ? setFixingId(null) : openFix(p)} style={{
+                              fontSize: '11px', padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
+                              border: `0.5px solid ${isFix ? 'var(--accent)' : 'var(--border-md)'}`,
+                              background: isFix ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+                              color: isFix ? 'var(--accent)' : s.muted,
+                              fontWeight: isFix ? 700 : 400,
+                            }}>{isFix ? 'Cancel' : 'Adjust'}</button>
+                          </td>
+                        </tr>
+
+                        {/* Inline fix panel */}
+                        {isFix && (
+                          <tr key={`${p.id}_fix`} style={{ background: 'rgba(232,160,32,0.04)' }}>
+                            <td colSpan={9} style={{ padding: '12px 16px', borderBottom: '0.5px solid var(--border)' }}>
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '11px', color: s.dim, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Tryout Age Group
+                                  </label>
+                                  <select value={fixGroup} onChange={e => setFixGroup(e.target.value)} style={{
+                                    background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
+                                    borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: 'var(--fg)',
+                                    minWidth: '100px',
+                                  }}>
+                                    <option value="">— select —</option>
+                                    {seasonAgeGroups.map(ag => (
+                                      <option key={ag} value={ag}>{ag}
+                                        {ba != null && ageGroupMax(ag) === ba ? ' ✓ correct' :
+                                         ba != null && ageGroupMax(ag)! < ba  ? ' ⚠ overage' :
+                                         ba != null                            ? ' ↑ playing up' : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div style={{ flex: 1, minWidth: '240px' }}>
+                                  <label style={{ display: 'block', fontSize: '11px', color: s.dim, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Reason for adjustment
+                                  </label>
+                                  <input
+                                    type="text" value={fixReason} onChange={e => setFixReason(e.target.value)}
+                                    placeholder={status === 'playing_up' ? 'e.g. Parent request, advanced ability' : status === 'overage' ? 'e.g. League waiver approved' : 'Optional note'}
+                                    style={{ background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: 'var(--fg)', width: '100%', boxSizing: 'border-box' }}
+                                  />
+                                </div>
+                                <button onClick={() => saveFix(p.id)} disabled={!fixGroup || savingFix} style={{
+                                  padding: '7px 18px', borderRadius: '7px', border: 'none',
+                                  background: fixGroup ? 'var(--accent)' : 'var(--bg-input)',
+                                  color: fixGroup ? 'var(--accent-text)' : s.dim,
+                                  fontSize: '13px', fontWeight: 700,
+                                  cursor: fixGroup && !savingFix ? 'pointer' : 'default',
+                                  opacity: savingFix ? 0.6 : 1,
+                                }}>{savingFix ? 'Saving…' : 'Save'}</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {ageRows.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>
+                  {ageStatusFilter === 'all' ? 'No players found.' : `No players with status "${STATUS_LABEL[ageStatusFilter as AgeStatus]}".`}
+                </div>
+              )}
+            </div>
           </div>
         )
       })()}
