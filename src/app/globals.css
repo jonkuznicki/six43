@@ -80,6 +80,13 @@ html[data-theme="light"] {
     max-width: 800px !important;
     padding-bottom: 3rem !important;
   }
+
+  /* Full-width override for data-heavy admin/eval pages */
+  .app-content main.page-wide {
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
 }
 
 /* ── Marketing page responsive ── */

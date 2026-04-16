@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '../../../../lib/supabase'
 import * as XLSX from 'xlsx'
 
@@ -91,8 +91,12 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   // Team lock — prevents coaches from browsing/editing other teams' evals
   const [teamLocked, setTeamLocked] = useState(false)
 
-  // Grid cell picker (floating)
-  const [cellPicker, setCellPicker] = useState<{ playerId: string; fieldKey: string; x: number; y: number } | null>(null)
+  // Keyboard-driven cell selection (replaces floating picker)
+  const [selected, setSelected] = useState<{ rowIdx: number; colIdx: number } | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
+  const histIdxRef = useRef(0)
+
   // Column fill
   const [colFillKey,  setColFillKey]  = useState<string | null>(null)
   // Row fill (expanded comment row)
@@ -141,17 +145,6 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
       setHasDraft(!!raw)
     } catch { setHasDraft(false) }
   }, [selectedTeam])
-
-  // Close cell picker on click outside
-  useEffect(() => {
-    if (!cellPicker) return
-    function handler(e: MouseEvent) {
-      const t = e.target as HTMLElement
-      if (!t.closest('[data-cell-picker]') && !t.closest('[data-grid-cell]')) setCellPicker(null)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [cellPicker])
 
   function claimTeam() {
     // Lock this browser session to the selected team
@@ -248,8 +241,70 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
   const allFields = useMemo(() => sections.flatMap(s => s.fields), [sections])
 
-  function setScore(playerId: string, fieldKey: string, val: number | null) {
-    setScores(prev => ({ ...prev, [playerId]: { ...(prev[playerId] ?? {}), [fieldKey]: val } }))
+  function commitScore(playerId: string, fieldKey: string, val: number | null) {
+    setScores(prev => {
+      const next = { ...prev, [playerId]: { ...(prev[playerId] ?? {}), [fieldKey]: val } }
+      historyRef.current = historyRef.current.slice(0, histIdxRef.current + 1)
+      historyRef.current.push(next)
+      histIdxRef.current = historyRef.current.length - 1
+      return next
+    })
+  }
+
+  function undoScore() {
+    if (histIdxRef.current <= 0) return
+    histIdxRef.current--
+    setScores(historyRef.current[histIdxRef.current])
+  }
+
+  function redoScore() {
+    if (histIdxRef.current >= historyRef.current.length - 1) return
+    histIdxRef.current++
+    setScores(historyRef.current[histIdxRef.current])
+  }
+
+  function moveSelected(dRow: number, dCol: number, numRows: number, numCols: number) {
+    setSelected(prev => {
+      if (!prev) return prev
+      let { rowIdx, colIdx } = prev
+      colIdx += dCol
+      rowIdx += dRow
+      if (colIdx >= numCols) { colIdx = 0; rowIdx++ }
+      if (colIdx < 0)        { colIdx = numCols - 1; rowIdx-- }
+      rowIdx = Math.max(0, Math.min(numRows - 1, rowIdx))
+      colIdx = Math.max(0, Math.min(numCols - 1, colIdx))
+      return { rowIdx, colIdx }
+    })
+  }
+
+  function handleGridKeyDown(e: React.KeyboardEvent, numRows: number, numCols: number) {
+    if (!selected) return
+    const player = teamPlayers[selected.rowIdx]
+    const field  = allFields[selected.colIdx]
+    if (!player || !field) return
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoScore(); return }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoScore(); return }
+
+    const cellNa = isNa(player.id, sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? '')
+    if (!cellNa && e.key >= '1' && e.key <= '5') {
+      e.preventDefault()
+      commitScore(player.id, field.field_key, parseInt(e.key))
+      moveSelected(0, 1, numRows, numCols)
+      return
+    }
+    if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
+      e.preventDefault()
+      commitScore(player.id, field.field_key, null)
+      return
+    }
+    if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
+    if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
+    if (e.key === 'Escape')     { setSelected(null); return }
   }
 
   function toggleNa(playerId: string, sectionKey: string, fields: EvalField[]) {
@@ -856,7 +911,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
   // ── Step: score (grid) ───────────────────────────────────────────────────
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
+    <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
       {/* Sticky header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: '10px 1.5rem' }}>
         <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -910,7 +965,15 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
 
         {/* ── Score grid ── */}
-        <div style={{ overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', marginBottom: '1.5rem' }}>
+        <div
+          ref={gridRef}
+          tabIndex={0}
+          onKeyDown={e => handleGridKeyDown(e, teamPlayers.length, allFields.length)}
+          style={{ outline: 'none', overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', marginBottom: '1.5rem' }}
+        >
+          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb),0.4)`, padding: '5px 12px 4px', borderBottom: '0.5px solid var(--border)', background: 'var(--bg-card)' }}>
+            Click a cell · type <strong>1–5</strong> · <strong>Tab</strong>/arrows to move · <strong>Del</strong> to clear · <strong>Ctrl+Z</strong>/<strong>Y</strong> undo/redo
+          </div>
           <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
             <thead>
               {/* Section header row */}
@@ -952,6 +1015,9 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                                   if ((next[p.id]?.[field.field_key] ?? null) == null)
                                     next[p.id] = { ...(next[p.id] ?? {}), [field.field_key]: v }
                                 }
+                                historyRef.current = historyRef.current.slice(0, histIdxRef.current + 1)
+                                historyRef.current.push(next)
+                                histIdxRef.current = historyRef.current.length - 1
                                 return next
                               })
                               setColFillKey(null)
@@ -960,7 +1026,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                           <button onClick={() => setColFillKey(null)} style={{ width: '28px', height: '16px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '10px', cursor: 'pointer', padding: 0 }}>×</button>
                         </div>
                       ) : (
-                        <button onClick={() => { setColFillKey(field.field_key); setCellPicker(null) }}
+                        <button onClick={() => { setColFillKey(field.field_key); setSelected(null) }}
                           style={{ marginTop: '4px', fontSize: '9px', padding: '2px 4px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
                           title={`Fill empty "${field.label}" cells`}>fill ↓</button>
                       )}
@@ -1003,17 +1069,15 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                         const val = ps[field.field_key] ?? null
                         const na = isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? '')
                         const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
-                        const isActive = cellPicker?.playerId === player.id && cellPicker?.fieldKey === field.field_key
+                        const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
                         return (
                           <td key={field.field_key}
-                            data-grid-cell="1"
-                            onClick={e => {
+                            onClick={() => {
                               if (na) return
-                              if (isActive) { setCellPicker(null); return }
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                              setCellPicker({ playerId: player.id, fieldKey: field.field_key, x: rect.left, y: rect.bottom + 4 })
+                              setSelected({ rowIdx: pi, colIdx: fi })
                               setColFillKey(null)
+                              gridRef.current?.focus()
                             }}
                             style={{
                               padding: '5px 3px',
@@ -1021,7 +1085,10 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                               borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                               textAlign: 'center',
                               cursor: na ? 'default' : 'pointer',
-                              background: isActive ? 'rgba(var(--fg-rgb),0.08)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val),
+                              background: isSelected ? 'rgba(80,160,232,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val),
+                              outline: isSelected ? '2px solid rgba(80,160,232,0.7)' : 'none',
+                              outlineOffset: '-2px',
+                              position: 'relative',
                               userSelect: 'none',
                             }}
                           >
@@ -1079,7 +1146,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
               })}
             </tbody>
           </table>
-        </div>
+        </div>{/* end grid focusable wrapper */}
 
         {/* Overall season notes */}
         <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
@@ -1117,26 +1184,6 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
       </div>
 
-      {/* Floating cell picker */}
-      {cellPicker && (() => {
-        const val = scores[cellPicker.playerId]?.[cellPicker.fieldKey] ?? null
-        return (
-          <div data-cell-picker="1" style={{
-            position: 'fixed', top: cellPicker.y, left: Math.min(cellPicker.x, (typeof window !== 'undefined' ? window.innerWidth : 800) - 230),
-            zIndex: 1000, background: 'var(--bg-card)', border: '0.5px solid var(--border-md)', borderRadius: '8px',
-            padding: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', display: 'flex', gap: '4px', alignItems: 'center',
-          }}>
-            {[1,2,3,4,5].map(v => (
-              <button key={v} onClick={() => { setScore(cellPicker.playerId, cellPicker.fieldKey, v); setCellPicker(null) }}
-                style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', background: val === v ? 'var(--accent)' : scoreColor(v) || 'var(--bg-input)', color: val === v ? 'var(--accent-text)' : 'var(--fg)', fontSize: '15px', fontWeight: 800, cursor: 'pointer', outline: val === v ? 'none' : '0.5px solid var(--border-md)' }}>{v}</button>
-            ))}
-            {val != null && (
-              <button onClick={() => { setScore(cellPicker.playerId, cellPicker.fieldKey, null); setCellPicker(null) }}
-                style={{ width: '30px', height: '36px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '14px', cursor: 'pointer', marginLeft: '2px' }}>×</button>
-            )}
-          </div>
-        )
-      })()}
     </main>
   )
 }
