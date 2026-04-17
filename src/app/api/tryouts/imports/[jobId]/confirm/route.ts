@@ -148,19 +148,26 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
     // Write registration staging
     if (job.type === 'registration' && job.season_id && payload) {
       await supabase.from('tryout_registration_staging').upsert({
-        player_id:     playerId,
-        org_id:        job.org_id,
-        season_id:     job.season_id,
-        import_job_id: job.id,
-        age_group:     payload.ageGroup,
-        prior_team:    payload.priorTeam,
-        parent_email:  payload.parentEmail,
-        parent_phone:  payload.parentPhone,
-        dob:           payload.dob,
-        grade:         payload.grade,
-        school:        payload.school,
-        prior_org:     payload.priorOrg,
+        player_id:            playerId,
+        org_id:               job.org_id,
+        season_id:            job.season_id,
+        import_job_id:        job.id,
+        age_group:            payload.ageGroup,
+        preferred_tryout_date: payload.preferredTryoutDate ?? null,
+        prior_team:           payload.priorTeam,
+        parent_email:         payload.parentEmail,
+        parent_phone:         payload.parentPhone,
+        dob:                  payload.dob,
+        grade:                payload.grade,
+        school:               payload.school,
+        prior_org:            payload.priorOrg,
       }, { onConflict: 'player_id,season_id' })
+
+      await autoAssignToSession({
+        supabase, playerId, orgId: job.org_id, seasonId: job.season_id,
+        ageGroup: payload.ageGroup ?? null,
+        preferredTryoutDate: payload.preferredTryoutDate ?? null,
+      })
     }
   }
 
@@ -222,19 +229,26 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
   // Write registration staging if this is a registration import
   if (job.type === 'registration' && job.season_id && payload) {
     await supabase.from('tryout_registration_staging').upsert({
-      player_id:     newPlayer.id,
-      org_id:        job.org_id,
-      season_id:     job.season_id,
-      import_job_id: job.id,
-      age_group:     payload.ageGroup,
-      prior_team:    payload.priorTeam,
-      parent_email:  payload.parentEmail,
-      parent_phone:  payload.parentPhone,
-      dob:           payload.dob,
-      grade:         payload.grade,
-      school:        payload.school,
-      prior_org:     payload.priorOrg,
+      player_id:            newPlayer.id,
+      org_id:               job.org_id,
+      season_id:            job.season_id,
+      import_job_id:        job.id,
+      age_group:            payload.ageGroup,
+      preferred_tryout_date: payload.preferredTryoutDate ?? null,
+      prior_team:           payload.priorTeam,
+      parent_email:         payload.parentEmail,
+      parent_phone:         payload.parentPhone,
+      dob:                  payload.dob,
+      grade:                payload.grade,
+      school:               payload.school,
+      prior_org:            payload.priorOrg,
     }, { onConflict: 'player_id,season_id' })
+
+    await autoAssignToSession({
+      supabase, playerId: newPlayer.id, orgId: job.org_id, seasonId: job.season_id,
+      ageGroup: payload.ageGroup ?? null,
+      preferredTryoutDate: payload.preferredTryoutDate ?? null,
+    })
   }
 
   await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Created new player: ${payload.firstName} ${payload.lastName}` })
@@ -284,19 +298,26 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       // Write registration staging
       const payload = row.createPayload
       await supabase.from('tryout_registration_staging').upsert({
-        player_id:     topCandidate.id,
-        org_id:        job.org_id,
-        season_id:     job.season_id,
-        import_job_id: job.id,
-        age_group:     payload.ageGroup,
-        prior_team:    payload.priorTeam,
-        parent_email:  payload.parentEmail,
-        parent_phone:  payload.parentPhone,
-        dob:           payload.dob,
-        grade:         payload.grade,
-        school:        payload.school,
-        prior_org:     payload.priorOrg,
+        player_id:            topCandidate.id,
+        org_id:               job.org_id,
+        season_id:            job.season_id,
+        import_job_id:        job.id,
+        age_group:            payload.ageGroup,
+        preferred_tryout_date: payload.preferredTryoutDate ?? null,
+        prior_team:           payload.priorTeam,
+        parent_email:         payload.parentEmail,
+        parent_phone:         payload.parentPhone,
+        dob:                  payload.dob,
+        grade:                payload.grade,
+        school:               payload.school,
+        prior_org:            payload.priorOrg,
       }, { onConflict: 'player_id,season_id' })
+
+      await autoAssignToSession({
+        supabase, playerId: topCandidate.id, orgId: job.org_id, seasonId: job.season_id,
+        ageGroup: payload.ageGroup ?? null,
+        preferredTryoutDate: payload.preferredTryoutDate ?? null,
+      })
     }
 
     results.push({ rowIndex: row.rowIndex, playerId: topCandidate.id })
@@ -333,6 +354,42 @@ async function skipRow({ supabase, job, report, row, userId }: any) {
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
+
+/**
+ * If a player has a preferred tryout date and a matching session exists
+ * (same org, season, age_group, session_date), pre-assign them to it.
+ * Uses upsert so re-running is idempotent. arrived=false means not yet on site.
+ */
+async function autoAssignToSession({
+  supabase, playerId, orgId, seasonId, ageGroup, preferredTryoutDate,
+}: {
+  supabase: any; playerId: string; orgId: string; seasonId: string
+  ageGroup: string | null; preferredTryoutDate: string | null
+}) {
+  if (!preferredTryoutDate || !ageGroup || !seasonId) return
+
+  const { data: session } = await supabase
+    .from('tryout_sessions')
+    .select('id, season_id, age_group')
+    .eq('org_id', orgId)
+    .eq('season_id', seasonId)
+    .eq('age_group', ageGroup)
+    .eq('session_date', preferredTryoutDate)
+    .maybeSingle()
+
+  if (!session) return   // no matching session — nothing to assign
+
+  // Pre-assign: arrived=false, tryout_number=null (assigned at check-in time)
+  await supabase.from('tryout_checkins').upsert({
+    session_id:    session.id,
+    season_id:     session.season_id,
+    age_group:     session.age_group,
+    player_id:     playerId,
+    tryout_number: null,
+    arrived:       false,
+    is_write_in:   false,
+  }, { onConflict: 'session_id,player_id' })
+}
 
 async function updateJobReport({ supabase, jobId, report, userId, orgId, action }: any) {
   const remaining = report.filter((r: any) => r.status === 'unresolved' || r.status === 'suggested').length

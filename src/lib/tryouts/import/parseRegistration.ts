@@ -27,7 +27,8 @@ export interface ParsedRegistrationRow {
   rawFullName: string   // preserved for alias creation
 
   // Tryout
-  ageGroup:    string   // "8U", "10U", etc. — normalized
+  ageGroup:            string        // "8U", "10U", etc. — normalized
+  preferredTryoutDate: string | null // ISO "YYYY-MM-DD" — which session date they selected
 
   // Contact
   parentEmail: string | null
@@ -59,14 +60,15 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   lastName:    ['Last Name', 'Last'],
   // "Full Name" is used when there's no separate First/Last
   // (handled specially below)
-  ageGroup:    ['Tryout Age Group', 'Age Group', 'Division', 'Age Division'],
-  parentEmail: ['Account Email', 'Email', 'Parent Email', 'Guardian Email'],
-  parentPhone: ['Guardian Phone', 'Parent Phone', 'Phone', 'Mobile'],
-  dob:         ['Date of Birth', 'DOB', 'Birth Date', 'Birthday'],
-  grade:       ['Grade', 'Grade Level', 'School Grade'],
-  school:      ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School', 'School Name'],
-  priorOrg:    ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization'],
-  priorTeam:   ['2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
+  ageGroup:             ['Tryout Age Group', 'Age Group', 'Division', 'Age Division'],
+  preferredTryoutDate:  ['Which tryout date will you attend?', 'Tryout Date', 'Preferred Tryout Date', 'Session Date', 'Preferred Session Date'],
+  parentEmail:          ['Account Email', 'Email', 'Parent Email', 'Guardian Email'],
+  parentPhone:          ['Guardian Phone', 'Parent Phone', 'Phone', 'Mobile'],
+  dob:                  ['Date of Birth', 'DOB', 'Birth Date', 'Birthday'],
+  grade:                ['Grade', 'Grade Level', 'School Grade'],
+  school:               ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School', 'School Name'],
+  priorOrg:             ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization'],
+  priorTeam:            ['2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
 }
 
 const FULL_NAME_COLS = ['Full Name', 'Player Name', 'Name', 'Athlete Name']
@@ -119,17 +121,18 @@ export function parseRegistrationFile(
   }
 
   // Resolve column indices for all fields
-  const firstNameIdx   = getCol(COL_MAP.firstName)
-  const lastNameIdx    = getCol(COL_MAP.lastName)
-  const fullNameIdx    = getCol(FULL_NAME_COLS)
-  const ageGroupIdx    = getCol(COL_MAP.ageGroup)
-  const emailIdx       = getCol(COL_MAP.parentEmail)
-  const phoneIdx       = getCol(COL_MAP.parentPhone)
-  const dobIdx         = getCol(COL_MAP.dob)
-  const gradeIdx       = getCol(COL_MAP.grade)
-  const schoolIdx      = getCol(COL_MAP.school)
-  const priorOrgIdx    = getCol(COL_MAP.priorOrg)
-  const priorTeamIdx   = getCol(COL_MAP.priorTeam)
+  const firstNameIdx          = getCol(COL_MAP.firstName)
+  const lastNameIdx           = getCol(COL_MAP.lastName)
+  const fullNameIdx           = getCol(FULL_NAME_COLS)
+  const ageGroupIdx           = getCol(COL_MAP.ageGroup)
+  const preferredTryoutDateIdx = getCol(COL_MAP.preferredTryoutDate)
+  const emailIdx              = getCol(COL_MAP.parentEmail)
+  const phoneIdx              = getCol(COL_MAP.parentPhone)
+  const dobIdx                = getCol(COL_MAP.dob)
+  const gradeIdx              = getCol(COL_MAP.grade)
+  const schoolIdx             = getCol(COL_MAP.school)
+  const priorOrgIdx           = getCol(COL_MAP.priorOrg)
+  const priorTeamIdx          = getCol(COL_MAP.priorTeam)
 
   const rows:   ParsedRegistrationRow[] = []
   const errors: Array<{ rowIndex: number; message: string }> = []
@@ -182,18 +185,33 @@ export function parseRegistrationFile(
       }
     }
 
+    // ── Preferred tryout date ────────────────────────────────────────
+    let preferredTryoutDate: string | null = null
+    if (preferredTryoutDateIdx >= 0) {
+      const raw = row[preferredTryoutDateIdx]
+      if (raw != null && typeof raw === 'object' && raw instanceof Date) {
+        preferredTryoutDate = (raw as Date).toISOString().split('T')[0]
+      } else if (typeof raw === 'string' && raw.trim()) {
+        preferredTryoutDate = parseDateString(raw.trim())
+      } else if (typeof raw === 'number') {
+        const d = XLSX.SSF.parse_date_code(raw)
+        if (d) preferredTryoutDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
+      }
+    }
+
     rows.push({
-      firstName:   capitalize(firstName),
-      lastName:    capitalize(lastName),
-      rawFullName: rawFullName || `${firstName} ${lastName}`,
-      ageGroup:    ageGroup || rawAgeGroup,
-      parentEmail: getString(emailIdx) || null,
-      parentPhone: getString(phoneIdx) || null,
+      firstName:           capitalize(firstName),
+      lastName:            capitalize(lastName),
+      rawFullName:         rawFullName || `${firstName} ${lastName}`,
+      ageGroup:            ageGroup || rawAgeGroup,
+      preferredTryoutDate,
+      parentEmail:         getString(emailIdx) || null,
+      parentPhone:         getString(phoneIdx) || null,
       dob,
-      grade:       getString(gradeIdx) || null,
-      school:      getString(schoolIdx) || null,
-      priorOrg:    getString(priorOrgIdx) || null,
-      priorTeam:   getString(priorTeamIdx) || null,
+      grade:               getString(gradeIdx) || null,
+      school:              getString(schoolIdx) || null,
+      priorOrg:            getString(priorOrgIdx) || null,
+      priorTeam:           getString(priorTeamIdx) || null,
       rowIndex,
     })
   })
