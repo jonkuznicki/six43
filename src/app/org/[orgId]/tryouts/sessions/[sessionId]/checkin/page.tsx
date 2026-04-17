@@ -21,6 +21,8 @@ interface Session {
   numbering_method: 'checkin_order' | 'alphabetical'
 }
 
+type PreAssignedSort = 'name' | 'preferred_date'
+
 export default function CheckinPage({ params }: { params: { orgId: string; sessionId: string } }) {
   const supabase = createClient()
 
@@ -28,12 +30,21 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   const [players,          setPlayers]          = useState<Player[]>([])
   const [checkins,         setCheckins]         = useState<Checkin[]>([])
   const [otherSessionsMax, setOtherSessionsMax] = useState(0)
+  // preferred_tryout_date keyed by player_id
+  const [prefDateMap,      setPrefDateMap]      = useState<Map<string, string | null>>(new Map())
   const [search,           setSearch]           = useState('')
   const [loading,          setLoading]          = useState(true)
   const [busy,             setBusy]             = useState<string | null>(null)
   const [checkinError,     setCheckinError]     = useState<string | null>(null)
 
-  // Write-in modal
+  // Multi-select for pre-assigned
+  const [selected,         setSelected]         = useState<Set<string>>(new Set())  // checkin IDs
+  const [bulkBusy,         setBulkBusy]         = useState(false)
+
+  // Pre-assigned sort
+  const [preSort,          setPreSort]          = useState<PreAssignedSort>('preferred_date')
+
+  // Walk-up modal
   const [showWriteIn,     setShowWriteIn]     = useState(false)
   const [writeInName,     setWriteInName]     = useState('')
   const [writeInAgeGroup, setWriteInAgeGroup] = useState('')
@@ -48,34 +59,37 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setSession(sess)
     if (!sess) { setLoading(false); return }
 
-    const [{ data: pData }, { data: cData }, { data: otherData }] = await Promise.all([
+    const [{ data: pData }, { data: cData }, { data: otherData }, { data: regData }] = await Promise.all([
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, jersey_number, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true).eq('age_group', sess.age_group)
         .order('last_name').order('first_name'),
       supabase.from('tryout_checkins').select('*')
         .eq('session_id', params.sessionId)
-        .order('arrived', { ascending: false })   // arrived players first, then pre-assigned
+        .order('arrived', { ascending: false })
         .order('tryout_number', { ascending: true, nullsFirst: false }),
-      // Max tryout number across ALL sessions for this season+age_group (for global numbering)
       supabase.from('tryout_checkins').select('tryout_number')
         .eq('season_id', sess.season_id).eq('age_group', sess.age_group)
         .neq('session_id', params.sessionId)
         .not('tryout_number', 'is', null)
         .order('tryout_number', { ascending: false }).limit(1),
+      // Load preferred tryout dates from registration staging
+      supabase.from('tryout_registration_staging')
+        .select('player_id, preferred_tryout_date')
+        .eq('org_id', params.orgId)
+        .eq('season_id', sess.season_id),
     ])
     setPlayers(pData ?? [])
     setCheckins(cData ?? [])
     setOtherSessionsMax(otherData?.[0]?.tryout_number ?? 0)
+    setPrefDateMap(new Map((regData ?? []).map((r: any) => [r.player_id, r.preferred_tryout_date ?? null])))
     setLoading(false)
   }
 
-  // IDs of players already in this session (assigned or arrived)
   const assignedPlayerIds = useMemo(
     () => new Set(checkins.map(c => c.player_id).filter(Boolean)),
     [checkins]
   )
 
-  // Players not yet in this session at all — shown as walk-ups
   const unassignedPlayers = useMemo(() => {
     const q = search.toLowerCase()
     return players.filter(p =>
@@ -84,26 +98,33 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     )
   }, [players, assignedPlayerIds, search])
 
-  // Pre-assigned but not yet arrived — shown in the "tap to arrive" section
-  const preAssigned = useMemo(
-    () => checkins.filter(c => !c.arrived && !c.is_write_in),
-    [checkins]
-  )
+  const preAssigned = useMemo(() => {
+    const list = checkins.filter(c => !c.arrived && !c.is_write_in)
+    return [...list].sort((a, b) => {
+      if (preSort === 'preferred_date') {
+        const da = (a.player_id ? prefDateMap.get(a.player_id) : null) ?? ''
+        const db = (b.player_id ? prefDateMap.get(b.player_id) : null) ?? ''
+        if (da !== db) return da.localeCompare(db)
+      }
+      // fallback: name sort
+      const playerMap = new Map(players.map(p => [p.id, p]))
+      const na = a.player_id ? (() => { const p = playerMap.get(a.player_id!); return p ? `${p.last_name} ${p.first_name}` : '' })() : ''
+      const nb = b.player_id ? (() => { const p = playerMap.get(b.player_id!); return p ? `${p.last_name} ${p.first_name}` : '' })() : ''
+      return na.localeCompare(nb)
+    })
+  }, [checkins, preSort, prefDateMap, players])
 
-  // Already arrived (or write-ins)
   const arrived = useMemo(
     () => checkins.filter(c => c.arrived || c.is_write_in),
     [checkins]
   )
 
   function nextNumber() {
-    // Global: continuous within season+age_group across all sessions
     const arrivedNums = checkins.filter(c => c.tryout_number != null).map(c => c.tryout_number as number)
     const localMax    = arrivedNums.length > 0 ? Math.max(...arrivedNums) : 0
     return Math.max(localMax, otherSessionsMax) + 1
   }
 
-  // Mark a pre-assigned player as arrived — assigns their tryout number
   async function markArrived(checkinId: string) {
     setBusy(checkinId)
     setCheckinError(null)
@@ -118,6 +139,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     if (error) { setCheckinError(error.message); setBusy(null); return }
     if (updated) {
       setCheckins(prev => prev.map(c => c.id === checkinId ? updated : c))
+      setSelected(prev => { const n = new Set(prev); n.delete(checkinId); return n })
       if (session?.numbering_method === 'alphabetical') {
         const all = checkins.map(c => c.id === checkinId ? updated : c)
         await renumberAlphabetically(all.filter(c => c.arrived))
@@ -126,7 +148,32 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setBusy(null)
   }
 
-  // Walk-up or direct check-in (player not pre-assigned)
+  async function markSelectedArrived() {
+    if (selected.size === 0) return
+    setBulkBusy(true)
+    setCheckinError(null)
+    const ids = Array.from(selected)
+    for (const id of ids) {
+      const num = session?.numbering_method === 'alphabetical' ? null : nextNumber()
+      const { data: updated, error } = await supabase
+        .from('tryout_checkins')
+        .update({ arrived: true, tryout_number: num ?? null, checked_in_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*').single()
+      if (error) { setCheckinError(error.message); break }
+      if (updated) setCheckins(prev => prev.map(c => c.id === id ? updated : c))
+    }
+    setSelected(new Set())
+    if (session?.numbering_method === 'alphabetical') {
+      setCheckins(prev => {
+        const all = prev.filter(c => c.arrived)
+        renumberAlphabetically(all)
+        return prev
+      })
+    }
+    setBulkBusy(false)
+  }
+
   async function checkIn(playerId: string) {
     setBusy(playerId)
     setCheckinError(null)
@@ -159,6 +206,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setBusy(checkinId)
     await supabase.from('tryout_checkins').delete().eq('id', checkinId)
     const remaining = checkins.filter(c => c.id !== checkinId)
+    setSelected(prev => { const n = new Set(prev); n.delete(checkinId); return n })
     if (session?.numbering_method === 'alphabetical') {
       await renumberAlphabetically(remaining.filter(c => c.arrived))
     } else {
@@ -213,6 +261,22 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setWriteInAgeGroup('')
     setShowWriteIn(false)
     setWritingIn(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === preAssigned.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(preAssigned.map(c => c.id)))
+    }
   }
 
   const playerMap = useMemo(() => new Map(players.map(p => [p.id, p])), [players])
@@ -286,7 +350,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
             {arrived.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: s.dim, fontSize: '13px', background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border)' }}>
-                {preAssigned.length > 0 ? 'Tap pre-assigned players on the left as they arrive.' : 'No one checked in yet.'}
+                {preAssigned.length > 0 ? 'Select pre-assigned players and click "Mark arrived" as they show up.' : 'No one checked in yet.'}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -322,25 +386,77 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
           {/* Pre-assigned (not yet arrived) */}
           {preAssigned.length > 0 && (
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#40A0E8' }}>
-                Pre-assigned — tap when player arrives ({preAssigned.length})
+              {/* Header with sort + bulk action */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#40A0E8', flex: 1 }}>
+                  Pre-assigned ({preAssigned.length})
+                </div>
+                {/* Sort toggle */}
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {(['preferred_date', 'name'] as PreAssignedSort[]).map(s2 => (
+                    <button key={s2} onClick={() => setPreSort(s2)} style={{
+                      padding: '3px 9px', borderRadius: '4px', border: '0.5px solid',
+                      borderColor: preSort === s2 ? '#40A0E8' : 'var(--border-md)',
+                      background: preSort === s2 ? 'rgba(64,160,232,0.1)' : 'var(--bg-input)',
+                      color: preSort === s2 ? '#40A0E8' : s.dim,
+                      fontSize: '11px', cursor: 'pointer',
+                    }}>{s2 === 'preferred_date' ? 'By date' : 'A–Z'}</button>
+                  ))}
+                </div>
+                {/* Select-all + bulk mark arrived */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: s.muted, cursor: 'pointer' }}>
+                  <input type="checkbox"
+                    checked={selected.size > 0 && selected.size === preAssigned.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < preAssigned.length }}
+                    onChange={toggleSelectAll}
+                  />
+                  All
+                </label>
+                {selected.size > 0 && (
+                  <button onClick={markSelectedArrived} disabled={bulkBusy} style={{
+                    padding: '4px 12px', borderRadius: '5px', border: 'none',
+                    background: '#40A0E8', color: '#fff',
+                    fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                    opacity: bulkBusy ? 0.6 : 1,
+                  }}>
+                    {bulkBusy ? 'Marking…' : `✓ Mark ${selected.size} arrived`}
+                  </button>
+                )}
               </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {preAssigned.map(c => {
                   const player = c.player_id ? playerMap.get(c.player_id) : null
                   const name = player ? `${player.first_name} ${player.last_name}` : 'Unknown'
+                  const prefDate = c.player_id ? prefDateMap.get(c.player_id) : null
+                  const isChecked = selected.has(c.id)
                   return (
                     <div key={c.id} style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
-                      background: 'rgba(80,160,232,0.06)', border: '0.5px solid rgba(80,160,232,0.2)',
-                      borderRadius: '8px', padding: '8px 12px', cursor: 'pointer',
+                      background: isChecked ? 'rgba(64,160,232,0.12)' : 'rgba(80,160,232,0.06)',
+                      border: `0.5px solid ${isChecked ? 'rgba(64,160,232,0.5)' : 'rgba(80,160,232,0.2)'}`,
+                      borderRadius: '8px', padding: '8px 12px',
                       opacity: busy === c.id ? 0.5 : 1,
-                    }} onClick={() => busy == null && markArrived(c.id)}>
-                      <div style={{ flex: 1 }}>
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelect(c.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ cursor: 'pointer', accentColor: '#40A0E8', flexShrink: 0 }}
+                      />
+                      <div style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}
+                        onClick={() => busy == null && markArrived(c.id)}>
                         <div style={{ fontSize: '13px', fontWeight: 600 }}>{name}</div>
-                        {player?.prior_team && <div style={{ fontSize: '11px', color: s.dim }}>↩ {player.prior_team}</div>}
+                        <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
+                          {prefDate && (
+                            <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>
+                          )}
+                          {player?.prior_team && <span>↩ {player.prior_team}</span>}
+                        </div>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#40A0E8', fontWeight: 700 }}>✓ Arrived</span>
+                      <span style={{ fontSize: '11px', color: '#40A0E8', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                        onClick={() => busy == null && markArrived(c.id)}>✓</span>
                       <button onClick={e => { e.stopPropagation(); removeCheckin(c.id) }} disabled={busy === c.id} style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         color: s.dim, fontSize: '14px', padding: '2px 4px',
@@ -367,22 +483,26 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '600px', overflowY: 'auto' }}>
-            {unassignedPlayers.map(p => (
-              <div key={p.id} style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-                borderRadius: '8px', padding: '8px 12px', cursor: 'pointer',
-                opacity: busy === p.id ? 0.5 : 1,
-              }} onClick={() => busy == null && checkIn(p.id)}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
-                  <div style={{ fontSize: '11px', color: s.dim }}>
-                    {p.jersey_number ? `#${p.jersey_number} · ` : ''}{p.prior_team ?? 'No prior team'}
+            {unassignedPlayers.map(p => {
+              const prefDate = prefDateMap.get(p.id)
+              return (
+                <div key={p.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                  borderRadius: '8px', padding: '8px 12px', cursor: 'pointer',
+                  opacity: busy === p.id ? 0.5 : 1,
+                }} onClick={() => busy == null && checkIn(p.id)}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
+                    <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
+                      {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
+                      <span>{p.jersey_number ? `#${p.jersey_number} · ` : ''}{p.prior_team ?? 'No prior team'}</span>
+                    </div>
                   </div>
+                  <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700 }}>+ Check in</span>
                 </div>
-                <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700 }}>+ Check in</span>
-              </div>
-            ))}
+              )
+            })}
             {unassignedPlayers.length === 0 && search === '' && (
               <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
                 All registered players are assigned to this session.

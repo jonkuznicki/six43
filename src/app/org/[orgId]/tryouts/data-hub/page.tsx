@@ -12,7 +12,7 @@ interface Player {
   prior_team: string | null; jersey_number: string | null
   dob: string | null; age_group_override_reason: string | null
 }
-interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null }
+interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null; preferred_tryout_date: string | null }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
   player_id: string; season_year: string; team_label: string|null
@@ -184,7 +184,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
-      seasonData ? supabase.from('tryout_registration_staging').select('player_id,prior_team,age_group,parent_email,imported_at,dob').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
+      seasonData ? supabase.from('tryout_registration_staging').select('player_id,prior_team,age_group,parent_email,imported_at,dob,preferred_tryout_date').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
@@ -558,7 +558,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age Group', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
+                {['Player', 'Age Group', 'Preferred Date', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
                   <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
                 ))}
               </tr></thead>
@@ -567,6 +567,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                   <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
                     <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
+                    <td style={{ ...td, color: '#40A0E8', fontSize: '12px' }}>{reg?.preferred_tryout_date ?? '—'}</td>
                     <td style={{ ...td, color: '#80B0E8' }}>{reg?.prior_team ?? '—'}</td>
                     <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? '—'}</td>
                     <td style={{ ...td, color: s.dim, fontSize: '12px' }}>{reg?.imported_at ? new Date(reg.imported_at).toLocaleDateString() : '—'}</td>
