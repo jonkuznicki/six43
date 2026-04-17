@@ -16,19 +16,20 @@ interface Checkin {
 }
 
 interface Session {
-  id: string; label: string; age_group: string; session_date: string
+  id: string; label: string; age_group: string; season_id: string; session_date: string
   numbering_method: 'checkin_order' | 'alphabetical'
 }
 
 export default function CheckinPage({ params }: { params: { orgId: string; sessionId: string } }) {
   const supabase = createClient()
 
-  const [session,   setSession]   = useState<Session | null>(null)
-  const [players,   setPlayers]   = useState<Player[]>([])
-  const [checkins,  setCheckins]  = useState<Checkin[]>([])
-  const [search,    setSearch]    = useState('')
-  const [loading,   setLoading]   = useState(true)
-  const [busy,      setBusy]      = useState<string | null>(null)
+  const [session,        setSession]        = useState<Session | null>(null)
+  const [players,        setPlayers]        = useState<Player[]>([])
+  const [checkins,       setCheckins]       = useState<Checkin[]>([])
+  const [otherSessionsMax, setOtherSessionsMax] = useState(0)
+  const [search,         setSearch]         = useState('')
+  const [loading,        setLoading]        = useState(true)
+  const [busy,           setBusy]           = useState<string | null>(null)
 
   // Write-in modal
   const [showWriteIn,     setShowWriteIn]     = useState(false)
@@ -40,20 +41,26 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
   async function loadData() {
     const { data: sess } = await supabase
-      .from('tryout_sessions').select('id, label, age_group, session_date, numbering_method')
+      .from('tryout_sessions').select('id, label, age_group, season_id, session_date, numbering_method')
       .eq('id', params.sessionId).single()
     setSession(sess)
     if (!sess) { setLoading(false); return }
 
-    const [{ data: pData }, { data: cData }] = await Promise.all([
+    const [{ data: pData }, { data: cData }, { data: otherData }] = await Promise.all([
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, jersey_number, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true).eq('age_group', sess.age_group)
         .order('last_name').order('first_name'),
       supabase.from('tryout_checkins').select('*')
         .eq('session_id', params.sessionId).order('tryout_number'),
+      // Max tryout number across ALL sessions for this season+age_group (for global numbering)
+      supabase.from('tryout_checkins').select('tryout_number')
+        .eq('season_id', sess.season_id).eq('age_group', sess.age_group)
+        .neq('session_id', params.sessionId)
+        .order('tryout_number', { ascending: false }).limit(1),
     ])
     setPlayers(pData ?? [])
     setCheckins(cData ?? [])
+    setOtherSessionsMax(otherData?.[0]?.tryout_number ?? 0)
     setLoading(false)
   }
 
@@ -71,7 +78,9 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   }, [players, checkedInPlayerIds, search])
 
   function nextNumber() {
-    return checkins.length > 0 ? Math.max(...checkins.map(c => c.tryout_number)) + 1 : 1
+    // Global: continuous within season+age_group across all sessions
+    const localMax  = checkins.length > 0 ? Math.max(...checkins.map(c => c.tryout_number)) : 0
+    return Math.max(localMax, otherSessionsMax) + 1
   }
 
   async function checkIn(playerId: string) {
@@ -83,6 +92,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     // For alphabetical: insert with a temp number, then renumber all
     const { data: newCheckin } = await supabase.from('tryout_checkins').insert({
       session_id: params.sessionId, player_id: playerId, tryout_number: num ?? 9999,
+      season_id: session!.season_id, age_group: session!.age_group,
       is_write_in: false,
     }).select('*').single()
 
@@ -118,11 +128,12 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
       const nb = b.is_write_in ? (b.write_in_name ?? '') : (() => { const p = playerMap.get(b.player_id!); return p ? `${p.last_name} ${p.first_name}` : '' })()
       return na.localeCompare(nb)
     })
-    // Batch update numbers
+    // Start numbering after any players from other sessions in this age group
+    const startFrom = otherSessionsMax + 1
     await Promise.all(sorted.map((c, i) =>
-      supabase.from('tryout_checkins').update({ tryout_number: i + 1 }).eq('id', c.id)
+      supabase.from('tryout_checkins').update({ tryout_number: startFrom + i }).eq('id', c.id)
     ))
-    setCheckins(sorted.map((c, i) => ({ ...c, tryout_number: i + 1 })))
+    setCheckins(sorted.map((c, i) => ({ ...c, tryout_number: startFrom + i })))
   }
 
   async function toggleNumberingMethod(method: 'checkin_order' | 'alphabetical') {
@@ -139,6 +150,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setWritingIn(true)
     const { data } = await supabase.from('tryout_checkins').insert({
       session_id: params.sessionId, tryout_number: nextNumber(),
+      season_id: session!.season_id, age_group: session!.age_group,
       is_write_in: true, write_in_name: writeInName.trim(),
       write_in_age_group: writeInAgeGroup.trim() || session?.age_group,
     }).select('*').single()

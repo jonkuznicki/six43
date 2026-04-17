@@ -5,6 +5,9 @@ import { createClient } from '../../../../../../../lib/supabase'
 import Link from 'next/link'
 import { computeTryoutScore, ScoringCategory } from '../../../../../../../lib/tryouts/computeScore'
 
+// Sub-keys that belong to tiebreaker categories (speed) — accept decimal seconds, not 1-5
+const TIEBREAKER_KEYS = new Set<string>()
+
 interface Checkin {
   id: string; tryout_number: number; player_id: string | null
   is_write_in: boolean; write_in_name: string | null
@@ -56,7 +59,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
 
     const [{ data: catData }, { data: checkinData }, { data: evalData }] = await Promise.all([
       supabase.from('tryout_scoring_config')
-        .select('category, label, weight, is_optional, subcategories, sort_order')
+        .select('category, label, weight, is_optional, is_tiebreaker, subcategories, sort_order')
         .eq('season_id', sess.season_id).order('sort_order'),
       supabase.from('tryout_checkins')
         .select('id, tryout_number, player_id, is_write_in, write_in_name, tryout_players(first_name, last_name)')
@@ -66,10 +69,19 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
         .eq('session_id', params.sessionId),
     ])
 
-    setCategories((catData ?? []).map((c: any) => ({
+    const cats = (catData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
-      is_optional: c.is_optional, subcategories: c.subcategories ?? [],
-    })))
+      is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false,
+      subcategories: c.subcategories ?? [],
+    }))
+    // Populate tiebreaker key set so inputs can behave differently
+    TIEBREAKER_KEYS.clear()
+    for (const cat of cats) {
+      if (cat.is_tiebreaker) {
+        for (const sub of cat.subcategories) TIEBREAKER_KEYS.add(sub.key)
+      }
+    }
+    setCategories(cats)
     setCheckins((checkinData ?? []).map((c: any) => ({
       id: c.id, tryout_number: c.tryout_number, player_id: c.player_id,
       is_write_in: c.is_write_in, write_in_name: c.write_in_name,
@@ -146,7 +158,13 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   }
 
   function handleCellChange(playerId: string, subKey: string, val: string) {
-    const num = val === '' ? '' : String(Math.min(5, Math.max(1, parseInt(val) || 0)))
+    // Tiebreaker (speed): raw decimal seconds — no range clamping
+    // Regular scores: integer 1–5
+    const num = val === ''
+      ? ''
+      : TIEBREAKER_KEYS.has(subKey)
+        ? val  // allow any decimal, e.g. "7.82"
+        : String(Math.min(5, Math.max(1, parseInt(val) || 0)))
     setGrid(prev => ({ ...prev, [playerId]: { ...(prev[playerId] ?? {}), [subKey]: num } }))
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => autoSave(playerId), 1000)
@@ -242,10 +260,11 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   )
 
   // Group subcategories by category header for the column headers
-  const catGroups: Array<{ label: string; key: string; isOptional: boolean; subs: typeof allSubcategories }> = []
+  const catGroups: Array<{ label: string; key: string; isOptional: boolean; isTiebreaker: boolean; subs: typeof allSubcategories }> = []
   for (const cat of categories) {
     catGroups.push({
       label: cat.label, key: cat.category, isOptional: cat.is_optional,
+      isTiebreaker: cat.is_tiebreaker,
       subs: allSubcategories.filter(s => s.catKey === cat.category),
     })
   }
@@ -339,10 +358,10 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                     padding: '4px 6px', textAlign: 'center', borderBottom: '0.5px solid var(--border)',
                     borderLeft: '0.5px solid var(--border-md)',
                     fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-                    color: s.muted, background: 'var(--bg)',
+                    color: grp.isTiebreaker ? s.dim : s.muted, background: 'var(--bg)',
                     whiteSpace: 'nowrap',
                   }}>
-                    {grp.label}{grp.isOptional ? ' *' : ''}
+                    {grp.label}{grp.isOptional ? ' *' : ''}{grp.isTiebreaker ? ' (sec)' : ''}
                   </th>
                 ))}
                 <th style={{ padding: '4px 8px', borderBottom: '0.5px solid var(--border)', borderLeft: '0.5px solid var(--border-md)', fontSize: '11px', color: s.dim, minWidth: '80px' }}>Comment</th>
@@ -395,6 +414,23 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                         }}>
                           {na ? (
                             <span style={{ fontSize: '10px', color: s.dim }}>N/A</span>
+                          ) : TIEBREAKER_KEYS.has(sub.key) ? (
+                            // Speed: raw decimal seconds — wider cell, no color coding
+                            <input
+                              ref={el => { inputRefs.current[rowIdx][colIdx] = el }}
+                              type="number" min={0} step={0.01}
+                              value={val}
+                              disabled={!playerId || isLocked}
+                              onChange={e => playerId && handleCellChange(playerId, sub.key, e.target.value)}
+                              onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
+                              style={{
+                                width: '54px', textAlign: 'center', padding: '3px 2px',
+                                background: val ? 'rgba(var(--fg-rgb),0.06)' : 'var(--bg-input)',
+                                border: `0.5px solid ${val ? 'transparent' : 'var(--border-md)'}`,
+                                borderRadius: '4px', fontSize: '13px', fontWeight: val ? 700 : 400,
+                                color: s.muted,
+                              }}
+                            />
                           ) : (
                             <input
                               ref={el => { inputRefs.current[rowIdx][colIdx] = el }}

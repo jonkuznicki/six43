@@ -1,7 +1,11 @@
 /**
  * Compute a tryout_score from subcategory scores + config.
- * Optional categories (pitching, catching) are excluded when all their
- * subcategories are null/missing.
+ *
+ * - Tiebreaker categories (e.g. speed) are excluded from the formula entirely.
+ *   Their values are stored but don't affect tryout_score.
+ * - Optional categories (pitching, catching) are excluded when all their
+ *   subcategories are null/missing.
+ * - Categories with weight = 0 don't contribute to the score.
  */
 
 export interface ScoringSubcategory {
@@ -15,6 +19,7 @@ export interface ScoringCategory {
   label:         string
   weight:        number
   is_optional:   boolean
+  is_tiebreaker: boolean
   subcategories: ScoringSubcategory[]
 }
 
@@ -25,6 +30,9 @@ export function computeTryoutScore(
   const components: [number, number][] = []
 
   for (const cat of categories) {
+    // Tiebreaker categories (speed) don't contribute to the score
+    if (cat.is_tiebreaker) continue
+
     const subs = cat.subcategories
     if (subs.length === 0) continue
 

@@ -77,7 +77,7 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
 
     setCategories((catData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
-      is_optional: c.is_optional, subcategories: c.subcategories ?? [],
+      is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false, subcategories: c.subcategories ?? [],
     })))
 
     const enrichedCheckins = (checkinData ?? []).map((c: any) => ({
