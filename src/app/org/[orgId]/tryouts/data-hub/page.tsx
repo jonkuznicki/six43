@@ -331,6 +331,16 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em',
     background: 'var(--bg)', borderBottom: '0.5px solid var(--border)',
     whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none',
+    position: 'sticky', top: 0, zIndex: 2,
+  }
+  // Sticky left column helpers
+  const stickyPlayerTh: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 3, background: 'var(--bg)',
+    boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)',
+  }
+  const stickyPlayerTd: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)',
+    boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)',
   }
   const td: React.CSSProperties = {
     padding: '7px 10px', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)', verticalAlign: 'middle',
@@ -346,7 +356,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '1300px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 4rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -420,7 +430,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
       {/* ── Master tab ─────────────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'master' && (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr>
@@ -434,7 +444,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                   { key: 'jersey',    label: 'Jersey' },
                   { key: null,        label: 'Data' },
                 ].map((col, i) => (
-                  <th key={i} style={{ ...th, cursor: col.key ? 'pointer' : 'default' }}
+                  <th key={i} style={{ ...th, cursor: col.key ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}
                     onClick={() => col.key && toggleSort(col.key)}>
                     {col.label}{col.key ? sortArrow(col.key) : null}
                   </th>
@@ -450,7 +460,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
                 return (
                   <tr key={p.id} style={{ background: rowBg }}>
-                    <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
 
                     {/* Tryout AG — editable */}
@@ -545,17 +555,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {!lazyLoading && tab === 'registration' && (() => {
         const rows = filtered.map(p => ({ p, reg: regMap.get(p.id) })).filter(r => r.reg)
         return (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age Group', 'Reg Team', 'Parent Email', 'Imported'].map(l => (
-                  <th key={l} style={th}>{l}</th>
+                {['Player', 'Age Group', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
+                  <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {rows.map(({ p, reg }, i) => (
                   <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                    <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
                     <td style={{ ...td, color: '#80B0E8' }}>{reg?.prior_team ?? '—'}</td>
                     <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? '—'}</td>
@@ -573,17 +583,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {!lazyLoading && tab === 'roster' && (() => {
         const rows = filtered.map(p => ({ p, ros: rosterMap.get(p.id) })).filter(r => r.ros)
         return (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age Group', 'Team', 'Jersey #', 'Imported'].map(l => (
-                  <th key={l} style={th}>{l}</th>
+                {['Player', 'Age Group', 'Team', 'Jersey #', 'Imported'].map((l, i) => (
+                  <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {rows.map(({ p, ros }, i) => (
                   <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                    <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
                     <td style={{ ...td, color: '#6DB875' }}>{ros?.team_name ?? '—'}</td>
                     <td style={{ ...td, color: s.muted }}>{ros?.jersey_number ?? '—'}</td>
@@ -703,15 +713,15 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               </div>
             )}
 
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {/* Checkbox */}
-                    <th style={{ ...th, width: '32px', cursor: 'pointer', paddingRight: '4px' }} rowSpan={2} onClick={toggleSelectAll}>
+                    {/* Checkbox — sticky left:0 */}
+                    <th style={{ ...th, ...stickyPlayerTh, width: '32px', cursor: 'pointer', paddingRight: '4px', boxShadow: 'none' }} rowSpan={2} onClick={toggleSelectAll}>
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
                     </th>
-                    <th style={thGc('name', { minWidth: '160px' })} rowSpan={2}>Player{gcArrow('name')}</th>
+                    <th style={thGc('name', { minWidth: '160px', position: 'sticky', left: '32px', zIndex: 3, background: 'var(--bg)', boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)' })} rowSpan={2}>Player{gcArrow('name')}</th>
                     <th style={thGc('age', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Age{gcArrow('age')}</th>
                     <th style={thGc('team', { textAlign: 'left', minWidth: '120px', whiteSpace: 'nowrap' })} rowSpan={2}>Team{gcArrow('team')}</th>
                     <th style={thGc('year', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Year{gcArrow('year')}</th>
@@ -737,10 +747,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     const selected = gcSelected.includes(p.id)
                     return (
                       <tr key={p.id} style={{ background: selected ? 'rgba(232,160,32,0.06)' : i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                        <td style={{ ...td, paddingRight: '4px', width: '32px' }}>
+                        <td style={{ ...td, ...stickyPlayerTd, paddingRight: '4px', width: '32px', boxShadow: 'none' }}>
                           <input type="checkbox" checked={selected} onChange={() => toggleSelectOne(p.id)} style={{ cursor: 'pointer' }} />
                         </td>
-                        <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                        <td style={{ ...td, position: 'sticky', left: '32px', zIndex: 1, background: 'var(--bg)', boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                         <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
                         <td style={{ ...td, textAlign: 'left', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', minWidth: '120px' }}>{gc?.team_label ?? '—'}</td>
                         <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
@@ -797,12 +807,12 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: s.dim }}>{rows.length} players with submitted evals · Read-only — edit on the <Link href={`/org/${params.orgId}/tryouts/coach-evals`} style={{ color: 'var(--accent)' }}>Coach Evals page</Link></div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   {/* Section headers */}
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    <th style={{ ...th, minWidth: '180px', fontWeight: 800, fontSize: '12px' }} rowSpan={2}>Player</th>
+                    <th style={{ ...th, ...stickyPlayerTh, minWidth: '180px', fontWeight: 800, fontSize: '12px' }} rowSpan={2}>Player</th>
                     {sections.map(sec => {
                       const secFields = evalFields.filter(f => f.section === sec)
                       return (
@@ -830,7 +840,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     const ev = evalMap.get(p.id)!
                     return (
                       <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.04)' }}>
-                        <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {p.last_name}, {p.first_name}
                           <span style={{ fontSize: '10px', color: s.dim, marginLeft: '6px' }}>{p.age_group}</span>
                         </td>
@@ -868,11 +878,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         }
         const rows = filtered.filter(p => aggMap.has(p.id))
         return (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age', 'Avg Score', 'Sessions', 'Evaluators'].map(l => (
-                  <th key={l} style={{ ...th, textAlign: l === 'Player' || l === 'Evaluators' ? 'left' : 'right' }}>{l}</th>
+                {['Player', 'Age', 'Avg Score', 'Sessions', 'Evaluators'].map((l, i) => (
+                  <th key={l} style={{ ...th, textAlign: l === 'Player' || l === 'Evaluators' ? 'left' : 'right', ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -886,7 +896,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                   const avg = agg.scores.length ? agg.scores.reduce((a, b) => a + b, 0) / agg.scores.length : null
                   return (
                     <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                      <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                      <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                       <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
                       <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: 'var(--accent)' }}>{fmt(avg)}</td>
                       <td style={{ ...td, textAlign: 'right', color: s.muted }}>{agg.scores.length}</td>
@@ -958,12 +968,12 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             </div>
 
             {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 310px)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    {['Player', 'Age Group', 'DOB', 'Baseball Age', 'Correct Group', 'Tryout Group', 'Status', 'Override Reason', ''].map(l => (
-                      <th key={l} style={th}>{l}</th>
+                    {['Player', 'Age Group', 'DOB', 'Baseball Age', 'Correct Group', 'Tryout Group', 'Status', 'Override Reason', ''].map((l, i) => (
+                      <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
                     ))}
                   </tr>
                 </thead>
@@ -976,7 +986,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     return (
                       <>
                         <tr key={p.id} style={{ background: rowBg }}>
-                          <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                          <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                           <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
                           <td style={{ ...td, color: s.muted, fontSize: '12px' }}>
                             {dob
