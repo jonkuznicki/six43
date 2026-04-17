@@ -223,6 +223,15 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     setLocking(false)
   }
 
+  async function unlockEvaluator() {
+    const evaluator = evaluators.find(e => e.id === selectedEval)
+    if (!evaluator) return
+    setLocking(true)
+    await supabase.from('tryout_session_evaluators').update({ locked_at: null }).eq('id', selectedEval)
+    setEvaluators(prev => prev.map(e => e.id === selectedEval ? { ...e, locked_at: null } : e))
+    setLocking(false)
+  }
+
   async function addEvaluator() {
     if (!newEvalName.trim()) return
     const { data } = await supabase.from('tryout_session_evaluators').insert({
@@ -333,9 +342,17 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
               }}>🔒 Lock scores</button>
             )}
             {isLocked && (
-              <span style={{ fontSize: '12px', color: '#6DB875', fontWeight: 600 }}>
-                🔒 Locked {currentEvaluator?.locked_at ? new Date(currentEvaluator.locked_at).toLocaleDateString() : ''}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#6DB875', fontWeight: 600 }}>
+                  🔒 Locked {currentEvaluator?.locked_at ? new Date(currentEvaluator.locked_at).toLocaleDateString() : ''}
+                </span>
+                <button onClick={unlockEvaluator} disabled={locking} style={{
+                  padding: '5px 12px', borderRadius: '5px',
+                  border: '0.5px solid rgba(232,160,32,0.4)',
+                  background: 'rgba(232,160,32,0.08)', color: 'var(--accent)',
+                  fontSize: '12px', cursor: 'pointer',
+                }}>Unlock</button>
+              </div>
             )}
           </div>
         </div>

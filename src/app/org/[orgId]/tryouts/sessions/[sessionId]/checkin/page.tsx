@@ -30,6 +30,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   const [search,         setSearch]         = useState('')
   const [loading,        setLoading]        = useState(true)
   const [busy,           setBusy]           = useState<string | null>(null)
+  const [checkinError,   setCheckinError]   = useState<string | null>(null)
 
   // Write-in modal
   const [showWriteIn,     setShowWriteIn]     = useState(false)
@@ -85,16 +86,23 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
   async function checkIn(playerId: string) {
     setBusy(playerId)
+    setCheckinError(null)
     const num = session?.numbering_method === 'alphabetical'
       ? null  // will recompute after insert
       : nextNumber()
 
     // For alphabetical: insert with a temp number, then renumber all
-    const { data: newCheckin } = await supabase.from('tryout_checkins').insert({
+    const { data: newCheckin, error } = await supabase.from('tryout_checkins').insert({
       session_id: params.sessionId, player_id: playerId, tryout_number: num ?? 9999,
       season_id: session!.season_id, age_group: session!.age_group,
       is_write_in: false,
     }).select('*').single()
+
+    if (error) {
+      setCheckinError(error.message)
+      setBusy(null)
+      return
+    }
 
     if (newCheckin) {
       if (session?.numbering_method === 'alphabetical') {
@@ -213,6 +221,12 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
               background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
             }}>+ Write-in</button>
           </div>
+
+          {checkinError && (
+            <div style={{ padding: '10px 14px', marginBottom: '10px', background: 'rgba(232,112,96,0.1)', border: '0.5px solid rgba(232,112,96,0.4)', borderRadius: '8px', fontSize: '12px', color: '#E87060' }}>
+              Check-in failed: {checkinError}
+            </div>
+          )}
 
           {checkins.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px', background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border)' }}>
