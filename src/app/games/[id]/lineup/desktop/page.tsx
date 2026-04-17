@@ -1167,45 +1167,45 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       background: 'var(--bg)',
                       borderRight: '1px solid var(--border)',
                       maxWidth: 0, overflow: 'hidden',
-                      cursor: 'grab', height: 'auto', paddingTop: 3, paddingBottom: 3,
+                      cursor: 'grab',
                     }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                            <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
-                            <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
-                          </div>
-                          <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
-                            #{slot.player?.jersey_number}
-                          </span>
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
+                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
+                        </div>
+                        <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 2, flexShrink: 0 }}>
+                          #{slot.player?.jersey_number}
+                        </span>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', minWidth: 0 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, minWidth: 30, fontSize: 12, fontWeight: 600 }}>
                             {slot.player?.first_name?.[0]}. {slot.player?.last_name}
                           </span>
-                          {allFilled && (
-                            <span style={{ fontSize: 9, color: '#6DB875', flexShrink: 0, marginRight: 2 }} title="All innings assigned">✓</span>
+                          {(pIn > 0 || cIn > 0 || ifIn > 0 || ofIn > 0 || benchIn > 0) && (
+                            <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                              {pIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.P?.color, fontWeight: 700 }}>P·{pIn}</span>}
+                              {cIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.C?.color, fontWeight: 700 }}>C·{cIn}</span>}
+                              {ifIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR['1B']?.color, fontWeight: 700 }}>IF·{ifIn}</span>}
+                              {ofIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.LF?.color, fontWeight: 700 }}>OF·{ofIn}</span>}
+                              {benchIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.Bench?.color, fontWeight: 700 }}>B·{benchIn}</span>}
+                            </div>
                           )}
-                          <button
-                            onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
-                            title="Mark absent"
-                            style={{
-                              flexShrink: 0, width: 14, height: 14, borderRadius: 3,
-                              border: '1px solid var(--border-md)', background: 'transparent',
-                              cursor: 'pointer', fontSize: 8, padding: 0,
-                              color: `rgba(var(--fg-rgb),0.28)`,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              marginRight: 3,
-                            }}
-                          >✕</button>
                         </div>
-                        {(pIn > 0 || cIn > 0 || ifIn > 0 || ofIn > 0 || benchIn > 0) && (
-                          <div style={{ display: 'flex', gap: 4, paddingLeft: 16, marginTop: 1 }}>
-                            {pIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.P?.color, fontWeight: 700 }}>P·{pIn}</span>}
-                            {cIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.C?.color, fontWeight: 700 }}>C·{cIn}</span>}
-                            {ifIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR['1B']?.color, fontWeight: 700 }}>IF·{ifIn}</span>}
-                            {ofIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.LF?.color, fontWeight: 700 }}>OF·{ofIn}</span>}
-                            {benchIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.Bench?.color, fontWeight: 700 }}>B·{benchIn}</span>}
-                          </div>
+                        {allFilled && (
+                          <span style={{ fontSize: 9, color: '#6DB875', flexShrink: 0, marginRight: 2 }} title="All innings assigned">✓</span>
                         )}
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
+                          title="Mark absent"
+                          style={{
+                            flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                            border: '1px solid var(--border-md)', background: 'transparent',
+                            cursor: 'pointer', fontSize: 8, padding: 0,
+                            color: `rgba(var(--fg-rgb),0.28)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginRight: 3,
+                          }}
+                        >✕</button>
                       </div>
                     </td>
 
