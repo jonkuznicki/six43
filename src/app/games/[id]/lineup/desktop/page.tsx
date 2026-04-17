@@ -1087,7 +1087,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     const p = (s.inning_positions ?? [])[ii]
                     if (p) counts[p] = (counts[p] ?? 0) + 1
                   }
-                  const hasDupe = Object.values(counts).some(v => v > 1)
+                  const hasDupe = Object.entries(counts).some(([pos, v]) => pos !== 'Bench' && v > 1)
                   const allFilled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii])
                   const hasMissing = teamPositions.filter(p => p !== 'Bench').some(p => !counts[p])
                   const valid = allFilled && !hasDupe && !hasMissing
