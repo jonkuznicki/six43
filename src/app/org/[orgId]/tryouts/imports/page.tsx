@@ -160,7 +160,7 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
   )
 
   return (
-    <main style={{
+    <main className="page-wide" style={{
       minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
       fontFamily: 'sans-serif',
       padding: '2rem 1.5rem 6rem',

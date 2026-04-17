@@ -157,7 +157,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
+    <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
 
       {/* Page header */}
       <div style={{ marginBottom: '2.5rem' }}>
