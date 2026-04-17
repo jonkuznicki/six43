@@ -128,6 +128,12 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [seasonAgeGroups, setSeasonAgeGroups] = useState<string[]>([])
   const [loading,       setLoading]       = useState(true)
 
+  // GC tab state
+  const [gcSortCol,     setGcSortCol]     = useState('name')
+  const [gcSortDir,     setGcSortDir]     = useState<1 | -1>(1)
+  const [gcTeamFilter,  setGcTeamFilter]  = useState<string[]>([])
+  const [gcSelected,    setGcSelected]    = useState<string[]>([])
+
   // Lazy-loaded tab data
   const [gcFull,        setGcFull]        = useState<GcRow[]    | null>(null)
   const [evalFields,    setEvalFields]    = useState<EvalField[] | null>(null)
@@ -594,9 +600,71 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {/* ── GC Stats tab ──────────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'gc' && gcFull !== null && (() => {
         const gcMap = new Map(gcFull.map(r => [r.player_id, r]))
-        const rows = filtered.map(p => ({ p, gc: gcMap.get(p.id) })).filter(r => r.gc)
+
+        // Distinct teams from loaded stats
+        const gcTeams = Array.from(new Set(gcFull.map(r => r.team_label).filter(Boolean) as string[])).sort()
+
+        // Column → GcRow key mapping
+        const GC_COL_KEY: Record<string, keyof GcRow> = {
+          name: 'player_id', age: 'player_id', team: 'team_label', year: 'season_year',
+          GP: 'games_played', AVG: 'avg', OBP: 'obp', SLG: 'slg', OPS: 'ops',
+          H: 'h', '2B': 'doubles', '3B': 'triples', HR: 'hr', RBI: 'rbi',
+          R: 'r', BB: 'bb', SO: 'so', SB: 'sb', HBP: 'hbp', SAC: 'sac', TB: 'tb',
+          ERA: 'era', WHIP: 'whip', IP: 'ip', W: 'w', SV: 'sv', 'K/BB': 'k_bb', 'STR%': 'strike_pct',
+          Score: 'gc_computed_score',
+        }
+
+        function gcToggleSort(col: string) {
+          if (gcSortCol === col) setGcSortDir(d => d === 1 ? -1 : 1)
+          else { setGcSortCol(col); setGcSortDir(col === 'name' || col === 'age' || col === 'team' || col === 'year' ? 1 : -1) }
+        }
+        function gcArrow(col: string) {
+          if (gcSortCol !== col) return <span style={{ opacity: 0.2, fontSize: '9px' }}> ↕</span>
+          return <span style={{ color: 'var(--accent)', fontSize: '9px' }}>{gcSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        function toggleTeamFilter(team: string) {
+          setGcTeamFilter(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team])
+        }
+
+        // Build filtered + sorted rows
+        let rows = filtered.map(p => ({ p, gc: gcMap.get(p.id) })).filter(r => r.gc)
+        if (gcTeamFilter.length > 0) {
+          rows = rows.filter(r => r.gc!.team_label && gcTeamFilter.includes(r.gc!.team_label))
+        }
+        rows = rows.sort((a, b) => {
+          const col = gcSortCol
+          const dir = gcSortDir
+          if (col === 'name') return dir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
+          if (col === 'age')  return dir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
+          if (col === 'team') return dir * (a.gc!.team_label ?? '').localeCompare(b.gc!.team_label ?? '')
+          if (col === 'year') return dir * (a.gc!.season_year ?? '').localeCompare(b.gc!.season_year ?? '')
+          const key = GC_COL_KEY[col]
+          if (!key) return 0
+          const va = (a.gc as any)[key] ?? -Infinity
+          const vb = (b.gc as any)[key] ?? -Infinity
+          return dir * (va - vb)
+        })
+
+        const allIds = rows.map(r => r.p.id)
+        const allSelected = allIds.length > 0 && allIds.every(id => gcSelected.includes(id))
+        function toggleSelectAll() {
+          if (allSelected) setGcSelected(prev => prev.filter(id => !allIds.includes(id)))
+          else setGcSelected(prev => Array.from(new Set([...prev, ...allIds])))
+        }
+        function toggleSelectOne(id: string) {
+          setGcSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+        }
+
         const batting  = ['GP','AVG','OBP','SLG','OPS','H','2B','3B','HR','RBI','R','BB','SO','SB','HBP','SAC','TB']
         const pitching = ['ERA','WHIP','IP','W','SV','K/BB','STR%']
+
+        const thGc = (col: string, extra?: React.CSSProperties) => ({
+          ...th, cursor: 'pointer',
+          ...extra,
+          onClick: () => gcToggleSort(col),
+        })
+
         return (
           <div>
             {rows.length === 0 && gcFull.length === 0 && (
@@ -604,62 +672,111 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 No GC stats saved. If you already imported a file, check the <strong>Import history</strong> — if the job shows "Needs review", open it to confirm player matches.
               </div>
             )}
+
+            {/* Team filter chips */}
+            {gcTeams.length > 0 && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: s.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Team:</span>
+                {gcTeams.map(team => {
+                  const active = gcTeamFilter.includes(team)
+                  return (
+                    <button key={team} onClick={() => toggleTeamFilter(team)} style={{
+                      padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
+                      borderColor: active ? 'var(--accent)' : 'var(--border-md)',
+                      background: active ? 'rgba(232,160,32,0.12)' : 'var(--bg-input)',
+                      color: active ? 'var(--accent)' : s.muted,
+                      fontSize: '12px', fontWeight: active ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>{team}</button>
+                  )
+                })}
+                {gcTeamFilter.length > 0 && (
+                  <button onClick={() => setGcTeamFilter([])} style={{ fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>
+                    Clear
+                  </button>
+                )}
+                {gcSelected.length > 0 && (
+                  <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>
+                    {gcSelected.length} selected
+                    <button onClick={() => setGcSelected([])} style={{ marginLeft: '6px', fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+                  </span>
+                )}
+              </div>
+            )}
+
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    <th style={{ ...th, minWidth: '160px' }} rowSpan={2}>Player</th>
-                    <th style={{ ...th, textAlign: 'right', minWidth: '48px' }} rowSpan={2}>Age</th>
-                    <th style={{ ...th, textAlign: 'right', minWidth: '60px' }} rowSpan={2}>Team</th>
-                    <th style={{ ...th, textAlign: 'right', minWidth: '48px' }} rowSpan={2}>Year</th>
-                    <th colSpan={batting.length} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)' }}>Batting</th>
-                    <th colSpan={pitching.length} style={{ ...th, textAlign: 'center', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)' }}>Pitching</th>
-                    <th style={{ ...th, textAlign: 'right', color: 'var(--accent)' }} rowSpan={2}>GC Score</th>
+                    {/* Checkbox */}
+                    <th style={{ ...th, width: '32px', cursor: 'pointer', paddingRight: '4px' }} rowSpan={2} onClick={toggleSelectAll}>
+                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
+                    </th>
+                    <th style={thGc('name', { minWidth: '160px' })} rowSpan={2}>Player{gcArrow('name')}</th>
+                    <th style={thGc('age', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Age{gcArrow('age')}</th>
+                    <th style={thGc('team', { textAlign: 'left', minWidth: '120px', whiteSpace: 'nowrap' })} rowSpan={2}>Team{gcArrow('team')}</th>
+                    <th style={thGc('year', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Year{gcArrow('year')}</th>
+                    <th colSpan={batting.length} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Batting</th>
+                    <th colSpan={pitching.length} style={{ ...th, textAlign: 'center', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Pitching</th>
+                    <th style={thGc('Score', { textAlign: 'right', color: 'var(--accent)' })} rowSpan={2}>Score{gcArrow('Score')}</th>
                   </tr>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {batting.map(l  => <th key={l}  style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: 500, borderLeft:  l === 'GP' ? '0.5px solid var(--border)' : undefined }}>{l}</th>)}
-                    {pitching.map(l => <th key={l}  style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: 500, borderLeft:  l === 'ERA' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined }}>{l}</th>)}
+                    {batting.map(l => (
+                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'GP' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
+                        {l}{gcArrow(l)}
+                      </th>
+                    ))}
+                    {pitching.map(l => (
+                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'ERA' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
+                        {l}{gcArrow(l)}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ p, gc }, i) => (
-                    <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                      <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
-                      <td style={{ ...td, textAlign: 'right', color: s.dim, fontSize: '11px' }}>{gc?.team_label ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
-                      {/* Batting */}
-                      <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.games_played ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.avg ?? null, 3)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.obp ?? null, 3)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.slg ?? null, 3)}</td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fmt(gc?.ops ?? null, 3)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.h ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.doubles ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.triples ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.hr ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.rbi ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.r ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.bb ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.so ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sb ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.hbp ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sac ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.tb ?? '—'}</td>
-                      {/* Pitching */}
-                      <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{fmt(gc?.era ?? null, 2)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.ip ?? null, 1)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.w ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sv ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.k_bb ?? null, 2)}</td>
-                      <td style={{ ...td, textAlign: 'right', borderRight: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.strike_pct != null ? `${(gc.strike_pct * 100).toFixed(0)}%` : '—'}</td>
-                      {/* Score */}
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, background: scoreColor(gc?.gc_computed_score ?? null) }}>
-                        {gc?.gc_computed_score != null ? gc.gc_computed_score.toFixed(2) : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {rows.map(({ p, gc }, i) => {
+                    const selected = gcSelected.includes(p.id)
+                    return (
+                      <tr key={p.id} style={{ background: selected ? 'rgba(232,160,32,0.06)' : i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
+                        <td style={{ ...td, paddingRight: '4px', width: '32px' }}>
+                          <input type="checkbox" checked={selected} onChange={() => toggleSelectOne(p.id)} style={{ cursor: 'pointer' }} />
+                        </td>
+                        <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                        <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
+                        <td style={{ ...td, textAlign: 'left', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', minWidth: '120px' }}>{gc?.team_label ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
+                        {/* Batting */}
+                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.games_played ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.avg ?? null, 3)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.obp ?? null, 3)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.slg ?? null, 3)}</td>
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fmt(gc?.ops ?? null, 3)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.h ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.doubles ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.triples ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.hr ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.rbi ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.r ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.bb ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.so ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sb ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.hbp ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sac ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.tb ?? '—'}</td>
+                        {/* Pitching */}
+                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{fmt(gc?.era ?? null, 2)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.ip ?? null, 1)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.w ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sv ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.k_bb ?? null, 2)}</td>
+                        <td style={{ ...td, textAlign: 'right', borderRight: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.strike_pct != null ? `${(gc.strike_pct * 100).toFixed(0)}%` : '—'}</td>
+                        {/* Score */}
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, background: scoreColor(gc?.gc_computed_score ?? null) }}>
+                          {gc?.gc_computed_score != null ? gc.gc_computed_score.toFixed(2) : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
               {rows.length === 0 && gcFull.length > 0 && (
