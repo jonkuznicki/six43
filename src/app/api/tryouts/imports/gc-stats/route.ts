@@ -81,10 +81,11 @@ export async function POST(req: NextRequest) {
   }))
 
   // ── Team detection ──────────────────────────────────────────────────────
-  // Priority: 1) admin override  2) embedded team label from file  3) filename heuristic  4) plurality vote from matched players
+  // Priority: 1) admin override  2) embedded team label from file  3) filename heuristic
+  // Deliberately NOT using players' prior_team — that reflects their current/new team,
+  // not the team these historical stats belong to.
   const filenameSuggestedTeam = detectTeamFromFilename(file.name)
-  const resolvedTeamFromFile  = overrideTeamLabel ?? parseResult.teamLabel ?? null
-  // We'll finalize after matching (plurality vote used as fallback)
+  const resolvedTeamFromFile  = overrideTeamLabel ?? parseResult.teamLabel ?? filenameSuggestedTeam ?? null
 
   // Resolve each row — boost confidence if jersey numbers match
   const matchReport = parseResult.rows.map(row => {
@@ -129,22 +130,7 @@ export async function POST(req: NextRequest) {
   const suggestedCount  = matchReport.filter(r => r.status === 'suggested').length
   const unresolvedCount = matchReport.filter(r => r.status === 'unresolved').length
 
-  // ── Plurality vote for team label from matched players' prior_team ───────
-  let finalTeamLabel: string | null = resolvedTeamFromFile
-  if (!finalTeamLabel) {
-    const teamVotes = new Map<string, number>()
-    for (const row of matchReport.filter(r => r.resolvedPlayerId)) {
-      const player = existingPlayers.find((p: any) => p.id === row.resolvedPlayerId)
-      if (player?.prior_team) {
-        teamVotes.set(player.prior_team, (teamVotes.get(player.prior_team) ?? 0) + 1)
-      }
-    }
-    if (teamVotes.size > 0) {
-      finalTeamLabel = Array.from(teamVotes.entries()).sort((a, b) => b[1] - a[1])[0][0]
-    }
-  }
-  // Last resort: use filename suggestion
-  if (!finalTeamLabel) finalTeamLabel = filenameSuggestedTeam
+  const finalTeamLabel: string | null = resolvedTeamFromFile
 
   // Write auto-matched stats
   const autoRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
