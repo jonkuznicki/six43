@@ -209,7 +209,7 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
   if (loading) return <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</main>
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
       {/* Header */}
@@ -281,7 +281,7 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
                       padding: '4px 6px', textAlign: 'center', borderBottom: '2px solid var(--border)',
                       borderLeft: fi === 0 ? '0.5px solid var(--border-md)' : undefined,
                       fontSize: '10px', fontWeight: 600, minWidth: '50px',
-                      color: s.muted, whiteSpace: 'nowrap', maxWidth: '70px', overflow: 'hidden',
+                      color: s.muted, whiteSpace: 'nowrap', overflow: 'hidden',
                     }} title={f.label}>
                       {f.label.split(' ').map(w => w[0]).join('').slice(0, 4)}
                     </th>
@@ -357,7 +357,7 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
 
       {/* ── CARD VIEW ──────────────────────────────────────────────────────── */}
       {view === 'card' && players.length > 0 && (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '480px' }}>
           {/* Player selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
             <button onClick={() => setCardIdx(Math.max(0, cardIdx - 1))} disabled={cardIdx === 0}

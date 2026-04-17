@@ -82,50 +82,86 @@ export async function POST(
 // ── Action handlers ──────────────────────────────────────────────────────────
 
 async function confirmMatch({ supabase, job, report, row, playerId, userId }: any) {
-  // Update the player record with any new info from the registration row
-  const payload = row.createPayload
-  await supabase
-    .from('tryout_players')
-    .update({
-      // Merge in registration data — don't overwrite if already set
-      ...(payload.dob         ? { dob:          payload.dob }         : {}),
-      ...(payload.parentEmail ? { parent_email: payload.parentEmail } : {}),
-      ...(payload.parentPhone ? { parent_phone: payload.parentPhone } : {}),
-      ...(payload.grade       ? { grade:        payload.grade }       : {}),
-      ...(payload.school      ? { school:       payload.school }      : {}),
-      ...(payload.priorOrg    ? { prior_org:    payload.priorOrg }    : {}),
-      ...(payload.priorTeam   ? { prior_team:   payload.priorTeam }   : {}),
-    })
-    .eq('id', playerId)
+  if (job.type === 'roster') {
+    // Roster: update prior_team and jersey number on the player record
+    await supabase
+      .from('tryout_players')
+      .update({
+        prior_team:    row.teamName ?? null,
+        ...(row.jerseyNumber ? { jersey_number: row.jerseyNumber } : {}),
+      })
+      .eq('id', playerId)
 
-  // Create alias record
-  await supabase.from('tryout_player_aliases').insert({
-    player_id:     playerId,
-    raw_name:      row.rawName,
-    source:        'registration',
-    confidence:    row.confidence ?? 0.90,
-    confirmed:     true,
-    confirmed_by:  userId,
-    confirmed_at:  new Date().toISOString(),
-    import_job_id: job.id,
-  })
-
-  // Write registration staging if this is a registration import
-  if (job.type === 'registration' && job.season_id && payload) {
-    await supabase.from('tryout_registration_staging').upsert({
+    // Create alias
+    await supabase.from('tryout_player_aliases').insert({
       player_id:     playerId,
-      org_id:        job.org_id,
-      season_id:     job.season_id,
+      raw_name:      row.rawName,
+      source:        'roster',
+      confidence:    row.confidence ?? 0.90,
+      confirmed:     true,
+      confirmed_by:  userId,
+      confirmed_at:  new Date().toISOString(),
       import_job_id: job.id,
-      age_group:     payload.ageGroup,
-      prior_team:    payload.priorTeam,
-      parent_email:  payload.parentEmail,
-      parent_phone:  payload.parentPhone,
-      dob:           payload.dob,
-      grade:         payload.grade,
-      school:        payload.school,
-      prior_org:     payload.priorOrg,
-    }, { onConflict: 'player_id,season_id' })
+    })
+
+    // Write roster staging
+    if (job.season_id) {
+      await supabase.from('tryout_roster_staging').upsert({
+        player_id:     playerId,
+        org_id:        job.org_id,
+        season_id:     job.season_id,
+        import_job_id: job.id,
+        team_name:     row.teamName ?? null,
+        jersey_number: row.jerseyNumber ?? null,
+      }, { onConflict: 'player_id,season_id' })
+    }
+  } else {
+    // Registration: update player record with registration data
+    const payload = row.createPayload
+    if (payload) {
+      await supabase
+        .from('tryout_players')
+        .update({
+          ...(payload.dob         ? { dob:          payload.dob }         : {}),
+          ...(payload.parentEmail ? { parent_email: payload.parentEmail } : {}),
+          ...(payload.parentPhone ? { parent_phone: payload.parentPhone } : {}),
+          ...(payload.grade       ? { grade:        payload.grade }       : {}),
+          ...(payload.school      ? { school:       payload.school }      : {}),
+          ...(payload.priorOrg    ? { prior_org:    payload.priorOrg }    : {}),
+          ...(payload.priorTeam   ? { prior_team:   payload.priorTeam }   : {}),
+        })
+        .eq('id', playerId)
+    }
+
+    // Create alias
+    await supabase.from('tryout_player_aliases').insert({
+      player_id:     playerId,
+      raw_name:      row.rawName,
+      source:        'registration',
+      confidence:    row.confidence ?? 0.90,
+      confirmed:     true,
+      confirmed_by:  userId,
+      confirmed_at:  new Date().toISOString(),
+      import_job_id: job.id,
+    })
+
+    // Write registration staging
+    if (job.type === 'registration' && job.season_id && payload) {
+      await supabase.from('tryout_registration_staging').upsert({
+        player_id:     playerId,
+        org_id:        job.org_id,
+        season_id:     job.season_id,
+        import_job_id: job.id,
+        age_group:     payload.ageGroup,
+        prior_team:    payload.priorTeam,
+        parent_email:  payload.parentEmail,
+        parent_phone:  payload.parentPhone,
+        dob:           payload.dob,
+        grade:         payload.grade,
+        school:        payload.school,
+        prior_org:     payload.priorOrg,
+      }, { onConflict: 'player_id,season_id' })
+    }
   }
 
   // Update the row in match_report
@@ -209,6 +245,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
 async function confirmAllSuggested({ supabase, job, report, userId }: any) {
   const suggested = (report as any[]).filter((r: any) => r.status === 'suggested')
   const results: Array<{ rowIndex: number; playerId: string }> = []
+  const isRoster = job.type === 'roster'
 
   for (const row of suggested) {
     const topCandidate = row.candidates?.[0]
@@ -217,13 +254,50 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
     await supabase.from('tryout_player_aliases').insert({
       player_id:     topCandidate.id,
       raw_name:      row.rawName,
-      source:        'registration',
+      source:        isRoster ? 'roster' : 'registration',
       confidence:    topCandidate.confidence,
       confirmed:     true,
       confirmed_by:  userId,
       confirmed_at:  new Date().toISOString(),
       import_job_id: job.id,
     })
+
+    if (isRoster) {
+      // Update player record
+      await supabase.from('tryout_players').update({
+        prior_team:    row.teamName ?? null,
+        ...(row.jerseyNumber ? { jersey_number: row.jerseyNumber } : {}),
+      }).eq('id', topCandidate.id)
+
+      // Write roster staging
+      if (job.season_id) {
+        await supabase.from('tryout_roster_staging').upsert({
+          player_id:     topCandidate.id,
+          org_id:        job.org_id,
+          season_id:     job.season_id,
+          import_job_id: job.id,
+          team_name:     row.teamName ?? null,
+          jersey_number: row.jerseyNumber ?? null,
+        }, { onConflict: 'player_id,season_id' })
+      }
+    } else if (job.type === 'registration' && job.season_id && row.createPayload) {
+      // Write registration staging
+      const payload = row.createPayload
+      await supabase.from('tryout_registration_staging').upsert({
+        player_id:     topCandidate.id,
+        org_id:        job.org_id,
+        season_id:     job.season_id,
+        import_job_id: job.id,
+        age_group:     payload.ageGroup,
+        prior_team:    payload.priorTeam,
+        parent_email:  payload.parentEmail,
+        parent_phone:  payload.parentPhone,
+        dob:           payload.dob,
+        grade:         payload.grade,
+        school:        payload.school,
+        prior_org:     payload.priorOrg,
+      }, { onConflict: 'player_id,season_id' })
+    }
 
     results.push({ rowIndex: row.rowIndex, playerId: topCandidate.id })
   }

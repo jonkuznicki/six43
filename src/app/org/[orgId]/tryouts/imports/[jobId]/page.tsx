@@ -178,7 +178,7 @@ export default function ImportReviewPage({
   return (
     <main style={{
       minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
-      fontFamily: 'sans-serif', maxWidth: '900px', margin: '0 auto',
+      fontFamily: 'sans-serif',
       padding: '2rem 1.5rem 6rem',
     }}>
 

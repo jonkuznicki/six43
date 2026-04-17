@@ -45,7 +45,7 @@ export default function CoachLandingPage({ params }: { params: { orgId: string; 
   const evalLabel   = evalStatus === 'submitted' ? '✅ Submitted' : evalStatus === 'in_progress' ? '🟡 In progress' : '⬜ Not started'
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '560px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
       <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '4px' }}>Coach Portal</div>
       <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '2px' }}>{team?.name}</h1>

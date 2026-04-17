@@ -157,7 +157,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '860px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
 
       {/* Page header */}
       <div style={{ marginBottom: '2.5rem' }}>
@@ -227,7 +227,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                   <div style={{ fontSize: '12px', color: warn ? '#E8A020' : s.muted, minWidth: '160px', fontWeight: warn ? 600 : 400 }}>
                     {warn && '⚠ '}{label}
                   </div>
-                  <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.08)', overflow: 'hidden', maxWidth: '200px' }}>
+                  <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.08)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '3px', transition: 'width 0.5s' }} />
                   </div>
                   <div style={{ fontSize: '11px', color: s.dim, minWidth: '180px' }}>{detail}</div>
