@@ -79,6 +79,24 @@ export async function POST(
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Upsert into tryout_registration_staging, retrying without preferred_tryout_date
+ * if the column doesn't exist yet (migration 051 pending).
+ */
+async function upsertRegStaging(supabase: any, row: Record<string, any>) {
+  const { error } = await supabase
+    .from('tryout_registration_staging')
+    .upsert(row, { onConflict: 'player_id,season_id' })
+  if (error) {
+    const { preferred_tryout_date: _drop, ...fallback } = row
+    await supabase
+      .from('tryout_registration_staging')
+      .upsert(fallback, { onConflict: 'player_id,season_id' })
+  }
+}
+
 // ── Action handlers ──────────────────────────────────────────────────────────
 
 async function confirmMatch({ supabase, job, report, row, playerId, userId }: any) {
@@ -147,7 +165,7 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
 
     // Write registration staging
     if (job.type === 'registration' && job.season_id && payload) {
-      await supabase.from('tryout_registration_staging').upsert({
+      await upsertRegStaging(supabase, {
         player_id:            playerId,
         org_id:               job.org_id,
         season_id:            job.season_id,
@@ -161,7 +179,7 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
         grade:                payload.grade,
         school:               payload.school,
         prior_org:            payload.priorOrg,
-      }, { onConflict: 'player_id,season_id' })
+      })
 
       await autoAssignToSession({
         supabase, playerId, orgId: job.org_id, seasonId: job.season_id,
@@ -228,7 +246,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
 
   // Write registration staging if this is a registration import
   if (job.type === 'registration' && job.season_id && payload) {
-    await supabase.from('tryout_registration_staging').upsert({
+    await upsertRegStaging(supabase, {
       player_id:            newPlayer.id,
       org_id:               job.org_id,
       season_id:            job.season_id,
@@ -242,7 +260,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
       grade:                payload.grade,
       school:               payload.school,
       prior_org:            payload.priorOrg,
-    }, { onConflict: 'player_id,season_id' })
+    })
 
     await autoAssignToSession({
       supabase, playerId: newPlayer.id, orgId: job.org_id, seasonId: job.season_id,
@@ -297,7 +315,7 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
     } else if (job.type === 'registration' && job.season_id && row.createPayload) {
       // Write registration staging
       const payload = row.createPayload
-      await supabase.from('tryout_registration_staging').upsert({
+      await upsertRegStaging(supabase, {
         player_id:            topCandidate.id,
         org_id:               job.org_id,
         season_id:            job.season_id,
@@ -311,7 +329,7 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
         grade:                payload.grade,
         school:               payload.school,
         prior_org:            payload.priorOrg,
-      }, { onConflict: 'player_id,season_id' })
+      })
 
       await autoAssignToSession({
         supabase, playerId: topCandidate.id, orgId: job.org_id, seasonId: job.season_id,

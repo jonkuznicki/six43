@@ -21,7 +21,7 @@ interface Session {
   numbering_method: 'checkin_order' | 'alphabetical'
 }
 
-type PreAssignedSort = 'name' | 'preferred_date'
+type UnassignedSort = 'preferred_date' | 'name'
 
 export default function CheckinPage({ params }: { params: { orgId: string; sessionId: string } }) {
   const supabase = createClient()
@@ -30,19 +30,18 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   const [players,          setPlayers]          = useState<Player[]>([])
   const [checkins,         setCheckins]         = useState<Checkin[]>([])
   const [otherSessionsMax, setOtherSessionsMax] = useState(0)
-  // preferred_tryout_date keyed by player_id
   const [prefDateMap,      setPrefDateMap]      = useState<Map<string, string | null>>(new Map())
   const [search,           setSearch]           = useState('')
   const [loading,          setLoading]          = useState(true)
   const [busy,             setBusy]             = useState<string | null>(null)
   const [checkinError,     setCheckinError]     = useState<string | null>(null)
 
-  // Multi-select for pre-assigned
-  const [selected,         setSelected]         = useState<Set<string>>(new Set())  // checkin IDs
+  // Multi-select
+  const [selected,         setSelected]         = useState<Set<string>>(new Set())   // player IDs
   const [bulkBusy,         setBulkBusy]         = useState(false)
 
-  // Pre-assigned sort
-  const [preSort,          setPreSort]          = useState<PreAssignedSort>('preferred_date')
+  // Sort for unassigned list
+  const [unassignedSort,   setUnassignedSort]   = useState<UnassignedSort>('preferred_date')
 
   // Walk-up modal
   const [showWriteIn,     setShowWriteIn]     = useState(false)
@@ -65,14 +64,12 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
         .order('last_name').order('first_name'),
       supabase.from('tryout_checkins').select('*')
         .eq('session_id', params.sessionId)
-        .order('arrived', { ascending: false })
         .order('tryout_number', { ascending: true, nullsFirst: false }),
       supabase.from('tryout_checkins').select('tryout_number')
         .eq('season_id', sess.season_id).eq('age_group', sess.age_group)
         .neq('session_id', params.sessionId)
         .not('tryout_number', 'is', null)
         .order('tryout_number', { ascending: false }).limit(1),
-      // Load preferred tryout dates from registration staging
       supabase.from('tryout_registration_staging')
         .select('player_id, preferred_tryout_date')
         .eq('org_id', params.orgId)
@@ -86,129 +83,105 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   }
 
   const assignedPlayerIds = useMemo(
-    () => new Set(checkins.map(c => c.player_id).filter(Boolean)),
+    () => new Set(checkins.filter(c => c.player_id).map(c => c.player_id!)),
     [checkins]
   )
 
-  const unassignedPlayers = useMemo(() => {
+  // Players with numbers assigned (the roster so far)
+  const assigned = useMemo(
+    () => checkins.filter(c => c.tryout_number != null || c.is_write_in),
+    [checkins]
+  )
+
+  // Players without numbers yet
+  const unassigned = useMemo(() => {
     const q = search.toLowerCase()
-    return players.filter(p =>
+    const list = players.filter(p =>
       !assignedPlayerIds.has(p.id) &&
       (q === '' || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q))
     )
-  }, [players, assignedPlayerIds, search])
-
-  const preAssigned = useMemo(() => {
-    const list = checkins.filter(c => !c.arrived && !c.is_write_in)
     return [...list].sort((a, b) => {
-      if (preSort === 'preferred_date') {
-        const da = (a.player_id ? prefDateMap.get(a.player_id) : null) ?? ''
-        const db = (b.player_id ? prefDateMap.get(b.player_id) : null) ?? ''
+      if (unassignedSort === 'preferred_date') {
+        const da = prefDateMap.get(a.id) ?? ''
+        const db = prefDateMap.get(b.id) ?? ''
         if (da !== db) return da.localeCompare(db)
       }
-      // fallback: name sort
-      const playerMap = new Map(players.map(p => [p.id, p]))
-      const na = a.player_id ? (() => { const p = playerMap.get(a.player_id!); return p ? `${p.last_name} ${p.first_name}` : '' })() : ''
-      const nb = b.player_id ? (() => { const p = playerMap.get(b.player_id!); return p ? `${p.last_name} ${p.first_name}` : '' })() : ''
-      return na.localeCompare(nb)
+      return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
     })
-  }, [checkins, preSort, prefDateMap, players])
-
-  const arrived = useMemo(
-    () => checkins.filter(c => c.arrived || c.is_write_in),
-    [checkins]
-  )
+  }, [players, assignedPlayerIds, search, unassignedSort, prefDateMap])
 
   function nextNumber() {
-    const arrivedNums = checkins.filter(c => c.tryout_number != null).map(c => c.tryout_number as number)
-    const localMax    = arrivedNums.length > 0 ? Math.max(...arrivedNums) : 0
+    const nums = checkins.filter(c => c.tryout_number != null).map(c => c.tryout_number as number)
+    const localMax = nums.length > 0 ? Math.max(...nums) : 0
     return Math.max(localMax, otherSessionsMax) + 1
   }
 
-  async function markArrived(checkinId: string) {
-    setBusy(checkinId)
-    setCheckinError(null)
-    const num = session?.numbering_method === 'alphabetical' ? null : nextNumber()
-
-    const { data: updated, error } = await supabase
-      .from('tryout_checkins')
-      .update({ arrived: true, tryout_number: num ?? null, checked_in_at: new Date().toISOString() })
-      .eq('id', checkinId)
-      .select('*').single()
-
-    if (error) { setCheckinError(error.message); setBusy(null); return }
-    if (updated) {
-      setCheckins(prev => prev.map(c => c.id === checkinId ? updated : c))
-      setSelected(prev => { const n = new Set(prev); n.delete(checkinId); return n })
-      if (session?.numbering_method === 'alphabetical') {
-        const all = checkins.map(c => c.id === checkinId ? updated : c)
-        await renumberAlphabetically(all.filter(c => c.arrived))
-      }
-    }
-    setBusy(null)
-  }
-
-  async function markSelectedArrived() {
-    if (selected.size === 0) return
-    setBulkBusy(true)
-    setCheckinError(null)
-    const ids = Array.from(selected)
-    for (const id of ids) {
-      const num = session?.numbering_method === 'alphabetical' ? null : nextNumber()
-      const { data: updated, error } = await supabase
-        .from('tryout_checkins')
-        .update({ arrived: true, tryout_number: num ?? null, checked_in_at: new Date().toISOString() })
-        .eq('id', id)
-        .select('*').single()
-      if (error) { setCheckinError(error.message); break }
-      if (updated) setCheckins(prev => prev.map(c => c.id === id ? updated : c))
-    }
-    setSelected(new Set())
-    if (session?.numbering_method === 'alphabetical') {
-      setCheckins(prev => {
-        const all = prev.filter(c => c.arrived)
-        renumberAlphabetically(all)
-        return prev
-      })
-    }
-    setBulkBusy(false)
-  }
-
-  async function checkIn(playerId: string) {
+  async function assignNumber(playerId: string) {
     setBusy(playerId)
     setCheckinError(null)
     const num = session?.numbering_method === 'alphabetical' ? null : nextNumber()
 
-    const { data: newCheckin, error } = await supabase.from('tryout_checkins').insert({
-      session_id:   params.sessionId,
-      player_id:    playerId,
-      tryout_number: num ?? null,
-      season_id:    session!.season_id,
-      age_group:    session!.age_group,
-      arrived:      true,
-      is_write_in:  false,
-    }).select('*').single()
+    // Check if a pre-assignment row exists (arrived=false) — update it, else insert
+    const existing = checkins.find(c => c.player_id === playerId)
+    let result: Checkin | null = null
+    let error: any = null
+
+    if (existing) {
+      const { data, error: e } = await supabase
+        .from('tryout_checkins')
+        .update({ tryout_number: num ?? null, arrived: true, checked_in_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select('*').single()
+      result = data; error = e
+    } else {
+      const { data, error: e } = await supabase.from('tryout_checkins').insert({
+        session_id:    params.sessionId,
+        player_id:     playerId,
+        tryout_number: num ?? null,
+        season_id:     session!.season_id,
+        age_group:     session!.age_group,
+        arrived:       true,
+        is_write_in:   false,
+      }).select('*').single()
+      result = data; error = e
+    }
 
     if (error) { setCheckinError(error.message); setBusy(null); return }
-
-    if (newCheckin) {
+    if (result) {
+      setCheckins(prev => existing
+        ? prev.map(c => c.id === existing.id ? result! : c)
+        : [...prev, result!]
+      )
+      setSelected(prev => { const n = new Set(prev); n.delete(playerId); return n })
       if (session?.numbering_method === 'alphabetical') {
-        const all = [...arrived, newCheckin]
+        const all = [...checkins.filter(c => c.id !== existing?.id), result].filter(c => c!.tryout_number != null || c!.is_write_in) as Checkin[]
         await renumberAlphabetically(all)
-      } else {
-        setCheckins(prev => [...prev, newCheckin])
       }
     }
     setBusy(null)
+  }
+
+  async function assignSelected() {
+    if (selected.size === 0) return
+    setBulkBusy(true)
+    setCheckinError(null)
+    for (const playerId of Array.from(selected)) {
+      await assignNumber(playerId)
+    }
+    setSelected(new Set())
+    if (session?.numbering_method === 'alphabetical') {
+      const all = checkins.filter(c => c.tryout_number != null || c.is_write_in)
+      await renumberAlphabetically(all)
+    }
+    setBulkBusy(false)
   }
 
   async function removeCheckin(checkinId: string) {
     setBusy(checkinId)
     await supabase.from('tryout_checkins').delete().eq('id', checkinId)
     const remaining = checkins.filter(c => c.id !== checkinId)
-    setSelected(prev => { const n = new Set(prev); n.delete(checkinId); return n })
     if (session?.numbering_method === 'alphabetical') {
-      await renumberAlphabetically(remaining.filter(c => c.arrived))
+      await renumberAlphabetically(remaining.filter(c => c.tryout_number != null && !c.is_write_in))
     } else {
       setCheckins(remaining)
     }
@@ -238,8 +211,8 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     if (!session) return
     await supabase.from('tryout_sessions').update({ numbering_method: method }).eq('id', session.id)
     setSession(prev => prev ? { ...prev, numbering_method: method } : prev)
-    if (method === 'alphabetical' && arrived.length > 0) {
-      await renumberAlphabetically(arrived)
+    if (method === 'alphabetical' && assigned.length > 0) {
+      await renumberAlphabetically(assigned.filter(c => !c.is_write_in))
     }
   }
 
@@ -247,13 +220,13 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     if (!writeInName.trim()) return
     setWritingIn(true)
     const { data } = await supabase.from('tryout_checkins').insert({
-      session_id:        params.sessionId,
-      season_id:         session!.season_id,
-      age_group:         session!.age_group,
-      tryout_number:     nextNumber(),
-      arrived:           true,
-      is_write_in:       true,
-      write_in_name:     writeInName.trim(),
+      session_id:         params.sessionId,
+      season_id:          session!.season_id,
+      age_group:          session!.age_group,
+      tryout_number:      nextNumber(),
+      arrived:            true,
+      is_write_in:        true,
+      write_in_name:      writeInName.trim(),
       write_in_age_group: writeInAgeGroup.trim() || session?.age_group,
     }).select('*').single()
     if (data) setCheckins(prev => [...prev, data])
@@ -263,20 +236,19 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setWritingIn(false)
   }
 
-  function toggleSelect(id: string) {
+  function toggleSelect(playerId: string) {
     setSelected(prev => {
       const n = new Set(prev)
-      if (n.has(id)) n.delete(id); else n.add(id)
+      if (n.has(playerId)) n.delete(playerId); else n.add(playerId)
       return n
     })
   }
 
   function toggleSelectAll() {
-    if (selected.size === preAssigned.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(preAssigned.map(c => c.id)))
-    }
+    setSelected(selected.size === unassigned.length
+      ? new Set()
+      : new Set(unassigned.map(p => p.id))
+    )
   }
 
   const playerMap = useMemo(() => new Map(players.map(p => [p.id, p])), [players])
@@ -296,12 +268,15 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '1.5rem' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>Check-In</h1>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>Assign Tryout Numbers</h1>
           <div style={{ fontSize: '13px', color: s.muted }}>
             {session?.label} · {session?.age_group}
-            {preAssigned.length > 0 && (
-              <span style={{ marginLeft: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(80,160,232,0.1)', color: '#40A0E8', fontSize: '11px', fontWeight: 600 }}>
-                {preAssigned.length} pre-assigned
+            <span style={{ marginLeft: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(109,184,117,0.12)', color: '#6DB875', fontSize: '11px', fontWeight: 600 }}>
+              {assigned.length} assigned
+            </span>
+            {unassigned.length > 0 && (
+              <span style={{ marginLeft: '6px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.07)', color: s.muted, fontSize: '11px', fontWeight: 600 }}>
+                {unassigned.length} remaining
               </span>
             )}
           </div>
@@ -315,7 +290,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
               background: session?.numbering_method === m ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
               color: session?.numbering_method === m ? 'var(--accent)' : s.muted,
               fontSize: '12px', cursor: 'pointer',
-            }}>{m === 'checkin_order' ? 'Arrival order' : 'Alphabetical'}</button>
+            }}>{m === 'checkin_order' ? 'Sequential' : 'Alphabetical'}</button>
           ))}
           <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}/roster`} style={{
             padding: '5px 14px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
@@ -327,185 +302,145 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
       {checkinError && (
         <div style={{ padding: '10px 14px', marginBottom: '1rem', background: 'rgba(232,112,96,0.1)', border: '0.5px solid rgba(232,112,96,0.4)', borderRadius: '8px', fontSize: '12px', color: '#E87060' }}>
-          Check-in failed: {checkinError}
+          Error: {checkinError}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-        {/* ── Left column: arrived + pre-assigned ─────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-          {/* Arrived */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700 }}>
-                Arrived <span style={{ fontSize: '13px', color: s.dim, fontWeight: 400 }}>({arrived.length})</span>
-              </div>
-              <button onClick={() => setShowWriteIn(true)} style={{
-                padding: '4px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
-                background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
-              }}>+ Walk-up</button>
+        {/* ── Left: assigned / roster ──────────────────────────────────────── */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700 }}>
+              Assigned <span style={{ fontSize: '13px', color: s.dim, fontWeight: 400 }}>({assigned.length})</span>
             </div>
-
-            {arrived.length === 0 ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: s.dim, fontSize: '13px', background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border)' }}>
-                {preAssigned.length > 0 ? 'Select pre-assigned players and click "Mark arrived" as they show up.' : 'No one checked in yet.'}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {arrived.map(c => {
-                  const player = c.player_id ? playerMap.get(c.player_id) : null
-                  const name = c.is_write_in ? (c.write_in_name ?? 'Walk-up') : player ? `${player.first_name} ${player.last_name}` : 'Unknown'
-                  return (
-                    <div key={c.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-                      borderRadius: '8px', padding: '8px 12px',
-                    }}>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--accent)', minWidth: '32px', textAlign: 'center' }}>
-                        {c.tryout_number != null ? `#${c.tryout_number}` : '—'}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>{name}</div>
-                        {player?.prior_team && <div style={{ fontSize: '11px', color: '#40A0E8' }}>↩ {player.prior_team}</div>}
-                        {c.is_write_in && <div style={{ fontSize: '11px', color: s.muted }}>Walk-up · {c.write_in_age_group ?? '—'}</div>}
-                      </div>
-                      <button onClick={() => removeCheckin(c.id)} disabled={busy === c.id} style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#E87060', fontSize: '16px', padding: '2px 6px',
-                        opacity: busy === c.id ? 0.4 : 1,
-                      }}>×</button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <button onClick={() => setShowWriteIn(true)} style={{
+              padding: '4px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
+            }}>+ Walk-up</button>
           </div>
 
-          {/* Pre-assigned (not yet arrived) */}
-          {preAssigned.length > 0 && (
-            <div>
-              {/* Header with sort + bulk action */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#40A0E8', flex: 1 }}>
-                  Pre-assigned ({preAssigned.length})
-                </div>
-                {/* Sort toggle */}
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {(['preferred_date', 'name'] as PreAssignedSort[]).map(s2 => (
-                    <button key={s2} onClick={() => setPreSort(s2)} style={{
-                      padding: '3px 9px', borderRadius: '4px', border: '0.5px solid',
-                      borderColor: preSort === s2 ? '#40A0E8' : 'var(--border-md)',
-                      background: preSort === s2 ? 'rgba(64,160,232,0.1)' : 'var(--bg-input)',
-                      color: preSort === s2 ? '#40A0E8' : s.dim,
-                      fontSize: '11px', cursor: 'pointer',
-                    }}>{s2 === 'preferred_date' ? 'By date' : 'A–Z'}</button>
-                  ))}
-                </div>
-                {/* Select-all + bulk mark arrived */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: s.muted, cursor: 'pointer' }}>
-                  <input type="checkbox"
-                    checked={selected.size > 0 && selected.size === preAssigned.length}
-                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < preAssigned.length }}
-                    onChange={toggleSelectAll}
-                  />
-                  All
-                </label>
-                {selected.size > 0 && (
-                  <button onClick={markSelectedArrived} disabled={bulkBusy} style={{
-                    padding: '4px 12px', borderRadius: '5px', border: 'none',
-                    background: '#40A0E8', color: '#fff',
-                    fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                    opacity: bulkBusy ? 0.6 : 1,
+          {assigned.length === 0 ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: s.dim, fontSize: '13px', background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border)' }}>
+              No numbers assigned yet. Select players on the right and click "Assign numbers."
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' }}>
+              {[...assigned].sort((a, b) => (a.tryout_number ?? 999) - (b.tryout_number ?? 999)).map(c => {
+                const player = c.player_id ? playerMap.get(c.player_id) : null
+                const name = c.is_write_in ? (c.write_in_name ?? 'Walk-up') : player ? `${player.first_name} ${player.last_name}` : 'Unknown'
+                const prefDate = c.player_id ? prefDateMap.get(c.player_id) : null
+                return (
+                  <div key={c.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                    borderRadius: '8px', padding: '8px 12px',
                   }}>
-                    {bulkBusy ? 'Marking…' : `✓ Mark ${selected.size} arrived`}
-                  </button>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {preAssigned.map(c => {
-                  const player = c.player_id ? playerMap.get(c.player_id) : null
-                  const name = player ? `${player.first_name} ${player.last_name}` : 'Unknown'
-                  const prefDate = c.player_id ? prefDateMap.get(c.player_id) : null
-                  const isChecked = selected.has(c.id)
-                  return (
-                    <div key={c.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      background: isChecked ? 'rgba(64,160,232,0.12)' : 'rgba(80,160,232,0.06)',
-                      border: `0.5px solid ${isChecked ? 'rgba(64,160,232,0.5)' : 'rgba(80,160,232,0.2)'}`,
-                      borderRadius: '8px', padding: '8px 12px',
-                      opacity: busy === c.id ? 0.5 : 1,
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleSelect(c.id)}
-                        onClick={e => e.stopPropagation()}
-                        style={{ cursor: 'pointer', accentColor: '#40A0E8', flexShrink: 0 }}
-                      />
-                      <div style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}
-                        onClick={() => busy == null && markArrived(c.id)}>
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>{name}</div>
-                        <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
-                          {prefDate && (
-                            <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>
-                          )}
-                          {player?.prior_team && <span>↩ {player.prior_team}</span>}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '11px', color: '#40A0E8', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                        onClick={() => busy == null && markArrived(c.id)}>✓</span>
-                      <button onClick={e => { e.stopPropagation(); removeCheckin(c.id) }} disabled={busy === c.id} style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: s.dim, fontSize: '14px', padding: '2px 4px',
-                      }}>×</button>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--accent)', minWidth: '36px', textAlign: 'center' }}>
+                      {c.tryout_number != null ? `#${c.tryout_number}` : '—'}
                     </div>
-                  )
-                })}
-              </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600 }}>{name}</div>
+                      <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
+                        {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
+                        {player?.prior_team && <span>↩ {player.prior_team}</span>}
+                        {c.is_write_in && <span>Walk-up · {c.write_in_age_group ?? '—'}</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => removeCheckin(c.id)} disabled={busy === c.id} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#E87060', fontSize: '16px', padding: '2px 6px',
+                      opacity: busy === c.id ? 0.4 : 1,
+                    }}>×</button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
 
-        {/* ── Right column: unassigned / walk-up search ────────────────────── */}
+        {/* ── Right: unassigned players ─────────────────────────────────────── */}
         <div>
-          <div style={{ marginBottom: '10px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
-              {preAssigned.length > 0 ? 'Walk-ups' : 'Registered Players'}
-              <span style={{ fontSize: '13px', color: s.dim, fontWeight: 400 }}> ({unassignedPlayers.length} not assigned)</span>
+          {/* Toolbar: search + sort + select-all + bulk assign */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, flex: 1 }}>
+                Not Assigned <span style={{ fontSize: '13px', color: s.dim, fontWeight: 400 }}>({unassigned.length})</span>
+              </div>
+              {/* Sort */}
+              {(['preferred_date', 'name'] as UnassignedSort[]).map(s2 => (
+                <button key={s2} onClick={() => setUnassignedSort(s2)} style={{
+                  padding: '3px 9px', borderRadius: '4px', border: '0.5px solid',
+                  borderColor: unassignedSort === s2 ? '#40A0E8' : 'var(--border-md)',
+                  background: unassignedSort === s2 ? 'rgba(64,160,232,0.1)' : 'var(--bg-input)',
+                  color: unassignedSort === s2 ? '#40A0E8' : s.dim,
+                  fontSize: '11px', cursor: 'pointer',
+                }}>{s2 === 'preferred_date' ? 'By date' : 'A–Z'}</button>
+              ))}
             </div>
-            <input
-              value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search…"
-              style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: 'var(--fg)', boxSizing: 'border-box' }}
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search…"
+                style={{ flex: 1, background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: 'var(--fg)' }}
+              />
+              {unassigned.length > 0 && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: s.muted, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input type="checkbox"
+                    checked={selected.size > 0 && selected.size === unassigned.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < unassigned.length }}
+                    onChange={toggleSelectAll}
+                  />
+                  All
+                </label>
+              )}
+              {selected.size > 0 && (
+                <button onClick={assignSelected} disabled={bulkBusy} style={{
+                  padding: '6px 14px', borderRadius: '5px', border: 'none',
+                  background: 'var(--accent)', color: 'var(--accent-text)',
+                  fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                  opacity: bulkBusy ? 0.6 : 1, whiteSpace: 'nowrap',
+                }}>
+                  {bulkBusy ? 'Assigning…' : `Assign ${selected.size}`}
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '600px', overflowY: 'auto' }}>
-            {unassignedPlayers.map(p => {
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '60vh', overflowY: 'auto' }}>
+            {unassigned.map(p => {
               const prefDate = prefDateMap.get(p.id)
+              const isSelected = selected.has(p.id)
               return (
                 <div key={p.id} style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
-                  background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-                  borderRadius: '8px', padding: '8px 12px', cursor: 'pointer',
+                  background: isSelected ? 'rgba(232,160,32,0.08)' : 'var(--bg-card)',
+                  border: `0.5px solid ${isSelected ? 'rgba(232,160,32,0.35)' : 'var(--border)'}`,
+                  borderRadius: '8px', padding: '8px 12px',
                   opacity: busy === p.id ? 0.5 : 1,
-                }} onClick={() => busy == null && checkIn(p.id)}>
-                  <div style={{ flex: 1 }}>
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(p.id)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent)', flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}
+                    onClick={() => busy == null && assignNumber(p.id)}>
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
                     <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
                       {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
-                      <span>{p.jersey_number ? `#${p.jersey_number} · ` : ''}{p.prior_team ?? 'No prior team'}</span>
+                      <span>{p.prior_team ?? 'No prior team'}</span>
                     </div>
                   </div>
-                  <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700 }}>+ Check in</span>
+                  <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    onClick={() => busy == null && assignNumber(p.id)}>+ Assign</span>
                 </div>
               )
             })}
-            {unassignedPlayers.length === 0 && search === '' && (
+            {unassigned.length === 0 && (
               <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
-                All registered players are assigned to this session.
+                {search ? 'No players match your search.' : 'All registered players have been assigned numbers.'}
               </div>
             )}
           </div>

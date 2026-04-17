@@ -233,23 +233,30 @@ export async function POST(req: NextRequest) {
         const stagingRows = createdPlayers.map((p: any, i: number) => {
           const row = newRows[i]
           return {
-            player_id:     p.id,
-            org_id:               orgId,
-            season_id:            seasonId,
-            import_job_id:        job.id,
-            age_group:            row.createPayload.ageGroup,
+            player_id:             p.id,
+            org_id:                orgId,
+            season_id:             seasonId,
+            import_job_id:         job.id,
+            age_group:             row.createPayload.ageGroup,
             preferred_tryout_date: row.createPayload.preferredTryoutDate ?? null,
-            prior_team:           row.createPayload.priorTeam,
-            parent_email:         row.createPayload.parentEmail,
-            parent_phone:         row.createPayload.parentPhone,
-            dob:                  row.createPayload.dob,
-            grade:                row.createPayload.grade,
-            school:               row.createPayload.school,
-            prior_org:            row.createPayload.priorOrg,
+            prior_team:            row.createPayload.priorTeam,
+            parent_email:          row.createPayload.parentEmail,
+            parent_phone:          row.createPayload.parentPhone,
+            dob:                   row.createPayload.dob,
+            grade:                 row.createPayload.grade,
+            school:                row.createPayload.school,
+            prior_org:             row.createPayload.priorOrg,
           }
         })
-        await supabase.from('tryout_registration_staging')
+        const { error: stagingErr } = await supabase.from('tryout_registration_staging')
           .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+        // If preferred_tryout_date column doesn't exist yet (migration 051 pending),
+        // retry without it so the rest of the import still lands.
+        if (stagingErr) {
+          const fallback = stagingRows.map(({ preferred_tryout_date: _drop, ...r }) => r)
+          await supabase.from('tryout_registration_staging')
+            .upsert(fallback, { onConflict: 'player_id,season_id' })
+        }
       }
     }
 
@@ -268,22 +275,27 @@ export async function POST(req: NextRequest) {
   const autoMatchedRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
   if (autoMatchedRows.length > 0 && seasonId) {
     const stagingRows = autoMatchedRows.map(r => ({
-      player_id:     r.resolvedPlayerId,
-      org_id:               orgId,
-      season_id:            seasonId,
-      import_job_id:        job.id,
-      age_group:            r.createPayload.ageGroup,
+      player_id:             r.resolvedPlayerId,
+      org_id:                orgId,
+      season_id:             seasonId,
+      import_job_id:         job.id,
+      age_group:             r.createPayload.ageGroup,
       preferred_tryout_date: r.createPayload.preferredTryoutDate ?? null,
-      prior_team:           r.createPayload.priorTeam,
-      parent_email:         r.createPayload.parentEmail,
-      parent_phone:         r.createPayload.parentPhone,
-      dob:           r.createPayload.dob,
-      grade:         r.createPayload.grade,
-      school:        r.createPayload.school,
-      prior_org:     r.createPayload.priorOrg,
+      prior_team:            r.createPayload.priorTeam,
+      parent_email:          r.createPayload.parentEmail,
+      parent_phone:          r.createPayload.parentPhone,
+      dob:                   r.createPayload.dob,
+      grade:                 r.createPayload.grade,
+      school:                r.createPayload.school,
+      prior_org:             r.createPayload.priorOrg,
     }))
-    await supabase.from('tryout_registration_staging')
+    const { error: stagingErr } = await supabase.from('tryout_registration_staging')
       .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+    if (stagingErr) {
+      const fallback = stagingRows.map(({ preferred_tryout_date: _drop, ...r }) => r)
+      await supabase.from('tryout_registration_staging')
+        .upsert(fallback, { onConflict: 'player_id,season_id' })
+    }
   }
 
   // ── Audit log ────────────────────────────────────────────────────────────
