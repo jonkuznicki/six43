@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
     }))
 
     await supabase.from('tryout_gc_stats')
-      .upsert(upserts, { onConflict: 'player_id,season_year' })
+      .upsert(upserts, { onConflict: 'player_id,org_id,season_year' })
 
     // ── Compute scores for newly upserted players ──────────────────────────
     if (seasonId) {
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
         }))
         if (scoreUpdates.length > 0) {
           await supabase.from('tryout_gc_stats')
-            .upsert(scoreUpdates, { onConflict: 'player_id,season_year' })
+            .upsert(scoreUpdates, { onConflict: 'player_id,org_id,season_year' })
         }
       }
     }

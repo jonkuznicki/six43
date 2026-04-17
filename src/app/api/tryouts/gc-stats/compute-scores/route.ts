@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       .from('tryout_gc_stats')
       .upsert(
         updates.map(u => ({ ...u, org_id: orgId })),
-        { onConflict: 'player_id,season_year' }
+        { onConflict: 'player_id,org_id,season_year' }
       )
     if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
   }
