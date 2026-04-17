@@ -63,11 +63,11 @@ const SECTIONS = [
   },
   {
     step:  4,
-    label: 'Rankings & Placement',
-    desc:  'Review combined scores, verify all data is complete, rank players within each age group, and build rosters.',
+    label: 'Team Making & Placement',
+    desc:  'Review combined scores, assign players to teams, and build rosters for the upcoming season.',
     color: 'rgba(109,184,117,0.05)',
     items: [
-      { href: 'rankings',  label: 'Rankings',        icon: '🏆', desc: 'Combined tryout + eval scores — order players by age group' },
+      { href: 'rankings',  label: 'Team Making',     icon: '🏆', desc: 'Assign players to Blue/White teams using combined scores, evals, and coach comments' },
       { href: 'readiness', label: 'Readiness',        icon: '✓',  desc: 'Pre-placement checklist — confirm all data sources are in' },
       { href: 'teams',     label: 'Teams & Rosters',  icon: '⚾', desc: 'Create teams and finalize player placements' },
     ],
