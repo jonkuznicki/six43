@@ -18,6 +18,9 @@ alter table tryout_checkins
 
 -- Prevent assigning the same player to the same session twice
 -- (nulls in player_id are still allowed for write-ins)
+-- Drop first so this is idempotent if constraint already exists.
+alter table tryout_checkins
+  drop constraint if exists tryout_checkins_session_player_key;
 alter table tryout_checkins
   add constraint tryout_checkins_session_player_key
   unique (session_id, player_id);
