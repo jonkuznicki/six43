@@ -172,6 +172,9 @@ export async function POST(req: NextRequest) {
       bb:     r.stats.bb         ?? null,
       so:     r.stats.so         ?? null,
       sb:     r.stats.sb         ?? null,
+      hbp:    r.stats.hbp        ?? null,
+      sac:    r.stats.sac        ?? null,
+      tb:     r.stats.tb         ?? null,
       // Pitching
       ip:     r.stats.ip         ?? null,
       gs:     r.stats.gs         ?? null,
@@ -180,6 +183,8 @@ export async function POST(req: NextRequest) {
       sv:     r.stats.sv         ?? null,
       era:    r.stats.era        ?? null,
       whip:   r.stats.whip       ?? null,
+      k_bb:   r.stats.k_bb       ?? null,
+      strike_pct: r.stats.strike_pct ?? null,
     }))
 
     await supabase.from('tryout_gc_stats')

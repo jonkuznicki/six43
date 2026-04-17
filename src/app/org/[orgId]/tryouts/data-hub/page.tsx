@@ -15,9 +15,15 @@ interface Player {
 interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
-  player_id: string; season_year: string
+  player_id: string; season_year: string; team_label: string|null
+  games_played: number|null
   avg: number|null; obp: number|null; slg: number|null; ops: number|null
-  era: number|null; whip: number|null; games_played: number|null; ip: number|null
+  h: number|null; doubles: number|null; triples: number|null; hr: number|null
+  rbi: number|null; r: number|null; bb: number|null; so: number|null
+  sb: number|null; hbp: number|null; sac: number|null; tb: number|null
+  era: number|null; whip: number|null; ip: number|null
+  w: number|null; sv: number|null; k_bb: number|null; strike_pct: number|null
+  gc_computed_score: number|null
 }
 interface EvalField { field_key: string; label: string; section: string; sort_order: number; weight: number }
 interface EvalRow   { player_id: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
@@ -190,7 +196,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   async function lazyLoad(target: 'gc' | 'evals' | 'scores') {
     setLazyLoading(true)
     if (target === 'gc') {
-      const { data } = await supabase.from('tryout_gc_stats').select('player_id,season_year,avg,obp,slg,ops,era,whip,games_played,ip').eq('org_id', params.orgId)
+      const { data } = await supabase
+        .from('tryout_gc_stats')
+        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score')
+        .eq('org_id', params.orgId)
       setGcFull(data ?? [])
     }
     if (target === 'evals') {
@@ -586,33 +595,77 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {!lazyLoading && tab === 'gc' && gcFull !== null && (() => {
         const gcMap = new Map(gcFull.map(r => [r.player_id, r]))
         const rows = filtered.map(p => ({ p, gc: gcMap.get(p.id) })).filter(r => r.gc)
+        const batting  = ['GP','AVG','OBP','SLG','OPS','H','2B','3B','HR','RBI','R','BB','SO','SB','HBP','SAC','TB']
+        const pitching = ['ERA','WHIP','IP','W','SV','K/BB','STR%']
         return (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr>
-                {['Player', 'Age', 'Year', 'GP', 'AVG', 'OBP', 'SLG', 'OPS', 'ERA', 'WHIP', 'IP'].map(l => (
-                  <th key={l} style={{ ...th, textAlign: l === 'Player' ? 'left' : 'right' }}>{l}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {rows.map(({ p, gc }, i) => (
-                  <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                    <td style={{ ...td, fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
-                    <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
-                    <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{gc?.games_played ?? '—'}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.avg ?? null, 3)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.obp ?? null, 3)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.slg ?? null, 3)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fmt(gc?.ops ?? null, 3)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.era ?? null, 2)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
-                    <td style={{ ...td, textAlign: 'right', color: s.muted }}>{fmt(gc?.ip ?? null, 1)}</td>
+          <div>
+            {rows.length === 0 && gcFull.length === 0 && (
+              <div style={{ padding: '12px 16px', marginBottom: '10px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '13px', color: '#E8A020' }}>
+                No GC stats saved. If you already imported a file, check the <strong>Import history</strong> — if the job shows "Needs review", open it to confirm player matches.
+              </div>
+            )}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                    <th style={{ ...th, minWidth: '160px' }} rowSpan={2}>Player</th>
+                    <th style={{ ...th, textAlign: 'right', minWidth: '48px' }} rowSpan={2}>Age</th>
+                    <th style={{ ...th, textAlign: 'right', minWidth: '60px' }} rowSpan={2}>Team</th>
+                    <th style={{ ...th, textAlign: 'right', minWidth: '48px' }} rowSpan={2}>Year</th>
+                    <th colSpan={batting.length} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)' }}>Batting</th>
+                    <th colSpan={pitching.length} style={{ ...th, textAlign: 'center', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)' }}>Pitching</th>
+                    <th style={{ ...th, textAlign: 'right', color: 'var(--accent)' }} rowSpan={2}>GC Score</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No GC stats found.</div>}
+                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                    {batting.map(l  => <th key={l}  style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: 500, borderLeft:  l === 'GP' ? '0.5px solid var(--border)' : undefined }}>{l}</th>)}
+                    {pitching.map(l => <th key={l}  style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: 500, borderLeft:  l === 'ERA' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined }}>{l}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ p, gc }, i) => (
+                    <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
+                      <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
+                      <td style={{ ...td, textAlign: 'right', color: s.dim, fontSize: '11px' }}>{gc?.team_label ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
+                      {/* Batting */}
+                      <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.games_played ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.avg ?? null, 3)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.obp ?? null, 3)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.slg ?? null, 3)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fmt(gc?.ops ?? null, 3)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.h ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.doubles ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.triples ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.hr ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.rbi ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.r ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.bb ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.so ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sb ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.hbp ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sac ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.tb ?? '—'}</td>
+                      {/* Pitching */}
+                      <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{fmt(gc?.era ?? null, 2)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.ip ?? null, 1)}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.w ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{gc?.sv ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.k_bb ?? null, 2)}</td>
+                      <td style={{ ...td, textAlign: 'right', borderRight: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.strike_pct != null ? `${(gc.strike_pct * 100).toFixed(0)}%` : '—'}</td>
+                      {/* Score */}
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, background: scoreColor(gc?.gc_computed_score ?? null) }}>
+                        {gc?.gc_computed_score != null ? gc.gc_computed_score.toFixed(2) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length === 0 && gcFull.length > 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No GC stats match your current filter.</div>
+              )}
+            </div>
           </div>
         )
       })()}

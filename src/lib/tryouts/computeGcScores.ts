@@ -27,6 +27,9 @@ export interface GcPlayerStat {
   sb?:          number | null
   bb?:          number | null
   so?:          number | null
+  hbp?:         number | null
+  sac?:         number | null
+  tb?:          number | null
   era?:         number | null
   whip?:        number | null
   ip?:          number | null
