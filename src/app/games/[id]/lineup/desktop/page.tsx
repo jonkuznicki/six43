@@ -86,6 +86,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
   const [readOnly, setReadOnly]         = useState(false)
+  const [locked, setLocked]             = useState(false)
+  const [isOwner, setIsOwner]           = useState(false)
+  const [showBattingOrderModal, setShowBattingOrderModal] = useState(false)
+  const [prevGameForBatting, setPrevGameForBatting] = useState<{id:string,opponent:string,game_date:string}|null>(null)
   const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
   const [dcWarning, setDcWarning]       = useState<string | null>(null)
   const [showPlayerNotes, setShowPlayerNotes] = useState(false)
@@ -144,59 +148,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setTeamPositions(positions)
     setActivePos(positions[0] ?? 'P')
 
-    // Check if the current user is a read-only member of this team
+    // Check membership: read_only flag, owner role, and locked status
     const { data: { user } } = await supabase.auth.getUser()
     if (user && (gameData as any)?.season?.team_id) {
       const { data: membership } = await supabase
         .from('team_members')
-        .select('read_only')
+        .select('read_only, role')
         .eq('team_id', (gameData as any).season.team_id)
         .eq('user_id', user.id)
         .maybeSingle()
+      const ownerRole = membership?.role === 'owner'
+      setIsOwner(ownerRole)
       if (membership?.read_only) setReadOnly(true)
+      const isLocked = (gameData as any)?.locked ?? false
+      setLocked(isLocked)
+      if (isLocked && !ownerRole) setReadOnly(true)
     }
 
-    let { data: slotData } = await supabase
-      .from('lineup_slots')
-      .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
-      .eq('game_id', params.id)
-      .order('batting_order', { ascending: true, nullsFirst: false })
-
-    // If no slots exist yet (first time opening the lineup), auto-create from roster
-    if (!slotData?.length && gameData?.season_id) {
-      const { data: players } = await supabase
-        .from('players')
-        .select('id, first_name, last_name, jersey_number, batting_pref_order, innings_target')
-        .eq('season_id', gameData.season_id)
-        .eq('status', 'active')
-        .order('batting_pref_order', { ascending: true, nullsFirst: false })
-      if (players?.length) {
-        await supabase.from('lineup_slots').insert(
-          players.map((p, i) => ({
-            game_id: params.id,
-            player_id: p.id,
-            batting_order: i + 1,
-            availability: 'available',
-            inning_positions: [...BLANK],
-          }))
-        )
-        const { data: fresh } = await supabase
-          .from('lineup_slots')
-          .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
-          .eq('game_id', params.id)
-          .order('batting_order', { ascending: true, nullsFirst: false })
-        slotData = fresh
-      }
-    }
-
-    setSlots(slotData ?? [])
-
-    // Load position history for all players from ALL previous games (any status)
+    // Load position history (runs before slot check so it's available after batting order modal)
     if (gameData?.season_id) {
       const currentDate = (gameData as any)?.game_date ?? null
       const defaultInn  = (gameData as any)?.season?.innings_per_game ?? 6
 
-      // Base: final game stats from pre-aggregated view
       const { data: statsData } = await supabase
         .from('season_position_stats')
         .select('player_id, innings_p, innings_c, innings_1b, innings_2b, innings_ss, innings_3b, innings_lf, innings_cf, innings_rf, innings_bench')
@@ -213,7 +186,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         }
       }
 
-      // Supplement: non-final games before the current game date (not double-counted with the view)
       let nonFinalQuery = supabase
         .from('games')
         .select('id, innings_played, game_date')
@@ -252,10 +224,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
 
       if (Object.keys(ph).length) setPlayerPositionHistory(ph)
-    }
 
-    // Load most recent previous game's slot positions for last-game context in right panel
-    if (gameData?.season_id) {
+      // Last game breakdown for right panel context
       const { data: otherGames } = await supabase
         .from('games')
         .select('id, innings_played, game_date, status')
@@ -263,8 +233,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .neq('id', params.id)
         .order('created_at', { ascending: false })
 
-      // Pick the most recently dated game BEFORE this game's date, regardless of status
-      const currentDate = (gameData as any)?.game_date ?? null
       const sorted = (otherGames ?? [])
         .filter(g => g.game_date)
         .sort((a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime())
@@ -295,8 +263,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         }
       }
 
-      // Load pitching history for rest-days widget — all previous games regardless of status
-      const currentDate2 = (gameData as any)?.game_date ?? null
+      // Pitching history for rest-days widget
       let prevGamesQuery = supabase
         .from('games')
         .select('id, game_date, innings_played')
@@ -305,41 +272,39 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .not('game_date', 'is', null)
         .order('game_date', { ascending: false })
         .limit(20)
-      if (currentDate2) prevGamesQuery = (prevGamesQuery as any).lt('game_date', currentDate2)
+      if (currentDate) prevGamesQuery = (prevGamesQuery as any).lt('game_date', currentDate)
 
-      const { data: prevGames } = await prevGamesQuery
-      if (prevGames?.length) {
+      const { data: prevGamesForPitching } = await prevGamesQuery
+      if (prevGamesForPitching?.length) {
         const { data: pitchSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, game_id')
-          .in('game_id', prevGames.map((g: any) => g.id))
+          .in('game_id', prevGamesForPitching.map((g: any) => g.id))
 
-        const ph: Record<string, {lastDate:string,lastInnings:number,daysSince:number}> = {}
-        const defaultInn = (gameData as any).season?.innings_per_game ?? 6
-        // Games are already sorted date desc — first match per player is most recent
-        for (const game of prevGames) {
+        const pitchHist: Record<string, {lastDate:string,lastInnings:number,daysSince:number}> = {}
+        for (const game of prevGamesForPitching) {
           const gameSlots = (pitchSlots ?? []).filter((s: any) => s.game_id === game.id)
           const gameInn = game.innings_played ?? defaultInn
           for (const slot of gameSlots) {
-            if (ph[slot.player_id]) continue // already have most recent
+            if (pitchHist[slot.player_id]) continue
             const pCount = (slot.inning_positions ?? []).slice(0, gameInn)
               .filter((p: string|null) => p === 'P').length
             if (pCount > 0) {
-              const referenceDate = currentDate2
-                ? new Date(currentDate2 + 'T12:00:00').getTime()
+              const referenceDate = currentDate
+                ? new Date(currentDate + 'T12:00:00').getTime()
                 : Date.now()
               const daysSince = Math.floor(
                 (referenceDate - new Date(game.game_date + 'T12:00:00').getTime()) / 86400000
               )
-              ph[slot.player_id] = { lastDate: game.game_date, lastInnings: pCount, daysSince }
+              pitchHist[slot.player_id] = { lastDate: game.game_date, lastInnings: pCount, daysSince }
             }
           }
         }
-        setPitchingHistory(ph)
+        setPitchingHistory(pitchHist)
       }
     }
 
-    // Load depth chart restrictions for warning display
+    // Depth chart restrictions
     if (gameData?.season_id) {
       const { data: dcRows } = await supabase
         .from('depth_chart')
@@ -349,7 +314,131 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       setRestrictedSet(new Set((dcRows ?? []).map((r: any) => `${r.player_id}::${r.position}`)))
     }
 
+    // Fetch existing slots
+    let { data: slotData } = await supabase
+      .from('lineup_slots')
+      .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+      .eq('game_id', params.id)
+      .order('batting_order', { ascending: true, nullsFirst: false })
+
+    // If no slots exist yet, offer batting order choice if a previous game has slots
+    if (!slotData?.length && gameData?.season_id) {
+      const { data: recentGames } = await supabase
+        .from('games')
+        .select('id, opponent, game_date')
+        .eq('season_id', gameData.season_id)
+        .neq('id', params.id)
+        .not('game_date', 'is', null)
+        .order('game_date', { ascending: false })
+        .limit(5)
+
+      let prevWithSlots: { id: string; opponent: string; game_date: string } | null = null
+      for (const pg of recentGames ?? []) {
+        const { count } = await supabase
+          .from('lineup_slots')
+          .select('id', { count: 'exact', head: true })
+          .eq('game_id', pg.id)
+        if ((count ?? 0) > 0) { prevWithSlots = pg; break }
+      }
+
+      if (prevWithSlots) {
+        setPrevGameForBatting(prevWithSlots)
+        setShowBattingOrderModal(true)
+        setLoading(false)
+        return
+      }
+
+      // No previous game with slots — auto-create from roster batting order
+      const { data: players } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, jersey_number, batting_pref_order, innings_target')
+        .eq('season_id', gameData.season_id)
+        .eq('status', 'active')
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
+      if (players?.length) {
+        await supabase.from('lineup_slots').insert(
+          players.map((p, i) => ({
+            game_id: params.id, player_id: p.id,
+            batting_order: i + 1, availability: 'available',
+            inning_positions: [...BLANK],
+          }))
+        )
+        const { data: fresh } = await supabase
+          .from('lineup_slots')
+          .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+          .eq('game_id', params.id)
+          .order('batting_order', { ascending: true, nullsFirst: false })
+        slotData = fresh
+      }
+    }
+
+    setSlots(slotData ?? [])
     setLoading(false)
+  }
+
+  async function handleBattingOrderChoice(choice: 'last' | 'roster') {
+    if (!game?.season_id) return
+    setShowBattingOrderModal(false)
+    setLoading(true)
+
+    if (choice === 'last' && prevGameForBatting) {
+      const { data: lastSlots } = await supabase
+        .from('lineup_slots')
+        .select('player_id, batting_order')
+        .eq('game_id', prevGameForBatting.id)
+        .order('batting_order', { ascending: true, nullsFirst: false })
+
+      const { data: activePlayers } = await supabase
+        .from('players')
+        .select('id, batting_pref_order')
+        .eq('season_id', game.season_id)
+        .eq('status', 'active')
+
+      const lastOrderMap = new Map((lastSlots ?? []).map((s: any) => [s.player_id, s.batting_order]))
+      const sorted = (activePlayers ?? []).sort((a: any, b: any) => {
+        const ao = lastOrderMap.get(a.id) ?? 999
+        const bo = lastOrderMap.get(b.id) ?? 999
+        if (ao !== bo) return ao - bo
+        return (a.batting_pref_order ?? 99) - (b.batting_pref_order ?? 99)
+      })
+      await supabase.from('lineup_slots').insert(
+        sorted.map((p: any, i: number) => ({
+          game_id: params.id, player_id: p.id,
+          batting_order: i + 1, availability: 'available',
+          inning_positions: [...BLANK],
+        }))
+      )
+    } else {
+      const { data: rosterPlayers } = await supabase
+        .from('players')
+        .select('id, batting_pref_order')
+        .eq('season_id', game.season_id)
+        .eq('status', 'active')
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
+      if (rosterPlayers?.length) {
+        await supabase.from('lineup_slots').insert(
+          rosterPlayers.map((p: any, i: number) => ({
+            game_id: params.id, player_id: p.id,
+            batting_order: i + 1, availability: 'available',
+            inning_positions: [...BLANK],
+          }))
+        )
+      }
+    }
+
+    const { data: fresh } = await supabase
+      .from('lineup_slots')
+      .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+      .eq('game_id', params.id)
+      .order('batting_order', { ascending: true, nullsFirst: false })
+    setSlots(fresh ?? [])
+    setLoading(false)
+  }
+
+  async function toggleLock() {
+    const newLocked = !locked
+    setLocked(newLocked)
+    await supabase.from('games').update({ locked: newLocked }).eq('id', params.id)
   }
 
   // ── Position assignment ───────────────────────────────────────────────────
@@ -752,17 +841,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   )
   const tipVisible = showTip && totalAssigned < activeSlots.length
 
-  // Right-panel: position summary for the focused (or first) inning
-  const summaryII = focused?.ii ?? 0
-  const posSummary: Record<string, string[]> = {}
-  for (const p of teamPositions) posSummary[p] = []
-  posSummary['_empty'] = []
-  for (const s of activeSlots) {
-    const p = (s.inning_positions ?? [])[summaryII] ?? null
-    if (!p) posSummary['_empty'].push(s.player?.last_name ?? '?')
-    else if (posSummary[p] !== undefined) posSummary[p].push(s.player?.last_name ?? '?')
-  }
-
   const gameDate = game?.game_date
     ? new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
         weekday: 'short', month: 'short', day: 'numeric',
@@ -821,7 +899,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 borderRadius: 4, background: 'rgba(232,160,32,0.15)',
                 color: '#E8A020', border: '1px solid rgba(232,160,32,0.3)',
                 letterSpacing: '0.04em',
-              }}>VIEW ONLY</span>
+              }}>{locked && !isOwner ? '🔒 LOCKED' : 'VIEW ONLY'}</span>
             )}
           </div>
           {nextGameId ? (
@@ -872,6 +950,19 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <button onClick={() => setConfirmClear(true)} style={topBtn(true)}>Clear lineup</button>
           )}
           <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
+          {isOwner && (
+            <button
+              onClick={toggleLock}
+              title={locked ? 'Unlock lineup for editing by all staff' : 'Lock lineup to prevent changes by staff'}
+              style={{
+                ...topBtn(true),
+                color: locked ? '#E87060' : 'rgba(255,255,255,0.55)',
+                border: locked ? '1px solid rgba(232,112,96,0.4)' : 'none',
+              }}
+            >
+              {locked ? '🔒 Locked' : '🔓 Lock'}
+            </button>
+          )}
           </>)}
           <a
             href={`/games/${params.id}/print`}
@@ -972,186 +1063,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         </div>
       )}
 
-      {/* ─── THREE PANELS ─── */}
+      {/* ─── TWO PANELS ─── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* ── LEFT: Inning helper + Summary + Notes + Palette ── */}
-        <div style={{
-          width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column',
-          borderRight: '1px solid var(--border)', overflow: 'hidden',
-        }}>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
-
-            {/* ── Inning position helper (moved from right panel) ── */}
-            <div style={{ padding: '0 10px 6px' }}>
-              <div style={{ ...secLabel, padding: '0 0 4px' }}>Inning {summaryII + 1}</div>
-              {teamPositions.filter(p => p !== 'Bench').map(pos => {
-                const players = posSummary[pos] ?? []
-                const dupe = players.length > 1
-                const empty = players.length === 0
-                const pc = POS_COLOR[pos]
-                return (
-                  <div key={pos} style={{
-                    display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px',
-                    borderRadius: 4, marginBottom: 2,
-                    background: dupe ? 'rgba(232,112,96,0.08)' : 'transparent',
-                  }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px',
-                      borderRadius: 3, textAlign: 'center', flexShrink: 0,
-                      background: pc?.bg ?? 'transparent', color: pc?.color ?? 'var(--fg)',
-                    }}>{pos}</span>
-                    <span style={{
-                      fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      color: dupe ? '#E87060' : empty ? `rgba(var(--fg-rgb),0.2)` : 'var(--fg)',
-                      fontStyle: empty ? 'italic' : 'normal',
-                    }}>{empty ? '—' : players.join(', ')}</span>
-                    {dupe && <span style={{ fontSize: 9, color: '#E87060', flexShrink: 0 }}>!</span>}
-                  </div>
-                )
-              })}
-              {(posSummary['Bench']?.length ?? 0) > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px', borderRadius: 4, marginBottom: 2 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, minWidth: 24, padding: '1px 3px', borderRadius: 3,
-                    textAlign: 'center', flexShrink: 0,
-                    background: 'rgba(120,120,120,0.12)', color: `rgba(var(--fg-rgb),0.4)` }}>B</span>
-                  <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.38)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {posSummary['Bench'].join(', ')}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* ── Inning summary ── */}
-            {activeSlots.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                <div style={{ ...secLabel, padding: '0 10px 4px' }}>Inning summary</div>
-                <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
-                  <colgroup>
-                    <col style={{ width: 20 }} />
-                    <col />
-                    <col style={{ width: 20 }} />
-                    <col style={{ width: 20 }} />
-                    <col style={{ width: 22 }} />
-                    <col style={{ width: 22 }} />
-                    <col style={{ width: 22 }} />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }}>#</th>
-                      <th style={{ ...gHdr, position: 'static', textAlign: 'left', paddingLeft: 6, fontSize: 8 }}>Player</th>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Pitcher innings">P</th>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Catcher innings">C</th>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Infield innings (1B 2B SS 3B)">IF</th>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Outfield innings">OF</th>
-                      <th style={{ ...gHdr, position: 'static', fontSize: 8 }} title="Bench innings">B</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeSlots.map((slot, si) => {
-                      const pos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
-                      const pIn     = pos.filter(p => p === 'P').length
-                      const cIn     = pos.filter(p => p === 'C').length
-                      const ifIn    = pos.filter(p => IF_POS.has(p ?? '')).length
-                      const ofIn    = pos.filter(p => OF_POS.has(p ?? '')).length
-                      const benchIn = pos.filter(p => p === 'Bench').length
-                      const sumCell = (count: number, pc: typeof POS_COLOR[string] | undefined) => (
-                        <td style={{ ...gCell, textAlign: 'center', height: 26, padding: '0 1px' }}>
-                          {count > 0 ? (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: pc?.color ?? 'var(--fg)' }}>{count}</span>
-                          ) : (
-                            <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.15)` }}>—</span>
-                          )}
-                        </td>
-                      )
-                      return (
-                        <tr key={slot.id} style={{ background: si % 2 === 0 ? 'transparent' : `rgba(var(--fg-rgb),0.018)` }}>
-                          <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 9, height: 26 }}>{si + 1}</td>
-                          <td style={{ ...gCell, paddingLeft: 6, fontSize: 11, maxWidth: 0, overflow: 'hidden', height: 26 }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                              {slot.player?.first_name?.[0]}. {slot.player?.last_name}
-                            </span>
-                          </td>
-                          {sumCell(pIn,     POS_COLOR.P)}
-                          {sumCell(cIn,     POS_COLOR.C)}
-                          {sumCell(ifIn,    POS_COLOR['1B'])}
-                          {sumCell(ofIn,    POS_COLOR.LF)}
-                          {sumCell(benchIn, POS_COLOR.Bench)}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* ── Notes (separator between summary and palette) ── */}
-            <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, padding: '8px 10px 4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <span style={{ ...secLabel, padding: 0 }}>Notes</span>
-                {!notesSaved && <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.3)` }}>saving…</span>}
-              </div>
-              <textarea
-                value={gameNotes}
-                onChange={e => handleNotesChange(e.target.value)}
-                placeholder="e.g. Connor hurt his arm — no pitching"
-                rows={3}
-                style={{
-                  width: '100%', padding: '6px 8px', borderRadius: 6,
-                  border: '0.5px solid var(--border-md)',
-                  background: 'var(--bg-input)', color: 'var(--fg)',
-                  fontSize: 11, resize: 'vertical', boxSizing: 'border-box',
-                  fontFamily: 'inherit', lineHeight: 1.5,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Position palette */}
-          <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, marginBottom: 8 }}>
-              {selectedCells.size > 0
-                ? `Fill ${selectedCells.size} selected cell${selectedCells.size > 1 ? 's' : ''}:`
-                : 'Select cells, then fill:'}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {teamPositions.map(pos => {
-                const isActive = activePos === pos
-                const pc = POS_COLOR[pos]
-                const sc = POS_KEY[pos]
-                return (
-                  <button
-                    key={pos}
-                    onClick={() => { setActivePos(pos); fillSelected(pos) }}
-                    style={{
-                      padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                      position: 'relative', minWidth: 34, textAlign: 'center',
-                      fontSize: 11, fontWeight: 700,
-                      border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : 'var(--border-md)'}`,
-                      background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
-                      color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.5)`,
-                      boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
-                    }}
-                  >
-                    {pos}
-                    {sc && (
-                      <span style={{ position: 'absolute', bottom: 0, right: 2, fontSize: 6, opacity: 0.4, fontWeight: 400 }}>
-                        {sc}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* ── CENTER: Grid ── */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        {/* ── CENTER: Grid + Palette ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '100%' }}>
             <colgroup>
               <col style={{ width: 24 }} />
-              <col style={{ width: 190 }} />
+              <col style={{ width: 220 }} />
               {innings.map(i => <col key={i} style={{ width: 54 }} />)}
               <col style={{ width: 62 }} />
             </colgroup>
@@ -1205,6 +1126,14 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               {activeSlots.map((slot, si) => {
                 const bi = benchInnings(slot, inningCount)
                 const ai = assignedInnings(slot, inningCount)
+                // Inline inning summary counts
+                const slotPos = (slot.inning_positions ?? []).slice(0, inningCount) as (string|null)[]
+                const pIn     = slotPos.filter(p => p === 'P').length
+                const cIn     = slotPos.filter(p => p === 'C').length
+                const ifIn    = slotPos.filter(p => IF_POS.has(p ?? '')).length
+                const ofIn    = slotPos.filter(p => OF_POS.has(p ?? '')).length
+                const benchIn = slotPos.filter(p => p === 'Bench').length
+                const allFilled = innings.every(i => (slot.inning_positions ?? [])[i] != null)
                 // Color based on whether this player has benched more/less than their fair share
                 const bpColor = bi === 0
                   ? `rgba(var(--fg-rgb),0.18)`
@@ -1238,31 +1167,45 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       background: 'var(--bg)',
                       borderRight: '1px solid var(--border)',
                       maxWidth: 0, overflow: 'hidden',
-                      cursor: 'grab',
+                      cursor: 'grab', height: 'auto', paddingTop: 3, paddingBottom: 3,
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
-                          <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
+                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                            <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
+                            <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
+                          </div>
+                          <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
+                            #{slot.player?.jersey_number}
+                          </span>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                            {slot.player?.first_name?.[0]}. {slot.player?.last_name}
+                          </span>
+                          {allFilled && (
+                            <span style={{ fontSize: 9, color: '#6DB875', flexShrink: 0, marginRight: 2 }} title="All innings assigned">✓</span>
+                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
+                            title="Mark absent"
+                            style={{
+                              flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                              border: '1px solid var(--border-md)', background: 'transparent',
+                              cursor: 'pointer', fontSize: 8, padding: 0,
+                              color: `rgba(var(--fg-rgb),0.28)`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              marginRight: 3,
+                            }}
+                          >✕</button>
                         </div>
-                        <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
-                          #{slot.player?.jersey_number}
-                        </span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-                          {slot.player?.first_name?.[0]}. {slot.player?.last_name}
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
-                          title="Mark absent"
-                          style={{
-                            flexShrink: 0, width: 14, height: 14, borderRadius: 3,
-                            border: '1px solid var(--border-md)', background: 'transparent',
-                            cursor: 'pointer', fontSize: 8, padding: 0,
-                            color: `rgba(var(--fg-rgb),0.28)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginRight: 3,
-                          }}
-                        >✕</button>
+                        {(pIn > 0 || cIn > 0 || ifIn > 0 || ofIn > 0 || benchIn > 0) && (
+                          <div style={{ display: 'flex', gap: 4, paddingLeft: 16, marginTop: 1 }}>
+                            {pIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.P?.color, fontWeight: 700 }}>P·{pIn}</span>}
+                            {cIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.C?.color, fontWeight: 700 }}>C·{cIn}</span>}
+                            {ifIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR['1B']?.color, fontWeight: 700 }}>IF·{ifIn}</span>}
+                            {ofIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.LF?.color, fontWeight: 700 }}>OF·{ofIn}</span>}
+                            {benchIn > 0 && <span style={{ fontSize: 8, color: POS_COLOR.Bench?.color, fontWeight: 700 }}>B·{benchIn}</span>}
+                          </div>
+                        )}
                       </div>
                     </td>
 
@@ -1394,7 +1337,51 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               ))}
             </tbody>
           </table>
+          </div>
 
+          {/* Position palette — below the grid */}
+          {!readOnly && (
+            <div style={{
+              padding: '8px 14px 10px', borderTop: '1px solid var(--border)',
+              background: 'var(--bg-card)', flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, flexShrink: 0 }}>
+                {selectedCells.size > 0
+                  ? `Fill ${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}:`
+                  : 'Select cells, then fill:'}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {teamPositions.map(pos => {
+                  const isActive = activePos === pos
+                  const pc = POS_COLOR[pos]
+                  const sc = POS_KEY[pos]
+                  return (
+                    <button
+                      key={pos}
+                      onClick={() => { setActivePos(pos); fillSelected(pos) }}
+                      style={{
+                        padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
+                        position: 'relative', minWidth: 34, textAlign: 'center',
+                        fontSize: 11, fontWeight: 700,
+                        border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : 'var(--border-md)'}`,
+                        background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
+                        color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.5)`,
+                        boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
+                      }}
+                    >
+                      {pos}
+                      {sc && (
+                        <span style={{ position: 'absolute', bottom: 0, right: 2, fontSize: 6, opacity: 0.4, fontWeight: 400 }}>
+                          {sc}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── RIGHT: Context ── */}
@@ -1402,6 +1389,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
           overflowY: 'auto', padding: 12,
         }}>
+          {/* Game notes */}
+          <div style={{ marginBottom: 10, padding: '7px 9px', borderRadius: 6,
+            background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase' }}>Notes</span>
+              {!notesSaved && <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.3)` }}>saving…</span>}
+            </div>
+            <textarea
+              value={gameNotes}
+              onChange={e => handleNotesChange(e.target.value)}
+              placeholder="e.g. Connor hurt his arm…"
+              rows={3}
+              style={{
+                width: '100%', padding: '5px 7px', borderRadius: 5,
+                border: '0.5px solid var(--border-md)',
+                background: 'var(--bg-input)', color: 'var(--fg)',
+                fontSize: 11, resize: 'vertical', boxSizing: 'border-box',
+                fontFamily: 'inherit', lineHeight: 1.5,
+              }}
+            />
+          </div>
           {/* Player position history — shown when a cell is focused */}
           {focused && (() => {
             const focusedSlot = activeSlots[focused.si]
@@ -1662,6 +1671,55 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </div>
         </div>
       </div>
+
+      {/* ─── Batting order choice modal ─── */}
+      {showBattingOrderModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+          zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--bg2)', borderRadius: 12, padding: '1.5rem',
+            width: 360, border: '0.5px solid var(--border)',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Starting batting order</div>
+            <div style={{ fontSize: 12, color: `rgba(var(--fg-rgb),0.45)`, marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              How should the initial batting order be set?
+              {prevGameForBatting && (
+                <span style={{ display: 'block', marginTop: 4, color: `rgba(var(--fg-rgb),0.6)`, fontStyle: 'italic' }}>
+                  Last game: vs {prevGameForBatting.opponent} · {new Date(prevGameForBatting.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => handleBattingOrderChoice('last')}
+                style={{
+                  flex: 1, padding: '14px 8px', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, textAlign: 'center',
+                  border: '1.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb),0.8)`,
+                }}
+              >
+                <div style={{ fontSize: 20, marginBottom: 5 }}>↩</div>
+                Last game order
+              </button>
+              <button
+                onClick={() => handleBattingOrderChoice('roster')}
+                style={{
+                  flex: 1, padding: '14px 8px', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, textAlign: 'center',
+                  border: '1.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb),0.8)`,
+                }}
+              >
+                <div style={{ fontSize: 20, marginBottom: 5 }}>📋</div>
+                Roster order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Copy modal ─── */}
       {copyOpen && (

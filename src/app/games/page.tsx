@@ -77,69 +77,6 @@ export default async function GamesPage({
   const firstUpcomingIdx = allGames.findIndex(g => g.game_date > today || (g.game_date === today && g.status !== 'final'))
   const teamName = selectedTeam?.name ?? 'Us'
 
-  // Dashboard summary card data
-  const nextGame = firstUpcomingIdx >= 0 ? allGames[firstUpcomingIdx] : null
-  const recentFinalGames = allGames
-    .filter(g => g.status === 'final' && g.game_date < today)
-    .slice(-3)
-
-  // Fetch lineup slot count and recent pitch slots in parallel
-  const [
-    { count: lineupSlotCount },
-    { data: recentPitchSlots },
-  ] = await Promise.all([
-    nextGame
-      ? supabase.from('lineup_slots').select('id', { count: 'exact', head: true }).eq('game_id', nextGame.id)
-      : Promise.resolve({ count: 0, data: null, error: null }),
-    recentFinalGames.length > 0
-      ? supabase.from('lineup_slots').select('player_id, pitch_count, game_id')
-          .in('game_id', recentFinalGames.map(g => g.id)).gt('pitch_count', 0)
-      : Promise.resolve({ data: [] as any[], error: null }),
-  ])
-
-  const lineupIsSet = (lineupSlotCount ?? 0) > 0
-
-  // Get unique pitcher player IDs and their most recent game date
-  const pitcherGameMap: Record<string, string> = {}
-  for (const slot of recentPitchSlots ?? []) {
-    const game = recentFinalGames.find(g => g.id === slot.game_id)
-    if (!game) continue
-    // Keep the most recent game date
-    if (!pitcherGameMap[slot.player_id] || game.game_date > pitcherGameMap[slot.player_id]) {
-      pitcherGameMap[slot.player_id] = game.game_date
-    }
-  }
-
-  const pitcherIds = Object.keys(pitcherGameMap)
-
-  const { data: pitcherPlayers } = pitcherIds.length > 0 ? await supabase
-    .from('players')
-    .select('id, first_name, last_name')
-    .in('id', pitcherIds) : { data: [] }
-
-  // Build pitcher rest alerts (only show if pitched within 3 days of today)
-  const pitcherAlerts: { name: string; daysAgo: number }[] = []
-  for (const p of pitcherPlayers ?? []) {
-    const lastGameDate = pitcherGameMap[p.id]
-    const diff = Math.round(
-      (new Date(today + 'T12:00:00').getTime() - new Date(lastGameDate + 'T12:00:00').getTime())
-      / (1000 * 60 * 60 * 24)
-    )
-    if (diff <= 3) {
-      pitcherAlerts.push({ name: p.first_name || p.last_name, daysAgo: diff })
-    }
-  }
-  pitcherAlerts.sort((a, b) => a.daysAgo - b.daysAgo)
-
-  // Days until next game
-  let daysUntilNext: number | null = null
-  if (nextGame) {
-    daysUntilNext = Math.round(
-      (new Date(nextGame.game_date + 'T12:00:00').getTime() - new Date(today + 'T12:00:00').getTime())
-      / (1000 * 60 * 60 * 24)
-    )
-  }
-
   const showGettingStarted = teams.length === 0 || !season || allGames.length === 0
 
   const steps = [
@@ -334,57 +271,6 @@ export default async function GamesPage({
                   }}>↓ Import / connect GameChanger</div>
                 </Link>
               )}
-            </div>
-          )}
-
-          {/* Dashboard summary card */}
-          {nextGame && (
-            <div style={{
-              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-              borderRadius: '12px', padding: '14px 16px', marginBottom: '1.25rem',
-            }}>
-              {/* Next game row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '3px' }}>
-                    Next game
-                  </div>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--fg)' }}>
-                    vs {nextGame.opponent}
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: '13px', fontWeight: 700,
-                  color: daysUntilNext === 0 ? 'var(--accent)' : daysUntilNext === 1 ? '#E87060' : `rgba(var(--fg-rgb), 0.6)`,
-                  background: daysUntilNext === 0 ? 'rgba(232,160,32,0.12)' : daysUntilNext === 1 ? 'rgba(232,112,96,0.1)' : 'var(--bg-input)',
-                  border: `0.5px solid ${daysUntilNext === 0 ? 'rgba(232,160,32,0.25)' : daysUntilNext === 1 ? 'rgba(232,112,96,0.25)' : 'var(--border-md)'}`,
-                  borderRadius: '20px', padding: '3px 10px', whiteSpace: 'nowrap',
-                }}>
-                  {daysUntilNext === 0 ? 'Today!' : daysUntilNext === 1 ? 'Tomorrow' : `In ${daysUntilNext} days`}
-                </div>
-              </div>
-
-              {/* Status pills */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '11px', fontWeight: 600, padding: '3px 9px', borderRadius: '20px',
-                  background: lineupIsSet ? 'rgba(45,106,53,0.15)' : 'rgba(232,112,96,0.1)',
-                  color: lineupIsSet ? '#6DB875' : '#E87060',
-                  border: `0.5px solid ${lineupIsSet ? 'rgba(109,184,117,0.3)' : 'rgba(232,112,96,0.3)'}`,
-                }}>
-                  {lineupIsSet ? '✓ Lineup set' : '⚠ Lineup not set'}
-                </span>
-                {pitcherAlerts.map(a => (
-                  <span key={a.name} style={{
-                    fontSize: '11px', fontWeight: 600, padding: '3px 9px', borderRadius: '20px',
-                    background: 'rgba(232,160,32,0.1)',
-                    color: 'var(--accent)',
-                    border: '0.5px solid rgba(232,160,32,0.25)',
-                  }}>
-                    {a.name} pitched {a.daysAgo === 0 ? 'today' : a.daysAgo === 1 ? 'yesterday' : `${a.daysAgo}d ago`}
-                  </span>
-                ))}
-              </div>
             </div>
           )}
 
