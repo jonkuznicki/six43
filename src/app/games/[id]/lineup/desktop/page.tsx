@@ -78,7 +78,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [copyMode, setCopyMode]         = useState<'full' | 'order'>('full')
   const [copying, setCopying]           = useState(false)
   const [showTip, setShowTip]           = useState(true)
-  const [showShortcuts, setShowShortcuts] = useState(true)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
   const [lastGameHistory, setLastGameHistory] = useState<Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}>>({})
   const [pitchingHistory, setPitchingHistory] = useState<Record<string, {lastDate:string,lastInnings:number,daysSince:number}>>({})
