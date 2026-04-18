@@ -78,7 +78,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [copyMode, setCopyMode]         = useState<'full' | 'order'>('full')
   const [copying, setCopying]           = useState(false)
   const [showTip, setShowTip]           = useState(true)
-  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(true)
   const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
   const [lastGameHistory, setLastGameHistory] = useState<Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}>>({})
   const [pitchingHistory, setPitchingHistory] = useState<Record<string, {lastDate:string,lastInnings:number,daysSince:number}>>({})
@@ -118,7 +118,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   async function loadData() {
     const { data: gameData } = await supabase
       .from('games')
-      .select('*, season:seasons(innings_per_game, team_id, team:teams(name, positions))')
+      .select('*, season:seasons(innings_per_game, team_id, team:teams(name, positions, user_id))')
       .eq('id', params.id).single()
     setGame(gameData)
 
@@ -157,7 +157,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .eq('team_id', (gameData as any).season.team_id)
         .eq('user_id', user.id)
         .maybeSingle()
-      const ownerRole = membership?.role === 'owner'
+      const isTeamCreator = (gameData as any)?.season?.team?.user_id === user.id
+      const ownerRole = isTeamCreator || membership?.role === 'owner'
       setIsOwner(ownerRole)
       if (membership?.read_only) setReadOnly(true)
       const isLocked = (gameData as any)?.locked ?? false
@@ -1362,7 +1363,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       onClick={() => { setActivePos(pos); fillSelected(pos) }}
                       style={{
                         padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                        position: 'relative', minWidth: 34, textAlign: 'center',
+                        display: 'flex', alignItems: 'center', gap: 4,
                         fontSize: 11, fontWeight: 700,
                         border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : 'var(--border-md)'}`,
                         background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
@@ -1372,7 +1373,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     >
                       {pos}
                       {sc && (
-                        <span style={{ position: 'absolute', bottom: 0, right: 2, fontSize: 6, opacity: 0.4, fontWeight: 400 }}>
+                        <span style={{
+                          fontSize: 9, fontWeight: 500, lineHeight: 1,
+                          padding: '1px 3px', borderRadius: 3,
+                          background: isActive ? `rgba(0,0,0,0.18)` : `rgba(var(--fg-rgb),0.07)`,
+                          color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.38)`,
+                          fontFamily: 'ui-monospace, monospace',
+                        }}>
                           {sc}
                         </span>
                       )}
