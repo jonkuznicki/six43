@@ -262,6 +262,7 @@ export default function FairnessPage() {
     const gameIds = (games ?? []).map((g: any) => g.id)
     const lcMap: Record<string, number> = {}
     const rcMap: Record<string, number> = {}
+    const pitchMap: Record<string, number> = {}
 
     // Load player targets for this season
     const { data: playerData } = await supabase
@@ -276,8 +277,6 @@ export default function FairnessPage() {
         .from('lineup_slots')
         .select('player_id, inning_positions, game_id, availability, pitch_count')
         .in('game_id', gameIds)
-
-      const pitchMap: Record<string, number> = {}
       const benchByInning: Record<string, Record<number, { benched: number; played: number }>> = {}
 
       for (const slot of slots ?? []) {
