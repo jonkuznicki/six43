@@ -11,7 +11,7 @@ const OF_POS    = ['LF','CF','LC','RC','RF']
 const POS_COLS  = [...INFIELD, 'OF'] // columns shown in positions view
 
 const POS_COLORS: Record<string, string> = {
-  P: '#E8C060', C: '#E090B0',
+  P: '#4B9CD3', C: '#E090B0',
   '1B': '#80B0E8', '2B': '#80B0E8', SS: '#80B0E8', '3B': '#80B0E8',
   LF: '#6DB875', CF: '#6DB875', LC: '#6DB875', RC: '#6DB875', RF: '#6DB875',
 }
@@ -28,6 +28,7 @@ type StatRow = {
   innings_total: number; innings_all: number; bench_pct: number
   innings_lc?: number; innings_rc?: number
   innings_target?: number | null
+  total_pitches?: number
 }
 
 function pct(val: number) {
@@ -55,7 +56,7 @@ function DiamondChart({ row, compact = false }: { row: StatRow; compact?: boolea
   const H = Math.round(W * 0.92)
 
   const positions = [
-    { key: 'innings_p',  label: 'P',  fx: 0.500, fy: 0.672, color: '#E8C060' },
+    { key: 'innings_p',  label: 'P',  fx: 0.500, fy: 0.672, color: '#4B9CD3' },
     { key: 'innings_c',  label: 'C',  fx: 0.500, fy: 0.935, color: '#E090B0' },
     { key: 'innings_1b', label: '1B', fx: 0.810, fy: 0.624, color: '#80B0E8' },
     { key: 'innings_2b', label: '2B', fx: 0.655, fy: 0.420, color: '#80B0E8' },
@@ -91,7 +92,7 @@ function DiamondChart({ row, compact = false }: { row: StatRow; compact?: boolea
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: `${W}px`, display: 'block' }}>
       {/* Infield diamond */}
       <polygon points={`${hX},${hY} ${fX},${fY} ${sX},${sY} ${tX},${tY}`}
-        style={{ fill: 'rgba(232,160,32,0.05)', stroke: 'rgba(232,160,32,0.2)', strokeWidth: 0.75 }} />
+        style={{ fill: 'rgba(75,156,211,0.05)', stroke: 'rgba(75,156,211,0.2)', strokeWidth: 0.75 }} />
       {/* Foul lines */}
       <line x1={hX} y1={hY} x2={0.04*W} y2={0.09*H} style={{ stroke: 'rgba(255,255,255,0.07)', strokeWidth: 1 }} />
       <line x1={hX} y1={hY} x2={0.96*W} y2={0.09*H} style={{ stroke: 'rgba(255,255,255,0.07)', strokeWidth: 1 }} />
@@ -141,7 +142,7 @@ function PositionBar({ row }: { row: StatRow }) {
   if (!total) return null
   const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
   const segments = [
-    { label: 'P',      val: row.innings_p ?? 0,         color: '#E8C060' },
+    { label: 'P',      val: row.innings_p ?? 0,         color: '#4B9CD3' },
     { label: 'C',      val: row.innings_c ?? 0,         color: '#E090B0' },
     { label: 'Infield',val: infieldInn,                  color: '#80B0E8' },
     { label: 'Outfield',val: row.innings_outfield ?? 0, color: '#6DB875' },
@@ -164,7 +165,7 @@ function PositionBarLegend({ row }: { row: StatRow }) {
   if (!total) return null
   const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
   const items = [
-    { label: 'P',  val: row.innings_p ?? 0,         color: '#E8C060' },
+    { label: 'P',  val: row.innings_p ?? 0,         color: '#4B9CD3' },
     { label: 'C',  val: row.innings_c ?? 0,         color: '#E090B0' },
     { label: 'IF', val: infieldInn,                  color: '#80B0E8' },
     { label: 'OF', val: row.innings_outfield ?? 0,  color: '#6DB875' },
@@ -273,9 +274,10 @@ export default function FairnessPage() {
     if (gameIds.length) {
       const { data: slots } = await supabase
         .from('lineup_slots')
-        .select('player_id, inning_positions, game_id, availability')
+        .select('player_id, inning_positions, game_id, availability, pitch_count')
         .in('game_id', gameIds)
 
+      const pitchMap: Record<string, number> = {}
       const benchByInning: Record<string, Record<number, { benched: number; played: number }>> = {}
 
       for (const slot of slots ?? []) {
@@ -287,6 +289,7 @@ export default function FairnessPage() {
           if (pos === 'LC') lcMap[slot.player_id] = (lcMap[slot.player_id] ?? 0) + 1
           if (pos === 'RC') rcMap[slot.player_id] = (rcMap[slot.player_id] ?? 0) + 1
         })
+        if (slot.pitch_count) pitchMap[slot.player_id] = (pitchMap[slot.player_id] ?? 0) + slot.pitch_count
 
         if (slot.availability === 'absent') continue
         if (!benchByInning[slot.player_id]) benchByInning[slot.player_id] = {}
@@ -314,6 +317,7 @@ export default function FairnessPage() {
       innings_lc: lcMap[r.player_id] ?? 0,
       innings_rc: rcMap[r.player_id] ?? 0,
       innings_target: targetMap[r.player_id] ?? null,
+      total_pitches: pitchMap[r.player_id] ?? 0,
     }))
 
     setStats(rows)
@@ -600,6 +604,24 @@ export default function FairnessPage() {
                 {sorted.map(row => {
                   const benchPctVal = Math.round(row.bench_pct * 100)
                   const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
+
+                  // Top positions by innings count
+                  const allPos = [
+                    { label: 'P',  val: row.innings_p ?? 0,   color: '#4B9CD3' },
+                    { label: 'C',  val: row.innings_c ?? 0,   color: '#E090B0' },
+                    { label: '1B', val: row.innings_1b ?? 0,  color: '#80B0E8' },
+                    { label: '2B', val: row.innings_2b ?? 0,  color: '#80B0E8' },
+                    { label: 'SS', val: row.innings_ss ?? 0,  color: '#80B0E8' },
+                    { label: '3B', val: row.innings_3b ?? 0,  color: '#80B0E8' },
+                    { label: 'LF', val: row.innings_lf ?? 0,  color: '#6DB875' },
+                    { label: 'CF', val: row.innings_cf ?? 0,  color: '#6DB875' },
+                    { label: 'RF', val: row.innings_rf ?? 0,  color: '#6DB875' },
+                    { label: 'LC', val: row.innings_lc ?? 0,  color: '#6DB875' },
+                    { label: 'RC', val: row.innings_rc ?? 0,  color: '#6DB875' },
+                  ].filter(p => p.val > 0).sort((a, b) => b.val - a.val)
+                  const topPos = allPos.slice(0, 3)
+                  const uniqueSpots = allPos.length
+
                   return (
                     <div
                       key={row.player_id}
@@ -612,24 +634,80 @@ export default function FairnessPage() {
                         transition: 'border-color 0.15s',
                       }}
                     >
-                      {/* Name + bench % */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                        <div>
-                          <span style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '4px' }}>
-                            #{row.jersey_number}
-                          </span>
-                          <span style={{ fontSize: '12px', fontWeight: 700 }}>
-                            {row.first_name[0]}. {row.last_name}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: benchColor }}>
-                          {benchPctVal}%B
+                      {/* Name row */}
+                      <div style={{ marginBottom: '6px' }}>
+                        <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '4px' }}>
+                          #{row.jersey_number}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: 700 }}>
+                          {row.first_name[0]}. {row.last_name}
                         </span>
                       </div>
-                      {/* Mini diamond */}
-                      <DiamondChart row={row} compact />
-                      {/* Position bar */}
-                      <div style={{ marginTop: '6px' }}>
+
+                      {/* Diamond + Stats side by side */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        {/* Left: mini diamond */}
+                        <div style={{ flex: '0 0 48%' }}>
+                          <DiamondChart row={row} compact />
+                        </div>
+
+                        {/* Right: stats */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', paddingTop: '2px' }}>
+                          {/* Bench % */}
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                            <span style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1, color: benchColor }}>
+                              {benchPctVal}%
+                            </span>
+                            <span style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)` }}>bench</span>
+                          </div>
+
+                          {/* Field / bench split */}
+                          <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.45)`, lineHeight: 1.3 }}>
+                            <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{row.innings_total ?? 0}</span> field
+                            {' · '}
+                            <span style={{ fontWeight: 600 }}>{row.innings_bench ?? 0}</span> bench
+                          </div>
+
+                          {/* Top positions */}
+                          {topPos.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                              {topPos.map(p => (
+                                <span key={p.label} style={{
+                                  fontSize: '10px', fontWeight: 700,
+                                  padding: '1px 5px', borderRadius: '3px',
+                                  background: `${p.color}20`, color: p.color,
+                                  border: `0.5px solid ${p.color}44`,
+                                }}>
+                                  {p.label}·{p.val}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Versatility + pitching */}
+                          <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.35)` }}>
+                            {uniqueSpots} spot{uniqueSpots !== 1 ? 's' : ''}
+                          </div>
+
+                          {/* Pitching line — only if they've pitched */}
+                          {(row.innings_p ?? 0) > 0 && (
+                            <div style={{
+                              marginTop: '1px', fontSize: '9px', fontWeight: 600,
+                              color: '#4B9CD3', lineHeight: 1.4,
+                            }}>
+                              {row.innings_p} IP
+                              {(row.total_pitches ?? 0) > 0 && (
+                                <span style={{ fontWeight: 400, color: `rgba(var(--fg-rgb), 0.4)` }}>
+                                  {' · '}{row.total_pitches} pitches
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Position bar — full width at bottom */}
+                      <div style={{ marginTop: '8px' }}>
                         <PositionBar row={row} />
                       </div>
                     </div>
@@ -680,7 +758,7 @@ export default function FairnessPage() {
               {/* Bench + total pills */}
               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
                 {[
-                  { label: 'P', val: selectedPlayer.innings_p, color: '#E8C060' },
+                  { label: 'P', val: selectedPlayer.innings_p, color: '#4B9CD3' },
                   { label: 'C', val: selectedPlayer.innings_c, color: '#E090B0' },
                   { label: 'IF', val: (selectedPlayer.innings_1b??0)+(selectedPlayer.innings_2b??0)+(selectedPlayer.innings_ss??0)+(selectedPlayer.innings_3b??0), color: '#80B0E8' },
                   { label: 'OF', val: selectedPlayer.innings_outfield, color: '#6DB875' },
@@ -762,7 +840,7 @@ export default function FairnessPage() {
                 const date = new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
                 const POS_CHIP_COLORS: Record<string, string> = {
-                  P: '#E8C060', C: '#E090B0',
+                  P: '#4B9CD3', C: '#E090B0',
                   '1B': '#80B0E8', '2B': '#80B0E8', SS: '#80B0E8', '3B': '#80B0E8',
                   LF: '#6DB875', CF: '#6DB875', LC: '#6DB875', RC: '#6DB875', RF: '#6DB875',
                 }
