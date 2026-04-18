@@ -322,8 +322,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       .eq('game_id', params.id)
       .order('batting_order', { ascending: true, nullsFirst: false })
 
-    // If no slots exist yet, offer batting order choice if a previous game has slots
-    if (!slotData?.length && gameData?.season_id) {
+    // If lineup is blank (no slots, or slots exist but no positions filled), offer batting order choice
+    const lineupIsBlank = !slotData?.length ||
+      slotData.filter((s: any) => s.availability !== 'absent')
+        .every((s: any) => (s.inning_positions ?? []).every((p: any) => !p))
+    if (lineupIsBlank && gameData?.season_id) {
       const { data: recentGames } = await supabase
         .from('games')
         .select('id, opponent, game_date')
@@ -1094,8 +1097,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   }
                   const hasDupe = Object.entries(counts).some(([pos, v]) => pos !== 'Bench' && v > 1)
                   const allFilled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii])
-                  const hasMissing = teamPositions.filter(p => p !== 'Bench').some(p => !counts[p])
-                  const valid = allFilled && !hasDupe && !hasMissing
                   return (
                     <th
                       key={ii}
@@ -1103,8 +1104,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
                         <span>{ii + 1}</span>
-                        <span style={{ fontSize: 8 }}>
-                          {hasDupe ? <span style={{ color: '#E87060' }}>⚠</span> : valid ? <span style={{ color: '#6DB875' }}>✓</span> : null}
+                        <span style={{ fontSize: 9 }}>
+                          {hasDupe
+                            ? <span style={{ color: '#E87060' }}>⚠</span>
+                            : allFilled
+                              ? <span style={{ color: '#6DB875', fontWeight: 700 }}>✓</span>
+                              : <span style={{ color: `rgba(var(--fg-rgb),0.12)` }}>·</span>}
                         </span>
                       </div>
                     </th>
