@@ -811,9 +811,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         e.preventDefault()
         setActivePos(pos)
         fillSelected(pos)
-        // Auto-advance focus to next inning only when single cell selected
-        if (selectedCellsRef.current.size === 1 && ii < inningCount - 1) {
-          moveFocus(si, ii + 1)
+        // Auto-advance: next inning, or wrap to first inning of next player
+        if (selectedCellsRef.current.size === 1) {
+          if (ii < inningCount - 1) {
+            moveFocus(si, ii + 1)
+          } else if (si < rowCount - 1) {
+            moveFocus(si + 1, 0)
+          }
         }
       }
     }
