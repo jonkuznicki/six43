@@ -7,7 +7,7 @@ import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
-  P:     { bg: 'rgba(232,160,32,0.25)',   color: '#E8C060' },
+  P:     { bg: 'rgba(75,156,211,0.25)',    color: '#4B9CD3' },
   C:     { bg: 'rgba(192,80,120,0.25)',   color: '#E090B0' },
   '1B':  { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
   '2B':  { bg: 'rgba(59,109,177,0.25)',   color: '#80B0E8' },
@@ -27,7 +27,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [game, setGame] = useState<any>(null)
   const [slots, setSlots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editorMode, setEditorMode] = useState<'paint' | 'pick'>('paint')
+  const [editorMode, setEditorMode] = useState<'paint' | 'pick'>('pick')
 
   // Redirect desktop browsers to the full desktop editor
   useEffect(() => {

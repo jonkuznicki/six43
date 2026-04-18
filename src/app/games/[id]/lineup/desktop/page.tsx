@@ -25,7 +25,7 @@ const POS_KEY: Record<string, string> = {
   LF: 'l', CF: 'm', RF: 'r', Bench: 'b',
 }
 const POS_COLOR: Record<string, { bg: string; color: string }> = {
-  P:    { bg: 'rgba(232,160,32,0.22)',  color: '#E8C060' },
+  P:    { bg: 'rgba(75,156,211,0.22)',   color: '#4B9CD3' },
   C:    { bg: 'rgba(192,80,120,0.22)', color: '#E090B0' },
   '1B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
   '2B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },

@@ -20,32 +20,32 @@
   --bg-card: rgba(255,255,255,0.04);
   --bg-card-alt: rgba(255,255,255,0.02);
   --bg-input: rgba(255,255,255,0.06);
-  --fg: #F5F2EB;
-  --fg-rgb: 245, 242, 235;
-  --accent: #E8A020;
+  --fg: #EDF2F7;
+  --fg-rgb: 237, 242, 247;
+  --accent: #4B9CD3;
   --accent-text: #0B1F3A;
-  --border-subtle: rgba(245,242,235,0.08);
-  --border: rgba(245,242,235,0.1);
-  --border-md: rgba(245,242,235,0.15);
-  --border-strong: rgba(245,242,235,0.2);
+  --border-subtle: rgba(237,242,247,0.08);
+  --border: rgba(237,242,247,0.1);
+  --border-md: rgba(237,242,247,0.15);
+  --border-strong: rgba(237,242,247,0.2);
   --nav-bg: rgba(11,31,58,0.96);
 }
 
 html[data-theme="light"] {
-  --bg: #f0ede8;
+  --bg: #EBF0F7;
   --bg2: #ffffff;
   --bg-card: rgba(0,0,0,0.04);
   --bg-card-alt: rgba(0,0,0,0.025);
-  --bg-input: rgba(0,0,0,0.07);
-  --fg: #142841;
-  --fg-rgb: 20, 40, 65;
-  --accent: #C87C10;
+  --bg-input: rgba(0,0,0,0.06);
+  --fg: #0B1F3A;
+  --fg-rgb: 11, 31, 58;
+  --accent: #2B7AB5;
   --accent-text: #ffffff;
-  --border-subtle: rgba(20,40,65,0.08);
-  --border: rgba(20,40,65,0.1);
-  --border-md: rgba(20,40,65,0.14);
-  --border-strong: rgba(20,40,65,0.2);
-  --nav-bg: rgba(240,237,232,0.96);
+  --border-subtle: rgba(11,31,58,0.07);
+  --border: rgba(11,31,58,0.1);
+  --border-md: rgba(11,31,58,0.14);
+  --border-strong: rgba(11,31,58,0.2);
+  --nav-bg: rgba(235,240,247,0.96);
 }
 
 /* ── Sidebar (hidden on mobile, shown on desktop) ── */
