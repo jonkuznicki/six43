@@ -160,7 +160,7 @@ export default async function GamesPage({
                   marginTop: '1px',
                   background: step.done
                     ? 'rgba(109,184,117,0.2)'
-                    : isNext ? 'rgba(232,160,32,0.15)' : 'var(--bg-input)',
+                    : isNext ? 'rgba(75,156,211,0.15)' : 'var(--bg-input)',
                   border: `0.5px solid ${step.done ? '#6DB875' : isNext ? 'var(--accent)' : 'var(--border-md)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '10px', fontWeight: 700,
@@ -311,10 +311,10 @@ export default async function GamesPage({
                             padding: '8px 12px',
                             borderRadius: '8px 8px 0 0', marginBottom: '0',
                             marginTop: idx > 0 ? '0.5rem' : 0,
-                            background: 'rgba(232,160,32,0.07)',
-                            borderTop: '0.5px solid rgba(232,160,32,0.25)',
-                            borderLeft: '0.5px solid rgba(232,160,32,0.25)',
-                            borderRight: '0.5px solid rgba(232,160,32,0.25)',
+                            background: 'rgba(75,156,211,0.07)',
+                            borderTop: '0.5px solid rgba(75,156,211,0.25)',
+                            borderLeft: '0.5px solid rgba(75,156,211,0.25)',
+                            borderRight: '0.5px solid rgba(75,156,211,0.25)',
                           }}>
                             <div>
                               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
@@ -330,8 +330,8 @@ export default async function GamesPage({
                         </Link>
                       )}
                       <div style={g.tournament_id ? {
-                        borderLeft: '0.5px solid rgba(232,160,32,0.25)',
-                        borderRight: '0.5px solid rgba(232,160,32,0.25)',
+                        borderLeft: '0.5px solid rgba(75,156,211,0.25)',
+                        borderRight: '0.5px solid rgba(75,156,211,0.25)',
                         padding: '0 4px',
                       } : {}}>
                         <GameCard game={g} teamName={teamName} />
@@ -342,10 +342,10 @@ export default async function GamesPage({
                             display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                             padding: '6px 12px',
                             borderRadius: '0 0 8px 8px',
-                            background: 'rgba(232,160,32,0.04)',
-                            borderBottom: '0.5px solid rgba(232,160,32,0.25)',
-                            borderLeft: '0.5px solid rgba(232,160,32,0.25)',
-                            borderRight: '0.5px solid rgba(232,160,32,0.25)',
+                            background: 'rgba(75,156,211,0.04)',
+                            borderBottom: '0.5px solid rgba(75,156,211,0.25)',
+                            borderLeft: '0.5px solid rgba(75,156,211,0.25)',
+                            borderRight: '0.5px solid rgba(75,156,211,0.25)',
                             marginBottom: '0.5rem',
                           }}>
                             <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>

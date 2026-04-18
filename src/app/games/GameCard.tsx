@@ -32,7 +32,7 @@ function writeScore(notes: string | null, us: number, them: number): string {
 const STATUS: Record<string, { bg: string; color: string; label: string }> = {
   scheduled:    { bg: 'var(--bg-card)',          color: `rgba(var(--fg-rgb), 0.5)`, label: 'Scheduled' },
   lineup_ready: { bg: 'rgba(59,109,177,0.18)',   color: '#80B0E8',                  label: 'Lineup Ready' },
-  in_progress:  { bg: 'rgba(232,160,32,0.2)',    color: '#E8A020',                  label: 'Live' },
+  in_progress:  { bg: 'rgba(75,156,211,0.2)',    color: '#4B9CD3',                  label: 'Live' },
   final:        { bg: 'rgba(45,106,53,0.2)',     color: '#6DB875',                  label: 'Final' },
 }
 

@@ -40,7 +40,7 @@ export default function Sidebar() {
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '9px 12px', borderRadius: '8px',
               textDecoration: 'none',
-              background: active ? 'rgba(232,160,32,0.12)' : 'transparent',
+              background: active ? 'rgba(75,156,211,0.12)' : 'transparent',
               color: active ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.6)`,
               fontSize: '14px', fontWeight: active ? 700 : 400,
               transition: 'background 0.15s, color 0.15s',

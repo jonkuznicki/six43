@@ -213,8 +213,8 @@ export default function NewGamePage() {
       <Link href="/games" style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
         textDecoration: 'none', display: 'block', marginBottom: '1.5rem' }}>‹ Games</Link>
       <div style={{
-        background: 'rgba(232,160,32,0.07)',
-        border: '0.5px solid rgba(232,160,32,0.25)',
+        background: 'rgba(75,156,211,0.07)',
+        border: '0.5px solid rgba(75,156,211,0.25)',
         borderRadius: '14px',
         padding: '2rem 1.5rem',
         textAlign: 'center',
