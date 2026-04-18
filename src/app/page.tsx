@@ -5,7 +5,7 @@ import { createServerClient } from '../lib/supabase-server'
 // ── Desktop grid illustration data ───────────────────────────────────────────
 
 const DEMO_POS: Record<string, { bg: string; fg: string }> = {
-  P:    { bg: 'rgba(232,160,32,0.22)',  fg: '#E8C060' },
+  P:    { bg: 'rgba(75,156,211,0.22)',  fg: '#4B9CD3' },
   C:    { bg: 'rgba(192,80,120,0.22)', fg: '#E090B0' },
   '1B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
   '2B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
@@ -32,10 +32,10 @@ const DEMO_PLAYERS = [
 const FEATURES = [
   { icon: '⚾', title: 'Lineup builder',           body: 'Build a complete lineup in minutes. See every player, every inning, all at once — no spreadsheets, no paper, no guessing.' },
   { icon: '📋', title: 'Attendance tracking',      body: 'Mark who shows up on game day and the lineup adjusts automatically. No manual removal, no scrambling.' },
-  { icon: '📊', title: 'Playing time fairness',    body: 'Track bench time and innings by position all season. Set targets and stay ahead of the conversation before any parent brings it up.' },
+  { icon: '📊', title: 'By-position stats cards',  body: 'Each player gets a field heat map, bench %, top positions played, innings pitched, and pitch count — all in one card. Spot problems at a glance.' },
   { icon: '🎯', title: 'Pitching planner',         body: 'See who\'s eligible, who needs rest, and who\'s approaching their limit — days before the game, not on the mound.' },
   { icon: '🏆', title: 'Tournament planning',      body: 'Set up placeholder games before the bracket drops. Swap in real games from GameChanger when the schedule is confirmed — lineup carries over.' },
-  { icon: '✦',  title: 'AI player evaluations',   body: 'Add notes throughout the season. At end-of-year, generate a personalized report for each player\'s family in one tap.' },
+  { icon: '🔒', title: 'Game locking',             body: 'Finalize a lineup and lock it so staff can view but not change it. Only the team admin can unlock — no more accidental edits on game day.' },
   { icon: '🔄', title: 'GameChanger sync',         body: 'Paste your webcal link once and your full schedule imports. Check for updates any time — reschedules sync automatically.' },
   { icon: '📐', title: 'Depth chart',              body: 'Rank players at every position and track who can\'t play certain spots. Always current, always accessible.' },
   { icon: '🔗', title: 'Invite coaching staff',     body: 'Add assistant coaches by email. They get instant access to the roster, schedule, and lineups — with full edit or view-only permissions.' },
@@ -137,7 +137,7 @@ function DesktopLineupGrid() {
           <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
           <span style={{
             fontSize: '9px', fontWeight: 700, padding: '2px 8px',
-            background: 'rgba(232,160,32,0.18)', color: '#E8C060', borderRadius: '4px',
+            background: 'rgba(75,156,211,0.18)', color: '#4B9CD3', borderRadius: '4px',
           }}>Lineup Ready</span>
         </div>
       </div>
@@ -193,31 +193,43 @@ function DesktopLineupGrid() {
   )
 }
 
+// Per-player inline zone chips shown in grid (P, C, IF, OF, B totals)
+const DEMO_ZONE_CHIPS: Array<{ chips: string[]; done: boolean }> = [
+  { chips: ['P·3', 'IF·1', 'OF·2'], done: true },
+  { chips: ['C·6'],                  done: true },
+  { chips: ['IF·6'],                 done: true },
+  { chips: ['IF·6'],                 done: true },
+  { chips: ['OF·6'],                 done: true },
+  { chips: ['OF·6'],                 done: true },
+  { chips: ['IF·5', 'B·1'],          done: false },
+  { chips: ['IF·4', 'OF·2'],         done: true },
+  { chips: ['OF·4', 'B·2'],          done: false },
+]
+
 function FullDesktopLineupEditor() {
   const innings = [0, 1, 2, 3, 4, 5]
-  const focusedInning = 2 // right panel shows inning 3
-  const focusedCell = { pi: 0, ii: 0 } // Jake M., inning 1
+  const focusedInning = 3
+  const focusedCell = { pi: 2, ii: 2 }
 
-  // Right panel: who's at each position in inning 3
-  const inning3Summary = [
-    { pos: 'P',  player: null          },
-    { pos: 'C',  player: 'Connor B.'  },
-    { pos: '1B', player: 'Jake M.'    },
-    { pos: '2B', player: 'Marcus L.'  },
-    { pos: 'SS', player: 'Tyler S.'   },
-    { pos: '3B', player: 'Sam T.'     },
-    { pos: 'LF', player: 'Drew K.'    },
-    { pos: 'CF', player: 'Ryan P.'    },
-    { pos: 'RF', player: 'Alex W.'    },
+  const inning4Summary = [
+    { pos: 'P',  player: 'Jake M.'   },
+    { pos: 'C',  player: 'Connor B.' },
+    { pos: '1B', player: 'Tyler S.'  },
+    { pos: '2B', player: 'Marcus L.' },
+    { pos: 'SS', player: null        },
+    { pos: '3B', player: 'Sam T.'    },
+    { pos: 'LF', player: 'Ryan P.'   },
+    { pos: 'CF', player: 'Drew K.'   },
+    { pos: 'RF', player: 'Alex W.'   },
   ]
 
   const palette = ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
   const jerseys  = [12, 5, 8, 3, 17, 9, 22, 7, 14]
 
   return (
-    <div style={{ background: '#0B1F3A', display: 'flex', flexDirection: 'column', height: '290px' }}>
+    <div style={{ background: '#0B1F3A', display: 'flex', flexDirection: 'column', height: '310px' }}>
 
-      {/* ── Topbar ── */}
+      {/* Topbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px',
         background: '#0d2240', borderBottom: '1px solid rgba(255,255,255,0.07)',
@@ -228,60 +240,88 @@ function FullDesktopLineupEditor() {
         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
         <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>↩ Undo</span>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>Redo ↪</span>
-        <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>Clear lineup</span>
         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', whiteSpace: 'nowrap' }}>🖨 Print</span>
         <div style={{ flex: 1 }} />
-        {[
-          { label: 'Scheduled',    active: false, color: 'rgba(255,255,255,0.3)',   bg: 'transparent',          border: 'rgba(255,255,255,0.1)' },
-          { label: 'Lineup Ready', active: true,  color: '#80B0E8',                 bg: 'rgba(59,109,177,0.3)', border: '#80B0E8' },
-          { label: 'Final',        active: false, color: 'rgba(255,255,255,0.3)',   bg: 'transparent',          border: 'rgba(255,255,255,0.1)' },
-        ].map(s => (
-          <span key={s.label} style={{
-            fontSize: 8, fontWeight: s.active ? 700 : 500, whiteSpace: 'nowrap',
-            color: s.color, padding: '2px 6px', borderRadius: 3,
-            border: `1px solid ${s.border}`, background: s.bg,
-          }}>{s.label}</span>
-        ))}
+        <span style={{ fontSize: 8, fontWeight: 700, color: '#80B0E8', padding: '2px 6px', borderRadius: 3, border: '1px solid #80B0E8', background: 'rgba(59,109,177,0.3)', whiteSpace: 'nowrap' }}>Lineup Ready</span>
       </div>
 
-      {/* ── Three panels ── */}
+      {/* Two-panel layout */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Left: Roster + Palette */}
-        <div style={{
-          width: 128, flexShrink: 0,
-          borderRight: '1px solid rgba(255,255,255,0.07)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        }}>
-          <div style={{ flex: 1, overflowY: 'hidden', padding: '5px 0' }}>
-            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', padding: '0 8px 3px' }}>
-              Batting order · 9
-            </div>
-            {DEMO_PLAYERS.map((p, i) => (
-              <div key={p.name} style={{
-                display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px',
-              }}>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)', width: 10, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.22)', width: 18, flexShrink: 0 }}>#{jerseys[i]}</span>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.name}
-                </span>
-              </div>
-            ))}
+        {/* Center: Grid + palette below */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', width: 14 }}>#</th>
+                  <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'left', minWidth: 80, borderRight: '1px solid rgba(255,255,255,0.06)' }}>Player</th>
+                  {innings.map(i => (
+                    <th key={i} style={{
+                      padding: '3px 4px', fontSize: 7, fontWeight: 600,
+                      borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', minWidth: 26,
+                      color: i === focusedInning ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.2)',
+                      background: i === focusedInning ? 'rgba(255,255,255,0.03)' : 'transparent',
+                    }}>
+                      {i + 1}
+                      {i < 3 && <div style={{ fontSize: 5, color: '#6DB875', lineHeight: 1 }}>✓</div>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {DEMO_PLAYERS.map((player, pi) => {
+                  const zoneInfo = DEMO_ZONE_CHIPS[pi]
+                  return (
+                    <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.018)' }}>
+                      <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(255,255,255,0.22)' }}>{pi + 1}</td>
+                      <td style={{ padding: '2px 6px', borderRight: '1px solid rgba(255,255,255,0.06)', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', fontWeight: 500, whiteSpace: 'nowrap' }}>{player.name}</span>
+                          {zoneInfo.done && <span style={{ fontSize: 7, color: '#6DB875' }}>✓</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 2, marginTop: 1, flexWrap: 'wrap' }}>
+                          {zoneInfo.chips.map(chip => {
+                            const col = chip.startsWith('P') ? '#4B9CD3' : chip.startsWith('C') ? '#E090B0' : chip.startsWith('IF') ? '#80B0E8' : chip.startsWith('OF') ? '#6DB875' : 'rgba(150,150,160,0.5)'
+                            return <span key={chip} style={{ fontSize: 6, fontWeight: 700, color: col, opacity: 0.85 }}>{chip}</span>
+                          })}
+                        </div>
+                      </td>
+                      {player.innings.map((pos, ii) => {
+                        const c = DEMO_POS[pos]
+                        const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
+                        const isColFoc = ii === focusedInning
+                        return (
+                          <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(255,255,255,0.025)' : 'transparent' }}>
+                            <div style={{
+                              background: isFoc ? 'rgba(59,109,177,0.5)' : (c?.bg ?? 'transparent'),
+                              color: isFoc ? '#fff' : (c?.fg ?? 'rgba(255,255,255,0.18)'),
+                              borderRadius: 2, padding: '2px 0',
+                              fontSize: 8, fontWeight: 700,
+                              minWidth: 22, display: 'inline-block',
+                              outline: isFoc ? '1.5px solid rgba(59,109,177,0.9)' : 'none',
+                              outlineOffset: -1,
+                            }}>{pos === 'Bnch' ? 'B' : pos}</div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Palette */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '5px 7px 6px', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 3 }}>Select cells, then fill:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+          {/* Palette below grid */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '5px 8px 6px', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginRight: 2 }}>Fill:</span>
               {palette.map(pos => {
                 const c = DEMO_POS[pos] ?? { bg: 'rgba(120,120,120,0.1)', fg: 'rgba(255,255,255,0.3)' }
-                const active = pos === 'P'
+                const active = pos === 'SS'
                 return (
                   <div key={pos} style={{
-                    padding: '2px 3px', borderRadius: 3, fontSize: 7, fontWeight: 700,
+                    padding: '2px 4px', borderRadius: 3, fontSize: 7, fontWeight: 700,
                     border: `1px solid ${active ? c.fg : 'rgba(255,255,255,0.12)'}`,
                     background: active ? c.bg : 'transparent',
                     color: active ? c.fg : 'rgba(255,255,255,0.35)',
@@ -293,95 +333,40 @@ function FullDesktopLineupEditor() {
           </div>
         </div>
 
-        {/* Center: Grid */}
-        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', width: 16 }}>#</th>
-                <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'left', minWidth: 58, borderRight: '1px solid rgba(255,255,255,0.06)' }}>Player</th>
-                {innings.map(i => (
-                  <th key={i} style={{
-                    padding: '3px 4px', fontSize: 7, fontWeight: 600,
-                    borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', minWidth: 26,
-                    color: i === focusedInning ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.2)',
-                    background: i === focusedInning ? 'rgba(255,255,255,0.03)' : 'transparent',
-                  }}>
-                    {i + 1}
-                    {i === focusedInning && <div style={{ fontSize: 5, color: '#6DB875', lineHeight: 1 }}>✓</div>}
-                  </th>
-                ))}
-                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(255,255,255,0.2)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>Bench</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DEMO_PLAYERS.map((player, pi) => {
-                const benchCount = player.innings.filter(p => p === 'Bnch').length
-                return (
-                  <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.018)' }}>
-                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(255,255,255,0.22)' }}>{pi + 1}</td>
-                    <td style={{ padding: '2px 6px', fontSize: 9, color: 'rgba(255,255,255,0.72)', fontWeight: 500, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-                      {player.name}
-                    </td>
-                    {player.innings.map((pos, ii) => {
-                      const c = DEMO_POS[pos]
-                      const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
-                      const isSel = pi === focusedCell.pi && ii === 1
-                      const isColFoc = ii === focusedInning
-                      return (
-                        <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(255,255,255,0.025)' : 'transparent' }}>
-                          <div style={{
-                            background: isFoc ? 'rgba(59,109,177,0.4)' : isSel ? 'rgba(59,109,177,0.14)' : (c?.bg ?? 'transparent'),
-                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : (c?.fg ?? 'rgba(255,255,255,0.18)'),
-                            borderRadius: 2, padding: '1px 0',
-                            fontSize: 8, fontWeight: 700,
-                            minWidth: 22, display: 'inline-block',
-                            outline: isFoc ? '1.5px solid rgba(59,109,177,0.85)' : isSel ? '1px solid rgba(59,109,177,0.4)' : 'none',
-                            outlineOffset: -1,
-                          }}>{pos === 'Bnch' ? 'B' : pos}</div>
-                        </td>
-                      )
-                    })}
-                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 8, fontWeight: 700, color: benchCount > 0 ? '#6DB875' : 'rgba(255,255,255,0.18)' }}>
-                      {benchCount > 0 ? benchCount : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Right: Inning summary */}
+        {/* Right panel: notes + inning snapshot */}
         <div style={{
-          width: 98, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.07)',
-          padding: '7px 7px', overflowY: 'hidden',
+          width: 108, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', flexDirection: 'column', overflowY: 'hidden',
         }}>
-          <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 4 }}>
-            Inning 3
+          {/* Notes */}
+          <div style={{ padding: '6px 7px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', marginBottom: 3 }}>Notes</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
           </div>
-          {inning3Summary.map(({ pos, player }) => {
-            const c = DEMO_POS[pos]
-            const empty = !player
-            return (
-              <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(232,112,96,0.07)' : 'transparent' }}>
-                <span style={{
-                  fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2,
-                  textAlign: 'center', flexShrink: 0,
-                  background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(255,255,255,0.5)',
-                }}>{pos}</span>
-                <span style={{
-                  fontSize: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: empty ? 'rgba(232,112,96,0.8)' : 'rgba(255,255,255,0.65)',
-                  fontStyle: empty ? 'italic' : 'normal',
-                }}>{player ?? '—'}</span>
-                {empty && <span style={{ fontSize: 7, color: '#E87060', flexShrink: 0 }}>!</span>}
-              </div>
-            )
-          })}
-          <div style={{ marginTop: 6, padding: '5px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)' }}>Bench: Josh M.</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>~0.7 bench inn exp</div>
+          {/* Inning snapshot */}
+          <div style={{ padding: '6px 7px', flex: 1, overflowY: 'hidden' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 4 }}>
+              Inning 4
+            </div>
+            {inning4Summary.map(({ pos, player }) => {
+              const c = DEMO_POS[pos]
+              const empty = !player
+              return (
+                <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(232,112,96,0.07)' : 'transparent' }}>
+                  <span style={{
+                    fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2,
+                    textAlign: 'center', flexShrink: 0,
+                    background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(255,255,255,0.5)',
+                  }}>{pos}</span>
+                  <span style={{
+                    fontSize: 7.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: empty ? 'rgba(232,112,96,0.8)' : 'rgba(255,255,255,0.62)',
+                    fontStyle: empty ? 'italic' : 'normal',
+                  }}>{player ?? '—'}</span>
+                  {empty && <span style={{ fontSize: 7, color: '#E87060', flexShrink: 0 }}>!</span>}
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -394,18 +379,18 @@ function BrowserMockupLight({ children, caption }: { children: React.ReactNode; 
   return (
     <div style={{ width: '100%' }}>
       <div style={{
-        background: '#f0ede8',
+        background: '#EBF0F7',
         borderRadius: '10px',
         overflow: 'hidden',
-        boxShadow: '0 0 0 1px rgba(0,0,0,0.1), 0 24px 60px rgba(0,0,0,0.15)',
+        boxShadow: '0 0 0 1px rgba(11,31,58,0.1), 0 24px 60px rgba(0,0,0,0.12)',
       }}>
         <div style={{
-          background: '#e4e0da',
+          background: '#dde4ee',
           padding: '9px 14px',
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
+          borderBottom: '1px solid rgba(11,31,58,0.08)',
         }}>
           <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF5F57' }} />
@@ -432,7 +417,7 @@ function BrowserMockupLight({ children, caption }: { children: React.ReactNode; 
 }
 
 const LIGHT_POS: Record<string, { bg: string; fg: string }> = {
-  P:     { bg: 'rgba(232,160,32,0.2)',   fg: '#9E6A00' },
+  P:     { bg: 'rgba(75,156,211,0.2)',   fg: '#2B7AB5' },
   C:     { bg: 'rgba(192,80,120,0.18)',  fg: '#A03060' },
   '1B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
   '2B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
@@ -447,91 +432,123 @@ const LIGHT_POS: Record<string, { bg: string; fg: string }> = {
 
 function FullDesktopLineupEditorLight() {
   const innings = [0, 1, 2, 3, 4, 5]
-  const focusedInning = 2
-  const focusedCell = { pi: 0, ii: 0 }
+  const focusedInning = 3
+  const focusedCell = { pi: 2, ii: 2 }
 
-  const inning3Summary = [
-    { pos: 'P',  player: null          },
-    { pos: 'C',  player: 'Connor B.'  },
-    { pos: '1B', player: 'Jake M.'    },
-    { pos: '2B', player: 'Marcus L.'  },
-    { pos: 'SS', player: 'Tyler S.'   },
-    { pos: '3B', player: 'Sam T.'     },
-    { pos: 'LF', player: 'Drew K.'    },
-    { pos: 'CF', player: 'Ryan P.'    },
-    { pos: 'RF', player: 'Alex W.'    },
+  const inning4Summary = [
+    { pos: 'P',  player: 'Jake M.'   },
+    { pos: 'C',  player: 'Connor B.' },
+    { pos: '1B', player: 'Tyler S.'  },
+    { pos: '2B', player: 'Marcus L.' },
+    { pos: 'SS', player: null        },
+    { pos: '3B', player: 'Sam T.'    },
+    { pos: 'LF', player: 'Ryan P.'   },
+    { pos: 'CF', player: 'Drew K.'   },
+    { pos: 'RF', player: 'Alex W.'   },
   ]
 
   const palette = ['P','C','1B','2B','SS','3B','LF','CF','RF','Bench']
   const jerseys  = [12, 5, 8, 3, 17, 9, 22, 7, 14]
 
   return (
-    <div style={{ background: '#f0ede8', display: 'flex', flexDirection: 'column', height: '290px' }}>
+    <div style={{ background: '#EBF0F7', display: 'flex', flexDirection: 'column', height: '310px' }}>
 
       {/* Topbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px',
-        background: '#e8e4de', borderBottom: '1px solid rgba(20,40,65,0.08)',
+        background: '#dde4ee', borderBottom: '1px solid rgba(11,31,58,0.08)',
         flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden',
       }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(20,40,65,0.8)', whiteSpace: 'nowrap' }}>vs Cardinals · Apr 12</span>
-        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
-        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
-        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
-        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>↩ Undo</span>
-        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>Redo ↪</span>
-        <div style={{ width: 1, height: 14, background: 'rgba(20,40,65,0.12)', flexShrink: 0 }} />
-        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>Clear lineup</span>
-        <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.35)', whiteSpace: 'nowrap' }}>🖨 Print</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(11,31,58,0.8)', whiteSpace: 'nowrap' }}>vs Cardinals · Apr 12</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(11,31,58,0.12)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(11,31,58,0.35)', whiteSpace: 'nowrap' }}>− 6 inn +</span>
+        <div style={{ width: 1, height: 14, background: 'rgba(11,31,58,0.12)', flexShrink: 0 }} />
+        <span style={{ fontSize: 9, color: 'rgba(11,31,58,0.35)', whiteSpace: 'nowrap' }}>↩ Undo</span>
+        <span style={{ fontSize: 9, color: 'rgba(11,31,58,0.35)', whiteSpace: 'nowrap' }}>🖨 Print</span>
         <div style={{ flex: 1 }} />
-        {[
-          { label: 'Scheduled',    active: false, color: 'rgba(20,40,65,0.35)', bg: 'transparent',           border: 'rgba(20,40,65,0.15)' },
-          { label: 'Lineup Ready', active: true,  color: '#2A5A9E',             bg: 'rgba(59,109,177,0.15)', border: '#2A5A9E' },
-          { label: 'Final',        active: false, color: 'rgba(20,40,65,0.35)', bg: 'transparent',           border: 'rgba(20,40,65,0.15)' },
-        ].map(s => (
-          <span key={s.label} style={{
-            fontSize: 8, fontWeight: s.active ? 700 : 500, whiteSpace: 'nowrap',
-            color: s.color, padding: '2px 6px', borderRadius: 3,
-            border: `1px solid ${s.border}`, background: s.bg,
-          }}>{s.label}</span>
-        ))}
+        <span style={{ fontSize: 8, fontWeight: 700, color: '#2B7AB5', padding: '2px 6px', borderRadius: 3, border: '1px solid #2B7AB5', background: 'rgba(43,122,181,0.12)', whiteSpace: 'nowrap' }}>Lineup Ready</span>
       </div>
 
-      {/* Three panels */}
+      {/* Two-panel layout */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Left: Roster + Palette */}
-        <div style={{
-          width: 128, flexShrink: 0,
-          borderRight: '1px solid rgba(20,40,65,0.08)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        }}>
-          <div style={{ flex: 1, overflowY: 'hidden', padding: '5px 0' }}>
-            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(20,40,65,0.3)', padding: '0 8px 3px' }}>
-              Batting order · 9
-            </div>
-            {DEMO_PLAYERS.map((p, i) => (
-              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px' }}>
-                <span style={{ fontSize: 8, color: 'rgba(20,40,65,0.25)', width: 10, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ fontSize: 8, color: 'rgba(20,40,65,0.3)', width: 18, flexShrink: 0 }}>#{jerseys[i]}</span>
-                <span style={{ fontSize: 9, color: 'rgba(20,40,65,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.name}
-                </span>
-              </div>
-            ))}
+        {/* Grid + palette */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(11,31,58,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(11,31,58,0.07)', textAlign: 'center', width: 14 }}>#</th>
+                  <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(11,31,58,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(11,31,58,0.07)', textAlign: 'left', minWidth: 80, borderRight: '1px solid rgba(11,31,58,0.07)' }}>Player</th>
+                  {innings.map(i => (
+                    <th key={i} style={{
+                      padding: '3px 4px', fontSize: 7, fontWeight: 600,
+                      borderBottom: '1px solid rgba(11,31,58,0.07)', textAlign: 'center', minWidth: 26,
+                      color: i === focusedInning ? 'rgba(11,31,58,0.6)' : 'rgba(11,31,58,0.25)',
+                      background: i === focusedInning ? 'rgba(11,31,58,0.03)' : 'transparent',
+                    }}>
+                      {i + 1}
+                      {i < 3 && <div style={{ fontSize: 5, color: '#2A6633', lineHeight: 1 }}>✓</div>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {DEMO_PLAYERS.map((player, pi) => {
+                  const zoneInfo = DEMO_ZONE_CHIPS[pi]
+                  return (
+                    <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(11,31,58,0.02)' }}>
+                      <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(11,31,58,0.3)' }}>{pi + 1}</td>
+                      <td style={{ padding: '2px 6px', borderRight: '1px solid rgba(11,31,58,0.07)', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 9, color: 'rgba(11,31,58,0.72)', fontWeight: 500, whiteSpace: 'nowrap' }}>{player.name}</span>
+                          {zoneInfo.done && <span style={{ fontSize: 7, color: '#2A6633' }}>✓</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 2, marginTop: 1, flexWrap: 'wrap' }}>
+                          {zoneInfo.chips.map(chip => {
+                            const col = chip.startsWith('P') ? '#2B7AB5' : chip.startsWith('C') ? '#A03060' : chip.startsWith('IF') ? '#2A5A9E' : chip.startsWith('OF') ? '#2A6633' : 'rgba(80,80,90,0.45)'
+                            return <span key={chip} style={{ fontSize: 6, fontWeight: 700, color: col, opacity: 0.85 }}>{chip}</span>
+                          })}
+                        </div>
+                      </td>
+                      {player.innings.map((pos, ii) => {
+                        const c = LIGHT_POS[pos]
+                        const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
+                        const isColFoc = ii === focusedInning
+                        return (
+                          <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(11,31,58,0.025)' : 'transparent' }}>
+                            <div style={{
+                              background: isFoc ? 'rgba(43,122,181,0.25)' : (c?.bg ?? 'transparent'),
+                              color: isFoc ? '#0B1F3A' : (c?.fg ?? 'rgba(11,31,58,0.2)'),
+                              borderRadius: 2, padding: '2px 0',
+                              fontSize: 8, fontWeight: 700,
+                              minWidth: 22, display: 'inline-block',
+                              outline: isFoc ? '1.5px solid rgba(43,122,181,0.7)' : 'none',
+                              outlineOffset: -1,
+                            }}>{pos === 'Bnch' ? 'B' : pos}</div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-          <div style={{ borderTop: '1px solid rgba(20,40,65,0.08)', padding: '5px 7px 6px', background: 'rgba(20,40,65,0.02)', flexShrink: 0 }}>
-            <div style={{ fontSize: 7, color: 'rgba(20,40,65,0.35)', marginBottom: 3 }}>Select cells, then fill:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+
+          {/* Palette */}
+          <div style={{ borderTop: '1px solid rgba(11,31,58,0.07)', padding: '5px 8px 6px', background: 'rgba(11,31,58,0.02)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 7, color: 'rgba(11,31,58,0.3)', marginRight: 2 }}>Fill:</span>
               {palette.map(pos => {
-                const c = LIGHT_POS[pos] ?? { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' }
-                const active = pos === 'P'
+                const c = LIGHT_POS[pos] ?? { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(11,31,58,0.4)' }
+                const active = pos === 'SS'
                 return (
                   <div key={pos} style={{
-                    padding: '2px 3px', borderRadius: 3, fontSize: 7, fontWeight: 700,
-                    border: `1px solid ${active ? c.fg : 'rgba(20,40,65,0.15)'}`,
+                    padding: '2px 4px', borderRadius: 3, fontSize: 7, fontWeight: 700,
+                    border: `1px solid ${active ? c.fg : 'rgba(11,31,58,0.15)'}`,
                     background: active ? c.bg : 'transparent',
-                    color: active ? c.fg : 'rgba(20,40,65,0.4)',
+                    color: active ? c.fg : 'rgba(11,31,58,0.4)',
                     minWidth: pos === 'Bench' ? 32 : 20, textAlign: 'center',
                   }}>{pos}</div>
                 )
@@ -540,98 +557,131 @@ function FullDesktopLineupEditorLight() {
           </div>
         </div>
 
-        {/* Center: Grid */}
-        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center', width: 16 }}>#</th>
-                <th style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'left', minWidth: 58, borderRight: '1px solid rgba(20,40,65,0.07)' }}>Player</th>
-                {innings.map(i => (
-                  <th key={i} style={{
-                    padding: '3px 4px', fontSize: 7, fontWeight: 600,
-                    borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center', minWidth: 26,
-                    color: i === focusedInning ? 'rgba(20,40,65,0.6)' : 'rgba(20,40,65,0.25)',
-                    background: i === focusedInning ? 'rgba(20,40,65,0.03)' : 'transparent',
-                  }}>
-                    {i + 1}
-                    {i === focusedInning && <div style={{ fontSize: 5, color: '#2A6633', lineHeight: 1 }}>✓</div>}
-                  </th>
-                ))}
-                <th style={{ padding: '3px 5px', fontSize: 7, color: 'rgba(20,40,65,0.25)', fontWeight: 600, borderBottom: '1px solid rgba(20,40,65,0.07)', textAlign: 'center' }}>Bench</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DEMO_PLAYERS.map((player, pi) => {
-                const benchCount = player.innings.filter(p => p === 'Bnch').length
-                return (
-                  <tr key={player.name} style={{ background: pi % 2 === 0 ? 'transparent' : 'rgba(20,40,65,0.02)' }}>
-                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 7, color: 'rgba(20,40,65,0.3)' }}>{pi + 1}</td>
-                    <td style={{ padding: '2px 6px', fontSize: 9, color: 'rgba(20,40,65,0.75)', fontWeight: 500, whiteSpace: 'nowrap', borderRight: '1px solid rgba(20,40,65,0.07)' }}>
-                      {player.name}
-                    </td>
-                    {player.innings.map((pos, ii) => {
-                      const c = LIGHT_POS[pos]
-                      const isFoc = pi === focusedCell.pi && ii === focusedCell.ii
-                      const isSel = pi === focusedCell.pi && ii === 1
-                      const isColFoc = ii === focusedInning
-                      return (
-                        <td key={ii} style={{ padding: '2px 2px', textAlign: 'center', background: isColFoc ? 'rgba(20,40,65,0.025)' : 'transparent' }}>
-                          <div style={{
-                            background: isFoc ? 'rgba(59,109,177,0.25)' : isSel ? 'rgba(59,109,177,0.1)' : (c?.bg ?? 'transparent'),
-                            color: isFoc ? '#142841' : isSel ? '#2A5A9E' : (c?.fg ?? 'rgba(20,40,65,0.2)'),
-                            borderRadius: 2, padding: '1px 0',
-                            fontSize: 8, fontWeight: 700,
-                            minWidth: 22, display: 'inline-block',
-                            outline: isFoc ? '1.5px solid rgba(59,109,177,0.7)' : isSel ? '1px solid rgba(59,109,177,0.3)' : 'none',
-                            outlineOffset: -1,
-                          }}>{pos === 'Bnch' ? 'B' : pos}</div>
-                        </td>
-                      )
-                    })}
-                    <td style={{ padding: '2px 5px', textAlign: 'center', fontSize: 8, fontWeight: 700, color: benchCount > 0 ? '#2A6633' : 'rgba(20,40,65,0.2)' }}>
-                      {benchCount > 0 ? benchCount : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Right: Inning summary */}
+        {/* Right panel */}
         <div style={{
-          width: 98, flexShrink: 0, borderLeft: '1px solid rgba(20,40,65,0.08)',
-          padding: '7px 7px', overflowY: 'hidden',
+          width: 108, flexShrink: 0, borderLeft: '1px solid rgba(11,31,58,0.08)',
+          display: 'flex', flexDirection: 'column', overflowY: 'hidden',
         }}>
-          <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(20,40,65,0.3)', marginBottom: 4 }}>
-            Inning 3
+          <div style={{ padding: '6px 7px', borderBottom: '1px solid rgba(11,31,58,0.06)' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(11,31,58,0.25)', marginBottom: 3 }}>Notes</div>
+            <div style={{ fontSize: 7, color: 'rgba(11,31,58,0.4)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
           </div>
-          {inning3Summary.map(({ pos, player }) => {
-            const c = LIGHT_POS[pos]
-            const empty = !player
-            return (
-              <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(200,80,70,0.07)' : 'transparent' }}>
-                <span style={{
-                  fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2,
-                  textAlign: 'center', flexShrink: 0,
-                  background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(20,40,65,0.5)',
-                }}>{pos}</span>
-                <span style={{
-                  fontSize: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: empty ? 'rgba(180,60,50,0.85)' : 'rgba(20,40,65,0.7)',
-                  fontStyle: empty ? 'italic' : 'normal',
-                }}>{player ?? '—'}</span>
-                {empty && <span style={{ fontSize: 7, color: '#B83C32', flexShrink: 0 }}>!</span>}
-              </div>
-            )
-          })}
-          <div style={{ marginTop: 6, padding: '5px 6px', borderRadius: 4, background: 'rgba(20,40,65,0.03)', border: '0.5px solid rgba(20,40,65,0.08)' }}>
-            <div style={{ fontSize: 8, color: 'rgba(20,40,65,0.5)' }}>Bench: Josh M.</div>
-            <div style={{ fontSize: 7, color: 'rgba(20,40,65,0.3)', marginTop: 1 }}>~0.7 bench inn exp</div>
+          <div style={{ padding: '6px 7px', flex: 1, overflowY: 'hidden' }}>
+            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(11,31,58,0.28)', marginBottom: 4 }}>
+              Inning 4
+            </div>
+            {inning4Summary.map(({ pos, player }) => {
+              const c = LIGHT_POS[pos]
+              const empty = !player
+              return (
+                <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2, padding: '1px 3px', borderRadius: 3, background: empty ? 'rgba(200,80,70,0.06)' : 'transparent' }}>
+                  <span style={{ fontSize: 7, fontWeight: 800, minWidth: 20, padding: '1px 2px', borderRadius: 2, textAlign: 'center', flexShrink: 0, background: c?.bg ?? 'transparent', color: c?.fg ?? 'rgba(11,31,58,0.5)' }}>{pos}</span>
+                  <span style={{ fontSize: 7.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: empty ? 'rgba(180,60,50,0.85)' : 'rgba(11,31,58,0.65)', fontStyle: empty ? 'italic' : 'normal' }}>{player ?? '—'}</span>
+                  {empty && <span style={{ fontSize: 7, color: '#B83C32', flexShrink: 0 }}>!</span>}
+                </div>
+              )
+            })}
           </div>
         </div>
 
+      </div>
+    </div>
+  )
+}
+
+// ── By-Position stats card demo ───────────────────────────────────────────────
+function ByPositionDemo() {
+  const players = [
+    { name: 'Jake M.',  jersey: 12, benchPct: 11, fieldInn: 16, benchInn: 2,  ip: 6, pitches: 78,
+      topPos: [{ l: 'P', v: 6, c: '#4B9CD3' }, { l: 'SS', v: 5, c: '#80B0E8' }, { l: 'CF', v: 5, c: '#6DB875' }], spots: 5,
+      d: { P: 0.85, C: 0, '1B': 0, '2B': 0, SS: 0.65, '3B': 0, LF: 0, CF: 0.55, RF: 0 } },
+    { name: 'Ryan P.',  jersey: 17, benchPct: 6,  fieldInn: 17, benchInn: 1,  ip: 0, pitches: 0,
+      topPos: [{ l: 'LF', v: 8, c: '#6DB875' }, { l: 'CF', v: 6, c: '#6DB875' }, { l: 'RF', v: 3, c: '#6DB875' }], spots: 3,
+      d: { P: 0, C: 0, '1B': 0, '2B': 0, SS: 0, '3B': 0, LF: 1.0, CF: 0.75, RF: 0.4 } },
+    { name: 'Tyler S.', jersey: 8,  benchPct: 44, fieldInn: 10, benchInn: 8,  ip: 0, pitches: 0,
+      topPos: [{ l: 'SS', v: 7, c: '#80B0E8' }, { l: '2B', v: 3, c: '#80B0E8' }], spots: 2,
+      d: { P: 0, C: 0, '1B': 0.2, '2B': 0.4, SS: 1.0, '3B': 0, LF: 0, CF: 0, RF: 0 } },
+  ]
+
+  function MiniDiamond({ d }: { d: Record<string, number> }) {
+    const W = 68, H = 63
+    const pos = [
+      { k: 'P',  fx: 0.500, fy: 0.660, c: '#4B9CD3' },
+      { k: 'C',  fx: 0.500, fy: 0.940, c: '#E090B0' },
+      { k: '1B', fx: 0.810, fy: 0.615, c: '#80B0E8' },
+      { k: '2B', fx: 0.655, fy: 0.415, c: '#80B0E8' },
+      { k: 'SS', fx: 0.332, fy: 0.480, c: '#80B0E8' },
+      { k: '3B', fx: 0.190, fy: 0.615, c: '#80B0E8' },
+      { k: 'LF', fx: 0.118, fy: 0.200, c: '#6DB875' },
+      { k: 'CF', fx: 0.500, fy: 0.065, c: '#6DB875' },
+      { k: 'RF', fx: 0.882, fy: 0.200, c: '#6DB875' },
+    ]
+    const hX = 0.5*W, hY = 0.94*H, fX = 0.81*W, fY = 0.615*H, sX = 0.5*W, sY = 0.25*H, tX = 0.19*W, tY = 0.615*H
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: `${W}px`, display: 'block' }}>
+        <polygon points={`${hX},${hY} ${fX},${fY} ${sX},${sY} ${tX},${tY}`}
+          style={{ fill: 'rgba(75,156,211,0.05)', stroke: 'rgba(75,156,211,0.2)', strokeWidth: 0.6 }} />
+        {pos.map(p => {
+          const v = d[p.k] ?? 0
+          const cx = p.fx * W, cy = p.fy * H, r = 5 + v * 3
+          return (
+            <g key={p.k}>
+              <circle cx={cx} cy={cy} r={r} style={{ fill: p.c, fillOpacity: v > 0 ? 0.1 + v * 0.55 : 0.04, stroke: p.c, strokeWidth: 1, strokeOpacity: v > 0 ? 0.35 + v * 0.55 : 0.12 }} />
+              <text x={cx} y={cy + 2.5} textAnchor="middle" style={{ fontSize: '5.5px', fontWeight: 800, fill: p.c, fillOpacity: v > 0 ? 0.88 : 0.18 }}>{p.k}</text>
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
+
+  return (
+    <div style={{ background: '#0B1F3A', padding: '10px 10px 12px', borderRadius: '0 0 9px 9px' }}>
+      <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+        Playing Time · By Position
+      </div>
+      <div style={{ display: 'flex', gap: '6px' }}>
+        {players.map(player => {
+          const benchColor = player.benchPct > 40 ? '#E87060' : player.benchPct > 25 ? '#E8A020' : '#6DB875'
+          return (
+            <div key={player.name} style={{
+              flex: 1, background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px', padding: '7px 6px',
+            }}>
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.28)', marginRight: 3 }}>#{player.jersey}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>{player.name}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 5, alignItems: 'flex-start' }}>
+                <div style={{ flex: '0 0 46%' }}>
+                  <MiniDiamond d={player.d} />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: 18, fontWeight: 800, lineHeight: 1, color: benchColor }}>{player.benchPct}%</span>
+                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>bench</span>
+                  </div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.42)' }}>
+                    <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{player.fieldInn}</span> field · <span style={{ fontWeight: 600 }}>{player.benchInn}</span> bench
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    {player.topPos.map(p => (
+                      <span key={p.l} style={{ fontSize: 8, fontWeight: 700, padding: '1px 4px', borderRadius: 2, background: `${p.c}20`, color: p.c, border: `0.5px solid ${p.c}44` }}>
+                        {p.l}·{p.v}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)' }}>{player.spots} spot{player.spots !== 1 ? 's' : ''}</div>
+                  {player.ip > 0 && (
+                    <div style={{ fontSize: 7.5, fontWeight: 600, color: '#4B9CD3' }}>
+                      {player.ip} IP · <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.32)' }}>{player.pitches}p</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -697,8 +747,8 @@ export default async function HomePage() {
             fontSize: '11px', fontWeight: 700,
             letterSpacing: '0.1em', textTransform: 'uppercase',
             color: 'var(--accent)',
-            background: 'rgba(232,160,32,0.12)',
-            border: '0.5px solid rgba(232,160,32,0.25)',
+            background: 'rgba(75,156,211,0.12)',
+            border: '0.5px solid rgba(75,156,211,0.25)',
             borderRadius: '20px',
             padding: '4px 14px',
             marginBottom: '1.5rem',
@@ -807,12 +857,12 @@ export default async function HomePage() {
                 <div className="mkt-step-connector" style={{
                   position: 'absolute', left: '19px', top: '40px',
                   width: '2px', height: 'calc(100% - 16px)',
-                  background: 'rgba(232,160,32,0.15)',
+                  background: 'rgba(75,156,211,0.15)',
                 }} />
               )}
               <div style={{
                 width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(232,160,32,0.12)', border: '0.5px solid rgba(232,160,32,0.3)',
+                background: 'rgba(75,156,211,0.12)', border: '0.5px solid rgba(75,156,211,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '15px', fontWeight: 800, color: 'var(--accent)',
               }}>{step.n}</div>
@@ -871,7 +921,9 @@ export default async function HomePage() {
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight reverse">
           <div className="mkt-spotlight-img">
-            <PhoneMockup src="/screenshot-fairness.png" alt="Playing time view" />
+            <BrowserMockup caption="By-position view — full season stats per player">
+              <ByPositionDemo />
+            </BrowserMockup>
           </div>
           <div className="mkt-spotlight-text">
             <div style={{
@@ -882,13 +934,14 @@ export default async function HomePage() {
               Be fair to every kid —<br />and prove it.
             </h2>
             <p style={{ fontSize: '15px', lineHeight: 1.7, color: `rgba(var(--fg-rgb), 0.6)`, marginBottom: '1.5rem' }}>
-              See bench time and innings by position for every player, every game, all season. Set targets and get flagged before anyone's being overlooked — so you're ahead of the conversation, not responding to it after the game.
+              Every player gets a card showing their field heat map, bench percentage, top positions, innings pitched, and pitch count — all season, at a glance. Set targets and get flagged before anyone's being overlooked.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
-                'Bench % tracked per player, per game, all season',
+                'Field heat map shows where each player actually spends innings',
+                'Bench %, field/bench split, and top positions in one card',
+                'Innings pitched and pitch count for your pitchers',
                 'Set an innings target and track progress toward it',
-                'Check fairness before building the next lineup',
                 'Per-game breakdown: who played where and when',
               ].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -1064,7 +1117,7 @@ export default async function HomePage() {
 
               <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', margin: '12px 0 8px' }}>Bracket</div>
               <div style={{
-                border: '1px dashed rgba(232,160,32,0.35)', borderRadius: '8px', padding: '10px 12px',
+                border: '1px dashed rgba(75,156,211,0.35)', borderRadius: '8px', padding: '10px 12px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 600 }}>Bracket Game 1</span>
@@ -1311,8 +1364,8 @@ export default async function HomePage() {
           <span style={{
             display: 'inline-block', fontSize: '11px', fontWeight: 700,
             letterSpacing: '0.08em', textTransform: 'uppercase',
-            color: 'var(--accent)', background: 'rgba(232,160,32,0.1)',
-            border: '0.5px solid rgba(232,160,32,0.25)',
+            color: 'var(--accent)', background: 'rgba(75,156,211,0.1)',
+            border: '0.5px solid rgba(75,156,211,0.25)',
             borderRadius: '20px', padding: '4px 14px',
           }}>
             Beta · limited spots available
@@ -1351,8 +1404,8 @@ export default async function HomePage() {
 
           {/* Pro */}
           <div style={{
-            background: 'rgba(232,160,32,0.05)',
-            border: '0.5px solid rgba(232,160,32,0.3)',
+            background: 'rgba(75,156,211,0.05)',
+            border: '0.5px solid rgba(75,156,211,0.3)',
             borderRadius: '12px', padding: '1.5rem',
             position: 'relative',
           }}>
@@ -1395,8 +1448,8 @@ export default async function HomePage() {
       {/* ── Bottom CTA ── */}
       <section className="mkt-wide" style={{ padding: '1rem 1.5rem 5rem' }}>
         <div style={{
-          background: 'rgba(232,160,32,0.07)',
-          border: '0.5px solid rgba(232,160,32,0.2)',
+          background: 'rgba(75,156,211,0.07)',
+          border: '0.5px solid rgba(75,156,211,0.2)',
           borderRadius: '14px',
           padding: '3rem 2rem',
           textAlign: 'center',
