@@ -123,7 +123,7 @@ export default function PitchingPage() {
     const upcomingGames  = (gameRows ?? []).filter((g: any) => g.status !== 'final')
     const finalizedGames = (gameRows ?? []).filter((g: any) => g.status === 'final')
     setUpcoming(upcomingGames)
-    setFinalized([...finalizedGames].reverse())
+    setFinalized(finalizedGames)
 
     // Load pitcher plans + lineup data for upcoming games
     const upcomingIds = upcomingGames.map((g: any) => g.id)
@@ -428,9 +428,146 @@ export default function PitchingPage() {
 
       {!loading && (
         <>
+          {/* ── UPCOMING ── */}
+          {upcoming.length > 0 && (
+            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                }}>
+                  Upcoming
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    onClick={() => setSlotCount(c => Math.max(1, c - 1))}
+                    disabled={slotCount <= 1}
+                    style={{
+                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                      background: 'transparent', cursor: slotCount <= 1 ? 'not-allowed' : 'pointer',
+                      color: slotCount <= 1 ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                    }}
+                  >−</button>
+                  <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, minWidth: 48, textAlign: 'center' }}>
+                    {slotCount} pitcher{slotCount !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={() => setSlotCount(c => Math.min(MAX_SLOTS, c + 1))}
+                    disabled={slotCount >= MAX_SLOTS}
+                    style={{
+                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                      background: 'transparent', cursor: slotCount >= MAX_SLOTS ? 'not-allowed' : 'pointer',
+                      color: slotCount >= MAX_SLOTS ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                    }}
+                  >+</button>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: upcomingGrid,
+                  gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
+                }}>
+                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
+                  {Array.from({ length: slotCount }, (_, i) => (
+                    <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
+                  ))}
+                </div>
+
+                {upcoming.map((game, idx) => {
+                  const gamePlans = plans[game.id] ?? {}
+                  return (
+                    <div key={game.id} style={{
+                      display: 'grid', gridTemplateColumns: upcomingGrid,
+                      gap: '6px', minWidth: upcomingMinW,
+                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
+                      borderRadius: '8px', padding: '10px',
+                      marginBottom: '4px', alignItems: 'center',
+                      border: '0.5px solid var(--border-subtle)',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
+                          vs {game.opponent}
+                        </div>
+                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                          {formatDate(game.game_date)}
+                          {game.location ? ` · ${game.location}` : ''}
+                        </div>
+                        {lineupPitchers[game.id]?.length > 0 && (
+                          <button
+                            onClick={() => syncFromLineup(game.id)}
+                            style={{
+                              marginTop: '5px', fontSize: '9px', fontWeight: 700,
+                              padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
+                              border: '0.5px solid var(--border-md)',
+                              background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`,
+                            }}
+                          >
+                            ↓ from lineup
+                          </button>
+                        )}
+                      </div>
+
+                      {Array.from({ length: slotCount }, (_, i) => {
+                        const slot = i + 1
+                        const plan = gamePlans[slot]
+                        const isSaving = saving === `${game.id}-${slot}`
+
+                        let restWarning: { label: string; color: string } | null = null
+                        if (plan?.player_id) {
+                          const effLast = effectiveLastPitched(plan.player_id, game.game_date)
+                          if (effLast) {
+                            const days = Math.round(
+                              (new Date(game.game_date + 'T12:00:00').getTime() -
+                               new Date(effLast + 'T12:00:00').getTime()) / 86400000
+                            )
+                            if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
+                            else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+                          }
+                        }
+
+                        return (
+                          <div key={slot}>
+                            <select
+                              value={plan?.player_id ?? ''}
+                              onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
+                              disabled={isSaving}
+                              style={{
+                                ...CELL_SEL,
+                                opacity: isSaving ? 0.5 : 1,
+                                borderColor: restWarning ? restWarning.color : undefined,
+                              }}
+                            >
+                              <option value="">—</option>
+                              {players.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  #{p.jersey_number} {p.last_name}{daysRest(effectiveLastPitched(p.id, game.game_date), game.game_date)}
+                                </option>
+                              ))}
+                            </select>
+                            {restWarning && (
+                              <div style={{
+                                fontSize: '9px', fontWeight: 700, textAlign: 'center',
+                                marginTop: '2px', color: restWarning.color,
+                              }}>
+                                {restWarning.label}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ── PAST GAMES ── */}
           {finalized.length > 0 && (
-            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
+            <div style={{ marginTop: upcoming.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
                 <div style={{
                   fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
@@ -557,144 +694,6 @@ export default function PitchingPage() {
             </div>
           )}
 
-          {/* ── UPCOMING ── */}
-          {upcoming.length > 0 && (
-            <div style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{
-                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
-                }}>
-                  Upcoming
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button
-                    onClick={() => setSlotCount(c => Math.max(1, c - 1))}
-                    disabled={slotCount <= 1}
-                    style={{
-                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
-                      background: 'transparent', cursor: slotCount <= 1 ? 'not-allowed' : 'pointer',
-                      color: slotCount <= 1 ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
-                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                    }}
-                  >−</button>
-                  <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, minWidth: 48, textAlign: 'center' }}>
-                    {slotCount} pitcher{slotCount !== 1 ? 's' : ''}
-                  </span>
-                  <button
-                    onClick={() => setSlotCount(c => Math.min(MAX_SLOTS, c + 1))}
-                    disabled={slotCount >= MAX_SLOTS}
-                    style={{
-                      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
-                      background: 'transparent', cursor: slotCount >= MAX_SLOTS ? 'not-allowed' : 'pointer',
-                      color: slotCount >= MAX_SLOTS ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
-                      fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                    }}
-                  >+</button>
-                </div>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <div style={{
-                  display: 'grid', gridTemplateColumns: upcomingGrid,
-                  gap: '6px', marginBottom: '4px', minWidth: upcomingMinW, padding: '0 2px',
-                }}>
-                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {Array.from({ length: slotCount }, (_, i) => (
-                    <div key={i + 1} style={HEADER_STYLE}>P{i + 1}</div>
-                  ))}
-                </div>
-
-                {upcoming.map((game, idx) => {
-                  const gamePlans = plans[game.id] ?? {}
-                  return (
-                    <div key={game.id} style={{
-                      display: 'grid', gridTemplateColumns: upcomingGrid,
-                      gap: '6px', minWidth: upcomingMinW,
-                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
-                      borderRadius: '8px', padding: '10px',
-                      marginBottom: '4px', alignItems: 'center',
-                      border: '0.5px solid var(--border-subtle)',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
-                          vs {game.opponent}
-                        </div>
-                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-                          {formatDate(game.game_date)}
-                          {game.location ? ` · ${game.location}` : ''}
-                        </div>
-                        {lineupPitchers[game.id]?.length > 0 && (
-                          <button
-                            onClick={() => syncFromLineup(game.id)}
-                            style={{
-                              marginTop: '5px', fontSize: '9px', fontWeight: 700,
-                              padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
-                              border: '0.5px solid var(--border-md)',
-                              background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`,
-                            }}
-                          >
-                            ↓ from lineup
-                          </button>
-                        )}
-                      </div>
-
-                      {Array.from({ length: slotCount }, (_, i) => {
-                        const slot = i + 1
-                        const plan = gamePlans[slot]
-                        const isSaving = saving === `${game.id}-${slot}`
-
-                        // Rest-day warning for the planned pitcher — uses effective last pitched
-                        // (accounts for final games, scheduled game actuals, and earlier upcoming plans)
-                        let restWarning: { label: string; color: string } | null = null
-                        if (plan?.player_id) {
-                          const effLast = effectiveLastPitched(plan.player_id, game.game_date)
-                          if (effLast) {
-                            const days = Math.round(
-                              (new Date(game.game_date + 'T12:00:00').getTime() -
-                               new Date(effLast + 'T12:00:00').getTime()) / 86400000
-                            )
-                            if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
-                            else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
-                          }
-                        }
-
-                        return (
-                          <div key={slot}>
-                            <select
-                              value={plan?.player_id ?? ''}
-                              onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
-                              disabled={isSaving}
-                              style={{
-                                ...CELL_SEL,
-                                opacity: isSaving ? 0.5 : 1,
-                                borderColor: restWarning ? restWarning.color : undefined,
-                              }}
-                            >
-                              <option value="">—</option>
-                              {players.map(p => (
-                                <option key={p.id} value={p.id}>
-                                  #{p.jersey_number} {p.last_name}{daysRest(effectiveLastPitched(p.id, game.game_date), game.game_date)}
-                                </option>
-                              ))}
-                            </select>
-                            {restWarning && (
-                              <div style={{
-                                fontSize: '9px', fontWeight: 700, textAlign: 'center',
-                                marginTop: '2px', color: restWarning.color,
-                              }}>
-                                {restWarning.label}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
           {/* ── SEASON TOTALS ── */}
           {seasonTotalsList.length > 0 && (
             <div style={{ marginTop: '1.75rem' }}>
