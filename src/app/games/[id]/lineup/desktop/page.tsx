@@ -27,16 +27,16 @@ const POS_KEY: Record<string, string> = {
 const POS_COLOR: Record<string, { bg: string; color: string }> = {
   P:    { bg: 'rgba(75,156,211,0.22)',   color: '#4B9CD3' },
   C:    { bg: 'rgba(192,80,120,0.22)', color: '#E090B0' },
-  '1B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
-  '2B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
-  SS:   { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
-  '3B': { bg: 'rgba(59,109,177,0.22)', color: '#80B0E8' },
-  LF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
-  CF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
-  LC:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
-  RC:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
-  RF:   { bg: 'rgba(45,106,53,0.22)',  color: '#6DB875' },
-  Bench:{ bg: 'rgba(120,120,120,0.1)', color: 'rgba(160,160,160,0.75)' },
+  '1B': { bg: 'transparent', color: '#80B0E8' },
+  '2B': { bg: 'transparent', color: '#80B0E8' },
+  SS:   { bg: 'transparent', color: '#80B0E8' },
+  '3B': { bg: 'transparent', color: '#80B0E8' },
+  LF:   { bg: 'transparent', color: '#6DB875' },
+  CF:   { bg: 'transparent', color: '#6DB875' },
+  LC:   { bg: 'transparent', color: '#6DB875' },
+  RC:   { bg: 'transparent', color: '#6DB875' },
+  RF:   { bg: 'transparent', color: '#6DB875' },
+  Bench:{ bg: 'transparent', color: 'rgba(160,160,160,0.75)' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1393,16 +1393,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               </div>
             </div>
           )}
-        </div>
 
-        {/* ── RIGHT: Context ── */}
-        <div style={{
-          width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
-          overflowY: 'auto', padding: 12,
-        }}>
-          {/* Game notes */}
-          <div style={{ marginBottom: 10, padding: '7px 9px', borderRadius: 6,
-            background: 'var(--bg-card)', border: '0.5px solid var(--border)' }}>
+          {/* Game notes — below the palette */}
+          <div style={{ padding: '8px 14px 10px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
                 color: `rgba(var(--fg-rgb),0.3)`, textTransform: 'uppercase' }}>Notes</span>
@@ -1412,7 +1405,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               value={gameNotes}
               onChange={e => handleNotesChange(e.target.value)}
               placeholder="e.g. Connor hurt his arm…"
-              rows={3}
+              rows={2}
               style={{
                 width: '100%', padding: '5px 7px', borderRadius: 5,
                 border: '0.5px solid var(--border-md)',
@@ -1422,6 +1415,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               }}
             />
           </div>
+        </div>
+
+        {/* ── RIGHT: Context ── */}
+        <div style={{
+          width: 186, flexShrink: 0, borderLeft: '1px solid var(--border)',
+          overflowY: 'auto', padding: 12,
+        }}>
           {/* Player position history — shown when a cell is focused */}
           {focused && (() => {
             const focusedSlot = activeSlots[focused.si]
