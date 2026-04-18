@@ -19,6 +19,10 @@ export default function NewGamePage() {
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<'free' | 'pro'>('free')
   const [gameCount, setGameCount] = useState(0)
+  const [pendingGameId, setPendingGameId] = useState<string | null>(null)
+  const [prevGameForBatting, setPrevGameForBatting] = useState<{ id: string; opponent: string; game_date: string } | null>(null)
+  const [battingModalOpen, setBattingModalOpen] = useState(false)
+  const [creatingSlots, setCreatingSlots] = useState(false)
   const [form, setForm] = useState({
     opponent: '',
     game_date: new Date().toISOString().split('T')[0],
@@ -115,17 +119,83 @@ export default function NewGamePage() {
     }
 
     if (players.length > 0) {
-      const slots = players.map((p, i) => ({
-        game_id: game.id,
-        player_id: p.id,
-        batting_order: i + 1,
-        availability: 'available',
-        inning_positions: [null, null, null, null, null, null, null, null, null],
-      }))
-      await supabase.from('lineup_slots').insert(slots)
+      // Check if any previous game has slots — if so, ask about batting order
+      const { data: recentGames } = await supabase
+        .from('games')
+        .select('id, opponent, game_date')
+        .eq('season_id', season.id)
+        .neq('id', game.id)
+        .not('game_date', 'is', null)
+        .order('game_date', { ascending: false })
+        .limit(5)
+
+      let prevWithSlots: { id: string; opponent: string; game_date: string } | null = null
+      for (const pg of recentGames ?? []) {
+        const { count } = await supabase
+          .from('lineup_slots')
+          .select('id', { count: 'exact', head: true })
+          .eq('game_id', pg.id)
+        if ((count ?? 0) > 0) { prevWithSlots = pg; break }
+      }
+
+      if (prevWithSlots) {
+        setPendingGameId(game.id)
+        setPrevGameForBatting(prevWithSlots)
+        setBattingModalOpen(true)
+        setSaving(false)
+        return
+      }
+
+      // No previous game — use roster order
+      await supabase.from('lineup_slots').insert(
+        players.map((p, i) => ({
+          game_id: game.id, player_id: p.id,
+          batting_order: i + 1, availability: 'available',
+          inning_positions: [null, null, null, null, null, null, null, null, null],
+        }))
+      )
     }
 
     router.push(`/games/${game.id}`)
+  }
+
+  async function handleBattingChoice(choice: 'last' | 'roster') {
+    if (!pendingGameId || !season) return
+    setBattingModalOpen(false)
+    setCreatingSlots(true)
+
+    if (choice === 'last' && prevGameForBatting) {
+      const { data: lastSlots } = await supabase
+        .from('lineup_slots')
+        .select('player_id, batting_order')
+        .eq('game_id', prevGameForBatting.id)
+        .order('batting_order', { ascending: true, nullsFirst: false })
+
+      const lastOrderMap = new Map((lastSlots ?? []).map((s: any) => [s.player_id, s.batting_order]))
+      const sorted = [...players].sort((a, b) => {
+        const ao = lastOrderMap.get(a.id) ?? 999
+        const bo = lastOrderMap.get(b.id) ?? 999
+        if (ao !== bo) return ao - bo
+        return (a.batting_pref_order ?? 99) - (b.batting_pref_order ?? 99)
+      })
+      await supabase.from('lineup_slots').insert(
+        sorted.map((p, i) => ({
+          game_id: pendingGameId, player_id: p.id,
+          batting_order: i + 1, availability: 'available',
+          inning_positions: [null, null, null, null, null, null, null, null, null],
+        }))
+      )
+    } else {
+      await supabase.from('lineup_slots').insert(
+        players.map((p, i) => ({
+          game_id: pendingGameId, player_id: p.id,
+          batting_order: i + 1, availability: 'available',
+          inning_positions: [null, null, null, null, null, null, null, null, null],
+        }))
+      )
+    }
+
+    router.push(`/games/${pendingGameId}`)
   }
 
   if (loading) return (
@@ -261,6 +331,67 @@ export default function NewGamePage() {
       }}>
         {saving ? 'Creating…' : 'Create game'}
       </button>
+
+      {/* Batting order choice modal */}
+      {battingModalOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+            zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            background: 'var(--bg2)', borderRadius: '14px', padding: '1.5rem',
+            width: '340px', maxWidth: '92vw', border: '0.5px solid var(--border)',
+          }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '6px' }}>
+              Starting batting order
+            </div>
+            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb),0.45)`, marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              How should the initial batting order be set?
+              {prevGameForBatting && (
+                <span style={{ display: 'block', marginTop: '4px', color: `rgba(var(--fg-rgb),0.6)`, fontStyle: 'italic' }}>
+                  Last game: vs {prevGameForBatting.opponent} ·{' '}
+                  {new Date(prevGameForBatting.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => handleBattingChoice('last')}
+                disabled={creatingSlots}
+                style={{
+                  flex: 1, padding: '14px 8px', borderRadius: '10px', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 600, textAlign: 'center',
+                  border: '1.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb),0.85)`, opacity: creatingSlots ? 0.5 : 1,
+                }}
+              >
+                <div style={{ fontSize: '22px', marginBottom: '6px' }}>↩</div>
+                Last game order
+              </button>
+              <button
+                onClick={() => handleBattingChoice('roster')}
+                disabled={creatingSlots}
+                style={{
+                  flex: 1, padding: '14px 8px', borderRadius: '10px', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 600, textAlign: 'center',
+                  border: '1.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb),0.85)`, opacity: creatingSlots ? 0.5 : 1,
+                }}
+              >
+                <div style={{ fontSize: '22px', marginBottom: '6px' }}>📋</div>
+                Roster order
+              </button>
+            </div>
+            {creatingSlots && (
+              <div style={{ textAlign: 'center', fontSize: '12px', color: `rgba(var(--fg-rgb),0.4)`, marginTop: '12px' }}>
+                Creating lineup…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
