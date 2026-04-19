@@ -64,7 +64,7 @@ export default async function TournamentPage({ params }: { params: { id: string 
       }}>
         {/* Header row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          marginBottom: isPlaceholder ? '12px' : 0 }}>
+          marginBottom: isPlaceholder ? '10px' : 0 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '15px', fontWeight: 600 }}>
@@ -87,12 +87,21 @@ export default async function TournamentPage({ params }: { params: { id: string 
               {game.location ? ` · ${game.location}` : ''}
             </div>
           </div>
-          {!isPlaceholder && (
+          {isPlaceholder ? (
+            <Link href={`/games/${game.id}`} style={{
+              fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)`, textDecoration: 'none',
+              padding: '4px 10px', borderRadius: '6px',
+              border: '0.5px solid var(--border-md)',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              Lineup →
+            </Link>
+          ) : (
             <Link href={`/games/${game.id}`} style={{
               fontSize: '12px', color: 'var(--accent)', textDecoration: 'none',
               padding: '4px 10px', borderRadius: '6px',
               border: '0.5px solid rgba(232,160,32,0.3)',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', flexShrink: 0,
             }}>
               View →
             </Link>
@@ -123,6 +132,37 @@ export default async function TournamentPage({ params }: { params: { id: string 
         <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)` }}>
           {formatDateRange(tournament.start_date, tournament.end_date)}
           {(tournament.season as any)?.team?.name ? ` · ${(tournament.season as any).team.name}` : ''}
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div style={{
+        background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+        borderRadius: '10px', padding: '14px 16px', marginBottom: '1.5rem',
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '10px' }}>
+          How this works
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {[
+            { n: '1', label: 'Add placeholder games', body: 'Use the buttons below to add slots for pool play and bracket rounds — before the schedule is confirmed.' },
+            { n: '2', label: 'Build lineups now', body: 'Tap "Lineup →" on any slot to start building. You don\'t need to know your opponent yet — the roster and innings are all there.' },
+            { n: '3', label: 'Swap when the bracket drops', body: 'Once you have real game details from GameChanger, tap "Swap with imported game." Your lineup carries over automatically.' },
+          ].map(({ n, label, body }) => (
+            <div key={n} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                background: 'rgba(var(--fg-rgb), 0.07)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '10px', fontWeight: 800, color: `rgba(var(--fg-rgb), 0.4)`,
+              }}>{n}</div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)`, lineHeight: 1.5 }}>{body}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
