@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../lib/supabase'
 import { setSelectedTeamId } from '../../lib/selectedTeam'
 
@@ -61,10 +61,19 @@ export default function PitchingPage() {
   const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
+  const didScrollRef = useRef(false)
 
   useEffect(() => { init() }, [])
   useEffect(() => {
+    if (!loading && !didScrollRef.current) {
+      didScrollRef.current = true
+      const el = document.getElementById('pitching-upcoming-anchor')
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: 'instant' })
+    }
+  }, [loading])
+  useEffect(() => {
     if (!selectedSeasonId) return
+    didScrollRef.current = false
     loadSeason(selectedSeasonId)
     // Persist selected team across all pages when season changes
     const season = seasons.find(s => s.id === selectedSeasonId)
@@ -428,9 +437,135 @@ export default function PitchingPage() {
 
       {!loading && (
         <>
+          {/* ── PAST GAMES ── */}
+          {finalized.length > 0 && (
+            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                <div style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
+                }}>
+                  Past games
+                </div>
+                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)` }}>
+                  tap pitch count to edit
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                {/* Column headers */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: pastGrid,
+                  gap: '6px', marginBottom: '4px', padding: '0 2px',
+                }}>
+                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
+                  {Array.from({ length: maxActualPitchers }, (_, i) => (
+                    <div key={i} style={HEADER_STYLE}>P{i + 1}</div>
+                  ))}
+                </div>
+
+                {finalized.map((game, idx) => {
+                  const pitchers = actualPitching[game.id] ?? []
+                  return (
+                    <div key={game.id} style={{
+                      display: 'grid', gridTemplateColumns: pastGrid,
+                      gap: '6px',
+                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
+                      borderRadius: '8px', padding: '10px',
+                      marginBottom: '4px', alignItems: 'start',
+                      border: '0.5px solid var(--border-subtle)',
+                    }}>
+                      {/* Game info */}
+                      <div style={{ paddingTop: '2px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
+                          vs {game.opponent}
+                        </div>
+                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
+                          {formatDate(game.game_date)}
+                        </div>
+                      </div>
+
+                      {/* Pitcher cells */}
+                      {Array.from({ length: maxActualPitchers }, (_, i) => {
+                        const p = pitchers[i]
+                        if (!p) return (
+                          <div key={i} style={{ textAlign: 'center', paddingTop: '2px' }}>
+                            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</div>
+                          </div>
+                        )
+
+                        const draftKey = p.slotId
+                        const isDrafting = draftKey in editingPitch
+                        const draftVal = editingPitch[draftKey] ?? ''
+                        const overLimit = pitchLimit != null && p.pitchCount != null && p.pitchCount > pitchLimit
+
+                        return (
+                          <div key={i} style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2, marginBottom: '2px' }}>
+                              {shortName(p.player)}
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, marginBottom: '3px' }}>
+                              {p.innings} inn
+                            </div>
+                            {isDrafting ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={draftVal}
+                                autoFocus
+                                onChange={e => setEditingPitch(prev => ({
+                                  ...prev, [draftKey]: e.target.value.replace(/\D/g, ''),
+                                }))}
+                                onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                  if (e.key === 'Escape') {
+                                    setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
+                                  }
+                                }}
+                                style={{
+                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
+                                  border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
+                                  color: 'var(--fg)', fontSize: '11px', textAlign: 'center',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingPitch(prev => ({
+                                  ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '',
+                                }))}
+                                title={overLimit ? `Exceeds ${pitchLimit}p limit` : undefined}
+                                style={{
+                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
+                                  border: overLimit
+                                    ? '0.5px solid rgba(232,112,96,0.6)'
+                                    : p.pitchCount != null
+                                      ? '0.5px solid var(--border-md)'
+                                      : '0.5px dashed var(--border-md)',
+                                  background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
+                                  color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
+                                  fontSize: '11px', cursor: 'pointer',
+                                  textAlign: 'center', fontWeight: overLimit ? 700 : 400,
+                                }}
+                              >
+                                {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ── UPCOMING ── */}
           {upcoming.length > 0 && (
-            <div style={{ marginTop: seasons.length <= 1 ? '1rem' : 0 }}>
+            <div id="pitching-upcoming-anchor" style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{
                   fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
@@ -554,135 +689,6 @@ export default function PitchingPage() {
                               }}>
                                 {restWarning.label}
                               </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ── PAST GAMES ── */}
-          {finalized.length > 0 && (
-            <div style={{ marginTop: upcoming.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-                <div style={{
-                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
-                }}>
-                  Past games
-                </div>
-                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.25)` }}>
-                  tap pitch count to edit
-                </div>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                {/* Column headers */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: pastGrid,
-                  gap: '6px', marginBottom: '4px', padding: '0 2px',
-                }}>
-                  <div style={{ ...HEADER_STYLE, textAlign: 'left' }}>Game</div>
-                  {Array.from({ length: maxActualPitchers }, (_, i) => (
-                    <div key={i} style={HEADER_STYLE}>P{i + 1}</div>
-                  ))}
-                </div>
-
-                {finalized.map((game, idx) => {
-                  const pitchers = actualPitching[game.id] ?? []
-                  return (
-                    <div key={game.id} style={{
-                      display: 'grid', gridTemplateColumns: pastGrid,
-                      gap: '6px',
-                      background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-alt)',
-                      borderRadius: '8px', padding: '10px',
-                      marginBottom: '4px', alignItems: 'start',
-                      border: '0.5px solid var(--border-subtle)',
-                    }}>
-                      {/* Game info */}
-                      <div style={{ paddingTop: '2px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
-                          vs {game.opponent}
-                        </div>
-                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-                          {formatDate(game.game_date)}
-                        </div>
-                      </div>
-
-                      {/* Pitcher cells — as many as pitched */}
-                      {Array.from({ length: maxActualPitchers }, (_, i) => {
-                        const p = pitchers[i]
-                        if (!p) return (
-                          <div key={i} style={{ textAlign: 'center', paddingTop: '2px' }}>
-                            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.2)` }}>—</div>
-                          </div>
-                        )
-
-                        const draftKey = p.slotId
-                        const isDrafting = draftKey in editingPitch
-                        const draftVal = editingPitch[draftKey] ?? ''
-                        const overLimit = pitchLimit != null && p.pitchCount != null && p.pitchCount > pitchLimit
-
-                        return (
-                          <div key={i} style={{ textAlign: 'center' }}>
-                            {/* Name */}
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2, marginBottom: '2px' }}>
-                              {shortName(p.player)}
-                            </div>
-                            {/* Innings */}
-                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, marginBottom: '3px' }}>
-                              {p.innings} inn
-                            </div>
-                            {/* Pitch count — editable */}
-                            {isDrafting ? (
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={draftVal}
-                                autoFocus
-                                onChange={e => setEditingPitch(prev => ({
-                                  ...prev, [draftKey]: e.target.value.replace(/\D/g, ''),
-                                }))}
-                                onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                                  if (e.key === 'Escape') {
-                                    setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
-                                  }
-                                }}
-                                style={{
-                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
-                                  border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
-                                  color: 'var(--fg)', fontSize: '11px', textAlign: 'center',
-                                  boxSizing: 'border-box',
-                                }}
-                              />
-                            ) : (
-                              <button
-                                onClick={() => setEditingPitch(prev => ({
-                                  ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '',
-                                }))}
-                                title={overLimit ? `Exceeds ${pitchLimit}p limit` : undefined}
-                                style={{
-                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
-                                  border: overLimit
-                                    ? '0.5px solid rgba(232,112,96,0.6)'
-                                    : p.pitchCount != null
-                                      ? '0.5px solid var(--border-md)'
-                                      : '0.5px dashed var(--border-md)',
-                                  background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
-                                  color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
-                                  fontSize: '11px', cursor: 'pointer',
-                                  textAlign: 'center', fontWeight: overLimit ? 700 : 400,
-                                }}
-                              >
-                                {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
-                              </button>
                             )}
                           </div>
                         )
