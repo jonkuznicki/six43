@@ -7,14 +7,14 @@ import { createServerClient } from '../lib/supabase-server'
 const DEMO_POS: Record<string, { bg: string; fg: string }> = {
   P:    { bg: 'rgba(75,156,211,0.22)',  fg: '#4B9CD3' },
   C:    { bg: 'rgba(192,80,120,0.22)', fg: '#E090B0' },
-  '1B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
-  '2B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
-  SS:   { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
-  '3B': { bg: 'rgba(59,109,177,0.22)', fg: '#80B0E8' },
-  LF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
-  CF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
-  RF:   { bg: 'rgba(45,106,53,0.22)',  fg: '#6DB875' },
-  Bnch: { bg: 'rgba(120,120,120,0.1)', fg: 'rgba(160,160,160,0.55)' },
+  '1B': { bg: 'transparent', fg: '#80B0E8' },
+  '2B': { bg: 'transparent', fg: '#80B0E8' },
+  SS:   { bg: 'transparent', fg: '#80B0E8' },
+  '3B': { bg: 'transparent', fg: '#80B0E8' },
+  LF:   { bg: 'transparent', fg: '#6DB875' },
+  CF:   { bg: 'transparent', fg: '#6DB875' },
+  RF:   { bg: 'transparent', fg: '#6DB875' },
+  Bnch: { bg: 'transparent', fg: 'rgba(160,160,160,0.55)' },
 }
 
 const DEMO_PLAYERS = [
@@ -317,7 +317,7 @@ function FullDesktopLineupEditor() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
               <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginRight: 2 }}>Fill:</span>
               {palette.map(pos => {
-                const c = DEMO_POS[pos] ?? { bg: 'rgba(120,120,120,0.1)', fg: 'rgba(255,255,255,0.3)' }
+                const c = DEMO_POS[pos] ?? { bg: 'transparent', fg: 'rgba(255,255,255,0.3)' }
                 const active = pos === 'SS'
                 return (
                   <div key={pos} style={{
@@ -331,18 +331,19 @@ function FullDesktopLineupEditor() {
               })}
             </div>
           </div>
+
+          {/* Notes — below palette */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '5px 8px 6px', background: 'rgba(255,255,255,0.01)', flexShrink: 0 }}>
+            <div style={{ fontSize: 6, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', marginBottom: 2 }}>Notes</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
+          </div>
         </div>
 
-        {/* Right panel: notes + inning snapshot */}
+        {/* Right panel: inning snapshot */}
         <div style={{
           width: 108, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.07)',
           display: 'flex', flexDirection: 'column', overflowY: 'hidden',
         }}>
-          {/* Notes */}
-          <div style={{ padding: '6px 7px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', marginBottom: 3 }}>Notes</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.28)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
-          </div>
           {/* Inning snapshot */}
           <div style={{ padding: '6px 7px', flex: 1, overflowY: 'hidden' }}>
             <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 4 }}>
@@ -419,15 +420,15 @@ function BrowserMockupLight({ children, caption }: { children: React.ReactNode; 
 const LIGHT_POS: Record<string, { bg: string; fg: string }> = {
   P:     { bg: 'rgba(75,156,211,0.2)',   fg: '#2B7AB5' },
   C:     { bg: 'rgba(192,80,120,0.18)',  fg: '#A03060' },
-  '1B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
-  '2B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
-  SS:    { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
-  '3B':  { bg: 'rgba(59,109,177,0.18)',  fg: '#2A5A9E' },
-  LF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
-  CF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
-  RF:    { bg: 'rgba(45,106,53,0.18)',   fg: '#2A6633' },
-  Bnch:  { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' },
-  Bench: { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(20,40,65,0.4)' },
+  '1B':  { bg: 'transparent', fg: '#2A5A9E' },
+  '2B':  { bg: 'transparent', fg: '#2A5A9E' },
+  SS:    { bg: 'transparent', fg: '#2A5A9E' },
+  '3B':  { bg: 'transparent', fg: '#2A5A9E' },
+  LF:    { bg: 'transparent', fg: '#2A6633' },
+  CF:    { bg: 'transparent', fg: '#2A6633' },
+  RF:    { bg: 'transparent', fg: '#2A6633' },
+  Bnch:  { bg: 'transparent', fg: 'rgba(20,40,65,0.4)' },
+  Bench: { bg: 'transparent', fg: 'rgba(20,40,65,0.4)' },
 }
 
 function FullDesktopLineupEditorLight() {
@@ -541,7 +542,7 @@ function FullDesktopLineupEditorLight() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
               <span style={{ fontSize: 7, color: 'rgba(11,31,58,0.3)', marginRight: 2 }}>Fill:</span>
               {palette.map(pos => {
-                const c = LIGHT_POS[pos] ?? { bg: 'rgba(120,120,120,0.08)', fg: 'rgba(11,31,58,0.4)' }
+                const c = LIGHT_POS[pos] ?? { bg: 'transparent', fg: 'rgba(11,31,58,0.4)' }
                 const active = pos === 'SS'
                 return (
                   <div key={pos} style={{
@@ -555,17 +556,19 @@ function FullDesktopLineupEditorLight() {
               })}
             </div>
           </div>
+
+          {/* Notes — below palette */}
+          <div style={{ borderTop: '1px solid rgba(11,31,58,0.07)', padding: '5px 8px 6px', background: 'rgba(11,31,58,0.015)', flexShrink: 0 }}>
+            <div style={{ fontSize: 6, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(11,31,58,0.25)', marginBottom: 2 }}>Notes</div>
+            <div style={{ fontSize: 7, color: 'rgba(11,31,58,0.4)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
+          </div>
         </div>
 
-        {/* Right panel */}
+        {/* Right panel — inning snapshot only */}
         <div style={{
           width: 108, flexShrink: 0, borderLeft: '1px solid rgba(11,31,58,0.08)',
           display: 'flex', flexDirection: 'column', overflowY: 'hidden',
         }}>
-          <div style={{ padding: '6px 7px', borderBottom: '1px solid rgba(11,31,58,0.06)' }}>
-            <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(11,31,58,0.25)', marginBottom: 3 }}>Notes</div>
-            <div style={{ fontSize: 7, color: 'rgba(11,31,58,0.4)', lineHeight: 1.4 }}>Jake pitching first 3. Watch Ryan's hamstring.</div>
-          </div>
           <div style={{ padding: '6px 7px', flex: 1, overflowY: 'hidden' }}>
             <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(11,31,58,0.28)', marginBottom: 4 }}>
               Inning 4
@@ -920,9 +923,9 @@ export default async function HomePage() {
       {/* ── Spotlight 2: Playing time ── */}
       <section className="mkt-wide" style={{ padding: '3.5rem 1.5rem' }}>
         <div className="mkt-spotlight reverse">
-          <div className="mkt-spotlight-img">
-            <BrowserMockup caption="By-position view — full season stats per player">
-              <ByPositionDemo />
+          <div className="mkt-spotlight-img" style={{ maxWidth: '420px', width: '100%' }}>
+            <BrowserMockup caption="Full season — field heat map, bench %, pitch counts">
+              <FullDesktopLineupEditor />
             </BrowserMockup>
           </div>
           <div className="mkt-spotlight-text">
