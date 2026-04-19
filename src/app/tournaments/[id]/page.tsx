@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import SwapButton from './SwapButton'
 import AddSlotButtons from './AddSlotButtons'
+import HowItWorks from './HowItWorks'
+import DeleteTournamentButton from './DeleteTournamentButton'
 import { formatTime } from '../../../lib/formatTime'
 
 export const dynamic = 'force-dynamic'
@@ -135,36 +137,7 @@ export default async function TournamentPage({ params }: { params: { id: string 
         </div>
       </div>
 
-      {/* How it works */}
-      <div style={{
-        background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-        borderRadius: '10px', padding: '14px 16px', marginBottom: '1.5rem',
-      }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '10px' }}>
-          How this works
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {[
-            { n: '1', label: 'Add placeholder games', body: 'Use the buttons below to add slots for pool play and bracket rounds — before the schedule is confirmed.' },
-            { n: '2', label: 'Build lineups now', body: 'Tap "Lineup →" on any slot to start building. You don\'t need to know your opponent yet — the roster and innings are all there.' },
-            { n: '3', label: 'Swap when the bracket drops', body: 'Once you have real game details from GameChanger, tap "Swap with imported game." Your lineup carries over automatically.' },
-          ].map(({ n, label, body }) => (
-            <div key={n} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <div style={{
-                width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                background: 'rgba(var(--fg-rgb), 0.07)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '10px', fontWeight: 800, color: `rgba(var(--fg-rgb), 0.4)`,
-              }}>{n}</div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
-                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.5)`, lineHeight: 1.5 }}>{body}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <HowItWorks />
 
       {/* Pool play section */}
       {poolGames.length > 0 && (
@@ -204,6 +177,10 @@ export default async function TournamentPage({ params }: { params: { id: string 
         poolCount={poolGames.length}
         bracketCount={bracketGames.length}
       />
+
+      <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '0.5px solid var(--border)' }}>
+        <DeleteTournamentButton tournamentId={params.id} />
+      </div>
     </main>
   )
 }
