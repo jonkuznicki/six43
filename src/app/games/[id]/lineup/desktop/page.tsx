@@ -1350,54 +1350,82 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </div>
 
           {/* Position palette — below the grid */}
-          {!readOnly && (
-            <div style={{
-              padding: '8px 14px 10px', borderTop: '1px solid var(--border)',
-              background: 'var(--bg-card)', flexShrink: 0,
-              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, flexShrink: 0 }}>
-                {selectedCells.size > 0
-                  ? `Fill ${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}:`
-                  : 'Select cells, then fill:'}
+          {!readOnly && (() => {
+            // Derive single active inning from selected cells (null if multi-inning or none)
+            const selIiVals = [...selectedCells].map(k => parseInt(k.split('-')[1]))
+            const selSiVals = new Set([...selectedCells].map(k => parseInt(k.split('-')[0])))
+            const uniqueIi = [...new Set(selIiVals)]
+            const activeInning = uniqueIi.length === 1 ? uniqueIi[0] : null
+
+            // Positions already used in the active inning by non-selected players
+            const usedInInning = new Set<string>()
+            if (activeInning !== null) {
+              activeSlots.forEach((s, si) => {
+                if (selSiVals.has(si)) return
+                const pos = (s.inning_positions ?? [])[activeInning]
+                if (pos && pos !== 'Bench') usedInInning.add(pos)
+              })
+            }
+
+            return (
+              <div style={{
+                padding: '8px 14px 10px', borderTop: '1px solid var(--border)',
+                background: 'var(--bg-card)', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, flexShrink: 0 }}>
+                  {selectedCells.size > 0
+                    ? `Fill ${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}:`
+                    : 'Select cells, then fill:'}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {teamPositions.map(pos => {
+                    const isActive = activePos === pos
+                    const pc = POS_COLOR[pos]
+                    const sc = POS_KEY[pos]
+                    const isUsed = activeInning !== null && usedInInning.has(pos)
+                    const isAvailable = activeInning !== null && !isUsed && pos !== 'Bench'
+                    return (
+                      <button
+                        key={pos}
+                        onClick={() => { setActivePos(pos); fillSelected(pos) }}
+                        style={{
+                          padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, fontWeight: isUsed ? 400 : 700,
+                          border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : isAvailable ? (pc?.color ?? 'var(--border-md)') : 'var(--border-md)'}`,
+                          background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
+                          color: isActive
+                            ? (pc?.color ?? 'var(--fg)')
+                            : isUsed
+                              ? `rgba(var(--fg-rgb),0.2)`
+                              : isAvailable
+                                ? (pc?.color ?? 'var(--fg)')
+                                : `rgba(var(--fg-rgb),0.5)`,
+                          opacity: isUsed ? 0.5 : 1,
+                          boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
+                          textDecoration: isUsed ? 'line-through' : 'none',
+                        }}
+                      >
+                        {pos}
+                        {sc && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 500, lineHeight: 1,
+                            padding: '1px 3px', borderRadius: 3,
+                            background: isActive ? `rgba(0,0,0,0.18)` : `rgba(var(--fg-rgb),0.07)`,
+                            color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.38)`,
+                            fontFamily: 'ui-monospace, monospace',
+                          }}>
+                            {sc}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {teamPositions.map(pos => {
-                  const isActive = activePos === pos
-                  const pc = POS_COLOR[pos]
-                  const sc = POS_KEY[pos]
-                  return (
-                    <button
-                      key={pos}
-                      onClick={() => { setActivePos(pos); fillSelected(pos) }}
-                      style={{
-                        padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        fontSize: 11, fontWeight: 700,
-                        border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : 'var(--border-md)'}`,
-                        background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
-                        color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.5)`,
-                        boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
-                      }}
-                    >
-                      {pos}
-                      {sc && (
-                        <span style={{
-                          fontSize: 9, fontWeight: 500, lineHeight: 1,
-                          padding: '1px 3px', borderRadius: 3,
-                          background: isActive ? `rgba(0,0,0,0.18)` : `rgba(var(--fg-rgb),0.07)`,
-                          color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.38)`,
-                          fontFamily: 'ui-monospace, monospace',
-                        }}>
-                          {sc}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Game notes — below the palette */}
           <div style={{ padding: '8px 14px 10px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}>
