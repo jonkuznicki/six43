@@ -85,6 +85,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [pitchingHistory, setPitchingHistory] = useState<Record<string, {lastDate:string,lastInnings:number,daysSince:number}>>({})
   // selectedCells: Set of "si-ii" keys. Click = select only; palette/key = fill.
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
+  const [clipboard, setClipboard]         = useState<Array<{si: number; ii: number; pos: string | null}> | null>(null)
+  const [copiedKeys, setCopiedKeys]       = useState<Set<string>>(new Set())
   const [confirmClear, setConfirmClear] = useState(false)
   const [readOnly, setReadOnly]         = useState(false)
   const [locked, setLocked]             = useState(false)
@@ -736,6 +738,66 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return }
 
+      // Ctrl+C — copy positions from selected cells
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !e.shiftKey) {
+        if (selectedCellsRef.current.size > 0) {
+          e.preventDefault()
+          const active = slotsRef.current.filter(s => s.availability !== 'absent')
+          const copied = Array.from(selectedCellsRef.current)
+            .map(k => {
+              const [si, ii] = k.split('-').map(Number)
+              return { si, ii, pos: (active[si]?.inning_positions ?? [])[ii] ?? null }
+            })
+            .sort((a, b) => a.si - b.si || a.ii - b.ii)
+          setClipboard(copied)
+          setCopiedKeys(new Set(selectedCellsRef.current))
+        }
+        return
+      }
+
+      // Ctrl+V — paste clipboard into selected cells (matched by row index within each inning)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !e.shiftKey) {
+        const clip = clipboard
+        if (clip && selectedCellsRef.current.size > 0) {
+          e.preventDefault()
+          const active = slotsRef.current.filter(s => s.availability !== 'absent')
+
+          // Group target cells by inning, each sorted by si
+          const byInning = new Map<number, number[]>()
+          for (const k of Array.from(selectedCellsRef.current)) {
+            const [si, ii] = k.split('-').map(Number)
+            if (!byInning.has(ii)) byInning.set(ii, [])
+            byInning.get(ii)!.push(si)
+          }
+          for (const rows of Array.from(byInning.values())) rows.sort((a, b) => a - b)
+
+          // Source: ordered by si, then ii
+          const srcOrdered = [...clip].sort((a, b) => a.si - b.si || a.ii - b.ii)
+          // Also index by si for exact-match paste (same rows, different inning)
+          const srcBySi = new Map<number, string | null>()
+          srcOrdered.forEach(c => { if (!srcBySi.has(c.si)) srcBySi.set(c.si, c.pos) })
+
+          const next = slotsRef.current.map(s => ({
+            ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
+          }))
+          const changedIds = new Set<string>()
+
+          for (const [ii, rows] of Array.from(byInning.entries())) {
+            rows.forEach((tsi, idx) => {
+              const srcPos = srcBySi.has(tsi)
+                ? srcBySi.get(tsi)!
+                : (srcOrdered[idx % srcOrdered.length]?.pos ?? null)
+              const slot = active[tsi]
+              if (!slot) return
+              const t = next.find(s => s.id === slot.id)
+              if (t) { t.inning_positions[ii] = srcPos; changedIds.add(t.id) }
+            })
+          }
+          if (changedIds.size) commit(next, Array.from(changedIds))
+        }
+        return
+      }
+
       if (!focused) return
       const { si, ii } = focused
       const rowCount = slotsRef.current.filter(s => s.availability !== 'absent').length
@@ -1100,10 +1162,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   }
                   const hasDupe = Object.entries(counts).some(([pos, v]) => pos !== 'Bench' && v > 1)
                   const allFilled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii])
+                  const colSelected = activeSlots.length > 0 && activeSlots.every((_, si) => selectedCells.has(`${si}-${ii}`))
+                  const colCopied = activeSlots.length > 0 && activeSlots.every((_, si) => copiedKeys.has(`${si}-${ii}`))
                   return (
                     <th
                       key={ii}
-                      style={{ ...gHdr }}
+                      onClick={() => {
+                        // Click header = select entire column
+                        const col = new Set<string>()
+                        activeSlots.forEach((_, si) => col.add(`${si}-${ii}`))
+                        setSelectedCells(col)
+                        setFocused({ si: 0, ii })
+                        anchorRef.current = { si: 0, ii }
+                      }}
+                      style={{ ...gHdr, cursor: 'pointer', userSelect: 'none',
+                        background: colSelected ? 'rgba(var(--fg-rgb),0.05)' : colCopied ? 'rgba(75,156,211,0.06)' : undefined }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
                         <span>{ii + 1}</span>
@@ -1228,6 +1301,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       const cellKey = `${si}-${ii}`
                       const isFoc = focused?.si === si && focused?.ii === ii
                       const isSel = selectedCells.has(cellKey)
+                      const isCopied = copiedKeys.has(cellKey) && !isSel
                       const isDupe = !!(pos && pos !== 'Bench' &&
                         activeSlots.filter(s => (s.inning_positions ?? [])[ii] === pos).length > 1)
 
@@ -1274,9 +1348,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                               ? '2px solid rgba(59,109,177,0.85)'
                               : isSel
                                 ? '1.5px solid rgba(59,109,177,0.4)'
-                                : isDupe
-                                  ? '2px solid rgba(232,112,96,0.7)'
-                                  : 'none',
+                                : isCopied
+                                  ? '1.5px dashed rgba(75,156,211,0.45)'
+                                  : isDupe
+                                    ? '2px solid rgba(232,112,96,0.7)'
+                                    : 'none',
                             outlineOffset: -2,
                             transition: 'background 0.05s',
                           }}
