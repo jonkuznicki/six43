@@ -630,19 +630,25 @@ export default function PitchingPage() {
                           {formatDate(game.game_date)}
                           {game.location ? ` · ${game.location}` : ''}
                         </div>
-                        {lineupPitchers[game.id]?.length > 0 && (
-                          <button
-                            onClick={() => syncFromLineup(game.id)}
-                            style={{
-                              marginTop: '5px', fontSize: '9px', fontWeight: 700,
-                              padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
-                              border: '0.5px solid var(--border-md)',
-                              background: 'transparent', color: `rgba(var(--fg-rgb), 0.5)`,
-                            }}
-                          >
-                            ↓ from lineup
-                          </button>
-                        )}
+                        {(() => {
+                          const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
+                          return (
+                            <button
+                              onClick={() => hasPitchers && syncFromLineup(game.id)}
+                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : 'No pitchers assigned in lineup yet — build a lineup first'}
+                              style={{
+                                marginTop: '5px', fontSize: '9px', fontWeight: 700,
+                                padding: '2px 6px', borderRadius: '4px',
+                                cursor: hasPitchers ? 'pointer' : 'default',
+                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.4)' : 'var(--border-subtle)'}`,
+                                background: hasPitchers ? 'rgba(75,156,211,0.08)' : 'transparent',
+                                color: hasPitchers ? '#4B9CD3' : `rgba(var(--fg-rgb), 0.22)`,
+                              }}
+                            >
+                              ↓ from lineup
+                            </button>
+                          )
+                        })()}
                       </div>
 
                       {Array.from({ length: slotCount }, (_, i) => {
