@@ -1382,7 +1382,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   {teamPositions.map(pos => {
                     const isActive = activePos === pos
                     const pc = POS_COLOR[pos]
-                    const sc = POS_KEY[pos]
                     const isUsed = activeInning !== null && usedInInning.has(pos)
                     const isAvailable = activeInning !== null && !isUsed && pos !== 'Bench'
                     return (
@@ -1391,7 +1390,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                         onClick={() => { setActivePos(pos); fillSelected(pos) }}
                         style={{
                           padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4,
                           fontSize: 11, fontWeight: isUsed ? 400 : 700,
                           border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : isAvailable ? (pc?.color ?? 'var(--border-md)') : 'var(--border-md)'}`,
                           background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
@@ -1408,17 +1406,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                         }}
                       >
                         {pos}
-                        {sc && (
-                          <span style={{
-                            fontSize: 9, fontWeight: 500, lineHeight: 1,
-                            padding: '1px 3px', borderRadius: 3,
-                            background: isActive ? `rgba(0,0,0,0.18)` : `rgba(var(--fg-rgb),0.07)`,
-                            color: isActive ? (pc?.color ?? 'var(--fg)') : `rgba(var(--fg-rgb),0.38)`,
-                            fontFamily: 'ui-monospace, monospace',
-                          }}>
-                            {sc}
-                          </span>
-                        )}
                       </button>
                     )
                   })}
