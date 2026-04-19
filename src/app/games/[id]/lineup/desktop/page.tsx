@@ -1352,9 +1352,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           {/* Position palette — below the grid */}
           {!readOnly && (() => {
             // Derive single active inning from selected cells (null if multi-inning or none)
-            const selIiVals = [...selectedCells].map(k => parseInt(k.split('-')[1]))
-            const selSiVals = new Set([...selectedCells].map(k => parseInt(k.split('-')[0])))
-            const uniqueIi = [...new Set(selIiVals)]
+            const selIiVals = Array.from(selectedCells).map(k => parseInt(k.split('-')[1]))
+            const selSiVals = new Set(Array.from(selectedCells).map(k => parseInt(k.split('-')[0])))
+            const uniqueIi = Array.from(new Set(selIiVals))
             const activeInning = uniqueIi.length === 1 ? uniqueIi[0] : null
 
             // Positions already used in the active inning by non-selected players
