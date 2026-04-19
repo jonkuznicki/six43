@@ -78,6 +78,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [copyMode, setCopyMode]         = useState<'full' | 'order'>('full')
   const [copying, setCopying]           = useState(false)
   const [showTip, setShowTip]           = useState(true)
+  const [hasPriorLineup, setHasPriorLineup] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [playerPositionHistory, setPlayerPositionHistory] = useState<Record<string, Record<string, number>>>({})
   const [lastGameHistory, setLastGameHistory] = useState<Record<string, {P:number,C:number,IF:number,OF:number,Bench:number}>>({})
@@ -346,6 +347,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
 
       if (prevWithSlots) {
+        setHasPriorLineup(true)
         setPrevGameForBatting(prevWithSlots)
         setShowBattingOrderModal(true)
         setLoading(false)
@@ -376,6 +378,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
     }
 
+    if (!lineupIsBlank) setHasPriorLineup(true)
     setSlots(slotData ?? [])
     setLoading(false)
   }
@@ -847,7 +850,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const totalAssigned = activeSlots.reduce(
     (sum, s) => sum + assignedInnings(s, inningCount), 0
   )
-  const tipVisible = showTip && totalAssigned < activeSlots.length
+  const tipVisible = showTip && !hasPriorLineup && totalAssigned < activeSlots.length
 
   const gameDate = game?.game_date
     ? new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
