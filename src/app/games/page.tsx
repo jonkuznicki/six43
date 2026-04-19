@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import TeamSelect from './TeamSelect'
-import ScrollToToday from './ScrollToToday'
-import GameCard from './GameCard'
+import GamesDesktopLayout from './GamesDesktopLayout'
 import SyncPanel from './SyncPanel'
 
 export const dynamic = 'force-dynamic'
@@ -111,11 +110,14 @@ export default async function GamesPage({
   ]
 
   return (
-    <main style={{
-      minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
-      fontFamily: 'sans-serif', padding: '1.5rem 1.5rem 6rem',
-      maxWidth: '480px', margin: '0 auto',
-    }}>
+    <main
+      className="games-page-main"
+      style={{
+        minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
+        fontFamily: 'sans-serif', padding: '1.5rem 1.5rem 6rem',
+        maxWidth: '480px', margin: '0 auto',
+      }}
+    >
 
       {/* Header */}
       {season && (
@@ -274,91 +276,15 @@ export default async function GamesPage({
             </div>
           )}
 
-          {/* All games in chronological order, scroll to today on load */}
+          {/* All games — desktop shows two-panel, mobile shows card list */}
           {allGames.length > 0 && (
-            <>
-              <ScrollToToday hasPastGames={firstUpcomingIdx > 0} />
-              {(() => {
-                const shownTournamentIds = new Set<string>()
-                // Pre-compute last index for each tournament so we can close the box
-                const tournamentLastIdx: Record<string, number> = {}
-                allGames.forEach((g, i) => {
-                  if (g.tournament_id) tournamentLastIdx[g.tournament_id] = i
-                })
-
-                return allGames.map((g, idx) => {
-                  const showTournamentHeader = g.tournament_id && !shownTournamentIds.has(g.tournament_id)
-                  if (showTournamentHeader) shownTournamentIds.add(g.tournament_id)
-                  const tournament = g.tournament_id ? tournamentMap[g.tournament_id] : null
-                  const isLastInTournament = g.tournament_id && tournamentLastIdx[g.tournament_id] === idx
-
-                  return (
-                    <div key={g.id}>
-                      {idx === firstUpcomingIdx && (
-                        <div id="today-anchor" style={{
-                          fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-                          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
-                          marginBottom: '8px',
-                          marginTop: idx > 0 ? '1.5rem' : 0,
-                        }}>
-                          Upcoming
-                        </div>
-                      )}
-                      {showTournamentHeader && tournament && (
-                        <Link href={`/tournaments/${g.tournament_id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                          <div style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            borderRadius: '8px 8px 0 0', marginBottom: '0',
-                            marginTop: idx > 0 ? '0.5rem' : 0,
-                            background: 'rgba(75,156,211,0.07)',
-                            borderTop: '0.5px solid rgba(75,156,211,0.25)',
-                            borderLeft: '0.5px solid rgba(75,156,211,0.25)',
-                            borderRight: '0.5px solid rgba(75,156,211,0.25)',
-                          }}>
-                            <div>
-                              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
-                                textTransform: 'uppercase', letterSpacing: '0.07em', marginRight: '8px' }}>
-                                Tournament
-                              </span>
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }}>
-                                {tournament.name}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '12px', color: 'var(--accent)' }}>›</span>
-                          </div>
-                        </Link>
-                      )}
-                      <div style={g.tournament_id ? {
-                        borderLeft: '0.5px solid rgba(75,156,211,0.25)',
-                        borderRight: '0.5px solid rgba(75,156,211,0.25)',
-                        padding: '0 4px',
-                      } : {}}>
-                        <GameCard game={g} teamName={teamName} />
-                      </div>
-                      {isLastInTournament && tournament && (
-                        <Link href={`/tournaments/${g.tournament_id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                          <div style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                            padding: '6px 12px',
-                            borderRadius: '0 0 8px 8px',
-                            background: 'rgba(75,156,211,0.04)',
-                            borderBottom: '0.5px solid rgba(75,156,211,0.25)',
-                            borderLeft: '0.5px solid rgba(75,156,211,0.25)',
-                            borderRight: '0.5px solid rgba(75,156,211,0.25)',
-                            marginBottom: '0.5rem',
-                          }}>
-                            <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>
-                              View tournament →
-                            </span>
-                          </div>
-                        </Link>
-                      )}
-                    </div>
-                  )
-                })
-              })()}
-            </>
+            <GamesDesktopLayout
+              games={allGames}
+              tournamentMap={tournamentMap}
+              teamName={teamName}
+              inningsPerGame={season?.innings_per_game ?? 6}
+              firstUpcomingIdx={firstUpcomingIdx}
+            />
           )}
         </>
       )}
