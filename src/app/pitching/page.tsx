@@ -333,13 +333,13 @@ export default function PitchingPage() {
   }
 
   // Season pitch count totals per player
-  const seasonPitchTotals: Record<string, { name: string; total: number; games: number; overLimit: number }> = {}
+  const seasonPitchTotals: Record<string, { playerId: string; name: string; total: number; games: number; overLimit: number }> = {}
   for (const pitchers of Object.values(actualPitching)) {
     for (const p of pitchers) {
       if (!p.player) continue
       const name = shortName(p.player)
       if (!seasonPitchTotals[p.playerId]) {
-        seasonPitchTotals[p.playerId] = { name, total: 0, games: 0, overLimit: 0 }
+        seasonPitchTotals[p.playerId] = { playerId: p.playerId, name, total: 0, games: 0, overLimit: 0 }
       }
       const entry = seasonPitchTotals[p.playerId]
       entry.games++
@@ -653,13 +653,17 @@ export default function PitchingPage() {
                 <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Games</th>
                 <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Total</th>
                 <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Avg/game</th>
-                {pitchLimit != null && <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Over limit</th>}
+                <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Last pitched</th>
               </tr>
             </thead>
             <tbody>
               {seasonTotalsList.map((entry, idx) => {
                 const avg = entry.games > 0 ? (entry.total / entry.games).toFixed(0) : '—'
                 const hasOverLimit = entry.overLimit > 0
+                const lastDate = lastPitched[entry.playerId]
+                const lastDateFmt = lastDate
+                  ? new Date(lastDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : '—'
                 return (
                   <tr key={idx} style={{ borderTop: idx > 0 ? '0.5px solid var(--border-subtle)' : 'none' }}>
                     <td style={{ fontSize: '13px', fontWeight: 500, padding: '8px 12px' }}>{entry.name}</td>
@@ -671,13 +675,9 @@ export default function PitchingPage() {
                     <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>
                       {entry.total > 0 ? `${avg}p` : '—'}
                     </td>
-                    {pitchLimit != null && (
-                      <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px' }}>
-                        {hasOverLimit
-                          ? <span style={{ color: '#E87060', fontWeight: 700 }}>{entry.overLimit}×</span>
-                          : <span style={{ color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>}
-                      </td>
-                    )}
+                    <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                      {lastDateFmt}
+                    </td>
                   </tr>
                 )
               })}
@@ -1089,13 +1089,17 @@ export default function PitchingPage() {
                       <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Games</th>
                       <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Total</th>
                       <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Avg/game</th>
-                      {pitchLimit != null && <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Over limit</th>}
+                      <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Last pitched</th>
                     </tr>
                   </thead>
                   <tbody>
                     {seasonTotalsList.map((entry, idx) => {
                       const avg = entry.games > 0 ? (entry.total / entry.games).toFixed(0) : '—'
                       const hasOverLimit = entry.overLimit > 0
+                      const lastDate = lastPitched[entry.playerId]
+                      const lastDateFmt = lastDate
+                        ? new Date(lastDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : '—'
                       return (
                         <tr key={idx} style={{ borderTop: idx > 0 ? '0.5px solid var(--border-subtle)' : 'none' }}>
                           <td style={{ fontSize: '13px', fontWeight: 500, padding: '8px 12px' }}>{entry.name}</td>
@@ -1107,13 +1111,9 @@ export default function PitchingPage() {
                           <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>
                             {entry.total > 0 ? `${avg}p` : '—'}
                           </td>
-                          {pitchLimit != null && (
-                            <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px' }}>
-                              {hasOverLimit
-                                ? <span style={{ color: '#E87060', fontWeight: 700 }}>{entry.overLimit}×</span>
-                                : <span style={{ color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>}
-                            </td>
-                          )}
+                          <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                            {lastDateFmt}
+                          </td>
                         </tr>
                       )
                     })}
