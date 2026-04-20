@@ -166,11 +166,17 @@ html[data-theme="light"] {
 .pitching-desktop-layout { display: none; }
 .pitching-mobile-layout  { display: block; }
 
-/* Pitching view toggle overrides (beat media queries) */
-.pitching-view-grid .pitching-desktop-layout { display: none !important; }
-.pitching-view-grid .pitching-mobile-layout  { display: block !important; }
-.pitching-view-planner .pitching-mobile-layout  { display: none !important; }
-.pitching-view-planner .pitching-desktop-layout { display: flex !important; }
+/* View toggle only visible on desktop */
+.pitching-view-toggle { display: none; }
+
+/* Pitching view toggle overrides — desktop only (mobile always uses grid/mobile layout) */
+@media (min-width: 768px) {
+  .pitching-view-toggle { display: flex; }
+  .pitching-view-grid .pitching-desktop-layout { display: none !important; }
+  .pitching-view-grid .pitching-mobile-layout  { display: block !important; }
+  .pitching-view-planner .pitching-mobile-layout  { display: none !important; }
+  .pitching-view-planner .pitching-desktop-layout { display: flex !important; }
+}
 
 /* Dashboard two-column (mobile: stacked) */
 .dashboard-cols         { display: block; }
