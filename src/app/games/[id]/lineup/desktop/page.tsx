@@ -1796,25 +1796,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {prevGameForBatting && (
-                <button
-                  onClick={() => handleBattingOrderChoice('last')}
-                  style={{
-                    width: '100%', padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
-                    fontSize: 13, fontWeight: 600, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12,
-                    border: '1.5px solid var(--border-md)', background: 'transparent',
-                    color: `rgba(var(--fg-rgb),0.8)`,
-                  }}
-                >
-                  <span style={{ fontSize: 20 }}>↩</span>
-                  <div>
-                    <div>Use last game's batting order</div>
-                    <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, marginTop: 2 }}>
-                      vs {prevGameForBatting.opponent} · {new Date(prevGameForBatting.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
+              <button
+                onClick={() => prevGameForBatting && handleBattingOrderChoice('last')}
+                disabled={!prevGameForBatting}
+                style={{
+                  width: '100%', padding: '12px 16px', borderRadius: 8,
+                  cursor: prevGameForBatting ? 'pointer' : 'default',
+                  fontSize: 13, fontWeight: 600, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12,
+                  border: '1.5px solid var(--border-md)', background: 'transparent',
+                  color: prevGameForBatting ? `rgba(var(--fg-rgb),0.8)` : `rgba(var(--fg-rgb),0.3)`,
+                  opacity: prevGameForBatting ? 1 : 0.5,
+                }}
+              >
+                <span style={{ fontSize: 20 }}>↩</span>
+                <div>
+                  <div>Use last game's batting order</div>
+                  <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, marginTop: 2 }}>
+                    {prevGameForBatting
+                      ? `vs ${prevGameForBatting.opponent} · ${new Date(prevGameForBatting.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                      : 'No previous game found'}
                   </div>
-                </button>
-              )}
+                </div>
+              </button>
               <button
                 onClick={() => handleBattingOrderChoice('roster')}
                 style={{
@@ -1829,23 +1832,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   <div>Use roster batting order</div>
                   <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, marginTop: 2 }}>
                     Each player's preferred batting position
-                  </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleBattingOrderChoice('fresh')}
-                style={{
-                  width: '100%', padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12,
-                  border: '1.5px solid var(--border-md)', background: 'transparent',
-                  color: `rgba(var(--fg-rgb),0.8)`,
-                }}
-              >
-                <span style={{ fontSize: 20 }}>🔢</span>
-                <div>
-                  <div>Start fresh by jersey number</div>
-                  <div style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, marginTop: 2 }}>
-                    Players ordered lowest to highest jersey #
                   </div>
                 </div>
               </button>
