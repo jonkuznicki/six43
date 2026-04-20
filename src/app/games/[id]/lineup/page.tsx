@@ -69,11 +69,37 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       setActivePosition(team.positions[0] ?? 'P')
     }
 
-    const { data: slotData } = await supabase
+    let { data: slotData } = await supabase
       .from('lineup_slots')
       .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
       .eq('game_id', params.id)
       .order('batting_order', { ascending: true, nullsFirst: false })
+
+    // Auto-initialize from roster if no slots exist yet
+    if (!slotData?.length && gameData?.season_id) {
+      const { data: rosterPlayers } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, jersey_number, batting_pref_order, innings_target')
+        .eq('season_id', gameData.season_id)
+        .eq('status', 'active')
+        .order('batting_pref_order', { ascending: true, nullsFirst: false })
+      if (rosterPlayers?.length) {
+        await supabase.from('lineup_slots').insert(
+          rosterPlayers.map((p, i) => ({
+            game_id: params.id, player_id: p.id,
+            batting_order: i + 1, availability: 'available',
+            inning_positions: [null,null,null,null,null,null,null,null,null],
+          }))
+        )
+        const { data: fresh } = await supabase
+          .from('lineup_slots')
+          .select('*, player:players(first_name, last_name, jersey_number, innings_target)')
+          .eq('game_id', params.id)
+          .order('batting_order', { ascending: true, nullsFirst: false })
+        slotData = fresh
+      }
+    }
+
     setSlots(slotData ?? [])
 
     if (gameData?.season_id) {
@@ -285,9 +311,14 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     return counts
   }
 
-  function isInningValid(inningIndex: number) {
+  function getInningStatus(inningIndex: number): 'complete' | 'duplicate' | number {
+    const active = slots.filter(s => s.availability !== 'absent')
     const counts = getInningCounts(inningIndex)
-    return teamPositions.filter(p => p !== 'Bench').every(p => counts[p] === 1)
+    const hasDupe = Object.entries(counts).some(([pos, v]) => pos !== 'Bench' && v > 1)
+    if (hasDupe) return 'duplicate'
+    const unassigned = active.filter(s => !(s.inning_positions ?? [])[inningIndex]).length
+    if (unassigned > 0) return unassigned
+    return 'complete'
   }
 
   if (loading) return (
@@ -719,12 +750,19 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             <div style={{ width: COL_NUM, flexShrink: 0 }} />
             <div style={{ width: COL_NAME, flexShrink: 0, fontSize: '10px',
               color: `rgba(var(--fg-rgb), 0.3)`, paddingLeft: '4px' }}></div>
-            {innings.map(i => (
-              <div key={i} style={{ width: COL_INN, flexShrink: 0, textAlign: 'center',
-                fontSize: '13px', color: isInningValid(i) ? '#6DB875' : `rgba(var(--fg-rgb), 0.2)` }}>
-                {isInningValid(i) ? '✓' : '·'}
-              </div>
-            ))}
+            {innings.map(i => {
+              const status = getInningStatus(i)
+              return (
+                <div key={i} style={{ width: COL_INN, flexShrink: 0, textAlign: 'center',
+                  fontSize: status === 'complete' ? '13px' : '11px',
+                  fontWeight: status === 'complete' ? 700 : 600,
+                  color: status === 'duplicate' ? '#E87060'
+                    : status === 'complete' ? '#6DB875'
+                    : `rgba(var(--fg-rgb), 0.4)` }}>
+                  {status === 'duplicate' ? '⚠' : status === 'complete' ? '✓' : status}
+                </div>
+              )
+            })}
             <div style={{ width: COL_STATUS, flexShrink: 0 }} />
           </div>
         </div>
