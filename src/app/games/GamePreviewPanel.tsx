@@ -121,16 +121,9 @@ export default function GamePreviewPanel({
           background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px',
           padding: '2.5rem', textAlign: 'center', marginBottom: '1.5rem',
         }}>
-          <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.4)` }}>
             No lineup built yet.
           </div>
-          <Link href={lineupHref} style={{
-            display: 'inline-block', fontSize: '14px', fontWeight: 700,
-            background: 'var(--accent)', color: 'var(--accent-text)',
-            padding: '10px 20px', borderRadius: '8px', textDecoration: 'none',
-          }}>
-            Build Lineup →
-          </Link>
         </div>
       ) : (
         <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
@@ -222,7 +215,7 @@ export default function GamePreviewPanel({
           padding: '10px 18px', borderRadius: '8px', textDecoration: 'none',
           display: 'inline-block',
         }}>
-          Open Full Editor →
+          {hasLineup ? 'Edit Lineup →' : 'Build Lineup →'}
         </Link>
         {hasLineup && (
           <Link

@@ -327,8 +327,14 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       .eq('game_id', params.id)
       .order('batting_order', { ascending: true, nullsFirst: false })
 
-    // If no slots exist yet, show batting order choice modal
-    const noSlots = !slotData?.length
+    // Show batting order modal when lineup is blank (no slots, or slots with no positions filled)
+    // but not if coach already made a choice for this game (tracked in localStorage)
+    const noPositions = !slotData?.length ||
+      slotData.filter((s: any) => s.availability !== 'absent')
+        .every((s: any) => (s.inning_positions ?? []).every((p: any) => !p))
+    const alreadyChose = typeof window !== 'undefined' &&
+      localStorage.getItem(`six43_batting_chose_${params.id}`) === '1'
+    const noSlots = noPositions && !alreadyChose
     if (noSlots && gameData?.season_id) {
       const { data: recentGames } = await supabase
         .from('games')
@@ -364,6 +370,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     if (!game?.season_id) return
     setShowBattingOrderModal(false)
     setLoading(true)
+    localStorage.setItem(`six43_batting_chose_${params.id}`, '1')
 
     if (choice === 'last' && prevGameForBatting) {
       const { data: lastSlots } = await supabase
