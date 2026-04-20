@@ -98,7 +98,7 @@ html[data-theme="light"] {
     max-width: 1080px !important;
   }
 
-  /* Pitching two-panel layout */
+  /* Pitching two-panel layout (default on desktop) */
   .pitching-mobile-layout { display: none !important; }
 
   .pitching-desktop-layout {
@@ -165,6 +165,12 @@ html[data-theme="light"] {
 /* Mobile defaults: hide desktop-only panels */
 .pitching-desktop-layout { display: none; }
 .pitching-mobile-layout  { display: block; }
+
+/* Pitching view toggle overrides (beat media queries) */
+.pitching-view-grid .pitching-desktop-layout { display: none !important; }
+.pitching-view-grid .pitching-mobile-layout  { display: block !important; }
+.pitching-view-planner .pitching-mobile-layout  { display: none !important; }
+.pitching-view-planner .pitching-desktop-layout { display: flex !important; }
 
 /* Dashboard two-column (mobile: stacked) */
 .dashboard-cols         { display: block; }

@@ -62,6 +62,11 @@ export default function PitchingPage() {
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null)
+  const [pitchingView, setPitchingView] = useState<'grid' | 'planner'>(() =>
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('six43_pitching_view') as 'grid' | 'planner' | null) ?? 'planner'
+      : 'planner'
+  )
   const didScrollRef = useRef(false)
 
   useEffect(() => { init() }, [])
@@ -698,7 +703,25 @@ export default function PitchingPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>Pitcher Planner</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>Pitcher Planner</h1>
+            <div style={{ display: 'flex', borderRadius: '6px', border: '0.5px solid var(--border-md)', overflow: 'hidden', flexShrink: 0 }}>
+              {(['planner', 'grid'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => { setPitchingView(v); localStorage.setItem('six43_pitching_view', v) }}
+                  style={{
+                    padding: '4px 10px', fontSize: '11px', fontWeight: 600,
+                    border: 'none', cursor: 'pointer',
+                    background: pitchingView === v ? 'var(--accent)' : 'transparent',
+                    color: pitchingView === v ? 'var(--accent-text)' : `rgba(var(--fg-rgb), 0.45)`,
+                  }}
+                >
+                  {v === 'planner' ? 'Planner' : 'Grid'}
+                </button>
+              ))}
+            </div>
+          </div>
           {activeSeason && (
             <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
               {(activeSeason as any).team?.name} · {activeSeason.name}
@@ -775,7 +798,10 @@ export default function PitchingPage() {
         </div>
       )}
 
-      {/* ── Mobile layout (hidden on desktop via CSS) ── */}
+      {/* ── View layouts ── */}
+      <div className={`pitching-view-${pitchingView}`}>
+
+      {/* ── Mobile/Grid layout ── */}
       {!loading && (
         <div className="pitching-mobile-layout">
         <>
@@ -1100,7 +1126,7 @@ export default function PitchingPage() {
         </div>
       )}
 
-      {/* ── Desktop two-panel layout (hidden on mobile via CSS) ── */}
+      {/* ── Desktop/Planner layout ── */}
       {!loading && (upcoming.length > 0 || finalized.length > 0) && (
         <div className="pitching-desktop-layout">
           <div className="pitching-list-panel">
@@ -1112,6 +1138,8 @@ export default function PitchingPage() {
           </div>
         </div>
       )}
+
+      </div>{/* end pitching-view wrapper */}
     </main>
   )
 }
