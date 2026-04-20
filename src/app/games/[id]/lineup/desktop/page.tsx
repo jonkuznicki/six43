@@ -1825,6 +1825,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             </div>
           )}
 
+          {/* CF tip */}
+          <div style={{ marginTop: 10, fontSize: 10, color: `rgba(var(--fg-rgb),0.38)`, lineHeight: 1.4 }}>
+            Tip: press <code style={{ fontSize: 9, background: 'var(--bg)', padding: '1px 4px', borderRadius: 3,
+              border: '0.5px solid var(--border-md)', color: `rgba(var(--fg-rgb),0.55)`,
+              fontFamily: 'ui-monospace, monospace' }}>m</code> to assign Center Field
+          </div>
+
           {/* Keyboard shortcuts — collapsible */}
           <div style={{ marginTop: 12 }}>
             <button
