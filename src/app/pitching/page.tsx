@@ -61,14 +61,22 @@ export default function PitchingPage() {
   const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null)
   const didScrollRef = useRef(false)
 
   useEffect(() => { init() }, [])
   useEffect(() => {
     if (!loading && !didScrollRef.current) {
       didScrollRef.current = true
-      const el = document.getElementById('pitching-upcoming-anchor')
-      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: 'instant' })
+      // Mobile: scroll to upcoming anchor
+      if (window.innerWidth < 768) {
+        const el = document.getElementById('pitching-upcoming-anchor')
+        if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: 'instant' })
+      } else {
+        // Desktop: auto-select first upcoming (or last finalized)
+        const first = upcoming[0] ?? finalized[finalized.length - 1] ?? null
+        if (first && !selectedGameId) setSelectedGameId(first.id)
+      }
     }
   }, [loading])
   useEffect(() => {
@@ -348,12 +356,344 @@ export default function PitchingPage() {
   const pastGrid     = `120px repeat(${maxActualPitchers}, 1fr)`
   const upcomingMinW = `${300 + slotCount * 80}px`
 
+  // ── Desktop detail panel renderers ───────────────────────────────────────
+
+  function renderDesktopGameList() {
+    return (
+      <>
+        {finalized.length > 0 && (
+          <div style={{ marginBottom: upcoming.length > 0 ? '1rem' : 0 }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: `rgba(var(--fg-rgb), 0.3)`, padding: '4px 10px', marginBottom: '4px' }}>
+              Past
+            </div>
+            {finalized.map(game => {
+              const pitchers = actualPitching[game.id] ?? []
+              const isSelected = selectedGameId === game.id
+              return (
+                <button key={game.id} onClick={() => setSelectedGameId(game.id)} style={{
+                  width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
+                  padding: '8px 10px', borderRadius: '8px',
+                  background: isSelected ? 'rgba(75,156,211,0.1)' : 'transparent',
+                  marginBottom: '2px', transition: 'background 0.12s', opacity: 0.8,
+                }}>
+                  <div style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 400,
+                    color: isSelected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.65)`,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    vs {game.opponent}
+                  </div>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
+                    {formatDate(game.game_date)}
+                    {pitchers.length > 0 ? ` · ${pitchers.map(p => shortName(p.player)).join(', ')}` : ''}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {upcoming.length > 0 && (
+          <div id="pitching-upcoming-anchor">
+            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: `rgba(var(--fg-rgb), 0.3)`, padding: '4px 10px', marginBottom: '4px',
+              marginTop: finalized.length > 0 ? '0.25rem' : 0 }}>
+              Upcoming
+            </div>
+            {upcoming.map(game => {
+              const isSelected = selectedGameId === game.id
+              const assignedCount = Object.values(plans[game.id] ?? {}).filter((p: PlanSlot) => p.player_id).length
+              return (
+                <button key={game.id} onClick={() => setSelectedGameId(game.id)} style={{
+                  width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
+                  padding: '8px 10px', borderRadius: '8px',
+                  background: isSelected ? 'rgba(75,156,211,0.1)' : 'transparent',
+                  marginBottom: '2px', transition: 'background 0.12s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 400,
+                      color: isSelected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.75)`,
+                      flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      vs {game.opponent}
+                    </span>
+                    {assignedCount > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+                        {assignedCount}P
+                      </span>
+                    )}
+                    {isSelected && <span style={{ color: 'var(--accent)', fontSize: '13px', flexShrink: 0 }}>›</span>}
+                  </div>
+                  <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
+                    {formatDate(game.game_date)}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  function renderDesktopUpcomingDetail(game: any) {
+    const gamePlans  = plans[game.id] ?? {}
+    const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
+    const btnBase: React.CSSProperties = {
+      width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+      background: 'transparent', fontSize: 16,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+    }
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, marginBottom: '4px' }}>
+            vs {game.opponent}
+          </h2>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+            {formatDate(game.game_date)}{game.location ? ` · ${game.location}` : ''}
+          </div>
+        </div>
+
+        {/* Controls row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={() => setSlotCount(c => Math.max(1, c - 1))} disabled={slotCount <= 1}
+              style={{ ...btnBase, cursor: slotCount <= 1 ? 'not-allowed' : 'pointer',
+                color: slotCount <= 1 ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)` }}>−</button>
+            <span style={{ fontSize: 12, color: `rgba(var(--fg-rgb),0.5)`, minWidth: 60, textAlign: 'center' }}>
+              {slotCount} pitcher{slotCount !== 1 ? 's' : ''}
+            </span>
+            <button onClick={() => setSlotCount(c => Math.min(MAX_SLOTS, c + 1))} disabled={slotCount >= MAX_SLOTS}
+              style={{ ...btnBase, cursor: slotCount >= MAX_SLOTS ? 'not-allowed' : 'pointer',
+                color: slotCount >= MAX_SLOTS ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)` }}>+</button>
+          </div>
+          <button
+            onClick={() => hasPitchers && syncFromLineup(game.id)}
+            title={hasPitchers ? 'Copy pitcher order from saved lineup' : 'No pitchers assigned in lineup yet'}
+            style={{
+              fontSize: '12px', fontWeight: 700, padding: '5px 12px', borderRadius: '6px',
+              cursor: hasPitchers ? 'pointer' : 'default',
+              border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.4)' : 'var(--border-subtle)'}`,
+              background: hasPitchers ? 'rgba(75,156,211,0.08)' : 'transparent',
+              color: hasPitchers ? '#4B9CD3' : `rgba(var(--fg-rgb), 0.22)`,
+            }}
+          >
+            ↓ from lineup
+          </button>
+        </div>
+
+        {/* Pitcher slot rows */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
+          {Array.from({ length: slotCount }, (_, i) => {
+            const slot = i + 1
+            const plan = gamePlans[slot]
+            const isSaving = saving === `${game.id}-${slot}`
+
+            let restWarning: { label: string; color: string } | null = null
+            if (plan?.player_id) {
+              const effLast = effectiveLastPitched(plan.player_id, game.game_date)
+              if (effLast) {
+                const days = Math.round(
+                  (new Date(game.game_date + 'T12:00:00').getTime() - new Date(effLast + 'T12:00:00').getTime()) / 86400000
+                )
+                if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
+                else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+              }
+            }
+
+            return (
+              <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.35)`, minWidth: '22px', textAlign: 'right' }}>
+                  P{slot}
+                </div>
+                <select
+                  value={plan?.player_id ?? ''}
+                  onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
+                  disabled={isSaving}
+                  style={{
+                    ...CELL_SEL, flex: 1, fontSize: '13px', padding: '8px 10px',
+                    opacity: isSaving ? 0.5 : 1,
+                    borderColor: restWarning ? restWarning.color : undefined,
+                  }}
+                >
+                  <option value="">— unassigned —</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.id}>
+                      #{p.jersey_number} {p.last_name}{daysRest(effectiveLastPitched(p.id, game.game_date), game.game_date)}
+                    </option>
+                  ))}
+                </select>
+                {restWarning ? (
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: restWarning.color, minWidth: '68px', flexShrink: 0 }}>
+                    {restWarning.label}
+                  </span>
+                ) : (
+                  <span style={{ minWidth: '68px' }} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  function renderDesktopPastDetail(game: any) {
+    const pitchers = actualPitching[game.id] ?? []
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, marginBottom: '4px' }}>
+            vs {game.opponent}
+          </h2>
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+            {formatDate(game.game_date)}
+          </div>
+        </div>
+
+        {pitchers.length === 0 && (
+          <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, padding: '2rem 0' }}>
+            No pitchers recorded for this game.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
+          {pitchers.map((p, i) => {
+            const draftKey = p.slotId
+            const isDrafting = draftKey in editingPitch
+            const draftVal = editingPitch[draftKey] ?? ''
+            const overLimit = pitchLimit != null && p.pitchCount != null && p.pitchCount > pitchLimit
+            return (
+              <div key={p.slotId} style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px',
+                padding: '12px 16px',
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.3)`, minWidth: '20px' }}>
+                  P{i + 1}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>{shortName(p.player)}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700 }}>{p.innings} inn</div>
+                </div>
+                {isDrafting ? (
+                  <input
+                    type="text" inputMode="numeric" pattern="[0-9]*"
+                    value={draftVal} autoFocus
+                    onChange={e => setEditingPitch(prev => ({ ...prev, [draftKey]: e.target.value.replace(/\D/g, '') }))}
+                    onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                      if (e.key === 'Escape') setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
+                    }}
+                    style={{
+                      width: '80px', padding: '6px 8px', borderRadius: '6px',
+                      border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
+                      color: 'var(--fg)', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box',
+                    }}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setEditingPitch(prev => ({ ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '' }))}
+                    title={overLimit ? `Exceeds ${pitchLimit}p limit` : 'Click to edit pitch count'}
+                    style={{
+                      padding: '6px 14px', borderRadius: '6px', cursor: 'pointer',
+                      border: overLimit ? '0.5px solid rgba(232,112,96,0.6)' : p.pitchCount != null ? '0.5px solid var(--border-md)' : '0.5px dashed var(--border-md)',
+                      background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
+                      color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.7)` : `rgba(var(--fg-rgb), 0.25)`,
+                      fontSize: '13px', fontWeight: overLimit ? 700 : 400,
+                      minWidth: '80px', textAlign: 'center',
+                    }}
+                  >
+                    {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  function renderDesktopDetail() {
+    if (!selectedGameId) {
+      return (
+        <div style={{ padding: '3rem 0', textAlign: 'center', color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '14px' }}>
+          Select a game to view pitcher details.
+        </div>
+      )
+    }
+    const upcomingGame = upcoming.find(g => g.id === selectedGameId)
+    if (upcomingGame) return renderDesktopUpcomingDetail(upcomingGame)
+    const pastGame = finalized.find(g => g.id === selectedGameId)
+    if (pastGame) return renderDesktopPastDetail(pastGame)
+    return null
+  }
+
+  function renderSeasonTotals() {
+    if (seasonTotalsList.length === 0) return null
+    return (
+      <div style={{ marginTop: '2rem' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
+          Season pitch totals
+        </div>
+        <div style={{ background: 'var(--bg-card)', borderRadius: '10px', border: '0.5px solid var(--border-subtle)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '0.5px solid var(--border-subtle)' }}>
+                <th style={{ ...HEADER_STYLE, textAlign: 'left', padding: '8px 12px' }}>Pitcher</th>
+                <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Games</th>
+                <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Total</th>
+                <th style={{ ...HEADER_STYLE, padding: '8px 8px' }}>Avg/game</th>
+                {pitchLimit != null && <th style={{ ...HEADER_STYLE, padding: '8px 12px 8px 4px' }}>Over limit</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {seasonTotalsList.map((entry, idx) => {
+                const avg = entry.games > 0 ? (entry.total / entry.games).toFixed(0) : '—'
+                const hasOverLimit = entry.overLimit > 0
+                return (
+                  <tr key={idx} style={{ borderTop: idx > 0 ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                    <td style={{ fontSize: '13px', fontWeight: 500, padding: '8px 12px' }}>{entry.name}</td>
+                    <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>{entry.games}</td>
+                    <td style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', padding: '8px',
+                      color: hasOverLimit ? '#E87060' : 'var(--fg)' }}>
+                      {entry.total > 0 ? `${entry.total}p` : '—'}
+                    </td>
+                    <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                      {entry.total > 0 ? `${avg}p` : '—'}
+                    </td>
+                    {pitchLimit != null && (
+                      <td style={{ fontSize: '12px', textAlign: 'center', padding: '8px 12px 8px 4px' }}>
+                        {hasOverLimit
+                          ? <span style={{ color: '#E87060', fontWeight: 700 }}>{entry.overLimit}×</span>
+                          : <span style={{ color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>}
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   return (
-    <main style={{
-      minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
-      fontFamily: 'sans-serif', maxWidth: '540px', margin: '0 auto',
-      padding: '1.5rem 1rem 6rem',
-    }}>
+    <main
+      className="pitching-page-main"
+      style={{
+        minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
+        fontFamily: 'sans-serif', maxWidth: '540px', margin: '0 auto',
+        padding: '1.5rem 1rem 6rem',
+      }}
+    >
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
@@ -435,7 +775,9 @@ export default function PitchingPage() {
         </div>
       )}
 
+      {/* ── Mobile layout (hidden on desktop via CSS) ── */}
       {!loading && (
+        <div className="pitching-mobile-layout">
         <>
           {/* ── PAST GAMES ── */}
           {finalized.length > 0 && (
@@ -755,6 +1097,20 @@ export default function PitchingPage() {
             </div>
           )}
         </>
+        </div>
+      )}
+
+      {/* ── Desktop two-panel layout (hidden on mobile via CSS) ── */}
+      {!loading && (upcoming.length > 0 || finalized.length > 0) && (
+        <div className="pitching-desktop-layout">
+          <div className="pitching-list-panel">
+            {renderDesktopGameList()}
+          </div>
+          <div className="pitching-detail-panel">
+            {renderDesktopDetail()}
+            {renderSeasonTotals()}
+          </div>
+        </div>
       )}
     </main>
   )

@@ -93,6 +93,34 @@ html[data-theme="light"] {
     max-width: 1080px !important;
   }
 
+  /* Pitching page: wider container for two-panel layout */
+  .app-content main.pitching-page-main {
+    max-width: 1080px !important;
+  }
+
+  /* Pitching two-panel layout */
+  .pitching-mobile-layout { display: none !important; }
+
+  .pitching-desktop-layout {
+    display: flex !important;
+    align-items: flex-start;
+    border-top: 0.5px solid var(--border);
+    margin: 0.75rem -1.5rem 0;
+  }
+
+  .pitching-list-panel {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 0.5px solid var(--border);
+    padding: 0.75rem 0.75rem 3rem;
+  }
+
+  .pitching-detail-panel {
+    flex: 1;
+    min-width: 0;
+    padding: 1.5rem 2rem 3rem;
+  }
+
   /* Games two-panel layout */
   .games-mobile-list { display: none !important; }
 
@@ -116,6 +144,10 @@ html[data-theme="light"] {
     padding: 1.5rem 2rem 3rem;
   }
 }
+
+/* Mobile defaults: hide desktop-only panels */
+.pitching-desktop-layout { display: none; }
+.pitching-mobile-layout  { display: block; }
 
 /* ── Standalone eval form (public coach link) ── */
 /* Hides all Six43 chrome so the page is a clean org-branded experience */
