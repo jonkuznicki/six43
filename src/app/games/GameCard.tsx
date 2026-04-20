@@ -157,6 +157,25 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
           ···
         </button>
 
+        {/* Print shortcut — visible directly for lineup_ready games */}
+        {status === 'lineup_ready' && (
+          <Link
+            href={`/games/${game.id}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            style={{
+              flexShrink: 0, width: '36px', textDecoration: 'none',
+              borderLeft: '0.5px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: `rgba(var(--fg-rgb), 0.35)`, fontSize: '15px',
+            }}
+            title="Print lineup"
+          >
+            🖨
+          </Link>
+        )}
+
         {/* Right action: score (finished) or lineup (upcoming) */}
         {isFinished ? (
           <button onClick={openScore} style={{

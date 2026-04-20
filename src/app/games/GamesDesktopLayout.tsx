@@ -30,50 +30,71 @@ function GameListRow({
   selected: boolean
   onSelect: (g: any) => void
 }) {
-  const isPlaceholder = !!game.is_placeholder
-  const today         = new Date().toISOString().split('T')[0]
-  const isStale       = isPlaceholder && game.game_date < today
-  const dotColor      = STATUS_DOT[game.status]
+  const isPlaceholder  = !!game.is_placeholder
+  const today          = new Date().toISOString().split('T')[0]
+  const isStale        = isPlaceholder && game.game_date < today
+  const dotColor       = STATUS_DOT[game.status]
+  const isPrintable    = game.status === 'lineup_ready'
 
   return (
-    <button
-      onClick={() => onSelect(game)}
-      style={{
-        width: '100%', textAlign: 'left', cursor: 'pointer',
-        border: 'none', padding: '9px 10px', borderRadius: '8px',
-        background: selected ? 'rgba(75,156,211,0.1)' : 'transparent',
-        display: 'flex', alignItems: 'center', gap: '8px',
-        marginBottom: '2px',
-        transition: 'background 0.12s',
-      }}
-    >
-      {/* Status indicator */}
-      <div style={{
-        width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-        background: dotColor ?? (selected ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`),
-      }} />
-
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '2px' }}>
+      <button
+        onClick={() => onSelect(game)}
+        style={{
+          flex: 1, minWidth: 0, textAlign: 'left', cursor: 'pointer',
+          border: 'none', padding: '9px 10px', borderRadius: '8px',
+          background: selected ? 'rgba(75,156,211,0.1)' : 'transparent',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          transition: 'background 0.12s',
+        }}
+      >
+        {/* Status indicator */}
         <div style={{
-          fontSize: '13px', fontWeight: selected ? 600 : 400,
-          color: selected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.75)`,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {isPlaceholder ? game.opponent : `vs ${game.opponent}`}
-          {isStale && (
-            <span style={{ marginLeft: '5px', fontSize: '10px', color: '#E87060' }}>⚠</span>
-          )}
-        </div>
-        <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
-          {formatDate(game.game_date)}
-          {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
-        </div>
-      </div>
+          width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+          background: dotColor ?? (selected ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`),
+        }} />
 
-      {selected && (
-        <span style={{ color: 'var(--accent)', fontSize: '14px', flexShrink: 0 }}>›</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: '13px', fontWeight: selected ? 600 : 400,
+            color: selected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.75)`,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {isPlaceholder ? game.opponent : `vs ${game.opponent}`}
+            {isStale && (
+              <span style={{ marginLeft: '5px', fontSize: '10px', color: '#E87060' }}>⚠</span>
+            )}
+          </div>
+          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
+            {formatDate(game.game_date)}
+            {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
+          </div>
+        </div>
+
+        {selected && (
+          <span style={{ color: 'var(--accent)', fontSize: '14px', flexShrink: 0 }}>›</span>
+        )}
+      </button>
+
+      {/* Print shortcut — only for lineup_ready games */}
+      {isPrintable && (
+        <Link
+          href={`/games/${game.id}/print`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Print lineup"
+          style={{
+            flexShrink: 0, width: '28px', height: '28px', borderRadius: '6px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textDecoration: 'none', fontSize: '13px',
+            color: `rgba(var(--fg-rgb), 0.35)`,
+            background: 'transparent',
+          }}
+        >
+          🖨
+        </Link>
       )}
-    </button>
+    </div>
   )
 }
 

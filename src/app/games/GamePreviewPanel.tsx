@@ -208,7 +208,7 @@ export default function GamePreviewPanel({
         }}>
           Open Full Editor →
         </Link>
-        {game.status === 'lineup_ready' && (
+        {hasLineup && (
           <Link
             href={`/games/${game.id}/print`}
             target="_blank" rel="noopener noreferrer"
