@@ -550,6 +550,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     }
     if (benchBlocked > 0) setBenchWarning(`${benchBlocked} cell${benchBlocked !== 1 ? 's' : ''} skipped — bench limit reached for those innings.`)
     if (changedIds.size) commit(next, Array.from(changedIds))
+    return changedIds.size > 0
   }
 
   // ── Undo / Redo ───────────────────────────────────────────────────────────
@@ -925,9 +926,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       if (pos && teamPositions.includes(pos)) {
         e.preventDefault()
         setActivePos(pos)
-        fillSelected(pos)
-        // Auto-advance: next inning, or wrap to first inning of next player
-        if (selectedCellsRef.current.size === 1) {
+        const filled = fillSelected(pos)
+        // Auto-advance only when something was actually assigned (stay put on bench-limit block)
+        if (filled && selectedCellsRef.current.size === 1) {
           if (ii < inningCount - 1) {
             moveFocus(si, ii + 1)
           } else if (si < rowCount - 1) {
@@ -1540,6 +1541,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               })
             }
 
+            // Bench fill state for active inning
+            const benchCountInInning = activeInning !== null
+              ? activeSlots.filter((s, si) => !selSiVals.has(si) && (s.inning_positions ?? [])[activeInning] === 'Bench').length
+              : 0
+            const benchFull = activeInning !== null && benchPerInning > 0 && benchCountInInning >= benchPerInning
+
             return (
               <div style={{
                 padding: '8px 14px 10px', borderTop: '1px solid var(--border)',
@@ -1555,29 +1562,34 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   {teamPositions.map(pos => {
                     const isActive = activePos === pos
                     const pc = POS_COLOR[pos]
-                    const isUsed = activeInning !== null && usedInInning.has(pos)
+                    const isUsed = pos === 'Bench' ? benchFull : (activeInning !== null && usedInInning.has(pos))
                     const isAvailable = activeInning !== null && !isUsed && pos !== 'Bench'
                     return (
                       <button
                         key={pos}
                         onClick={() => { setActivePos(pos); fillSelected(pos) }}
                         style={{
-                          padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                          fontSize: 11, fontWeight: isUsed ? 400 : 700,
+                          padding: '3px 7px 4px', borderRadius: 5, cursor: 'pointer',
+                          fontSize: 11, fontWeight: 700,
                           border: `1.5px solid ${isActive ? (pc?.color ?? 'var(--accent)') : isAvailable ? (pc?.color ?? 'var(--border-md)') : 'var(--border-md)'}`,
                           background: isActive ? (pc?.bg ?? 'transparent') : 'transparent',
                           color: isActive
                             ? (pc?.color ?? 'var(--fg)')
                             : isUsed
-                              ? `rgba(var(--fg-rgb),0.2)`
+                              ? `rgba(var(--fg-rgb),0.3)`
                               : isAvailable
                                 ? (pc?.color ?? 'var(--fg)')
                                 : `rgba(var(--fg-rgb),0.5)`,
-                          opacity: isUsed ? 0.5 : 1,
                           boxShadow: isActive ? `0 0 0 2px ${pc?.color ?? 'var(--accent)'}22` : 'none',
-                          textDecoration: isUsed ? 'line-through' : 'none',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
+                          lineHeight: 1,
                         }}
                       >
+                        <span style={{
+                          fontSize: 7, fontWeight: 700, color: '#6DB875', lineHeight: 1,
+                          visibility: isUsed ? 'visible' : 'hidden',
+                          marginBottom: 1,
+                        }}>✓</span>
                         {pos}
                       </button>
                     )
