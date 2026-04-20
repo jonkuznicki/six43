@@ -426,9 +426,9 @@ export default function PitchingPage() {
     ...Object.values(actualPitching).map(arr => arr.length)
   )
 
-  const upcomingGrid = `140px repeat(${slotCount}, 1fr)`
-  const pastGrid     = `120px repeat(${maxActualPitchers}, 1fr)`
-  const upcomingMinW = `${300 + slotCount * 80}px`
+  const upcomingGrid = `80px repeat(${slotCount}, 60px)`
+  const pastGrid     = `80px repeat(${maxActualPitchers}, 60px)`
+  const upcomingMinW = `${80 + slotCount * 60 + 20}px`
 
   // ── Desktop detail panel renderers ───────────────────────────────────────
 
@@ -1047,11 +1047,12 @@ export default function PitchingPage() {
                     }}>
                       {/* Game info */}
                       <div style={{ paddingTop: '2px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
-                          vs {game.opponent}
+                        <div style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {game.opponent}
                         </div>
-                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-                          {formatDate(game.game_date)}
+                        <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px', lineHeight: 1.2 }}>
+                          {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                       </div>
 
@@ -1071,56 +1072,39 @@ export default function PitchingPage() {
 
                         return (
                           <div key={i} style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2, marginBottom: '2px' }}>
-                              {shortName(p.player)}
-                            </div>
-                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, marginBottom: '3px' }}>
-                              {p.innings} inn
+                            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.2, marginBottom: '3px',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.player ? p.player.last_name : '—'}
                             </div>
                             {isDrafting ? (
                               <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={draftVal}
-                                autoFocus
-                                onChange={e => setEditingPitch(prev => ({
-                                  ...prev, [draftKey]: e.target.value.replace(/\D/g, ''),
-                                }))}
+                                type="text" inputMode="numeric" pattern="[0-9]*"
+                                value={draftVal} autoFocus
+                                onChange={e => setEditingPitch(prev => ({ ...prev, [draftKey]: e.target.value.replace(/\D/g, '') }))}
                                 onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                                  if (e.key === 'Escape') {
-                                    setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
-                                  }
+                                  if (e.key === 'Escape') setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
                                 }}
                                 style={{
-                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
+                                  width: '100%', padding: '2px 3px', borderRadius: '4px',
                                   border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
-                                  color: 'var(--fg)', fontSize: '11px', textAlign: 'center',
-                                  boxSizing: 'border-box',
+                                  color: 'var(--fg)', fontSize: '10px', textAlign: 'center', boxSizing: 'border-box',
                                 }}
                               />
                             ) : (
                               <button
-                                onClick={() => setEditingPitch(prev => ({
-                                  ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '',
-                                }))}
-                                title={overLimit ? `Exceeds ${pitchLimit}p limit` : undefined}
+                                onClick={() => setEditingPitch(prev => ({ ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '' }))}
+                                title={overLimit ? `Exceeds ${pitchLimit}p limit` : 'Tap to edit pitch count'}
                                 style={{
-                                  width: '100%', padding: '3px 4px', borderRadius: '4px',
-                                  border: overLimit
-                                    ? '0.5px solid rgba(232,112,96,0.6)'
-                                    : p.pitchCount != null
-                                      ? '0.5px solid var(--border-md)'
-                                      : '0.5px dashed var(--border-md)',
+                                  width: '100%', padding: '2px 3px', borderRadius: '4px',
+                                  border: overLimit ? '0.5px solid rgba(232,112,96,0.6)' : p.pitchCount != null ? '0.5px solid var(--border-md)' : '0.5px dashed var(--border-md)',
                                   background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
                                   color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.6)` : `rgba(var(--fg-rgb), 0.2)`,
-                                  fontSize: '11px', cursor: 'pointer',
-                                  textAlign: 'center', fontWeight: overLimit ? 700 : 400,
+                                  fontSize: '10px', cursor: 'pointer', textAlign: 'center', fontWeight: overLimit ? 700 : 400,
                                 }}
                               >
-                                {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
+                                {p.innings}i{p.pitchCount != null ? ` · ${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : ' · +p'}
                               </button>
                             )}
                           </div>
@@ -1193,12 +1177,12 @@ export default function PitchingPage() {
                       border: '0.5px solid var(--border-subtle)',
                     }}>
                       <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.2 }}>
-                          vs {game.opponent}
+                        <div style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {game.opponent}
                         </div>
-                        <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px' }}>
-                          {formatDate(game.game_date)}
-                          {game.location ? ` · ${game.location}` : ''}
+                        <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px', lineHeight: 1.2 }}>
+                          {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                         {(() => {
                           const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
