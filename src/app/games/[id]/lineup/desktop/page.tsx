@@ -336,14 +336,18 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       localStorage.getItem(`six43_batting_chose_${params.id}`) === '1'
     const noSlots = noPositions && !alreadyChose
     if (noSlots && gameData?.season_id) {
-      const { data: recentGames } = await supabase
+      let recentGamesQuery = supabase
         .from('games')
         .select('id, opponent, game_date')
         .eq('season_id', gameData.season_id)
         .neq('id', params.id)
         .not('game_date', 'is', null)
         .order('game_date', { ascending: false })
-        .limit(5)
+        .limit(10)
+      if (gameData.game_date) {
+        recentGamesQuery = (recentGamesQuery as any).lt('game_date', gameData.game_date)
+      }
+      const { data: recentGames } = await recentGamesQuery
 
       let prevWithSlots: { id: string; opponent: string; game_date: string } | null = null
       for (const pg of recentGames ?? []) {
