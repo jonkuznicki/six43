@@ -907,7 +907,7 @@ export default function PitchingPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
             <h1 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>Pitcher Planner</h1>
-            <div className="pitching-view-toggle" style={{ display: 'flex', borderRadius: '6px', border: '0.5px solid var(--border-md)', overflow: 'hidden', flexShrink: 0 }}>
+            <div className="pitching-view-toggle" style={{ borderRadius: '6px', border: '0.5px solid var(--border-md)', overflow: 'hidden', flexShrink: 0 }}>
               {(['planner', 'grid'] as const).map(v => (
                 <button
                   key={v}
