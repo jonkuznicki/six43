@@ -1255,15 +1255,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                                 ? <span style={{ color: `rgba(var(--fg-rgb),0.4)`, fontWeight: 600 }}>{unassignedCount}</span>
                                 : <span style={{ color: `rgba(var(--fg-rgb),0.12)` }}>·</span>}
                         </span>
-                        {benchPerInning > 0 && (
-                          <span style={{
-                            fontSize: 8, lineHeight: 1,
-                            color: benchOver ? '#E87060' : benchCount === benchPerInning ? '#6DB875' : `rgba(var(--fg-rgb),0.25)`,
-                            fontWeight: benchCount === benchPerInning || benchOver ? 700 : 400,
-                          }}>
-                            {benchCount}/{benchPerInning}B
-                          </span>
-                        )}
                       </div>
                     </th>
                   )
