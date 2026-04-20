@@ -1530,6 +1530,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               ? activeSlots.filter((s, si) => !selSiVals.has(si) && (s.inning_positions ?? [])[activeInning] === 'Bench').length
               : 0
             const benchFull = activeInning !== null && benchPerInning > 0 && benchCountInInning >= benchPerInning
+            // All-inclusive bench count (including selected) — for checkmark display
+            const allBenchCountInInning = activeInning !== null
+              ? activeSlots.filter(s => (s.inning_positions ?? [])[activeInning] === 'Bench').length
+              : 0
+            const allBenchFull = activeInning !== null && benchPerInning > 0 && allBenchCountInInning >= benchPerInning
 
             return (
               <div style={{
@@ -1546,7 +1551,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   {teamPositions.map(pos => {
                     const isActive = activePos === pos
                     const pc = POS_COLOR[pos]
-                    const isUsed = pos === 'Bench' ? benchFull : (activeInning !== null && allUsedInInning.has(pos))
+                    const isUsed = pos === 'Bench' ? allBenchFull : (activeInning !== null && allUsedInInning.has(pos))
                     const isAvailable = activeInning !== null && !isUsed && pos !== 'Bench'
                     return (
                       <button
