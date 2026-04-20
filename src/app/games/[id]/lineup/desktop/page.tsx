@@ -97,6 +97,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [prevGameForBatting, setPrevGameForBatting] = useState<{id:string,opponent:string,game_date:string}|null>(null)
   const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
   const [dcWarning, setDcWarning]       = useState<string | null>(null)
+  const [benchWarning, setBenchWarning] = useState<string | null>(null)
   const [showPlayerNotes, setShowPlayerNotes] = useState(false)
   const [playerNoteInputs, setPlayerNoteInputs] = useState<Record<string, string>>({})
   const [savingPlayerNotes, setSavingPlayerNotes] = useState(false)
@@ -113,10 +114,18 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const savedPositionsRef = useRef<Record<string, (string|null)[]>>({})
   // Anchor for shift-selection: the cell where selection started (stays fixed while shift-arrowing)
   const anchorRef = useRef<{ si: number; ii: number } | null>(null)
+  // Click+drag selection
+  const isDraggingCellRef  = useRef(false)
+  const dragCellAnchorRef  = useRef<{ si: number; ii: number } | null>(null)
   useEffect(() => { selectedCellsRef.current = selectedCells }, [selectedCells])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    const up = () => { isDraggingCellRef.current = false }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -479,6 +488,20 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         setDcWarning(`${name} is marked "should not play" at ${newPos} in the Depth Chart.`)
       }
     }
+    if (newPos === 'Bench') {
+      const active = slotsRef.current.filter(s => s.availability !== 'absent')
+      const fieldCount = teamPositions.filter(p => p !== 'Bench').length
+      const bpi = Math.max(0, active.length - fieldCount)
+      if (bpi === 0) {
+        setBenchWarning('Everyone plays this inning — no bench spots with this roster size.')
+        return
+      }
+      const currentBench = active.filter(s => s.id !== slotId && (s.inning_positions ?? [])[ii] === 'Bench').length
+      if (currentBench >= bpi) {
+        setBenchWarning(`Inning ${ii + 1} bench is full (${bpi}/${bpi}). Remove a bench player first.`)
+        return
+      }
+    }
     const next = slotsRef.current.map(s => ({
       ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
     }))
@@ -499,22 +522,33 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     const sel = selectedCellsRef.current
     if (sel.size === 0) return
     const active = slotsRef.current.filter(s => s.availability !== 'absent')
+    const fieldCount = teamPositions.filter(p => p !== 'Bench').length
+    const bpi = Math.max(0, active.length - fieldCount)
     const next = slotsRef.current.map(s => ({
       ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
     }))
     const changedIds = new Set<string>()
+    // Track bench count added per inning during this fill to respect the limit
+    const benchAdded: Record<number, number> = {}
+    let benchBlocked = 0
     for (const key of Array.from(sel)) {
       const [siStr, iiStr] = key.split('-')
       const si = parseInt(siStr), ii = parseInt(iiStr)
       const slot = active[si]
       if (!slot) continue
-      if (pos && pos !== 'Bench') {
+      if (pos === 'Bench') {
+        const currentBench = next.filter(s => s.id !== slot.id && s.availability !== 'absent' && s.inning_positions[ii] === 'Bench').length
+        const added = benchAdded[ii] ?? 0
+        if (bpi === 0 || currentBench + added >= bpi) { benchBlocked++; continue }
+        benchAdded[ii] = added + 1
+      } else {
         const holder = next.find(s => s.id !== slot.id && s.inning_positions[ii] === pos)
         if (holder) { holder.inning_positions[ii] = null; changedIds.add(holder.id) }
       }
       const target = next.find(s => s.id === slot.id)
       if (target) { target.inning_positions[ii] = pos; changedIds.add(target.id) }
     }
+    if (benchBlocked > 0) setBenchWarning(`${benchBlocked} cell${benchBlocked !== 1 ? 's' : ''} skipped — bench limit reached for those innings.`)
     if (changedIds.size) commit(next, Array.from(changedIds))
   }
 
@@ -812,10 +846,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       }
 
       switch (e.key) {
-        case 'ArrowRight': case 'Tab': {
+        case 'Tab': {
+          e.preventDefault()
+          if (!e.shiftKey) {
+            if (ii < inningCount - 1) moveFocus(si, ii + 1)
+            else if (si < rowCount - 1) moveFocus(si + 1, 0)
+          } else {
+            if (ii > 0) moveFocus(si, ii - 1)
+            else if (si > 0) moveFocus(si - 1, inningCount - 1)
+          }
+          return
+        }
+        case 'ArrowRight': {
           e.preventDefault()
           const newIi = Math.min(ii + 1, inningCount - 1)
-          if (e.shiftKey && e.key !== 'Tab') {
+          if (e.shiftKey) {
             // Move cursor forward; compute full range from anchor to new cursor
             const anchor = anchorRef.current ?? { si, ii }
             setFocused({ si, ii: newIi })
@@ -1123,6 +1168,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         </div>
       )}
 
+      {/* ─── BENCH LIMIT WARNING ─── */}
+      {benchWarning && (
+        <div style={{
+          background: 'rgba(232,112,96,0.09)', borderBottom: '1px solid rgba(232,112,96,0.3)',
+          padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 13, color: '#E87060' }}>⚠ {benchWarning}</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setBenchWarning(null)} style={{
+            background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+            fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0,
+          }}>×</button>
+        </div>
+      )}
+
       {/* ─── DEPTH CHART RESTRICTION WARNING ─── */}
       {dcWarning && (
         <div style={{
@@ -1164,7 +1224,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   }
                   const hasDupe = Object.entries(counts).some(([pos, v]) => pos !== 'Bench' && v > 1)
                   const unassignedCount = activeSlots.filter(s => !(s.inning_positions ?? [])[ii]).length
-                  const isComplete = activeSlots.length > 0 && unassignedCount === 0 && !hasDupe
+                  const benchCount = counts['Bench'] ?? 0
+                  const benchOver = benchPerInning > 0 && benchCount > benchPerInning
+                  const isComplete = activeSlots.length > 0 && unassignedCount === 0 && !hasDupe && !benchOver
                   const colSelected = activeSlots.length > 0 && activeSlots.every((_, si) => selectedCells.has(`${si}-${ii}`))
                   const colCopied = activeSlots.length > 0 && activeSlots.every((_, si) => copiedKeys.has(`${si}-${ii}`))
                   return (
@@ -1184,7 +1246,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
                         <span>{ii + 1}</span>
                         <span style={{ fontSize: 9 }}>
-                          {hasDupe
+                          {(hasDupe || benchOver)
                             ? <span style={{ color: '#E87060' }}>⚠</span>
                             : isComplete
                               ? <span style={{ color: '#6DB875', fontWeight: 700 }}>✓</span>
@@ -1192,6 +1254,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                                 ? <span style={{ color: `rgba(var(--fg-rgb),0.4)`, fontWeight: 600 }}>{unassignedCount}</span>
                                 : <span style={{ color: `rgba(var(--fg-rgb),0.12)` }}>·</span>}
                         </span>
+                        {benchPerInning > 0 && (
+                          <span style={{
+                            fontSize: 8, lineHeight: 1,
+                            color: benchOver ? '#E87060' : benchCount === benchPerInning ? '#6DB875' : `rgba(var(--fg-rgb),0.25)`,
+                            fontWeight: benchCount === benchPerInning || benchOver ? 700 : 400,
+                          }}>
+                            {benchCount}/{benchPerInning}B
+                          </span>
+                        )}
                       </div>
                     </th>
                   )
@@ -1313,18 +1384,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       return (
                         <td
                           key={ii}
-                          onClick={(e) => {
-                            if (e.shiftKey && focused !== null && focused.si === si) {
-                              // Range-select from anchor to clicked cell
+                          onMouseDown={(e) => {
+                            if (e.button !== 0) return
+                            if (e.shiftKey && focused !== null) {
+                              // Shift+click: rectangular range from anchor
                               const anchor = anchorRef.current ?? focused
-                              const lo = Math.min(anchor.ii, ii)
-                              const hi = Math.max(anchor.ii, ii)
+                              const minSi = Math.min(anchor.si, si)
+                              const maxSi = Math.max(anchor.si, si)
+                              const minIi = Math.min(anchor.ii, ii)
+                              const maxIi = Math.max(anchor.ii, ii)
                               const next = new Set<string>()
-                              for (let i = lo; i <= hi; i++) next.add(`${si}-${i}`)
+                              for (let r = minSi; r <= maxSi; r++)
+                                for (let c = minIi; c <= maxIi; c++) next.add(`${r}-${c}`)
                               setSelectedCells(next)
                               setFocused({ si, ii })
                             } else if (e.metaKey || e.ctrlKey) {
-                              // Toggle individual cell
                               setSelectedCells(prev => {
                                 const next = new Set(prev)
                                 if (next.has(cellKey)) next.delete(cellKey)
@@ -1334,13 +1408,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                               setFocused({ si, ii })
                               anchorRef.current = { si, ii }
                             } else {
-                              // Single select — sets anchor for future shift-selections
                               setSelectedCells(new Set([cellKey]))
                               setFocused({ si, ii })
                               anchorRef.current = { si, ii }
+                              isDraggingCellRef.current = true
+                              dragCellAnchorRef.current = { si, ii }
                             }
                           }}
-                          title={pos ? pos : 'Click to select · shift+click to extend · ⌘+click to toggle'}
+                          onMouseEnter={() => {
+                            if (!isDraggingCellRef.current || !dragCellAnchorRef.current) return
+                            const anchor = dragCellAnchorRef.current
+                            const minSi = Math.min(anchor.si, si)
+                            const maxSi = Math.max(anchor.si, si)
+                            const minIi = Math.min(anchor.ii, ii)
+                            const maxIi = Math.max(anchor.ii, ii)
+                            const next = new Set<string>()
+                            for (let r = minSi; r <= maxSi; r++)
+                              for (let c = minIi; c <= maxIi; c++) next.add(`${r}-${c}`)
+                            setSelectedCells(next)
+                            setFocused({ si, ii })
+                          }}
+                          title={pos ? pos : 'Click to select · drag to select range · shift+click to extend · ⌘+click to toggle'}
                           style={{
                             ...gCell,
                             textAlign: 'center', cursor: 'pointer',
@@ -1360,6 +1448,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                                     : 'none',
                             outlineOffset: -2,
                             transition: 'background 0.05s',
+                            userSelect: 'none',
                           }}
                         >
                           <span style={{
