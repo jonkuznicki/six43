@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
+import { parseScore, gameResult } from '../../lib/parseScore'
 
 const POS_COLOR: Record<string, { bg: string; color: string }> = {
   P:     { bg: 'rgba(75,156,211,0.22)',  color: '#4B9CD3' },
@@ -54,6 +55,9 @@ export default function GamePreviewPanel({
   const date      = new Date(game.game_date + 'T12:00:00')
   const formatted = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   const sc        = STATUS_LABEL[game.status] ?? STATUS_LABEL.scheduled
+  const score     = game.status === 'final' ? parseScore(game.notes) : null
+  const result    = score ? gameResult(score) : null
+  const resultColor = result === 'W' ? '#6DB875' : result === 'L' ? '#E87060' : `rgba(var(--fg-rgb), 0.45)`
 
   const activeSlots = slots.filter(s => s.availability !== 'absent')
   const hasLineup   = activeSlots.some(s => (s.inning_positions ?? []).some(Boolean))
@@ -70,15 +74,27 @@ export default function GamePreviewPanel({
           <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
             {isPlaceholder ? game.opponent : `vs ${game.opponent}`}
           </h2>
-          {!isPlaceholder && (
+          {score ? (
+            /* Final score + W/L */
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                fontSize: '12px', fontWeight: 800, padding: '2px 7px', borderRadius: '4px',
+                color: resultColor, border: `0.5px solid ${resultColor}55`, background: 'transparent',
+              }}>
+                {result}
+              </span>
+              <span style={{ fontSize: '20px', fontWeight: 800, color: resultColor, lineHeight: 1 }}>
+                {score.us}–{score.them}
+              </span>
+            </div>
+          ) : !isPlaceholder ? (
             <span style={{
               fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px',
               color: sc.color, border: `0.5px solid ${sc.color}55`, background: 'transparent',
             }}>
               {sc.label}
             </span>
-          )}
-          {isPlaceholder && (
+          ) : (
             <span style={{
               fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
               background: 'rgba(var(--fg-rgb),0.06)', color: `rgba(var(--fg-rgb), 0.4)`,

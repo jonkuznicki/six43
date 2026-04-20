@@ -6,6 +6,7 @@ import GameCard from './GameCard'
 import GamePreviewPanel from './GamePreviewPanel'
 import ScrollToToday from './ScrollToToday'
 import { formatTime } from '../../lib/formatTime'
+import { parseScore, gameResult } from '../../lib/parseScore'
 
 // ── Compact game row for the desktop left panel ────────────────────────────────
 
@@ -35,6 +36,10 @@ function GameListRow({
   const isStale        = isPlaceholder && game.game_date < today
   const dotColor       = STATUS_DOT[game.status]
   const isPrintable    = game.status === 'lineup_ready'
+  const isFinal        = game.status === 'final'
+  const score          = isFinal ? parseScore(game.notes) : null
+  const result         = score ? gameResult(score) : null
+  const resultColor    = result === 'W' ? '#6DB875' : result === 'L' ? '#E87060' : `rgba(var(--fg-rgb), 0.45)`
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '2px' }}>
@@ -46,13 +51,23 @@ function GameListRow({
           background: selected ? 'rgba(75,156,211,0.1)' : 'transparent',
           display: 'flex', alignItems: 'center', gap: '8px',
           transition: 'background 0.12s',
+          opacity: isFinal ? 0.75 : 1,
         }}
       >
-        {/* Status indicator */}
-        <div style={{
-          width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-          background: dotColor ?? (selected ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`),
-        }} />
+        {/* Status / result indicator */}
+        {result ? (
+          <span style={{
+            fontSize: '10px', fontWeight: 800, color: resultColor,
+            width: '12px', textAlign: 'center', flexShrink: 0,
+          }}>
+            {result}
+          </span>
+        ) : (
+          <div style={{
+            width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+            background: dotColor ?? (selected ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`),
+          }} />
+        )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
@@ -71,7 +86,17 @@ function GameListRow({
           </div>
         </div>
 
-        {selected && (
+        {/* Score for final games */}
+        {score && (
+          <span style={{
+            fontSize: '12px', fontWeight: 700, flexShrink: 0,
+            color: resultColor,
+          }}>
+            {score.us}–{score.them}
+          </span>
+        )}
+
+        {selected && !score && (
           <span style={{ color: 'var(--accent)', fontSize: '14px', flexShrink: 0 }}>›</span>
         )}
       </button>

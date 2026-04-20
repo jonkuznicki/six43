@@ -5,21 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
-
-function parseScore(notes: string | null): { us: number; them: number } | null {
-  try {
-    const p = JSON.parse(notes ?? '{}')
-    if (p._score != null) return p._score
-    if (p._box) {
-      const hasData = [...(p._box.us ?? []), ...(p._box.them ?? [])].some((v: number | null) => v !== null)
-      if (!hasData) return null
-      const us   = (p._box.us   ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0)
-      const them = (p._box.them ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0)
-      return { us, them }
-    }
-    return null
-  } catch { return null }
-}
+import { parseScore } from '../../lib/parseScore'
 
 function writeScore(notes: string | null, us: number, them: number): string {
   try {

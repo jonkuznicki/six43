@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { formatTime } from '../../lib/formatTime'
+import { parseScore } from '../../lib/parseScore'
 import TeamSelect from '../games/TeamSelect'
 
 export const dynamic = 'force-dynamic'
@@ -12,27 +13,16 @@ function parseRecord(games: any[]): { w: number; l: number } {
   let w = 0, l = 0
   for (const game of games) {
     if (game.status !== 'final') continue
-    try {
-      const box = JSON.parse(game.notes ?? '{}')._box
-      if (!box) continue
-      const us   = (box.us   ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0)
-      const them = (box.them ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0)
-      if (us > them) w++
-      else if (them > us) l++
-    } catch {}
+    const score = parseScore(game.notes)
+    if (!score) continue
+    if (score.us > score.them) w++
+    else if (score.them > score.us) l++
   }
   return { w, l }
 }
 
 function getBoxScore(game: any): { us: number; them: number } | null {
-  try {
-    const box = JSON.parse(game.notes ?? '{}')._box
-    if (!box) return null
-    return {
-      us:   (box.us   ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0),
-      them: (box.them ?? []).reduce((a: number, v: number | null) => a + (v ?? 0), 0),
-    }
-  } catch { return null }
+  return parseScore(game.notes)
 }
 
 function formatDate(d: string) {
