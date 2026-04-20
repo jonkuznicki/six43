@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { setSelectedTeamId } from '../../lib/selectedTeam'
 
@@ -444,22 +445,38 @@ export default function PitchingPage() {
               const pitchers = actualPitching[game.id] ?? []
               const isSelected = selectedGameId === game.id
               return (
-                <button key={game.id} onClick={() => setSelectedGameId(game.id)} style={{
-                  width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
-                  padding: '8px 10px', borderRadius: '8px',
+                <div key={game.id} style={{
+                  padding: '8px 10px', borderRadius: '8px', marginBottom: '2px',
                   background: isSelected ? 'rgba(75,156,211,0.1)' : 'transparent',
-                  marginBottom: '2px', transition: 'background 0.12s', opacity: 0.8,
-                }}>
-                  <div style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 400,
-                    color: isSelected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.65)`,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    vs {game.opponent}
+                  transition: 'background 0.12s', opacity: 0.8, cursor: 'pointer',
+                }} onClick={() => setSelectedGameId(game.id)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 400,
+                      color: isSelected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.65)`,
+                      flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      vs {game.opponent}
+                    </span>
+                    {isSelected && (
+                      <Link
+                        href={`/games/${game.id}/lineup/desktop`}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          fontSize: '10px', fontWeight: 600, color: 'var(--accent)',
+                          textDecoration: 'none', flexShrink: 0,
+                          padding: '2px 6px', borderRadius: 4,
+                          border: '0.5px solid rgba(75,156,211,0.4)',
+                          background: 'rgba(75,156,211,0.08)',
+                        }}
+                      >
+                        Edit Lineup
+                      </Link>
+                    )}
                   </div>
                   <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
                     {formatDate(game.game_date)}
                     {pitchers.length > 0 ? ` · ${pitchers.map(p => shortName(p.player)).join(', ')}` : ''}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -476,12 +493,11 @@ export default function PitchingPage() {
               const isSelected = selectedGameId === game.id
               const assignedCount = Object.values(plans[game.id] ?? {}).filter((p: PlanSlot) => p.player_id).length
               return (
-                <button key={game.id} onClick={() => setSelectedGameId(game.id)} style={{
-                  width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
-                  padding: '8px 10px', borderRadius: '8px',
+                <div key={game.id} style={{
+                  padding: '8px 10px', borderRadius: '8px', marginBottom: '2px',
                   background: isSelected ? 'rgba(75,156,211,0.1)' : 'transparent',
-                  marginBottom: '2px', transition: 'background 0.12s',
-                }}>
+                  transition: 'background 0.12s', cursor: 'pointer',
+                }} onClick={() => setSelectedGameId(game.id)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 400,
                       color: isSelected ? 'var(--fg)' : `rgba(var(--fg-rgb), 0.75)`,
@@ -493,12 +509,26 @@ export default function PitchingPage() {
                         {assignedCount}P
                       </span>
                     )}
-                    {isSelected && <span style={{ color: 'var(--accent)', fontSize: '13px', flexShrink: 0 }}>›</span>}
+                    {isSelected && (
+                      <Link
+                        href={`/games/${game.id}/lineup/desktop`}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          fontSize: '10px', fontWeight: 600, color: 'var(--accent)',
+                          textDecoration: 'none', flexShrink: 0,
+                          padding: '2px 6px', borderRadius: 4,
+                          border: '0.5px solid rgba(75,156,211,0.4)',
+                          background: 'rgba(75,156,211,0.08)',
+                        }}
+                      >
+                        Edit Lineup
+                      </Link>
+                    )}
                   </div>
                   <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.35)`, marginTop: '1px' }}>
                     {formatDate(game.game_date)}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
