@@ -903,7 +903,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const totalAssigned = activeSlots.reduce(
     (sum, s) => sum + assignedInnings(s, inningCount), 0
   )
-  const tipVisible = showTip && !hasPriorLineup
+  const tipVisible = showTip
 
   const gameDate = game?.game_date
     ? new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
