@@ -1244,18 +1244,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       style={{ ...gHdr, cursor: 'pointer', userSelect: 'none',
                         background: colSelected ? 'rgba(var(--fg-rgb),0.05)' : colCopied ? 'rgba(75,156,211,0.06)' : undefined }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
-                        <span>{ii + 1}</span>
-                        <span style={{ fontSize: 9 }}>
-                          {(hasDupe || benchOver)
-                            ? <span style={{ color: '#E87060' }}>⚠</span>
-                            : isComplete
-                              ? <span style={{ color: '#6DB875', fontWeight: 700 }}>✓</span>
-                              : unassignedCount > 0
-                                ? <span style={{ color: `rgba(var(--fg-rgb),0.4)`, fontWeight: 600 }}>{unassignedCount}</span>
-                                : <span style={{ color: `rgba(var(--fg-rgb),0.12)` }}>·</span>}
-                        </span>
-                      </div>
+                      {ii + 1}
                     </th>
                   )
                 })}
