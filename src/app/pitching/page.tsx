@@ -5,7 +5,7 @@ import { createClient } from '../../lib/supabase'
 import { setSelectedTeamId } from '../../lib/selectedTeam'
 
 type PlanSlot = { id?: string; player_id: string; notes: string }
-type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null; firstInning: number }
+type ActualPitcher = { player: any; playerId: string; slotId: string; innings: number; pitchCount: number | null; firstInning: number; isExtra?: boolean; extraId?: string }
 
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
@@ -62,6 +62,11 @@ export default function PitchingPage() {
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null)
+  const [addingPitcherGameId, setAddingPitcherGameId] = useState<string | null>(null)
+  const [addPitcherPlayerId, setAddPitcherPlayerId]   = useState('')
+  const [addPitcherInnings, setAddPitcherInnings]     = useState('1')
+  const [addPitcherPitches, setAddPitcherPitches]     = useState('')
+  const [addPitcherSaving, setAddPitcherSaving]       = useState(false)
   const [pitchingView, setPitchingView] = useState<'grid' | 'planner'>(() =>
     typeof window !== 'undefined'
       ? (localStorage.getItem('six43_pitching_view') as 'grid' | 'planner' | null) ?? 'planner'
@@ -240,6 +245,30 @@ export default function PitchingPage() {
       for (const id of Object.keys(actualMap)) {
         actualMap[id].sort((a, b) => a.firstInning - b.firstInning)
       }
+
+      // Merge in extra pitchers (mid-game subs not in original lineup)
+      const { data: extraRows } = await supabase
+        .from('game_extra_pitchers')
+        .select('id, game_id, player_id, innings, pitch_count, player:players(first_name, last_name, jersey_number)')
+        .in('game_id', finalizedIds)
+      for (const row of extraRows ?? []) {
+        if (!actualMap[row.game_id]) actualMap[row.game_id] = []
+        actualMap[row.game_id].push({
+          player: row.player,
+          playerId: row.player_id,
+          slotId: `extra-${row.id}`,
+          innings: row.innings,
+          pitchCount: row.pitch_count ?? null,
+          firstInning: 999,
+          isExtra: true,
+          extraId: row.id,
+        })
+        const game = finalizedGames.find((g: any) => g.id === row.game_id)
+        if (game && (!lastPitchedMap[row.player_id] || game.game_date > lastPitchedMap[row.player_id])) {
+          lastPitchedMap[row.player_id] = game.game_date
+        }
+      }
+
       setActualPitching(actualMap)
       setLastPitched(lastPitchedMap)
     }
@@ -291,6 +320,45 @@ export default function PitchingPage() {
     }))
     // Clear draft
     setEditingPitch(prev => { const n = { ...prev }; delete n[slotId]; return n })
+  }
+
+  async function addExtraPitcher(gameId: string) {
+    if (!addPitcherPlayerId) return
+    const innings = parseInt(addPitcherInnings) || 1
+    const pitches = addPitcherPitches === '' ? null : parseInt(addPitcherPitches)
+    setAddPitcherSaving(true)
+    const { data, error } = await supabase
+      .from('game_extra_pitchers')
+      .insert({ game_id: gameId, player_id: addPitcherPlayerId, innings, pitch_count: pitches })
+      .select('id, player_id, innings, pitch_count, player:players(first_name, last_name, jersey_number)')
+      .single()
+    setAddPitcherSaving(false)
+    if (error || !data) return
+    setActualPitching(prev => ({
+      ...prev,
+      [gameId]: [...(prev[gameId] ?? []), {
+        player: data.player,
+        playerId: data.player_id,
+        slotId: `extra-${data.id}`,
+        innings: data.innings,
+        pitchCount: data.pitch_count ?? null,
+        firstInning: 999,
+        isExtra: true,
+        extraId: data.id,
+      }],
+    }))
+    setAddingPitcherGameId(null)
+    setAddPitcherPlayerId('')
+    setAddPitcherInnings('1')
+    setAddPitcherPitches('')
+  }
+
+  async function removeExtraPitcher(extraId: string, gameId: string) {
+    await supabase.from('game_extra_pitchers').delete().eq('id', extraId)
+    setActualPitching(prev => ({
+      ...prev,
+      [gameId]: (prev[gameId] ?? []).filter(p => p.extraId !== extraId),
+    }))
   }
 
   async function savePitchLimit(value: string) {
@@ -563,7 +631,7 @@ export default function PitchingPage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
           {pitchers.map((p, i) => {
             const draftKey = p.slotId
             const isDrafting = draftKey in editingPitch
@@ -572,17 +640,25 @@ export default function PitchingPage() {
             return (
               <div key={p.slotId} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
-                background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px',
+                background: 'var(--bg-card)', border: `0.5px solid ${p.isExtra ? 'rgba(75,156,211,0.3)' : 'var(--border)'}`, borderRadius: '10px',
                 padding: '12px 16px',
               }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.3)`, minWidth: '20px' }}>
                   P{i + 1}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600 }}>{shortName(p.player)}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600 }}>{shortName(p.player)}</span>
+                    {p.isExtra && (
+                      <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600,
+                        background: 'rgba(75,156,211,0.12)', padding: '1px 5px', borderRadius: 3 }}>
+                        sub
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700 }}>{p.innings} inn</div>
                 </div>
-                {isDrafting ? (
+                {!p.isExtra && (isDrafting ? (
                   <input
                     type="text" inputMode="numeric" pattern="[0-9]*"
                     value={draftVal} autoFocus
@@ -613,11 +689,107 @@ export default function PitchingPage() {
                   >
                     {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
                   </button>
+                ))}
+                {p.isExtra && (
+                  <button
+                    onClick={() => p.extraId && removeExtraPitcher(p.extraId, game.id)}
+                    title="Remove this pitcher"
+                    style={{
+                      padding: '4px 8px', borderRadius: '6px', cursor: 'pointer',
+                      border: '0.5px solid var(--border-md)', background: 'transparent',
+                      color: `rgba(var(--fg-rgb), 0.35)`, fontSize: '12px',
+                    }}
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
             )
           })}
         </div>
+
+        {/* Add extra pitcher */}
+        {addingPitcherGameId === game.id ? (
+          <div style={{
+            background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px',
+            padding: '14px 16px', marginBottom: '1.5rem',
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '10px', color: `rgba(var(--fg-rgb),0.6)` }}>
+              Add substitute pitcher
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <select
+                value={addPitcherPlayerId}
+                onChange={e => setAddPitcherPlayerId(e.target.value)}
+                style={{ ...CELL_SEL }}
+              >
+                <option value="">— Select player —</option>
+                {players
+                  .filter(pl => !(actualPitching[game.id] ?? []).some(p => p.playerId === pl.id))
+                  .sort((a, b) => (a.last_name ?? '').localeCompare(b.last_name ?? ''))
+                  .map(pl => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.first_name} {pl.last_name}{pl.jersey_number != null ? ` (#${pl.jersey_number})` : ''}
+                    </option>
+                  ))}
+              </select>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb),0.4)`, marginBottom: 3 }}>Innings pitched</div>
+                  <input
+                    type="text" inputMode="numeric" value={addPitcherInnings}
+                    onChange={e => setAddPitcherInnings(e.target.value.replace(/\D/g, ''))}
+                    style={{ ...CELL_SEL, textAlign: 'center' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb),0.4)`, marginBottom: 3 }}>Pitch count (optional)</div>
+                  <input
+                    type="text" inputMode="numeric" value={addPitcherPitches}
+                    onChange={e => setAddPitcherPitches(e.target.value.replace(/\D/g, ''))}
+                    placeholder="—"
+                    style={{ ...CELL_SEL, textAlign: 'center' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: 2 }}>
+                <button
+                  onClick={() => addExtraPitcher(game.id)}
+                  disabled={!addPitcherPlayerId || addPitcherSaving}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: '7px', cursor: addPitcherPlayerId ? 'pointer' : 'default',
+                    background: addPitcherPlayerId ? 'var(--accent)' : 'var(--bg-input)',
+                    color: addPitcherPlayerId ? 'var(--accent-text)' : `rgba(var(--fg-rgb),0.3)`,
+                    border: 'none', fontSize: '13px', fontWeight: 700,
+                  }}
+                >
+                  {addPitcherSaving ? 'Saving…' : 'Add'}
+                </button>
+                <button
+                  onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+                  style={{
+                    padding: '8px 14px', borderRadius: '7px', cursor: 'pointer',
+                    border: '0.5px solid var(--border-md)', background: 'transparent',
+                    color: `rgba(var(--fg-rgb),0.5)`, fontSize: '13px',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setAddingPitcherGameId(game.id); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+            style={{
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '1.5rem',
+              background: 'transparent', border: '0.5px dashed var(--border-md)',
+              color: `rgba(var(--fg-rgb),0.45)`, padding: '8px 16px', borderRadius: '8px',
+            }}
+          >
+            + Add substitute pitcher
+          </button>
+        )}
       </div>
     )
   }
