@@ -1513,11 +1513,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
             // Positions already used in the active inning by non-selected players
             const usedInInning = new Set<string>()
+            // All used positions (including selected players) — for checkmark display
+            const allUsedInInning = new Set<string>()
             if (activeInning !== null) {
               activeSlots.forEach((s, si) => {
-                if (selSiVals.has(si)) return
                 const pos = (s.inning_positions ?? [])[activeInning]
-                if (pos && pos !== 'Bench') usedInInning.add(pos)
+                if (pos && pos !== 'Bench') {
+                  allUsedInInning.add(pos)
+                  if (!selSiVals.has(si)) usedInInning.add(pos)
+                }
               })
             }
 
@@ -1542,7 +1546,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   {teamPositions.map(pos => {
                     const isActive = activePos === pos
                     const pc = POS_COLOR[pos]
-                    const isUsed = pos === 'Bench' ? benchFull : (activeInning !== null && usedInInning.has(pos))
+                    const isUsed = pos === 'Bench' ? benchFull : (activeInning !== null && allUsedInInning.has(pos))
                     const isAvailable = activeInning !== null && !isUsed && pos !== 'Bench'
                     return (
                       <button
