@@ -113,7 +113,7 @@ export default async function Dashboard({
       padding: '1.5rem 1.5rem 6rem',
     }}>
 
-      {/* Header */}
+      {/* Header — always full width */}
       <div style={{ marginBottom: '0.25rem' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '2px' }}>
           Six<span style={{ color: 'var(--accent)' }}>43</span>
@@ -125,7 +125,6 @@ export default async function Dashboard({
         )}
       </div>
 
-      {/* Team selector (only shown when multiple teams) */}
       <TeamSelect teams={teams} selectedTeamId={selectedTeamId} basePath="/dashboard" />
 
       {!season && teams.length > 0 && (
@@ -133,137 +132,143 @@ export default async function Dashboard({
           No active season — set one up in Team Settings →
         </Link>
       )}
-
       {!season && teams.length === 0 && (
         <Link href="/settings" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
           Get started — set up your team →
         </Link>
       )}
 
-      {/* Next game */}
-      {nextGame ? (
-        <Link href={`/games/${nextGame.id}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(232,160,32,0.14), rgba(232,160,32,0.04))',
-            border: '0.5px solid rgba(232,160,32,0.35)',
-            borderRadius: '14px', padding: '16px 18px',
-          }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
-              textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>
-              Next game
-            </div>
-            <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px', letterSpacing: '-0.5px' }}>
-              vs {nextGame.opponent}
-            </div>
-            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.55)` }}>
-              {formatDate(nextGame.game_date)}
-              {nextGame.location ? ` · ${nextGame.location}` : ''}
-              {nextGame.game_time ? ` · ${formatTime(nextGame.game_time)}` : ''}
-            </div>
-          </div>
-        </Link>
-      ) : season ? (
-        <Link href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
-          <div style={{
-            background: 'var(--bg-card)', border: '0.5px dashed var(--border-strong)',
-            borderRadius: '14px', padding: '20px 18px', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
-              No upcoming games
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent)' }}>
-              + Schedule a game
-            </div>
-          </div>
-        </Link>
-      ) : null}
+      {/* Two-column layout on desktop, stacked on mobile */}
+      <div className="dashboard-cols">
 
-      {/* Stats row */}
-      {season && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
-          {[
-            { label: 'Record',   value: `${record.w}–${record.l}` },
-            { label: 'Upcoming', value: upcomingCount },
-            { label: 'Players',  value: rosterCount ?? 0 },
-          ].map(s => (
-            <div key={s.label} style={{
-              flex: 1, background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-              borderRadius: '10px', padding: '12px 14px',
-            }}>
-              <div style={{ fontSize: '20px', fontWeight: 800 }}>{s.value}</div>
-              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px',
-                textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Quick actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '1.5rem' }}>
-        {[
-          { href: `/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`, label: '+ New game',       sub: 'Schedule a game' },
-          { href: `/roster${season ? `?seasonId=${season.id}` : ''}`,               label: '👥 Roster',        sub: `${rosterCount ?? 0} active players` },
-          { href: '/fairness',                                                        label: '📊 Playing time',  sub: 'Season fairness' },
-          { href: '/settings',                                                        label: '⚙️ Team Settings', sub: 'Team & season' },
-        ].map(a => (
-          <a key={a.href} href={a.href} style={{
-            textDecoration: 'none', background: 'var(--bg-card)',
-            border: '0.5px solid var(--border)', borderRadius: '10px',
-            padding: '12px 14px', display: 'block',
-          }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--fg)', marginBottom: '2px' }}>{a.label}</div>
-            <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>{a.sub}</div>
-          </a>
-        ))}
-      </div>
-
-      {/* Recent results */}
-      {recentGames.length > 0 && (
-        <>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
-            Recent results
-          </div>
-          {recentGames.map((game: any) => {
-            const score = getBoxScore(game)
-            const won = score ? score.us > score.them : null
-            return (
-              <Link key={game.id} href={`/games/${game.id}`} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-                  borderRadius: '10px', padding: '12px 14px', marginBottom: '6px',
-                }}>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '2px' }}>
-                      vs {game.opponent}
-                    </div>
-                    <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>
-                      {formatDate(game.game_date)}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    {score ? (
-                      <>
-                        <div style={{ fontSize: '16px', fontWeight: 800,
-                          color: won ? '#6DB875' : '#E87060' }}>
-                          {score.us}–{score.them}
-                        </div>
-                        <div style={{ fontSize: '10px', fontWeight: 700,
-                          color: won ? '#6DB875' : '#E87060' }}>
-                          {won ? 'W' : score.us === score.them ? 'T' : 'L'}
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)` }}>Final</div>
-                    )}
-                  </div>
+        {/* Left column: next game + recent results */}
+        <div className="dashboard-left">
+          {nextGame ? (
+            <Link href={`/games/${nextGame.id}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(232,160,32,0.14), rgba(232,160,32,0.04))',
+                border: '0.5px solid rgba(232,160,32,0.35)',
+                borderRadius: '14px', padding: '16px 18px',
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+                  textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>
+                  Next game
                 </div>
-              </Link>
-            )
-          })}
-        </>
-      )}
+                <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px', letterSpacing: '-0.5px' }}>
+                  vs {nextGame.opponent}
+                </div>
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.55)` }}>
+                  {formatDate(nextGame.game_date)}
+                  {nextGame.location ? ` · ${nextGame.location}` : ''}
+                  {nextGame.game_time ? ` · ${formatTime(nextGame.game_time)}` : ''}
+                </div>
+              </div>
+            </Link>
+          ) : season ? (
+            <Link href={`/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>
+              <div style={{
+                background: 'var(--bg-card)', border: '0.5px dashed var(--border-strong)',
+                borderRadius: '14px', padding: '20px 18px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
+                  No upcoming games
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent)' }}>
+                  + Schedule a game
+                </div>
+              </div>
+            </Link>
+          ) : null}
+
+          {recentGames.length > 0 && (
+            <>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '8px' }}>
+                Recent results
+              </div>
+              {recentGames.map((game: any) => {
+                const score = getBoxScore(game)
+                const won = score ? score.us > score.them : null
+                return (
+                  <Link key={game.id} href={`/games/${game.id}`} style={{ textDecoration: 'none' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                      borderRadius: '10px', padding: '12px 14px', marginBottom: '6px',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '2px' }}>
+                          vs {game.opponent}
+                        </div>
+                        <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>
+                          {formatDate(game.game_date)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        {score ? (
+                          <>
+                            <div style={{ fontSize: '16px', fontWeight: 800,
+                              color: won ? '#6DB875' : '#E87060' }}>
+                              {score.us}–{score.them}
+                            </div>
+                            <div style={{ fontSize: '10px', fontWeight: 700,
+                              color: won ? '#6DB875' : '#E87060' }}>
+                              {won ? 'W' : score.us === score.them ? 'T' : 'L'}
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)` }}>Final</div>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </>
+          )}
+        </div>
+
+        {/* Right column: stats + quick actions */}
+        <div className="dashboard-right">
+          {season && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+              {[
+                { label: 'Record',   value: `${record.w}–${record.l}` },
+                { label: 'Upcoming', value: upcomingCount },
+                { label: 'Players',  value: rosterCount ?? 0 },
+              ].map(s => (
+                <div key={s.label} style={{
+                  flex: 1, background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                  borderRadius: '10px', padding: '12px 14px',
+                }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800 }}>{s.value}</div>
+                  <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px',
+                    textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '1.5rem' }}>
+            {[
+              { href: `/games/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`, label: '+ New game',       sub: 'Schedule a game' },
+              { href: `/roster${season ? `?seasonId=${season.id}` : ''}`,               label: '👥 Roster',        sub: `${rosterCount ?? 0} active players` },
+              { href: '/fairness',                                                        label: '📊 Playing time',  sub: 'Season fairness' },
+              { href: '/settings',                                                        label: '⚙️ Team Settings', sub: 'Team & season' },
+            ].map(a => (
+              <a key={a.href} href={a.href} style={{
+                textDecoration: 'none', background: 'var(--bg-card)',
+                border: '0.5px solid var(--border)', borderRadius: '10px',
+                padding: '12px 14px', display: 'block',
+              }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--fg)', marginBottom: '2px' }}>{a.label}</div>
+                <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)` }}>{a.sub}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </main>
   )
 }

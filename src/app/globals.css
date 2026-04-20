@@ -77,7 +77,7 @@ html[data-theme="light"] {
 
   /* Widen page containers and remove bottom-nav padding */
   .app-content main {
-    max-width: 800px !important;
+    max-width: 1100px !important;
     padding-bottom: 3rem !important;
   }
 
@@ -121,6 +121,23 @@ html[data-theme="light"] {
     padding: 1.5rem 2rem 3rem;
   }
 
+  /* Dashboard two-column layout */
+  .dashboard-cols {
+    display: flex;
+    gap: 2.5rem;
+    align-items: flex-start;
+  }
+  .dashboard-left  { flex: 1.5; min-width: 0; }
+  .dashboard-right { flex: 1;   min-width: 0; }
+
+  /* Roster: show table, hide cards */
+  .roster-desktop-table { display: block !important; }
+  .roster-mobile-cards  { display: none  !important; }
+
+  /* Fairness: show table, hide cards */
+  .fairness-desktop-table { display: block !important; }
+  .fairness-mobile-cards  { display: none  !important; }
+
   /* Games two-panel layout */
   .games-mobile-list { display: none !important; }
 
@@ -148,6 +165,17 @@ html[data-theme="light"] {
 /* Mobile defaults: hide desktop-only panels */
 .pitching-desktop-layout { display: none; }
 .pitching-mobile-layout  { display: block; }
+
+/* Dashboard two-column (mobile: stacked) */
+.dashboard-cols         { display: block; }
+
+/* Roster desktop table / mobile cards (mobile: hide table, show cards) */
+.roster-desktop-table   { display: none; }
+.roster-mobile-cards    { display: block; }
+
+/* Fairness desktop table / mobile cards (mobile: hide table, show cards) */
+.fairness-desktop-table { display: none; }
+.fairness-mobile-cards  { display: block; }
 
 /* ── Standalone eval form (public coach link) ── */
 /* Hides all Six43 chrome so the page is a clean org-branded experience */

@@ -484,8 +484,8 @@ export default function FairnessPage() {
           {/* ── SUMMARY VIEW ── */}
           {view === 'summary' && (
             <>
-              {/* Sort controls */}
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', paddingLeft: '4px' }}>
+              {/* Sort controls (mobile only) */}
+              <div className="fairness-mobile-cards" style={{ display: 'flex', gap: '12px', marginBottom: '8px', paddingLeft: '4px' }}>
                 <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)` }}>Sort:</span>
                 <SortBtn k="name" label="Name" />
                 <SortBtn k="bench_pct" label="Bench %" />
@@ -493,6 +493,97 @@ export default function FairnessPage() {
                 <SortBtn k="innings_bench" label="Bench inn" />
               </div>
 
+              {/* Desktop table */}
+              <div className="fairness-desktop-table" style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                      {[
+                        { label: '#',        k: null,              width: '36px',  align: 'center' as const },
+                        { label: 'Name',     k: 'name' as SortKey, width: '160px', align: 'left'   as const },
+                        { label: 'Total',    k: null,              width: '56px',  align: 'center' as const },
+                        { label: 'Field',    k: 'innings_total' as SortKey, width: '56px', align: 'center' as const },
+                        { label: 'Bench',    k: 'innings_bench' as SortKey, width: '56px', align: 'center' as const },
+                        { label: 'Bench %',  k: 'bench_pct' as SortKey,    width: '72px', align: 'center' as const },
+                        { label: 'P',        k: null,              width: '44px',  align: 'center' as const },
+                        { label: 'C',        k: null,              width: '44px',  align: 'center' as const },
+                        { label: 'IF',       k: null,              width: '44px',  align: 'center' as const },
+                        { label: 'OF',       k: null,              width: '44px',  align: 'center' as const },
+                        { label: 'Target',   k: null,              width: '80px',  align: 'center' as const },
+                      ].map(col => (
+                        <th key={col.label} style={{
+                          padding: '6px 8px', textAlign: col.align, fontSize: '10px', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.07em',
+                          color: col.k && sortKey === col.k ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.35)`,
+                          width: col.width, cursor: col.k ? 'pointer' : 'default', whiteSpace: 'nowrap',
+                        }} onClick={() => col.k && sort(col.k)}>
+                          {col.label}{col.k && sortKey === col.k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map(row => {
+                      const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
+                      const benchPctVal = Math.round(row.bench_pct * 100)
+                      const benchColor = benchPctVal > 50 ? '#E87060' : benchPctVal > 33 ? '#E8A020' : '#6DB875'
+                      const behindTarget = (row.innings_target ?? 0) > 0 && row.innings_total < row.innings_target!
+                      const alertLevel = benchPctVal > 50 ? 'red' : (benchPctVal > 33 || behindTarget) ? 'amber' : null
+                      const tdR: React.CSSProperties = {
+                        padding: '7px 8px', borderBottom: '0.5px solid var(--border-subtle)',
+                        textAlign: 'center', fontSize: '12px', color: `rgba(var(--fg-rgb), 0.55)`,
+                        verticalAlign: 'middle',
+                      }
+                      return (
+                        <tr key={row.player_id} onClick={() => openPlayer(row)} style={{ cursor: 'pointer' }}>
+                          <td style={{ ...tdR, color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '11px' }}>{row.jersey_number}</td>
+                          <td style={{ ...tdR, textAlign: 'left', color: 'var(--fg)', fontWeight: 500 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {row.first_name} {row.last_name}
+                              {alertLevel === 'red' && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#E87060',
+                                  background: 'rgba(232,112,96,0.12)', borderRadius: '3px', padding: '1px 5px' }}>
+                                  Too much bench
+                                </span>
+                              )}
+                              {alertLevel === 'amber' && !behindTarget && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#E8A020',
+                                  background: 'rgba(232,160,32,0.12)', borderRadius: '3px', padding: '1px 5px' }}>
+                                  High bench
+                                </span>
+                              )}
+                              {behindTarget && alertLevel !== 'red' && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#E8A020',
+                                  background: 'rgba(232,160,32,0.12)', borderRadius: '3px', padding: '1px 5px' }}>
+                                  Below target
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={tdR}>{row.innings_all}</td>
+                          <td style={tdR}>{row.innings_total ?? 0}</td>
+                          <td style={tdR}>{row.innings_bench ?? 0}</td>
+                          <td style={{ ...tdR, fontWeight: 700, color: benchColor }}>{benchPctVal}%</td>
+                          <td style={{ ...tdR, color: row.innings_p > 0 ? '#4B9CD3' : `rgba(var(--fg-rgb), 0.2)` }}>{row.innings_p > 0 ? row.innings_p : '—'}</td>
+                          <td style={{ ...tdR, color: row.innings_c > 0 ? '#E090B0' : `rgba(var(--fg-rgb), 0.2)` }}>{row.innings_c > 0 ? row.innings_c : '—'}</td>
+                          <td style={{ ...tdR, color: infieldInn > 0 ? '#80B0E8' : `rgba(var(--fg-rgb), 0.2)` }}>{infieldInn > 0 ? infieldInn : '—'}</td>
+                          <td style={{ ...tdR, color: (row.innings_outfield ?? 0) > 0 ? '#6DB875' : `rgba(var(--fg-rgb), 0.2)` }}>{(row.innings_outfield ?? 0) > 0 ? row.innings_outfield : '—'}</td>
+                          <td style={tdR}>
+                            {(row.innings_target ?? 0) > 0 ? (
+                              <span style={{ color: row.innings_total >= row.innings_target! ? '#6DB875' : '#E8A020', fontWeight: 600 }}>
+                                {row.innings_total}/{row.innings_target}{row.innings_total >= row.innings_target! ? ' ✓' : ''}
+                              </span>
+                            ) : <span style={{ color: `rgba(var(--fg-rgb), 0.2)` }}>—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="fairness-mobile-cards">
               {sorted.map(row => {
                 const infieldInn = (row.innings_1b ?? 0) + (row.innings_2b ?? 0) + (row.innings_ss ?? 0) + (row.innings_3b ?? 0)
                 const infieldPct = row.innings_total > 0 ? Math.round(infieldInn / row.innings_total * 100) : 0
@@ -586,6 +677,7 @@ export default function FairnessPage() {
                   </div>
                 )
               })}
+              </div>{/* end fairness-mobile-cards */}
             </>
           )}
 

@@ -361,6 +361,21 @@ export default function RosterPage() {
   const active = players.filter(p => p.status === 'active')
   const inactive = players.filter(p => p.status !== 'active')
 
+  const thSt: React.CSSProperties = {
+    padding: '6px 10px', textAlign: 'left', fontSize: '10px', fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: '0.07em', color: `rgba(var(--fg-rgb), 0.35)`,
+    borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
+  }
+  const tdSt: React.CSSProperties = {
+    padding: '8px 10px', fontSize: '13px', color: 'var(--fg)',
+    borderBottom: '0.5px solid var(--border-subtle)', verticalAlign: 'middle',
+  }
+  const aBtnSt: React.CSSProperties = {
+    fontSize: '12px', padding: '4px 10px', borderRadius: '4px',
+    border: '0.5px solid var(--border-md)', background: 'transparent',
+    color: `rgba(var(--fg-rgb), 0.45)`, cursor: 'pointer',
+  }
+
   if (loading) return (
     <main style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--fg)',
       fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -449,52 +464,126 @@ export default function RosterPage() {
 
       {/* ── PLAYERS VIEW ── */}
       {rosterView === 'players' && (<>
-        {active.length > 0 && (
-          <section style={{ marginBottom: '2rem' }}>
-            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-              letterSpacing: '0.08em', marginBottom: '8px' }}>
-              {reorderMode ? 'Drag to set batting order' : `Active · ${active.length}`}
-            </div>
-            {active.map((player, idx) => (
-              <div
-                key={player.id}
-                draggable={reorderMode}
-                onDragStart={() => setDragId(player.id)}
-                onDragOver={e => { e.preventDefault(); setDragOverId(player.id) }}
-                onDrop={() => handleDrop(player.id)}
-                onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                style={{
-                  opacity: dragId === player.id ? 0.4 : 1,
-                  outline: dragOverId === player.id && dragId !== player.id
-                    ? '2px solid var(--accent)' : 'none',
-                  borderRadius: '8px',
-                  cursor: reorderMode ? 'grab' : 'default',
-                }}
-              >
-                <PlayerRow
-                  player={player}
-                  onEdit={reorderMode ? () => {} : openEdit}
-                  onDelete={setDeleteConfirm}
-                  onEval={reorderMode ? undefined : openEval}
-                  reorderMode={reorderMode}
-                  order={idx + 1}
-                />
-              </div>
-            ))}
-          </section>
+
+        {/* Desktop table (hidden on mobile via CSS) */}
+        {players.length > 0 && (
+          <div className="roster-desktop-table" style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thSt, width: '32px', textAlign: 'center' }}>Ord</th>
+                  <th style={{ ...thSt, width: '36px', textAlign: 'center' }}>#</th>
+                  <th style={{ ...thSt, minWidth: '160px' }}>Name</th>
+                  <th style={{ ...thSt, textAlign: 'center' }}>Position</th>
+                  <th style={{ ...thSt, textAlign: 'center' }}>Min inn</th>
+                  <th style={{ ...thSt, textAlign: 'center' }}>Status</th>
+                  <th style={{ ...thSt, textAlign: 'right', width: '120px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {active.map((player, idx) => (
+                  <tr key={player.id}>
+                    <td style={{ ...tdSt, color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '11px', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ ...tdSt, color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '11px', textAlign: 'center' }}>{player.jersey_number}</td>
+                    <td style={{ ...tdSt, fontWeight: 500 }}>{player.first_name} {player.last_name}</td>
+                    <td style={{ ...tdSt, textAlign: 'center' }}><PosChip pos={player.primary_position} /></td>
+                    <td style={{ ...tdSt, textAlign: 'center', color: `rgba(var(--fg-rgb), 0.4)`, fontSize: '12px' }}>{player.innings_target ?? '—'}</td>
+                    <td style={{ ...tdSt, textAlign: 'center' }}>
+                      {player.status !== 'active' && (
+                        <span style={{ fontSize: '11px', color: STATUS_STYLES[player.status]?.color }}>
+                          {STATUS_STYLES[player.status]?.label}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ ...tdSt, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => openEval(player)} style={aBtnSt}>Eval</button>
+                        <button onClick={() => openEdit(player)} style={aBtnSt}>Edit</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {inactive.length > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan={7} style={{ padding: '12px 10px 4px', fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Inactive / Injured · {inactive.length}
+                      </td>
+                    </tr>
+                    {inactive.map(player => (
+                      <tr key={player.id} style={{ opacity: 0.6 }}>
+                        <td style={tdSt}></td>
+                        <td style={{ ...tdSt, color: `rgba(var(--fg-rgb), 0.3)`, fontSize: '11px', textAlign: 'center' }}>{player.jersey_number}</td>
+                        <td style={{ ...tdSt, fontWeight: 500 }}>{player.first_name} {player.last_name}</td>
+                        <td style={{ ...tdSt, textAlign: 'center' }}><PosChip pos={player.primary_position} /></td>
+                        <td style={{ ...tdSt, textAlign: 'center', color: `rgba(var(--fg-rgb), 0.4)`, fontSize: '12px' }}>{player.innings_target ?? '—'}</td>
+                        <td style={{ ...tdSt, textAlign: 'center', fontSize: '11px', color: STATUS_STYLES[player.status]?.color }}>
+                          {STATUS_STYLES[player.status]?.label}
+                        </td>
+                        <td style={{ ...tdSt, textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => openEval(player)} style={aBtnSt}>Eval</button>
+                            <button onClick={() => openEdit(player)} style={aBtnSt}>Edit</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {inactive.length > 0 && (
-          <section>
-            <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
-              letterSpacing: '0.08em', marginBottom: '8px' }}>
-              Inactive / Injured · {inactive.length}
-            </div>
-            {inactive.map(player => (
-              <PlayerRow key={player.id} player={player} onEdit={openEdit} onDelete={setDeleteConfirm} onEval={openEval} />
-            ))}
-          </section>
-        )}
+        {/* Mobile card list (hidden on desktop via CSS) */}
+        <div className="roster-mobile-cards">
+          {active.length > 0 && (
+            <section style={{ marginBottom: '2rem' }}>
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
+                letterSpacing: '0.08em', marginBottom: '8px' }}>
+                {reorderMode ? 'Drag to set batting order' : `Active · ${active.length}`}
+              </div>
+              {active.map((player, idx) => (
+                <div
+                  key={player.id}
+                  draggable={reorderMode}
+                  onDragStart={() => setDragId(player.id)}
+                  onDragOver={e => { e.preventDefault(); setDragOverId(player.id) }}
+                  onDrop={() => handleDrop(player.id)}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                  style={{
+                    opacity: dragId === player.id ? 0.4 : 1,
+                    outline: dragOverId === player.id && dragId !== player.id
+                      ? '2px solid var(--accent)' : 'none',
+                    borderRadius: '8px',
+                    cursor: reorderMode ? 'grab' : 'default',
+                  }}
+                >
+                  <PlayerRow
+                    player={player}
+                    onEdit={reorderMode ? () => {} : openEdit}
+                    onDelete={setDeleteConfirm}
+                    onEval={reorderMode ? undefined : openEval}
+                    reorderMode={reorderMode}
+                    order={idx + 1}
+                  />
+                </div>
+              ))}
+            </section>
+          )}
+
+          {inactive.length > 0 && (
+            <section>
+              <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, textTransform: 'uppercase',
+                letterSpacing: '0.08em', marginBottom: '8px' }}>
+                Inactive / Injured · {inactive.length}
+              </div>
+              {inactive.map(player => (
+                <PlayerRow key={player.id} player={player} onEdit={openEdit} onDelete={setDeleteConfirm} onEval={openEval} />
+              ))}
+            </section>
+          )}
+        </div>
 
         {players.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: '4rem', padding: '0 1rem' }}>
