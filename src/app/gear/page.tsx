@@ -13,12 +13,19 @@ export const metadata: Metadata = {
 }
 
 // ── Affiliate link helpers ─────────────────────────────────────────────────
-// Dick's: wrap any dickssportinggoods.com URL with your CJ tracking link:
-//   DICKS_BASE + encodeURIComponent('https://www.dickssportinggoods.com/p/...')
-const DICKS_BASE = 'https://www.tkqlhce.com/click-101704867-17172189?url='
+// Dick's CJ affiliate: product link + optional image
+//   Link:  https://www.anrdoezrs.net/click-101704867-16989341?url=ENCODED_URL&cjsku=SKU
+//   Image: https://www.awltovhc.com/image-101704867-16989341?imgurl=ENCODED_IMG_URL
+const DICKS_LINK_BASE  = 'https://www.anrdoezrs.net/click-101704867-16989341?url='
+const DICKS_IMAGE_BASE = 'https://www.awltovhc.com/image-101704867-16989341?imgurl='
 
-function dicks(productUrl: string) {
-  return DICKS_BASE + encodeURIComponent(productUrl)
+function dicks(productUrl: string, cjsku?: string) {
+  const base = DICKS_LINK_BASE + encodeURIComponent(productUrl)
+  return cjsku ? `${base}&cjsku=${cjsku}` : base
+}
+
+function dicksImg(imgUrl: string) {
+  return DICKS_IMAGE_BASE + encodeURIComponent(imgUrl)
 }
 
 // Amazon: replace TAG with your Amazon Associates tracking ID
@@ -34,8 +41,10 @@ function amazon(asin: string) {
 type Product = {
   name: string
   note: string
-  dicksUrl?: string   // dickssportinggoods.com product URL (pre-encoding)
-  amazonAsin?: string // Amazon ASIN
+  dicksUrl?: string     // dickssportinggoods.com product URL (pre-encoding)
+  dicksSku?: string     // CJ cjsku parameter (from the affiliate link)
+  dicksImgUrl?: string  // dks.scene7.com image URL (pre-encoding)
+  amazonAsin?: string   // Amazon ASIN
 }
 
 type Category = {
@@ -80,9 +89,11 @@ const CATEGORIES: Category[] = [
     intro: 'Every batter needs a properly fitted helmet. Look for NOCSAE certification and a snug fit without being tight. Double-ear flaps are required in most youth leagues.',
     products: [
       {
-        name: 'Rawlings Mach EXT Batting Helmet',
-        note: 'Top-rated protection with a comfortable fit. One of the best helmets in youth baseball at a reasonable price.',
-        dicksUrl: 'https://www.dickssportinggoods.com/s/rawlings-batting-helmets',
+        name: 'Mizuno B6 Junior Batting Helmet',
+        note: 'Lightweight and well-ventilated with a comfortable dual-density foam liner. Great fit for younger players.',
+        dicksUrl: 'https://www.dickssportinggoods.com/p/mizuno-junior-b6-baseball-batting-helmet-19mizmmznb6jrsldhbth/19mizmmznb6jrsldhbth',
+        dicksSku: '20784083',
+        dicksImgUrl: 'https://dks.scene7.com/is/image/dkscdn/19MIZMMZNB6JRSLDHBTH_Grey_is?$UTPMain$?$DSG_Google_PLA$',
         amazonAsin: 'B09XXXXXXX', // TODO: replace with real ASIN
       },
       {
@@ -322,6 +333,17 @@ export default function GearPage() {
                   display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
                   gap: '1.5rem', flexWrap: 'wrap',
                 }}>
+                  {product.dicksImgUrl && (
+                    <a href={dicks(product.dicksUrl!, product.dicksSku)} target="_blank" rel="noopener noreferrer nofollow"
+                      style={{ flexShrink: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={dicksImg(product.dicksImgUrl)}
+                        alt={product.name}
+                        style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8 }}
+                      />
+                    </a>
+                  )}
                   <div style={{ flex: 1, minWidth: '200px' }}>
                     <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                       {product.name}
@@ -347,7 +369,7 @@ export default function GearPage() {
                     )}
                     {product.dicksUrl && (
                       <a
-                        href={dicks(product.dicksUrl)}
+                        href={dicks(product.dicksUrl, product.dicksSku)}
                         target="_blank" rel="noopener noreferrer nofollow"
                         style={{
                           fontSize: '12px', fontWeight: 700, padding: '7px 14px',
