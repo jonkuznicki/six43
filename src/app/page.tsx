@@ -707,13 +707,6 @@ export default async function HomePage() {
           Six<span style={{ color: 'var(--accent)' }}>43</span>
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link href="/gear" style={{
-            fontSize: '13px', fontWeight: 600,
-            color: `rgba(var(--fg-rgb), 0.55)`,
-            textDecoration: 'none',
-          }}>
-            Gear Guide
-          </Link>
           {loggedIn ? (
             <Link href="/games" style={{
               fontSize: '13px', fontWeight: 700,
@@ -1507,18 +1500,12 @@ export default async function HomePage() {
             support@six43.com
           </a>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
+        <div>
           <Link href="/privacy" style={{
             color: `rgba(var(--fg-rgb), 0.3)`, textDecoration: 'none',
             borderBottom: '0.5px solid rgba(var(--fg-rgb), 0.15)',
           }}>
             Privacy Policy
-          </Link>
-          <Link href="/gear" style={{
-            color: `rgba(var(--fg-rgb), 0.3)`, textDecoration: 'none',
-            borderBottom: '0.5px solid rgba(var(--fg-rgb), 0.15)',
-          }}>
-            Gear Guide
           </Link>
         </div>
       </footer>
