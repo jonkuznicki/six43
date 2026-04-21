@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { setSelectedTeamId } from '../../lib/selectedTeam'
@@ -879,7 +879,8 @@ export default function PitchingPage() {
                   {finalized.map(game => {
                     const pitchers = actualPitching[game.id] ?? []
                     return (
-                      <tr key={game.id}>
+                      <React.Fragment key={game.id}>
+                      <tr>
                         <td style={tdGame}>
                           <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
                             vs {game.opponent}
@@ -895,6 +896,20 @@ export default function PitchingPage() {
                           }}>
                             Edit Lineup →
                           </Link>
+                          <div style={{ marginTop: 8 }}>
+                            {addingPitcherGameId === game.id ? null : (
+                              <button
+                                onClick={() => { setAddingPitcherGameId(game.id); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+                                style={{
+                                  fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                                  background: 'transparent', border: '0.5px dashed var(--border-md)',
+                                  color: `rgba(var(--fg-rgb),0.45)`, padding: '3px 8px', borderRadius: '5px',
+                                }}
+                              >
+                                + Add sub pitcher
+                              </button>
+                            )}
+                          </div>
                         </td>
                         {Array.from({ length: maxActualPitchers }, (_, i) => {
                           const p = pitchers[i]
@@ -959,6 +974,69 @@ export default function PitchingPage() {
                           )
                         })}
                       </tr>
+                      {addingPitcherGameId === game.id && (
+                        <tr>
+                          <td colSpan={maxActualPitchers + 1} style={{ padding: '0 12px 12px' }}>
+                            <div style={{
+                              background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: '8px',
+                              padding: '12px 14px', display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap',
+                            }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: `rgba(var(--fg-rgb),0.5)`, marginBottom: 4, width: '100%' }}>
+                                Add substitute pitcher
+                              </div>
+                              <div style={{ flex: 2, minWidth: 140 }}>
+                                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb),0.4)`, marginBottom: 3 }}>Player</div>
+                                <select value={addPitcherPlayerId} onChange={e => setAddPitcherPlayerId(e.target.value)} style={{ ...CELL_SEL }}>
+                                  <option value="">— Select player —</option>
+                                  {players
+                                    .filter(pl => !(actualPitching[game.id] ?? []).some(p => p.playerId === pl.id))
+                                    .sort((a, b) => (a.last_name ?? '').localeCompare(b.last_name ?? ''))
+                                    .map(pl => (
+                                      <option key={pl.id} value={pl.id}>
+                                        {pl.first_name} {pl.last_name}{pl.jersey_number != null ? ` (#${pl.jersey_number})` : ''}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                              <div style={{ width: 80 }}>
+                                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb),0.4)`, marginBottom: 3 }}>Innings</div>
+                                <input type="text" inputMode="numeric" value={addPitcherInnings}
+                                  onChange={e => setAddPitcherInnings(e.target.value.replace(/\D/g, ''))}
+                                  style={{ ...CELL_SEL, textAlign: 'center' }} />
+                              </div>
+                              <div style={{ width: 100 }}>
+                                <div style={{ fontSize: '10px', color: `rgba(var(--fg-rgb),0.4)`, marginBottom: 3 }}>Pitch count (opt.)</div>
+                                <input type="text" inputMode="numeric" value={addPitcherPitches} placeholder="—"
+                                  onChange={e => setAddPitcherPitches(e.target.value.replace(/\D/g, ''))}
+                                  style={{ ...CELL_SEL, textAlign: 'center' }} />
+                              </div>
+                              <button
+                                onClick={() => addExtraPitcher(game.id)}
+                                disabled={!addPitcherPlayerId || addPitcherSaving}
+                                style={{
+                                  padding: '6px 16px', borderRadius: '6px', cursor: addPitcherPlayerId ? 'pointer' : 'default',
+                                  background: addPitcherPlayerId ? 'var(--accent)' : 'var(--bg-input)',
+                                  color: addPitcherPlayerId ? 'var(--accent-text)' : `rgba(var(--fg-rgb),0.3)`,
+                                  border: 'none', fontSize: '13px', fontWeight: 700,
+                                }}
+                              >
+                                {addPitcherSaving ? 'Saving…' : 'Add'}
+                              </button>
+                              <button
+                                onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+                                style={{
+                                  padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
+                                  border: '0.5px solid var(--border-md)', background: 'transparent',
+                                  color: `rgba(var(--fg-rgb),0.5)`, fontSize: '13px',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
