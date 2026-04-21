@@ -98,6 +98,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
   const [dcWarning, setDcWarning]       = useState<string | null>(null)
   const [benchWarning, setBenchWarning] = useState<string | null>(null)
+  const benchWarnTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showBenchWarning = (msg: string) => {
+    if (benchWarnTimer.current) clearTimeout(benchWarnTimer.current)
+    setBenchWarning(msg)
+    benchWarnTimer.current = setTimeout(() => setBenchWarning(null), 5000)
+  }
   const [showPlayerNotes, setShowPlayerNotes] = useState(false)
   const [playerNoteInputs, setPlayerNoteInputs] = useState<Record<string, string>>({})
   const [savingPlayerNotes, setSavingPlayerNotes] = useState(false)
@@ -493,12 +499,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       const fieldCount = teamPositions.filter(p => p !== 'Bench').length
       const bpi = Math.max(0, active.length - fieldCount)
       if (bpi === 0) {
-        setBenchWarning('Everyone plays this inning — no bench spots with this roster size.')
+        showBenchWarning('Your roster size fills all field positions — there are no bench spots this inning.')
         return
       }
       const currentBench = active.filter(s => s.id !== slotId && (s.inning_positions ?? [])[ii] === 'Bench').length
       if (currentBench >= bpi) {
-        setBenchWarning(`Inning ${ii + 1} bench is full (${bpi}/${bpi}). Remove a bench player first.`)
+        showBenchWarning(`Inning ${ii + 1} already has a full bench. Move a bench player to a field position first.`)
         return
       }
     }
@@ -548,7 +554,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       const target = next.find(s => s.id === slot.id)
       if (target) { target.inning_positions[ii] = pos; changedIds.add(target.id) }
     }
-    if (benchBlocked > 0) setBenchWarning(`${benchBlocked} cell${benchBlocked !== 1 ? 's' : ''} skipped — bench limit reached for those innings.`)
+    if (benchBlocked > 0) showBenchWarning(`Bench is already full in ${benchBlocked} inning${benchBlocked !== 1 ? 's' : ''} — those slots were left unchanged.`)
     if (changedIds.size) commit(next, Array.from(changedIds))
     return changedIds.size > 0
   }
