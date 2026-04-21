@@ -1054,6 +1054,12 @@ export default function PitchingPage() {
                         <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px', lineHeight: 1.2 }}>
                           {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
+                        <Link href={`/games/${game.id}/lineup/desktop`} style={{
+                          fontSize: '9px', fontWeight: 600, color: 'var(--accent)',
+                          textDecoration: 'none', marginTop: '4px', display: 'inline-block',
+                        }}>
+                          Edit Lineup →
+                        </Link>
                       </div>
 
                       {/* Pitcher cells */}
@@ -1184,6 +1190,12 @@ export default function PitchingPage() {
                         <div style={{ fontSize: '9px', color: `rgba(var(--fg-rgb), 0.4)`, marginTop: '2px', lineHeight: 1.2 }}>
                           {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
+                        <Link href={`/games/${game.id}/lineup/desktop`} style={{
+                          fontSize: '9px', fontWeight: 600, color: 'var(--accent)',
+                          textDecoration: 'none', marginTop: '4px', display: 'inline-block',
+                        }}>
+                          Edit Lineup →
+                        </Link>
                         {(() => {
                           const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
                           return (
