@@ -125,12 +125,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const dragCellAnchorRef  = useRef<{ si: number; ii: number } | null>(null)
   useEffect(() => { selectedCellsRef.current = selectedCells }, [selectedCells])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSaveRef = useRef<{ slots: any[]; ids: string[] } | null>(null)
 
   useEffect(() => { loadData() }, [])
   useEffect(() => {
     const up = () => { isDraggingCellRef.current = false }
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
+  }, [])
+
+  // Flush any pending debounced save immediately when navigating away
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      const pending = pendingSaveRef.current
+      if (pending) {
+        pending.slots
+          .filter((s: any) => pending.ids.includes(s.id))
+          .forEach((s: any) => {
+            supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
+          })
+      }
+    }
   }, [])
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -473,12 +489,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setHistory(h => [...h.slice(-49), slotsRef.current])
     setFuture([])
     setSlots(newSlots)
-    // Debounced save
+    pendingSaveRef.current = { slots: newSlots, ids: changedIds }
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
+      const pending = pendingSaveRef.current
+      if (!pending) return
+      pendingSaveRef.current = null
       await Promise.all(
-        newSlots
-          .filter(s => changedIds.includes(s.id))
+        pending.slots
+          .filter(s => pending.ids.includes(s.id))
           .map(s => supabase.from('lineup_slots').update({
             inning_positions: s.inning_positions,
           }).eq('id', s.id))
@@ -568,9 +587,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       setFuture(f => [slotsRef.current, ...f.slice(0, 49)])
       setSlots(prev)
       slotsRef.current = prev
+      pendingSaveRef.current = { slots: prev, ids: prev.map((s: any) => s.id) }
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(async () => {
-        await Promise.all(prev.map((s: any) =>
+        const pending = pendingSaveRef.current
+        if (!pending) return
+        pendingSaveRef.current = null
+        await Promise.all(pending.slots.map((s: any) =>
           supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
         ))
       }, 300)
@@ -585,9 +608,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       setHistory(h => [...h.slice(-49), slotsRef.current])
       setSlots(next)
       slotsRef.current = next
+      pendingSaveRef.current = { slots: next, ids: next.map((s: any) => s.id) }
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(async () => {
-        await Promise.all(next.map((s: any) =>
+        const pending = pendingSaveRef.current
+        if (!pending) return
+        pendingSaveRef.current = null
+        await Promise.all(pending.slots.map((s: any) =>
           supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
         ))
       }, 300)
