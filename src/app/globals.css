@@ -98,11 +98,12 @@ html[data-theme="light"] {
     max-width: 1080px !important;
   }
 
-  /* Pitching two-panel layout (default on desktop) */
-  .pitching-mobile-layout { display: none !important; }
+  /* Pitching: hide mobile layout, show desktop area */
+  .pitching-mobile-layout  { display: none !important; }
+  .pitching-desktop-only   { display: block !important; }
 
   .pitching-desktop-layout {
-    display: flex !important;
+    display: flex;
     align-items: flex-start;
     border-top: 0.5px solid var(--border);
     margin: 0.75rem -1.5rem 0;
@@ -167,23 +168,12 @@ html[data-theme="light"] {
 .pitching-mobile-layout  { display: block; }
 
 /* View toggle only visible on desktop */
-.pitching-view-toggle { display: none; }
+.pitching-view-toggle  { display: none; }
+/* Desktop-only pitching area: hidden on mobile */
+.pitching-desktop-only { display: none; }
 
-/* Desktop grid layout: hidden by default everywhere */
-.pitching-desktop-grid-layout { display: none; }
-
-/* Pitching view toggle overrides — desktop only (mobile always uses grid/mobile layout) */
 @media (min-width: 768px) {
   .pitching-view-toggle { display: flex; }
-
-  /* Grid view on desktop: hide mobile layout + planner, show desktop grid */
-  .pitching-view-grid .pitching-desktop-layout  { display: none !important; }
-  .pitching-view-grid .pitching-mobile-layout   { display: none !important; }
-  .pitching-view-grid .pitching-desktop-grid-layout { display: block !important; }
-
-  /* Planner view on desktop */
-  .pitching-view-planner .pitching-mobile-layout  { display: none !important; }
-  .pitching-view-planner .pitching-desktop-layout { display: flex !important; }
 }
 
 /* Dashboard two-column (mobile: stacked) */

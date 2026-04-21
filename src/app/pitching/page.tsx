@@ -1256,9 +1256,6 @@ export default function PitchingPage() {
         </div>
       )}
 
-      {/* ── View layouts ── */}
-      <div className={`pitching-view-${pitchingView}`}>
-
       {/* ── Mobile/Grid layout ── */}
       {!loading && (
         <div className="pitching-mobile-layout">
@@ -1580,27 +1577,25 @@ export default function PitchingPage() {
         </div>
       )}
 
-      {/* ── Desktop/Planner layout ── */}
+      {/* ── Desktop layouts (hidden on mobile via CSS) ── */}
       {!loading && (upcoming.length > 0 || finalized.length > 0) && (
-        <div className="pitching-desktop-layout">
-          <div className="pitching-list-panel">
-            {renderDesktopGameList()}
-          </div>
-          <div className="pitching-detail-panel">
-            {renderDesktopDetail()}
-            {renderSeasonTotals()}
-          </div>
+        <div className="pitching-desktop-only">
+          {pitchingView === 'planner' ? (
+            <div className="pitching-desktop-layout">
+              <div className="pitching-list-panel">
+                {renderDesktopGameList()}
+              </div>
+              <div className="pitching-detail-panel">
+                {renderDesktopDetail()}
+                {renderSeasonTotals()}
+              </div>
+            </div>
+          ) : (
+            renderDesktopGrid()
+          )}
         </div>
       )}
 
-      {/* ── Desktop Grid layout ── */}
-      {!loading && (upcoming.length > 0 || finalized.length > 0) && (
-        <div className="pitching-desktop-grid-layout">
-          {renderDesktopGrid()}
-        </div>
-      )}
-
-      </div>{/* end pitching-view wrapper */}
     </main>
   )
 }
