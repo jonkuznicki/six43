@@ -169,11 +169,19 @@ html[data-theme="light"] {
 /* View toggle only visible on desktop */
 .pitching-view-toggle { display: none; }
 
+/* Desktop grid layout: hidden by default everywhere */
+.pitching-desktop-grid-layout { display: none; }
+
 /* Pitching view toggle overrides — desktop only (mobile always uses grid/mobile layout) */
 @media (min-width: 768px) {
   .pitching-view-toggle { display: flex; }
-  .pitching-view-grid .pitching-desktop-layout { display: none !important; }
-  .pitching-view-grid .pitching-mobile-layout  { display: block !important; }
+
+  /* Grid view on desktop: hide mobile layout + planner, show desktop grid */
+  .pitching-view-grid .pitching-desktop-layout  { display: none !important; }
+  .pitching-view-grid .pitching-mobile-layout   { display: none !important; }
+  .pitching-view-grid .pitching-desktop-grid-layout { display: block !important; }
+
+  /* Planner view on desktop */
   .pitching-view-planner .pitching-mobile-layout  { display: none !important; }
   .pitching-view-planner .pitching-desktop-layout { display: flex !important; }
 }

@@ -839,6 +839,262 @@ export default function PitchingPage() {
     return null
   }
 
+  function renderDesktopGrid() {
+    const deskPastGrid  = `180px repeat(${maxActualPitchers}, 1fr)`
+    const deskUpcomingGrid = `180px repeat(${slotCount}, 1fr)`
+    const thStyle: React.CSSProperties = {
+      ...HEADER_STYLE, padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap',
+      borderBottom: '0.5px solid var(--border-subtle)',
+    }
+    const tdGame: React.CSSProperties = {
+      padding: '12px 12px', verticalAlign: 'top',
+      borderBottom: '0.5px solid var(--border-subtle)',
+    }
+    const tdPitcher: React.CSSProperties = {
+      padding: '12px 10px', verticalAlign: 'top', textAlign: 'center',
+      borderBottom: '0.5px solid var(--border-subtle)',
+    }
+
+    return (
+      <div style={{ padding: '1.5rem 2rem 3rem' }}>
+        {/* ── Past games ── */}
+        {finalized.length > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '10px' }}>
+              Past games
+            </div>
+            <div style={{ background: 'var(--bg-card)', borderRadius: '10px',
+              border: '0.5px solid var(--border-subtle)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Game</th>
+                    {Array.from({ length: maxActualPitchers }, (_, i) => (
+                      <th key={i} style={{ ...thStyle, textAlign: 'center' }}>P{i + 1}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {finalized.map(game => {
+                    const pitchers = actualPitching[game.id] ?? []
+                    return (
+                      <tr key={game.id}>
+                        <td style={tdGame}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
+                            vs {game.opponent}
+                          </div>
+                          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
+                            {formatDate(game.game_date)}
+                          </div>
+                          <Link href={`/games/${game.id}/lineup/desktop`} style={{
+                            fontSize: '11px', fontWeight: 600, color: 'var(--accent)',
+                            textDecoration: 'none', padding: '2px 7px', borderRadius: 4,
+                            border: '0.5px solid rgba(75,156,211,0.35)',
+                            background: 'rgba(75,156,211,0.07)',
+                          }}>
+                            Edit Lineup →
+                          </Link>
+                        </td>
+                        {Array.from({ length: maxActualPitchers }, (_, i) => {
+                          const p = pitchers[i]
+                          if (!p) return (
+                            <td key={i} style={tdPitcher}>
+                              <span style={{ color: `rgba(var(--fg-rgb), 0.15)`, fontSize: '13px' }}>—</span>
+                            </td>
+                          )
+                          const draftKey = p.slotId
+                          const isDrafting = draftKey in editingPitch
+                          const draftVal = editingPitch[draftKey] ?? ''
+                          const overLimit = pitchLimit != null && p.pitchCount != null && p.pitchCount > pitchLimit
+                          return (
+                            <td key={i} style={tdPitcher}>
+                              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>
+                                {shortName(p.player)}
+                                {p.isExtra && (
+                                  <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600,
+                                    background: 'rgba(75,156,211,0.12)', padding: '1px 4px',
+                                    borderRadius: 3, marginLeft: 4 }}>sub</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 700, marginBottom: '6px' }}>
+                                {p.innings} inn
+                              </div>
+                              {isDrafting ? (
+                                <input
+                                  type="text" inputMode="numeric" pattern="[0-9]*"
+                                  value={draftVal} autoFocus
+                                  onChange={e => setEditingPitch(prev => ({ ...prev, [draftKey]: e.target.value.replace(/\D/g, '') }))}
+                                  onBlur={() => savePitchCount(p.slotId, game.id, draftVal)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                    if (e.key === 'Escape') setEditingPitch(prev => { const n = { ...prev }; delete n[draftKey]; return n })
+                                  }}
+                                  style={{
+                                    width: '80px', padding: '4px 6px', borderRadius: '5px',
+                                    border: '0.5px solid var(--accent)', background: 'var(--bg-input)',
+                                    color: 'var(--fg)', fontSize: '12px', textAlign: 'center', boxSizing: 'border-box',
+                                  }}
+                                />
+                              ) : !p.isExtra ? (
+                                <button
+                                  onClick={() => setEditingPitch(prev => ({ ...prev, [draftKey]: p.pitchCount != null ? String(p.pitchCount) : '' }))}
+                                  title={overLimit ? `Exceeds ${pitchLimit}p limit` : 'Click to edit pitch count'}
+                                  style={{
+                                    padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
+                                    border: overLimit ? '0.5px solid rgba(232,112,96,0.6)' : p.pitchCount != null ? '0.5px solid var(--border-md)' : '0.5px dashed var(--border-md)',
+                                    background: overLimit ? 'rgba(232,112,96,0.1)' : 'transparent',
+                                    color: overLimit ? '#E87060' : p.pitchCount != null ? `rgba(var(--fg-rgb), 0.7)` : `rgba(var(--fg-rgb), 0.25)`,
+                                    fontSize: '12px', fontWeight: overLimit ? 700 : 400,
+                                  }}
+                                >
+                                  {p.pitchCount != null ? `${p.pitchCount}p${overLimit ? ' ⚠' : ''}` : '+ pitches'}
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.4)` }}>
+                                  {p.pitchCount != null ? `${p.pitchCount}p` : '—'}
+                                </span>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Upcoming games ── */}
+        {upcoming.length > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)` }}>
+                Upcoming
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button onClick={() => setSlotCount(c => Math.max(1, c - 1))} disabled={slotCount <= 1}
+                  style={{ width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                    background: 'transparent', cursor: slotCount <= 1 ? 'not-allowed' : 'pointer',
+                    color: slotCount <= 1 ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                    fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>−</button>
+                <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)`, minWidth: 48, textAlign: 'center' }}>
+                  {slotCount} pitcher{slotCount !== 1 ? 's' : ''}
+                </span>
+                <button onClick={() => setSlotCount(c => Math.min(MAX_SLOTS, c + 1))} disabled={slotCount >= MAX_SLOTS}
+                  style={{ width: 24, height: 24, borderRadius: 4, border: '0.5px solid var(--border-md)',
+                    background: 'transparent', cursor: slotCount >= MAX_SLOTS ? 'not-allowed' : 'pointer',
+                    color: slotCount >= MAX_SLOTS ? `rgba(var(--fg-rgb),0.2)` : `rgba(var(--fg-rgb),0.55)`,
+                    fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>+</button>
+              </div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', borderRadius: '10px',
+              border: '0.5px solid var(--border-subtle)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Game</th>
+                    {Array.from({ length: slotCount }, (_, i) => (
+                      <th key={i} style={{ ...thStyle, textAlign: 'center' }}>P{i + 1}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcoming.map(game => {
+                    const gamePlans = plans[game.id] ?? {}
+                    const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
+                    return (
+                      <tr key={game.id}>
+                        <td style={tdGame}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
+                            vs {game.opponent}
+                          </div>
+                          <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.4)`, marginBottom: '6px' }}>
+                            {formatDate(game.game_date)}
+                            {game.location ? ` · ${game.location}` : ''}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Link href={`/games/${game.id}/lineup/desktop`} style={{
+                              fontSize: '11px', fontWeight: 600, color: 'var(--accent)',
+                              textDecoration: 'none', padding: '2px 7px', borderRadius: 4,
+                              border: '0.5px solid rgba(75,156,211,0.35)',
+                              background: 'rgba(75,156,211,0.07)',
+                            }}>
+                              Edit Lineup →
+                            </Link>
+                            <button
+                              onClick={() => hasPitchers && syncFromLineup(game.id)}
+                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : 'No pitchers in lineup yet'}
+                              style={{
+                                fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: 4,
+                                cursor: hasPitchers ? 'pointer' : 'default',
+                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.35)' : 'var(--border-subtle)'}`,
+                                background: hasPitchers ? 'rgba(75,156,211,0.07)' : 'transparent',
+                                color: hasPitchers ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.22)`,
+                              }}
+                            >
+                              ↓ from lineup
+                            </button>
+                          </div>
+                        </td>
+                        {Array.from({ length: slotCount }, (_, i) => {
+                          const slot = i + 1
+                          const plan = gamePlans[slot]
+                          const isSaving = saving === `${game.id}-${slot}`
+                          let restWarning: { label: string; color: string } | null = null
+                          if (plan?.player_id) {
+                            const effLast = effectiveLastPitched(plan.player_id, game.game_date)
+                            if (effLast) {
+                              const days = Math.round(
+                                (new Date(game.game_date + 'T12:00:00').getTime() -
+                                 new Date(effLast + 'T12:00:00').getTime()) / 86400000
+                              )
+                              if (days <= 1)      restWarning = { label: days <= 0 ? 'Same day!' : '1d rest ⚠', color: '#E87060' }
+                              else if (days <= 3) restWarning = { label: `${days}d rest ⚠`, color: '#E8A020' }
+                            }
+                          }
+                          return (
+                            <td key={slot} style={tdPitcher}>
+                              <select
+                                value={plan?.player_id ?? ''}
+                                onChange={e => setPlanPlayer(game.id, slot, e.target.value)}
+                                disabled={isSaving}
+                                style={{ ...CELL_SEL, opacity: isSaving ? 0.5 : 1,
+                                  borderColor: restWarning ? restWarning.color : undefined }}
+                              >
+                                <option value="">—</option>
+                                {players.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    #{p.jersey_number} {p.last_name}{daysRest(effectiveLastPitched(p.id, game.game_date), game.game_date)}
+                                  </option>
+                                ))}
+                              </select>
+                              {restWarning && (
+                                <div style={{ fontSize: '10px', fontWeight: 700, textAlign: 'center',
+                                  marginTop: '3px', color: restWarning.color }}>
+                                  {restWarning.label}
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {renderSeasonTotals()}
+      </div>
+    )
+  }
+
   function renderSeasonTotals() {
     if (seasonTotalsList.length === 0) return null
     return (
@@ -1334,6 +1590,13 @@ export default function PitchingPage() {
             {renderDesktopDetail()}
             {renderSeasonTotals()}
           </div>
+        </div>
+      )}
+
+      {/* ── Desktop Grid layout ── */}
+      {!loading && (upcoming.length > 0 || finalized.length > 0) && (
+        <div className="pitching-desktop-grid-layout">
+          {renderDesktopGrid()}
         </div>
       )}
 
