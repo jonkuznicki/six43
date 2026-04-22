@@ -180,18 +180,39 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setSeasonAgeGroups(seasonData?.age_groups ?? [])
 
     const [
-      { data: playerData }, { data: regData }, { data: rosterData },
+      { data: playerData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
-      seasonData ? supabase.from('tryout_registration_staging').select('player_id,prior_team,age_group,parent_email,imported_at,dob,preferred_tryout_date').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
       supabase.from('tryout_scores').select('player_id').eq('org_id', params.orgId),
     ])
+
+    // Load registration staging for the whole org (not season-filtered) so data
+    // shows even if the import season doesn't match the current active season.
+    // Try with preferred_tryout_date first; fall back without it if the column
+    // hasn't been migrated yet (migration 051).
+    let regData: any[] = []
+    {
+      const { data, error } = await supabase
+        .from('tryout_registration_staging')
+        .select('player_id,prior_team,age_group,parent_email,imported_at,dob,preferred_tryout_date')
+        .eq('org_id', params.orgId)
+      if (!error) {
+        regData = data ?? []
+      } else {
+        const { data: fallback } = await supabase
+          .from('tryout_registration_staging')
+          .select('player_id,prior_team,age_group,parent_email,imported_at,dob')
+          .eq('org_id', params.orgId)
+        regData = fallback ?? []
+      }
+    }
+
     setPlayers(playerData ?? [])
-    setRegMap(new Map((regData ?? []).map((r: any) => [r.player_id, r])))
+    setRegMap(new Map(regData.map((r: any) => [r.player_id, r])))
     setRosterMap(new Map((rosterData ?? []).map((r: any) => [r.player_id, r])))
     setGcIds(new Set((gcData ?? []).map((r: any) => r.player_id)))
     setEvalIds(new Set((evalData ?? []).map((r: any) => r.player_id)))
