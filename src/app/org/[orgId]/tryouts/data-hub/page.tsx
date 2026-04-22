@@ -200,7 +200,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
-      seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
+      supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
       supabase.from('tryout_scores').select('player_id').eq('org_id', params.orgId),

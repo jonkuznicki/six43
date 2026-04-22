@@ -202,22 +202,40 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
 }
 
 async function createNewPlayer({ supabase, job, report, row, userId }: any) {
-  const payload = row.createPayload
+  const payload = row.createPayload  // present for registration, absent for roster
+
+  // Derive name fields — roster rows store the name directly on row, not in createPayload
+  let firstName: string, lastName: string
+  if (payload?.firstName) {
+    firstName = payload.firstName
+    lastName  = payload.lastName ?? ''
+  } else {
+    const parts = (row.rawName ?? '').trim().split(/\s+/)
+    firstName = parts[0] ?? ''
+    lastName  = parts.slice(1).join(' ')
+  }
+
+  const isRoster = job.type === 'roster'
 
   const { data: newPlayer, error } = await supabase
     .from('tryout_players')
     .insert({
       org_id:       job.org_id,
-      first_name:   payload.firstName,
-      last_name:    payload.lastName,
-      dob:          payload.dob,
-      age_group:    payload.ageGroup,
-      parent_email: payload.parentEmail,
-      parent_phone: payload.parentPhone,
-      grade:        payload.grade,
-      school:       payload.school,
-      prior_org:    payload.priorOrg,
-      prior_team:   payload.priorTeam,
+      first_name:   firstName,
+      last_name:    lastName,
+      dob:          payload?.dob ?? row.dob ?? null,
+      age_group:    payload?.ageGroup ?? row.ageGroup ?? null,
+      ...(isRoster ? {
+        prior_team:    row.teamName ?? null,
+        jersey_number: row.jerseyNumber ?? null,
+      } : {
+        parent_email: payload?.parentEmail ?? null,
+        parent_phone: payload?.parentPhone ?? null,
+        grade:        payload?.grade ?? null,
+        school:       payload?.school ?? null,
+        prior_org:    payload?.priorOrg ?? null,
+        prior_team:   payload?.priorTeam ?? null,
+      }),
     })
     .select('id')
     .single()
@@ -230,7 +248,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
   await supabase.from('tryout_player_aliases').insert({
     player_id:     newPlayer.id,
     raw_name:      row.rawName,
-    source:        'registration',
+    source:        isRoster ? 'roster' : 'registration',
     confidence:    1.0,
     confirmed:     true,
     confirmed_by:  userId,
@@ -244,8 +262,18 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
       : r
   )
 
-  // Write registration staging if this is a registration import
-  if (job.type === 'registration' && job.season_id && payload) {
+  if (isRoster && job.season_id) {
+    await supabase.from('tryout_roster_staging').upsert({
+      player_id:     newPlayer.id,
+      org_id:        job.org_id,
+      season_id:     job.season_id,
+      import_job_id: job.id,
+      team_name:     row.teamName ?? null,
+      jersey_number: row.jerseyNumber ?? null,
+    }, { onConflict: 'player_id,season_id' })
+  }
+
+  if (!isRoster && job.season_id && payload) {
     await upsertRegStaging(supabase, {
       player_id:            newPlayer.id,
       org_id:               job.org_id,
@@ -269,7 +297,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
     })
   }
 
-  await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Created new player: ${payload.firstName} ${payload.lastName}` })
+  await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Created new player: ${firstName} ${lastName}` })
 
   return NextResponse.json({ ok: true, playerId: newPlayer.id })
 }
