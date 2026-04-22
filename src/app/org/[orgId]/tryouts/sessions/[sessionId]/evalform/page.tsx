@@ -214,12 +214,12 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                     <th rowSpan={2} style={{
                       padding: '4px 6px', textAlign: 'left', border: '0.5px solid var(--border)',
                       background: `rgba(var(--fg-rgb),0.04)`, fontWeight: 700, fontSize: '11px',
-                      minWidth: '20px', whiteSpace: 'nowrap',
+                      width: '24px',
                     }}>#</th>
                     <th rowSpan={2} style={{
                       padding: '4px 8px', textAlign: 'left', border: '0.5px solid var(--border)',
                       background: `rgba(var(--fg-rgb),0.04)`, fontWeight: 700, fontSize: '11px',
-                      minWidth: '130px',
+                      width: '130px',
                     }}>Player</th>
                     {catColGroups.map(grp => (
                       <th key={grp.key} colSpan={grp.count} style={{
@@ -240,7 +240,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                     <th rowSpan={2} style={{
                       padding: '4px 6px', textAlign: 'center', border: '0.5px solid var(--border)',
                       background: `rgba(var(--fg-rgb),0.04)`, fontSize: '10px', fontWeight: 700,
-                      minWidth: '80px',
+                      width: '80px',
                     }}>Comments</th>
                   </tr>
                   {/* Subcategory header row */}
@@ -287,7 +287,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                           <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)', textAlign: 'center', fontWeight: 700, fontSize: '11px' }}>
                             {c.tryout_number}
                           </td>
-                          <td style={{ padding: '5px 8px', border: '0.5px solid var(--border)', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '11px' }}>
+                          <td style={{ padding: '5px 8px', border: '0.5px solid var(--border)', fontWeight: 600, fontSize: '11px' }}>
                             {name}
                           </td>
                           {allCols.map((col, ci) => (
