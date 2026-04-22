@@ -51,8 +51,8 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
       supabase.from('tryout_orgs').select('name').eq('id', params.orgId).single(),
       supabase.from('tryout_seasons').select('label').eq('id', sess.season_id).single(),
       supabase.from('tryout_checkins')
-        .select('id, tryout_number, player_id, is_write_in, write_in_name, tryout_players(first_name, last_name)')
-        .eq('session_id', params.sessionId).order('tryout_number'),
+        .select('id, tryout_number, player_id, is_write_in, write_in_name')
+        .eq('session_id', params.sessionId).order('tryout_number', { ascending: true, nullsFirst: false }),
       supabase.from('tryout_scoring_config')
         .select('category, label, weight, is_optional, is_tiebreaker, subcategories, sort_order')
         .eq('season_id', sess.season_id).order('sort_order'),
@@ -197,7 +197,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
 
             {/* Score grid */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '11px' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '11px', tableLayout: 'fixed' }}>
                 <thead>
                   {/* Category header row */}
                   <tr>
@@ -223,8 +223,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                         whiteSpace: 'nowrap',
                         color: grp.isTiebreaker ? `rgba(var(--fg-rgb),0.4)` : 'inherit',
                       }}>
-                        {grp.label}
-                        {grp.isTiebreaker ? ' (sec, lower=better)' : ''}
+                        {grp.isTiebreaker ? 'Speed' : grp.label}
                         {grp.isOptional && !grp.isTiebreaker ? ' *' : ''}
                       </th>
                     ))}
@@ -246,7 +245,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                             : `rgba(var(--fg-rgb),0.03)`,
                         fontSize: '9px', fontWeight: 600,
                         color: col.isTiebreaker ? `rgba(var(--fg-rgb),0.4)` : `rgba(var(--fg-rgb),0.6)`,
-                        whiteSpace: 'nowrap', minWidth: col.isTiebreaker ? '42px' : '28px',
+                        whiteSpace: 'nowrap', width: '36px',
                       }}>
                         {col.subLabel}
                       </th>
@@ -261,7 +260,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                         <td style={{ padding: '6px 6px', border: '0.5px solid var(--border)', textAlign: 'center', color: `rgba(var(--fg-rgb),0.3)`, fontSize: '10px' }}>{i + 1}</td>
                         <td style={{ padding: '6px 8px', border: '0.5px solid var(--border)' }}>&nbsp;</td>
                         {allCols.map((col, ci) => (
-                          <td key={ci} style={{ padding: '6px 4px', border: '0.5px solid var(--border)', minWidth: col.isTiebreaker ? '42px' : '28px' }}>&nbsp;</td>
+                          <td key={ci} style={{ padding: '6px 4px', border: '0.5px solid var(--border)', width: '36px' }}>&nbsp;</td>
                         ))}
                         <td style={{ padding: '6px 6px', border: '0.5px solid var(--border)' }}>&nbsp;</td>
                       </tr>
@@ -284,7 +283,7 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                           {allCols.map((col, ci) => (
                             <td key={ci} style={{
                               padding: '5px 4px', border: '0.5px solid var(--border)',
-                              minWidth: col.isTiebreaker ? '42px' : '28px',
+                              width: '36px',
                               background: col.isTiebreaker ? `rgba(var(--fg-rgb),0.015)` : 'transparent',
                             }}>&nbsp;</td>
                           ))}
