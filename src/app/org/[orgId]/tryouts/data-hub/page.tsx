@@ -176,9 +176,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [backfillDone,  setBackfillDone]  = useState(false)
   const [backfillError, setBackfillError] = useState('')
 
-  // Registration tab sort
-  const [regSortCol, setRegSortCol] = useState('name')
-  const [regSortDir, setRegSortDir] = useState<1 | -1>(1)
+  // Per-tab sort state
+  const [regSortCol,    setRegSortCol]    = useState('name')
+  const [regSortDir,    setRegSortDir]    = useState<1 | -1>(1)
+  const [rosterSortCol, setRosterSortCol] = useState('name')
+  const [rosterSortDir, setRosterSortDir] = useState<1 | -1>(1)
+  const [evalsSortCol,  setEvalsSortCol]  = useState('score')
+  const [evalsSortDir,  setEvalsSortDir]  = useState<1 | -1>(-1)
+  const [scoresSortCol, setScoresSortCol] = useState('avg')
+  const [scoresSortDir, setScoresSortDir] = useState<1 | -1>(-1)
+  const [ageSortCol,    setAgeSortCol]    = useState('name')
+  const [ageSortDir,    setAgeSortDir]    = useState<1 | -1>(1)
 
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (editingCell && inputRef.current) inputRef.current.focus() }, [editingCell])
@@ -787,16 +795,46 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {/* ── Roster tab ────────────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'roster' && (() => {
         const rows = filtered.map(p => ({ p, ros: rosterMap.get(p.id) })).filter(r => r.ros)
+
+        function rosterToggleSort(col: string) {
+          if (rosterSortCol === col) setRosterSortDir(d => d === 1 ? -1 : 1)
+          else { setRosterSortCol(col); setRosterSortDir(1) }
+        }
+        function rosterArrow(col: string) {
+          if (rosterSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
+          return <span style={{ color: 'var(--accent)' }}>{rosterSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        const sorted = [...rows].sort((a, b) => {
+          if (rosterSortCol === 'name')     return rosterSortDir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
+          if (rosterSortCol === 'age')      return rosterSortDir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
+          if (rosterSortCol === 'team')     return rosterSortDir * (a.ros!.team_name ?? '').localeCompare(b.ros!.team_name ?? '')
+          if (rosterSortCol === 'jersey')   return rosterSortDir * (a.ros!.jersey_number ?? '').localeCompare(b.ros!.jersey_number ?? '')
+          if (rosterSortCol === 'imported') return rosterSortDir * (a.ros!.imported_at ?? '').localeCompare(b.ros!.imported_at ?? '')
+          return 0
+        })
+
+        const cols = [
+          { key: 'name',     label: 'Player',    sticky: true },
+          { key: 'age',      label: 'Age Group' },
+          { key: 'team',     label: 'Team' },
+          { key: 'jersey',   label: 'Jersey #' },
+          { key: 'imported', label: 'Imported' },
+        ]
+
         return (
           <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age Group', 'Team', 'Jersey #', 'Imported'].map((l, i) => (
-                  <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
+                {cols.map((col) => (
+                  <th key={col.key} onClick={() => rosterToggleSort(col.key)}
+                    style={{ ...th, cursor: 'pointer', ...(col.sticky ? stickyPlayerTh : {}) }}>
+                    {col.label}{rosterArrow(col.key)}
+                  </th>
                 ))}
               </tr></thead>
               <tbody>
-                {rows.map(({ p, ros }, i) => (
+                {sorted.map(({ p, ros }, i) => (
                   <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
                     <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
@@ -807,7 +845,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 ))}
               </tbody>
             </table>
-            {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No roster data. Import a roster file first.</div>}
+            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No roster data. Import a roster file first.</div>}
           </div>
         )
       })()}
@@ -1007,6 +1045,26 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         const evalMap = new Map(evalFull.map(r => [r.player_id, r]))
         const rows = filtered.filter(p => evalMap.has(p.id))
         const sections = Array.from(new Set(evalFields.map(f => f.section)))
+
+        function evalsToggleSort(col: string) {
+          if (evalsSortCol === col) setEvalsSortDir(d => d === 1 ? -1 : 1)
+          else { setEvalsSortCol(col); setEvalsSortDir(col === 'name' ? 1 : -1) }
+        }
+        function evalsArrow(col: string) {
+          if (evalsSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
+          return <span style={{ color: 'var(--accent)' }}>{evalsSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        const sorted = [...rows].sort((a, b) => {
+          if (evalsSortCol === 'name') return evalsSortDir * `${a.last_name}${a.first_name}`.localeCompare(`${b.last_name}${b.first_name}`)
+          if (evalsSortCol === 'score') {
+            const sa = evalMap.get(a.id)?.computed_score ?? -Infinity
+            const sb = evalMap.get(b.id)?.computed_score ?? -Infinity
+            return evalsSortDir * (sa - sb)
+          }
+          return 0
+        })
+
         return (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -1017,7 +1075,9 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 <thead>
                   {/* Section headers */}
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    <th style={{ ...th, ...stickyPlayerTh, minWidth: '180px', fontWeight: 800, fontSize: '12px' }} rowSpan={2}>Player</th>
+                    <th onClick={() => evalsToggleSort('name')} style={{ ...th, ...stickyPlayerTh, minWidth: '180px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }} rowSpan={2}>
+                      Player{evalsArrow('name')}
+                    </th>
                     {sections.map(sec => {
                       const secFields = evalFields.filter(f => f.section === sec)
                       return (
@@ -1025,23 +1085,26 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                           ...th, textAlign: 'center', fontSize: '10px',
                           borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)',
                           background: sec === 'pitching_catching' ? 'rgba(var(--fg-rgb),0.03)' : 'var(--bg)',
+                          cursor: 'default',
                         }}>
                           {sec === 'fielding_hitting' ? 'Fielding & Hitting' : sec === 'pitching_catching' ? 'Pitching & Catching' : 'Intangibles'}
                         </th>
                       )
                     })}
-                    <th style={{ ...th, textAlign: 'right', minWidth: '72px', color: 'var(--accent)' }} rowSpan={2}>Score</th>
+                    <th onClick={() => evalsToggleSort('score')} style={{ ...th, textAlign: 'right', minWidth: '72px', color: evalsSortCol === 'score' ? 'var(--accent)' : 'var(--accent)', cursor: 'pointer' }} rowSpan={2}>
+                      Score{evalsArrow('score')}
+                    </th>
                   </tr>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
                     {evalFields.map(f => (
-                      <th key={f.field_key} title={f.label} style={{ ...th, textAlign: 'center', minWidth: '52px', maxWidth: '72px', fontSize: '10px', fontWeight: 500 }}>
+                      <th key={f.field_key} title={f.label} style={{ ...th, textAlign: 'center', minWidth: '52px', maxWidth: '72px', fontSize: '10px', fontWeight: 500, cursor: 'default' }}>
                         {f.label.length > 8 ? f.label.slice(0, 7) + '…' : f.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((p, i) => {
+                  {sorted.map((p, i) => {
                     const ev = evalMap.get(p.id)!
                     return (
                       <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.04)' }}>
@@ -1065,7 +1128,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                   })}
                 </tbody>
               </table>
-              {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No submitted coach evals yet.</div>}
+              {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No submitted coach evals yet.</div>}
             </div>
           </div>
         )
@@ -1082,21 +1145,50 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           if (r.evaluator_name) a.evaluators.add(r.evaluator_name)
         }
         const rows = filtered.filter(p => aggMap.has(p.id))
+
+        function scoresToggleSort(col: string) {
+          if (scoresSortCol === col) setScoresSortDir(d => d === 1 ? -1 : 1)
+          else { setScoresSortCol(col); setScoresSortDir(col === 'name' || col === 'age' ? 1 : -1) }
+        }
+        function scoresArrow(col: string) {
+          if (scoresSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
+          return <span style={{ color: 'var(--accent)' }}>{scoresSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        const sorted = [...rows].sort((a, b) => {
+          if (scoresSortCol === 'name') return scoresSortDir * `${a.last_name}${a.first_name}`.localeCompare(`${b.last_name}${b.first_name}`)
+          if (scoresSortCol === 'age')  return scoresSortDir * (a.age_group ?? '').localeCompare(b.age_group ?? '')
+          if (scoresSortCol === 'avg') {
+            const sa = aggMap.get(a.id)!.scores; const sb = aggMap.get(b.id)!.scores
+            const avgA = sa.length ? sa.reduce((x, y) => x + y, 0) / sa.length : -Infinity
+            const avgB = sb.length ? sb.reduce((x, y) => x + y, 0) / sb.length : -Infinity
+            return scoresSortDir * (avgA - avgB)
+          }
+          if (scoresSortCol === 'sessions') return scoresSortDir * (aggMap.get(a.id)!.scores.length - aggMap.get(b.id)!.scores.length)
+          return 0
+        })
+
+        const scoreCols: { key: string; label: string; align: 'left' | 'right' }[] = [
+          { key: 'name',     label: 'Player',     align: 'left' },
+          { key: 'age',      label: 'Age',        align: 'right' },
+          { key: 'avg',      label: 'Avg Score',  align: 'right' },
+          { key: 'sessions', label: 'Sessions',   align: 'right' },
+          { key: 'evals',    label: 'Evaluators', align: 'left' },
+        ]
+
         return (
           <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead><tr>
-                {['Player', 'Age', 'Avg Score', 'Sessions', 'Evaluators'].map((l, i) => (
-                  <th key={l} style={{ ...th, textAlign: l === 'Player' || l === 'Evaluators' ? 'left' : 'right', ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
+                {scoreCols.map((col, i) => (
+                  <th key={col.key} onClick={() => col.key !== 'evals' && scoresToggleSort(col.key)}
+                    style={{ ...th, textAlign: col.align, cursor: col.key !== 'evals' ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}>
+                    {col.label}{col.key !== 'evals' ? scoresArrow(col.key) : null}
+                  </th>
                 ))}
               </tr></thead>
               <tbody>
-                {rows.sort((a, b) => {
-                  const sa = aggMap.get(a.id)!.scores; const sb = aggMap.get(b.id)!.scores
-                  const avgA = sa.length ? sa.reduce((x,y)=>x+y,0)/sa.length : -1
-                  const avgB = sb.length ? sb.reduce((x,y)=>x+y,0)/sb.length : -1
-                  return avgB - avgA
-                }).map((p, i) => {
+                {sorted.map((p, i) => {
                   const agg = aggMap.get(p.id)!
                   const avg = agg.scores.length ? agg.scores.reduce((a, b) => a + b, 0) / agg.scores.length : null
                   return (
@@ -1111,7 +1203,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 })}
               </tbody>
             </table>
-            {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No tryout scores recorded yet.</div>}
+            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No tryout scores recorded yet.</div>}
           </div>
         )
       })()}
@@ -1142,6 +1234,26 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           no_dob:     filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'no_dob' }).length,
           no_group:   filtered.filter(p => { const d = p.dob ?? regMap.get(p.id)?.dob ?? null; return calcAgeStatus(d, p.tryout_age_group, seasonYear) === 'no_group' }).length,
         }
+
+        function ageToggleSort(col: string) {
+          if (ageSortCol === col) setAgeSortDir(d => d === 1 ? -1 : 1)
+          else { setAgeSortCol(col); setAgeSortDir(1) }
+        }
+        function ageArrow(col: string) {
+          if (ageSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
+          return <span style={{ color: 'var(--accent)' }}>{ageSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        const sortedAgeRows = [...ageRows].sort((a, b) => {
+          if (ageSortCol === 'name')    return ageSortDir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
+          if (ageSortCol === 'age')     return ageSortDir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
+          if (ageSortCol === 'dob')     return ageSortDir * (a.dob ?? '').localeCompare(b.dob ?? '')
+          if (ageSortCol === 'ba')      return ageSortDir * ((a.ba ?? -1) - (b.ba ?? -1))
+          if (ageSortCol === 'correct') return ageSortDir * (a.correctGroup ?? '').localeCompare(b.correctGroup ?? '')
+          if (ageSortCol === 'tryout')  return ageSortDir * (a.p.tryout_age_group ?? '').localeCompare(b.p.tryout_age_group ?? '')
+          if (ageSortCol === 'status')  return ageSortDir * a.status.localeCompare(b.status)
+          return 0
+        })
 
         return (
           <div>
@@ -1177,13 +1289,26 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    {['Player', 'Age Group', 'DOB', 'Baseball Age', 'Correct Group', 'Tryout Group', 'Status', 'Override Reason', ''].map((l, i) => (
-                      <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
+                    {([
+                      { key: 'name',    label: 'Player',         sticky: true },
+                      { key: 'age',     label: 'Age Group' },
+                      { key: 'dob',     label: 'DOB' },
+                      { key: 'ba',      label: 'Baseball Age' },
+                      { key: 'correct', label: 'Correct Group' },
+                      { key: 'tryout',  label: 'Tryout Group' },
+                      { key: 'status',  label: 'Status' },
+                      { key: null,      label: 'Override Reason' },
+                      { key: null,      label: '' },
+                    ] as { key: string | null; label: string; sticky?: boolean }[]).map((col, i) => (
+                      <th key={i} onClick={() => col.key && ageToggleSort(col.key)}
+                        style={{ ...th, cursor: col.key ? 'pointer' : 'default', ...(col.sticky ? stickyPlayerTh : {}) }}>
+                        {col.label}{col.key ? ageArrow(col.key) : null}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {ageRows.map(({ p, dob, ba, status, correctGroup }, i) => {
+                  {sortedAgeRows.map(({ p, dob, ba, status, correctGroup }, i) => {
                     const isFix = fixingId === p.id
                     const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
                     const tagDisplay = p.tryout_age_group
@@ -1284,7 +1409,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                   })}
                 </tbody>
               </table>
-              {ageRows.length === 0 && (
+              {sortedAgeRows.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>
                   {ageStatusFilter === 'all' ? 'No players found.' : `No players with status "${STATUS_LABEL[ageStatusFilter as AgeStatus]}".`}
                 </div>
