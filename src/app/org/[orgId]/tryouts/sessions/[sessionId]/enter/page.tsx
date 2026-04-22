@@ -44,8 +44,13 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   const [addingEval,    setAddingEval]    = useState(false)
   const [newEvalName,   setNewEvalName]   = useState('')
 
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>()
-  const inputRefs = useRef<(HTMLInputElement | null)[][]>([])
+  const saveTimer  = useRef<ReturnType<typeof setTimeout>>()
+  const inputRefs  = useRef<(HTMLInputElement | null)[][]>([])
+  const gridRef    = useRef<GridValues>({})
+  const commentsRef = useRef<Record<string, string>>({})
+
+  useEffect(() => { gridRef.current = grid }, [grid])
+  useEffect(() => { commentsRef.current = comments }, [comments])
 
   useEffect(() => { loadSession() }, [])
   useEffect(() => { if (selectedEval) loadScores(selectedEval) }, [selectedEval])
@@ -176,7 +181,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     const evaluator = evaluators.find(e => e.id === selectedEval)
     if (!evaluator || evaluator.locked_at) return
 
-    const row = grid[playerId] ?? {}
+    // Read from refs so we always get the latest values, not the stale closure
+    const row = gridRef.current[playerId] ?? {}
     const scores: Record<string, number | null> = {}
     for (const [k, v] of Object.entries(row)) {
       scores[k] = v === '' ? null : parseFloat(v)
@@ -184,15 +190,16 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     const tryoutScore = computeTryoutScore(scores, categories)
 
     setSaving(playerId)
-    await supabase.from('tryout_scores').upsert({
+    const { error } = await supabase.from('tryout_scores').upsert({
       player_id: playerId, session_id: params.sessionId, org_id: params.orgId,
       evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-      scores, tryout_score: tryoutScore, comments: comments[playerId] ?? null,
+      scores, tryout_score: tryoutScore,
+      comments: commentsRef.current[playerId] ?? null,
       submitted_at: new Date().toISOString(),
     }, { onConflict: 'player_id,session_id,evaluator_id' })
     setSaving(null)
-    setSavedAt(new Date())
-  }, [grid, categories, evaluators, selectedEval, comments])
+    if (!error) setSavedAt(new Date())
+  }, [categories, evaluators, selectedEval])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number) {
     const refs = inputRefs.current
