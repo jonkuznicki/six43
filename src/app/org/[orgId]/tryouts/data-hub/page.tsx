@@ -390,11 +390,25 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (ageFilter !== 'all') list = list.filter(p => p.age_group === ageFilter)
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(p =>
-        `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-        (pv(p, 'prior_team') ?? '').toLowerCase().includes(q) ||
-        (pv(p, 'tryout_age_group') ?? '').toLowerCase().includes(q)
-      )
+      list = list.filter(p => {
+        const reg = regMap.get(p.id)
+        return (
+          `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
+          (pv(p, 'prior_team') ?? '').toLowerCase().includes(q) ||
+          (pv(p, 'tryout_age_group') ?? '').toLowerCase().includes(q) ||
+          (p.age_group ?? '').toLowerCase().includes(q) ||
+          (p.school ?? '').toLowerCase().includes(q) ||
+          (p.prior_org ?? '').toLowerCase().includes(q) ||
+          (p.parent_email ?? '').toLowerCase().includes(q) ||
+          (p.parent_phone ?? '').toLowerCase().includes(q) ||
+          (p.grade ?? '').toLowerCase().includes(q) ||
+          (reg?.school ?? '').toLowerCase().includes(q) ||
+          (reg?.prior_org ?? '').toLowerCase().includes(q) ||
+          (reg?.parent_email ?? '').toLowerCase().includes(q) ||
+          (reg?.parent_phone ?? '').toLowerCase().includes(q) ||
+          (reg?.grade ?? '').toLowerCase().includes(q)
+        )
+      })
     }
     return [...list].sort((a, b) => {
       let va = '', vb = ''
@@ -404,7 +418,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       if (sortCol === 'age')       { va = a.age_group; vb = b.age_group }
       return va.localeCompare(vb) * sortDir
     })
-  }, [players, ageFilter, search, sortCol, sortDir, localUpdates])
+  }, [players, ageFilter, search, sortCol, sortDir, localUpdates, regMap])
 
   const ageAlerts = useMemo(() =>
     players.filter(p => {
@@ -511,11 +525,20 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
       {/* Search + Age filter — shared across tabs */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search players…"
-          style={{ background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '7px 12px', fontSize: '13px', color: 'var(--fg)', width: '220px' }}
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Name, team, school, email, org…"
+            style={{ background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '7px 30px 7px 12px', fontSize: '13px', color: 'var(--fg)', width: '260px' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{
+              position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px',
+              color: `rgba(var(--fg-rgb),0.35)`, padding: '0', lineHeight: 1,
+            }}>×</button>
+          )}
+        </div>
         {['all', ...ageGroups].map(ag => (
           <button key={ag} onClick={() => setAgeFilter(ag)} style={{
             padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
