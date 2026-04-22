@@ -11,6 +11,7 @@ interface Player {
   age_group: string; tryout_age_group: string | null
   prior_team: string | null; jersey_number: string | null
   dob: string | null; age_group_override_reason: string | null
+  parent_email: string | null
 }
 interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null; preferred_tryout_date: string | null }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
@@ -183,7 +184,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       { data: playerData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
-      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
+      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
       seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
@@ -399,7 +400,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         {TABS.map(t => {
           const counts: Record<Tab, number> = {
             master: players.length,
-            registration: regMap.size,
+            registration: regMap.size > 0 ? regMap.size : players.length,
             roster: rosterMap.size,
             gc: gcIds.size,
             evals: evalIds.size,
@@ -574,29 +575,39 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
       {/* ── Registration tab ──────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'registration' && (() => {
-        const rows = filtered.map(p => ({ p, reg: regMap.get(p.id) })).filter(r => r.reg)
+        // Show all players, using staging row when available and falling back to
+        // player record fields (happens when import ran before a season existed).
+        const rows = filtered.map(p => ({ p, reg: regMap.get(p.id) ?? null }))
+        const hasAnyReg = rows.some(r => r.reg)
         return (
-          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr>
-                {['Player', 'Age Group', 'Preferred Date', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
-                  <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {rows.map(({ p, reg }, i) => (
-                  <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                    <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
-                    <td style={{ ...td, color: '#40A0E8', fontSize: '12px' }}>{reg?.preferred_tryout_date ?? '—'}</td>
-                    <td style={{ ...td, color: '#80B0E8' }}>{reg?.prior_team ?? '—'}</td>
-                    <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? '—'}</td>
-                    <td style={{ ...td, color: s.dim, fontSize: '12px' }}>{reg?.imported_at ? new Date(reg.imported_at).toLocaleDateString() : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No registration data. Import a registration file first.</div>}
+          <div>
+            {!hasAnyReg && rows.length > 0 && (
+              <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '12px', color: '#E8A020' }}>
+                Registration staging data not found — showing data from player records. This happens when a file is imported before a season is created. Re-importing the registration file with an active season will populate full staging data.
+              </div>
+            )}
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 270px)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead><tr>
+                  {['Player', 'Age Group', 'Preferred Date', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
+                    <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {rows.map(({ p, reg }, i) => (
+                    <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
+                      <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                      <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
+                      <td style={{ ...td, color: '#40A0E8', fontSize: '12px' }}>{reg?.preferred_tryout_date ?? '—'}</td>
+                      <td style={{ ...td, color: '#80B0E8' }}>{reg?.prior_team ?? p.prior_team ?? '—'}</td>
+                      <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? p.parent_email ?? '—'}</td>
+                      <td style={{ ...td, color: s.dim, fontSize: '12px' }}>{reg?.imported_at ? new Date(reg.imported_at).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a registration file first.</div>}
+            </div>
           </div>
         )
       })()}
