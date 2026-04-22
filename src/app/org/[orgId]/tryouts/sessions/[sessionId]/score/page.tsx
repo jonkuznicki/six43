@@ -65,25 +65,35 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     setSession(sess)
     if (!sess) { setLoading(false); return }
 
-    const [{ data: catData }, { data: checkinData }, memberResult] = await Promise.all([
+    const [{ data: catData }, { data: checkinRaw }, memberResult] = await Promise.all([
       supabase.from('tryout_scoring_config')
         .select('category, label, weight, is_optional, subcategories, sort_order')
         .eq('season_id', sess.season_id).order('sort_order'),
       supabase.from('tryout_checkins')
-        .select('id, tryout_number, player_id, is_write_in, write_in_name, tryout_players(first_name, last_name, prior_team)')
-        .eq('session_id', params.sessionId).order('tryout_number'),
+        .select('id, tryout_number, player_id, is_write_in, write_in_name')
+        .eq('session_id', params.sessionId).order('tryout_number', { ascending: true, nullsFirst: false }),
       user ? supabase.from('tryout_org_members').select('name, email').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
+
+    // Load player data separately to avoid FK join failures
+    const checkinRows = checkinRaw ?? []
+    const playerIds = Array.from(new Set(checkinRows.filter((c: any) => c.player_id).map((c: any) => c.player_id as string)))
+    const playerMap = new Map<string, { first_name: string; last_name: string; prior_team: string | null }>()
+    if (playerIds.length > 0) {
+      const { data: playerData } = await supabase
+        .from('tryout_players').select('id, first_name, last_name, prior_team').in('id', playerIds)
+      for (const p of playerData ?? []) playerMap.set(p.id, { first_name: p.first_name, last_name: p.last_name, prior_team: p.prior_team })
+    }
 
     setCategories((catData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
       is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false, subcategories: c.subcategories ?? [],
     })))
 
-    const enrichedCheckins = (checkinData ?? []).map((c: any) => ({
+    const enrichedCheckins = checkinRows.map((c: any) => ({
       id: c.id, tryout_number: c.tryout_number, player_id: c.player_id,
       is_write_in: c.is_write_in, write_in_name: c.write_in_name,
-      player: c.tryout_players ?? null,
+      player: c.player_id ? playerMap.get(c.player_id) : undefined,
     }))
     setCheckins(enrichedCheckins)
 

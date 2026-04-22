@@ -59,8 +59,9 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     if (!sess) { setLoading(false); return }
 
     const [{ data: pData }, { data: cData }, { data: otherData }, { data: regData }] = await Promise.all([
-      supabase.from('tryout_players').select('id, first_name, last_name, age_group, jersey_number, prior_team')
-        .eq('org_id', params.orgId).eq('is_active', true).eq('age_group', sess.age_group)
+      supabase.from('tryout_players').select('id, first_name, last_name, age_group, tryout_age_group, jersey_number, prior_team')
+        .eq('org_id', params.orgId).eq('is_active', true)
+        .or(`tryout_age_group.eq.${sess.age_group},and(tryout_age_group.is.null,age_group.eq.${sess.age_group})`)
         .order('last_name').order('first_name'),
       supabase.from('tryout_checkins').select('*')
         .eq('session_id', params.sessionId)
