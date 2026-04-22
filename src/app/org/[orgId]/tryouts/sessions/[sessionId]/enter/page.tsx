@@ -105,16 +105,9 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     const evaluator = evaluators.find(e => e.id === evalId)
     if (!evaluator) return
 
-    // Get the actual user_id for this evaluator via their member record
-    const { data: memberData } = await supabase
-      .from('tryout_org_members').select('user_id').eq('id', evaluator.id).maybeSingle()
-    const userId = memberData?.user_id
-
-    if (!userId) { setGrid({}); setComments({}); return }
-
     const { data: scoreData } = await supabase
       .from('tryout_scores').select('player_id, scores, comments')
-      .eq('session_id', params.sessionId).eq('evaluator_id', userId)
+      .eq('session_id', params.sessionId).eq('evaluator_id', evalId)
 
     const newGrid: GridValues = {}
     const newComments: Record<string, string> = {}
@@ -183,11 +176,6 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     const evaluator = evaluators.find(e => e.id === selectedEval)
     if (!evaluator || evaluator.locked_at) return
 
-    const { data: memberData } = await supabase
-      .from('tryout_org_members').select('user_id').eq('id', evaluator.id).maybeSingle()
-    const userId = memberData?.user_id
-    if (!userId) return
-
     const row = grid[playerId] ?? {}
     const scores: Record<string, number | null> = {}
     for (const [k, v] of Object.entries(row)) {
@@ -198,7 +186,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     setSaving(playerId)
     await supabase.from('tryout_scores').upsert({
       player_id: playerId, session_id: params.sessionId, org_id: params.orgId,
-      evaluator_id: userId, evaluator_name: evaluator.name ?? evaluator.email,
+      evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
       scores, tryout_score: tryoutScore, comments: comments[playerId] ?? null,
       submitted_at: new Date().toISOString(),
     }, { onConflict: 'player_id,session_id,evaluator_id' })

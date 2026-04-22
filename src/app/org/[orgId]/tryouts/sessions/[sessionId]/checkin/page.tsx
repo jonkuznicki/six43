@@ -58,10 +58,9 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setSession(sess)
     if (!sess) { setLoading(false); return }
 
-    const [{ data: pData }, { data: cData }, { data: otherData }, { data: regData }] = await Promise.all([
+    const [{ data: pDataRaw }, { data: cData }, { data: otherData }, { data: regData }] = await Promise.all([
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, tryout_age_group, jersey_number, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true)
-        .or(`tryout_age_group.eq.${sess.age_group},and(tryout_age_group.is.null,age_group.eq.${sess.age_group})`)
         .order('last_name').order('first_name'),
       supabase.from('tryout_checkins').select('*')
         .eq('session_id', params.sessionId)
@@ -76,7 +75,11 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
         .eq('org_id', params.orgId)
         .eq('season_id', sess.season_id),
     ])
-    setPlayers(pData ?? [])
+    const pData = (pDataRaw ?? []).filter((p: any) =>
+      p.tryout_age_group === sess.age_group ||
+      (p.tryout_age_group == null && p.age_group === sess.age_group)
+    )
+    setPlayers(pData)
     setCheckins(cData ?? [])
     setOtherSessionsMax(otherData?.[0]?.tryout_number ?? 0)
     setPrefDateMap(new Map((regData ?? []).map((r: any) => [r.player_id, r.preferred_tryout_date ?? null])))

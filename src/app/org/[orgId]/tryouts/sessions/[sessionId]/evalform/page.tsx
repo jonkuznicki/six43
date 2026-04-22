@@ -60,12 +60,22 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
         .select('id, name, email').eq('session_id', params.sessionId),
     ])
 
+    // Load player names separately
+    const checkinRows = checkinData ?? []
+    const playerIds = Array.from(new Set(checkinRows.filter((c: any) => c.player_id).map((c: any) => c.player_id as string)))
+    const playerNameMap = new Map<string, { first_name: string; last_name: string }>()
+    if (playerIds.length > 0) {
+      const { data: playerData } = await supabase
+        .from('tryout_players').select('id, first_name, last_name').in('id', playerIds)
+      for (const p of playerData ?? []) playerNameMap.set(p.id, { first_name: p.first_name, last_name: p.last_name })
+    }
+
     setOrg(orgData)
     setSeason(seasonData)
-    setCheckins((checkinData ?? []).map((c: any) => ({
+    setCheckins(checkinRows.map((c: any) => ({
       id: c.id, tryout_number: c.tryout_number, player_id: c.player_id,
       is_write_in: c.is_write_in, write_in_name: c.write_in_name,
-      player: c.tryout_players ?? null,
+      player: c.player_id ? (playerNameMap.get(c.player_id) ?? null) : null,
     })))
     setCategories((catData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
