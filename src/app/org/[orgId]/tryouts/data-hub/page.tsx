@@ -280,7 +280,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
     if (error) {
       // Retry without preferred_tryout_date if column doesn't exist yet
-      const fallback = deduped.map(({ preferred_tryout_date: _d, ...r }) => r)
+      const fallback = (deduped as any[]).map(({ preferred_tryout_date: _d, ...r }) => r)
       const { error: e2 } = await supabase
         .from('tryout_registration_staging')
         .upsert(fallback, { onConflict: 'player_id,season_id' })
