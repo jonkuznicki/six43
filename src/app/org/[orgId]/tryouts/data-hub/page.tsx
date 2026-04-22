@@ -269,13 +269,18 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
     if (!stagingRows.length) { setBackfillError('No matched players found in import jobs.'); setBackfilling(false); return }
 
+    // Deduplicate by player_id — keep last entry (jobs are ordered by created_at desc)
+    const deduped = Array.from(
+      stagingRows.reduce((m, r) => { m.set(r.player_id, r); return m }, new Map<string, any>()).values()
+    )
+
     const { error } = await supabase
       .from('tryout_registration_staging')
-      .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+      .upsert(deduped, { onConflict: 'player_id,season_id' })
 
     if (error) {
       // Retry without preferred_tryout_date if column doesn't exist yet
-      const fallback = stagingRows.map(({ preferred_tryout_date: _d, ...r }) => r)
+      const fallback = deduped.map(({ preferred_tryout_date: _d, ...r }) => r)
       const { error: e2 } = await supabase
         .from('tryout_registration_staging')
         .upsert(fallback, { onConflict: 'player_id,season_id' })
