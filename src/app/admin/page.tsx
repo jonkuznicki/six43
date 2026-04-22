@@ -283,7 +283,16 @@ export default function AdminPage() {
           textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '4px' }}>
           Admin
         </div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Users</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Users</h1>
+          <a href="/tryouts" style={{
+            fontSize: '13px', fontWeight: 600, padding: '6px 14px', borderRadius: '8px',
+            background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+            color: `rgba(var(--fg-rgb), 0.6)`, textDecoration: 'none',
+          }}>
+            Tryouts →
+          </a>
+        </div>
       </div>
 
       {/* Success banner */}
