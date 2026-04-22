@@ -165,6 +165,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [fixReason,   setFixReason]   = useState('')
   const [savingFix,   setSavingFix]   = useState(false)
 
+  // Staging backfill
+  const [backfilling,   setBackfilling]   = useState(false)
+  const [backfillDone,  setBackfillDone]  = useState(false)
+  const [backfillError, setBackfillError] = useState('')
+
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (editingCell && inputRef.current) inputRef.current.focus() }, [editingCell])
 
@@ -219,6 +224,67 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setEvalIds(new Set((evalData ?? []).map((r: any) => r.player_id)))
     setScoreIds(new Set((scoreData ?? []).map((r: any) => r.player_id)))
     setLoading(false)
+  }
+
+  async function backfillStaging() {
+    if (!seasonId) { setBackfillError('No active season — create one first.'); return }
+    setBackfilling(true)
+    setBackfillError('')
+
+    // Load all completed registration import jobs for this org
+    const { data: jobs } = await supabase
+      .from('tryout_import_jobs')
+      .select('id,season_id,match_report,created_at')
+      .eq('org_id', params.orgId)
+      .eq('type', 'registration')
+      .in('status', ['complete', 'needs_review'])
+
+    if (!jobs?.length) { setBackfillError('No registration import jobs found.'); setBackfilling(false); return }
+
+    const stagingRows: any[] = []
+    for (const job of jobs) {
+      const report: any[] = job.match_report ?? []
+      for (const row of report) {
+        if (!row.resolvedPlayerId) continue
+        if (row.status === 'skipped') continue
+        const p = row.createPayload ?? {}
+        stagingRows.push({
+          player_id:             row.resolvedPlayerId,
+          org_id:                params.orgId,
+          season_id:             seasonId,
+          import_job_id:         job.id,
+          age_group:             p.ageGroup ?? row.ageGroup ?? null,
+          preferred_tryout_date: p.preferredTryoutDate ?? null,
+          prior_team:            p.priorTeam ?? null,
+          parent_email:          p.parentEmail ?? null,
+          parent_phone:          p.parentPhone ?? null,
+          dob:                   p.dob ?? null,
+          grade:                 p.grade ?? null,
+          school:                p.school ?? null,
+          prior_org:             p.priorOrg ?? null,
+          imported_at:           job.created_at,
+        })
+      }
+    }
+
+    if (!stagingRows.length) { setBackfillError('No matched players found in import jobs.'); setBackfilling(false); return }
+
+    const { error } = await supabase
+      .from('tryout_registration_staging')
+      .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+
+    if (error) {
+      // Retry without preferred_tryout_date if column doesn't exist yet
+      const fallback = stagingRows.map(({ preferred_tryout_date: _d, ...r }) => r)
+      const { error: e2 } = await supabase
+        .from('tryout_registration_staging')
+        .upsert(fallback, { onConflict: 'player_id,season_id' })
+      if (e2) { setBackfillError(e2.message); setBackfilling(false); return }
+    }
+
+    setBackfilling(false)
+    setBackfillDone(true)
+    await loadData()
   }
 
   async function lazyLoad(target: 'gc' | 'evals' | 'scores') {
@@ -581,9 +647,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         const hasAnyReg = rows.some(r => r.reg)
         return (
           <div>
-            {!hasAnyReg && rows.length > 0 && (
-              <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '12px', color: '#E8A020' }}>
-                Registration staging data not found — showing data from player records. This happens when a file is imported before a season is created. Re-importing the registration file with an active season will populate full staging data.
+            {!hasAnyReg && rows.length > 0 && !backfillDone && (
+              <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '12px', color: '#E8A020', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <span style={{ flex: 1 }}>Registration was imported before a season was created — staging data is missing. Click to backfill from import history.</span>
+                {backfillError && <span style={{ color: '#E87060' }}>{backfillError}</span>}
+                <button onClick={backfillStaging} disabled={backfilling || !seasonId} style={{
+                  padding: '5px 14px', borderRadius: '6px', border: 'none', cursor: backfilling || !seasonId ? 'default' : 'pointer',
+                  background: 'rgba(232,160,32,0.25)', color: '#E8A020', fontWeight: 700, fontSize: '12px',
+                  opacity: backfilling || !seasonId ? 0.6 : 1, whiteSpace: 'nowrap',
+                }}>
+                  {backfilling ? 'Fixing…' : seasonId ? 'Fix now' : 'No active season'}
+                </button>
               </div>
             )}
             <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 270px)' }}>
