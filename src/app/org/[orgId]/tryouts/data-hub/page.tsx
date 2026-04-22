@@ -11,9 +11,15 @@ interface Player {
   age_group: string; tryout_age_group: string | null
   prior_team: string | null; jersey_number: string | null
   dob: string | null; age_group_override_reason: string | null
-  parent_email: string | null
+  parent_email: string | null; parent_phone: string | null
+  grade: string | null; school: string | null; prior_org: string | null
 }
-interface RegRow  { player_id: string; prior_team: string | null; age_group: string | null; parent_email: string | null; imported_at: string; dob: string | null; preferred_tryout_date: string | null }
+interface RegRow {
+  player_id: string; prior_team: string | null; age_group: string | null
+  parent_email: string | null; parent_phone: string | null
+  imported_at: string; dob: string | null; preferred_tryout_date: string | null
+  grade: string | null; school: string | null; prior_org: string | null
+}
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
   player_id: string; season_year: string; team_label: string|null
@@ -170,6 +176,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [backfillDone,  setBackfillDone]  = useState(false)
   const [backfillError, setBackfillError] = useState('')
 
+  // Registration tab sort
+  const [regSortCol, setRegSortCol] = useState('name')
+  const [regSortDir, setRegSortDir] = useState<1 | -1>(1)
+
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (editingCell && inputRef.current) inputRef.current.focus() }, [editingCell])
 
@@ -189,7 +199,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       { data: playerData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
-      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
+      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
       seasonData ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId).eq('season_id', seasonData.id) : Promise.resolve({ data: [] }),
       supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
       supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
@@ -204,14 +214,14 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     {
       const { data, error } = await supabase
         .from('tryout_registration_staging')
-        .select('player_id,prior_team,age_group,parent_email,imported_at,dob,preferred_tryout_date')
+        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org')
         .eq('org_id', params.orgId)
       if (!error) {
         regData = data ?? []
       } else {
         const { data: fallback } = await supabase
           .from('tryout_registration_staging')
-          .select('player_id,prior_team,age_group,parent_email,imported_at,dob')
+          .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,grade,school,prior_org')
           .eq('org_id', params.orgId)
         regData = fallback ?? []
       }
@@ -646,10 +656,55 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
       {/* ── Registration tab ──────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'registration' && (() => {
-        // Show all players, using staging row when available and falling back to
-        // player record fields (happens when import ran before a season existed).
         const rows = filtered.map(p => ({ p, reg: regMap.get(p.id) ?? null }))
         const hasAnyReg = rows.some(r => r.reg)
+
+        function regVal(p: Player, reg: RegRow | null, col: string): string {
+          switch (col) {
+            case 'name':     return `${p.last_name} ${p.first_name}`
+            case 'age':      return reg?.age_group ?? p.age_group ?? ''
+            case 'dob':      return reg?.dob ?? p.dob ?? ''
+            case 'grade':    return reg?.grade ?? p.grade ?? ''
+            case 'school':   return reg?.school ?? p.school ?? ''
+            case 'prior_org': return reg?.prior_org ?? p.prior_org ?? ''
+            case 'team':     return reg?.prior_team ?? p.prior_team ?? ''
+            case 'email':    return reg?.parent_email ?? p.parent_email ?? ''
+            case 'phone':    return reg?.parent_phone ?? p.parent_phone ?? ''
+            case 'pref_date': return reg?.preferred_tryout_date ?? ''
+            case 'imported': return reg?.imported_at ?? ''
+            default:         return ''
+          }
+        }
+
+        const sorted = [...rows].sort((a, b) => {
+          const va = regVal(a.p, a.reg, regSortCol)
+          const vb = regVal(b.p, b.reg, regSortCol)
+          return va.localeCompare(vb) * regSortDir
+        })
+
+        function regToggleSort(col: string) {
+          if (regSortCol === col) setRegSortDir(d => d === 1 ? -1 : 1)
+          else { setRegSortCol(col); setRegSortDir(1) }
+        }
+        function regArrow(col: string) {
+          if (regSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
+          return <span style={{ color: 'var(--accent)' }}>{regSortDir === 1 ? ' ↑' : ' ↓'}</span>
+        }
+
+        const cols: { key: string; label: string; sticky?: boolean }[] = [
+          { key: 'name',      label: 'Player',       sticky: true },
+          { key: 'age',       label: 'Age Group' },
+          { key: 'dob',       label: 'DOB' },
+          { key: 'grade',     label: 'Grade' },
+          { key: 'school',    label: 'School' },
+          { key: 'prior_org', label: 'Prior Org' },
+          { key: 'team',      label: 'Prior Team' },
+          { key: 'email',     label: 'Parent Email' },
+          { key: 'phone',     label: 'Parent Phone' },
+          { key: 'pref_date', label: 'Pref. Date' },
+          { key: 'imported',  label: 'Imported' },
+        ]
+
         return (
           <div>
             {!hasAnyReg && rows.length > 0 && !backfillDone && (
@@ -667,25 +722,40 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             )}
             <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 270px)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead><tr>
-                  {['Player', 'Age Group', 'Preferred Date', 'Reg Team', 'Parent Email', 'Imported'].map((l, i) => (
-                    <th key={l} style={{ ...th, ...(i === 0 ? stickyPlayerTh : {}) }}>{l}</th>
-                  ))}
-                </tr></thead>
+                <thead>
+                  <tr>
+                    {cols.map((col) => (
+                      <th key={col.key} onClick={() => regToggleSort(col.key)} style={{ ...th, cursor: 'pointer', whiteSpace: 'nowrap', ...(col.sticky ? stickyPlayerTh : {}) }}>
+                        {col.label}{regArrow(col.key)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
-                  {rows.map(({ p, reg }, i) => (
-                    <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                      <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                      <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
-                      <td style={{ ...td, color: '#40A0E8', fontSize: '12px' }}>{reg?.preferred_tryout_date ?? '—'}</td>
-                      <td style={{ ...td, color: '#80B0E8' }}>{reg?.prior_team ?? p.prior_team ?? '—'}</td>
-                      <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? p.parent_email ?? '—'}</td>
-                      <td style={{ ...td, color: s.dim, fontSize: '12px' }}>{reg?.imported_at ? new Date(reg.imported_at).toLocaleDateString() : '—'}</td>
-                    </tr>
-                  ))}
+                  {sorted.map(({ p, reg }, i) => {
+                    const dob = reg?.dob ?? p.dob
+                    const imported = reg?.imported_at
+                    return (
+                      <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
+                        <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                        <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {dob ? new Date(dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}
+                        </td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.grade ?? p.grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reg?.school ?? p.school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.prior_org ?? p.prior_org ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: '#80B0E8', whiteSpace: 'nowrap' }}>{reg?.prior_team ?? p.prior_team ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? p.parent_email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.parent_phone ?? p.parent_phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: '#40A0E8', fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.preferred_tryout_date ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.dim, fontSize: '12px', whiteSpace: 'nowrap' }}>{imported ? new Date(imported).toLocaleDateString() : <span style={{ opacity: 0.3 }}>—</span>}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
-              {rows.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a registration file first.</div>}
+              {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a registration file first.</div>}
             </div>
           </div>
         )
