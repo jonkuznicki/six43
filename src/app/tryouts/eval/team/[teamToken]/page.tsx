@@ -13,6 +13,16 @@ interface EvalField {
   is_optional: boolean; sort_order: number; weight: number
 }
 
+interface DraftData {
+  coach_name:    string | null
+  scores:        Record<string, Record<string, number>>
+  comments:      Record<string, string>
+  overall_notes: string | null
+  status:        'in_progress' | 'submitted'
+  last_saved_at: string | null
+  submitted_at:  string | null
+}
+
 interface FormData {
   org_name:             string
   selected_team:        string
@@ -20,6 +30,7 @@ interface FormData {
   players:              EvalPlayer[]
   eval_config:          EvalField[]
   submitted_player_ids: string[]
+  draft:                DraftData | null
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -45,7 +56,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading,   setLoading]   = useState(true)
 
-  const [step,     setStep]     = useState<'identify' | 'score' | 'review' | 'submitted'>('identify')
+  const [step,      setStep]      = useState<'identify' | 'score' | 'review' | 'submitted'>('identify')
   const [coachName, setCoachName] = useState('')
 
   const [scores,         setScores]         = useState<Record<string, Record<string, number | null>>>({})
@@ -53,12 +64,15 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [playerComments, setPlayerComments] = useState<Record<string, string>>({})
   const [overallNotes,   setOverallNotes]   = useState('')
 
-  const [submitting,  setSubmitting]  = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting,      setSubmitting]      = useState(false)
+  const [submitError,     setSubmitError]     = useState<string | null>(null)
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false)
 
   const [savingDraft, setSavingDraft] = useState(false)
   const [lastSaved,   setLastSaved]   = useState<Date | null>(null)
   const [hasDraft,    setHasDraft]    = useState(false)
+  // true when server returned an in-progress draft (scores loaded into state, no coach name yet)
+  const [serverDraftPending, setServerDraftPending] = useState(false)
 
   const [selected,        setSelected]        = useState<{ rowIdx: number; colIdx: number } | null>(null)
   const [colFillKey,      setColFillKey]      = useState<string | null>(null)
@@ -67,6 +81,17 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const gridRef    = useRef<HTMLDivElement>(null)
   const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
   const histIdxRef = useRef(0)
+
+  // Refs for auto-save interval (avoid stale closures)
+  const scoresRef    = useRef(scores)
+  const commentsRef  = useRef(playerComments)
+  const notesRef     = useRef(overallNotes)
+  const coachNameRef = useRef(coachName)
+
+  useEffect(() => { scoresRef.current    = scores },         [scores])
+  useEffect(() => { commentsRef.current  = playerComments }, [playerComments])
+  useEffect(() => { notesRef.current     = overallNotes },   [overallNotes])
+  useEffect(() => { coachNameRef.current = coachName },      [coachName])
 
   // Hide Six43 chrome — standalone org-branded page
   useEffect(() => {
@@ -84,17 +109,42 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       })
   }, [])
 
-  // Check for draft in localStorage when form loads
+  // Restore draft state when form loads — server draft takes priority over localStorage
   useEffect(() => {
     if (!formData) return
-    try {
-      const raw = localStorage.getItem(`eval_team_draft_${params.teamToken}`)
-      if (raw) {
+    const draft = formData.draft
+
+    if (draft) {
+      // Restore scores/comments/notes from server draft
+      if (draft.scores        && Object.keys(draft.scores).length > 0)   setScores(draft.scores)
+      if (draft.comments      && Object.keys(draft.comments).length > 0) setPlayerComments(draft.comments)
+      if (draft.overall_notes) setOverallNotes(draft.overall_notes)
+      if (draft.last_saved_at) setLastSaved(new Date(draft.last_saved_at))
+
+      if (draft.status === 'submitted') {
+        if (draft.coach_name) setCoachName(draft.coach_name)
+        setAlreadySubmitted(true)
+        setStep('submitted')
+      } else if (draft.coach_name) {
+        // Skip identify — resume directly to scoring grid
+        setCoachName(draft.coach_name)
+        setStep('score')
+      } else {
+        // Scores loaded but no name — show banner in identify step
+        setServerDraftPending(true)
         setHasDraft(true)
-        const saved = JSON.parse(raw)
-        if (saved.coachName) setCoachName(saved.coachName)
       }
-    } catch { /* ignore */ }
+    } else {
+      // No server draft — fall back to localStorage
+      try {
+        const raw = localStorage.getItem(`eval_team_draft_${params.teamToken}`)
+        if (raw) {
+          setHasDraft(true)
+          const saved = JSON.parse(raw)
+          if (saved.coachName) setCoachName(saved.coachName)
+        }
+      } catch { /* ignore */ }
+    }
   }, [formData])
 
   // Auto-save to localStorage during scoring
@@ -107,7 +157,41 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     } catch { /* ignore */ }
   }, [scores, playerComments, overallNotes, step])
 
+  // Auto-save to server every 60s during scoring
+  useEffect(() => {
+    if (step !== 'score' || !formData) return
+    const interval = setInterval(async () => {
+      const name = coachNameRef.current.trim()
+      if (!name) return
+      const playerScores: Record<string, Record<string, number>> = {}
+      const commentMap:   Record<string, string> = {}
+      for (const p of formData.players) {
+        const ps = scoresRef.current[p.id] ?? {}
+        const filtered: Record<string, number> = {}
+        for (const [k, v] of Object.entries(ps)) { if (v != null) filtered[k] = v }
+        if (Object.keys(filtered).length > 0) playerScores[p.id] = filtered
+        if (commentsRef.current[p.id]?.trim()) commentMap[p.id] = commentsRef.current[p.id].trim()
+      }
+      try {
+        await supabase.rpc('tryout_save_eval_draft_by_team_token', {
+          p_token:           params.teamToken,
+          p_coach_name:      name,
+          p_player_scores:   playerScores,
+          p_player_comments: commentMap,
+          p_overall_notes:   notesRef.current.trim() || null,
+        })
+        setLastSaved(new Date())
+      } catch { /* ignore */ }
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [step, formData])
+
   function resumeDraft() {
+    if (serverDraftPending) {
+      // Scores already restored from server draft — just proceed
+      setStep('score')
+      return
+    }
     try {
       const raw = localStorage.getItem(`eval_team_draft_${params.teamToken}`)
       if (!raw) return
@@ -139,6 +223,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         p_coach_name:      coachName.trim(),
         p_player_scores:   playerScores,
         p_player_comments: commentMap,
+        p_overall_notes:   overallNotes.trim() || null,
       })
     } catch { /* ignore — localStorage is the backup */ }
     setLastSaved(new Date())
@@ -331,89 +416,183 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   if (!formData) return null
 
   // ── Step: submitted ───────────────────────────────────────────────────────
-  if (step === 'submitted') return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '3rem 1.5rem' }}>
-      <div style={{ maxWidth: '520px', margin: '0 auto', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px' }}>Evaluations submitted!</h1>
-        <p style={{ fontSize: '14px', color: s.muted, lineHeight: 1.6 }}>
-          Thank you, {coachName}. Your evaluations for <strong>{formData.selected_team}</strong> have been received.
-        </p>
-      </div>
-    </main>
-  )
+  if (step === 'submitted') {
+    if (alreadySubmitted) {
+      // Read-only view — form was already submitted before this session
+      const allFieldsFlat = sections.flatMap(sec => sec.fields)
+      return (
+        <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '3rem 1.5rem' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>{formData.org_name}</div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>{formData.selected_team} — Evaluations</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(109,184,117,0.15)', color: '#2f855a', fontWeight: 700, border: '0.5px solid rgba(109,184,117,0.3)' }}>
+                ✓ Submitted
+              </span>
+              {formData.draft?.submitted_at && (
+                <span style={{ fontSize: '12px', color: s.dim }}>
+                  {new Date(formData.draft.submitted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {coachName && <span style={{ fontSize: '12px', color: s.dim }}>{coachName}</span>}
+            </div>
+
+            <div style={{ padding: '12px 16px', background: 'rgba(80,160,232,0.07)', border: '0.5px solid rgba(80,160,232,0.2)', borderRadius: '10px', marginBottom: '1.5rem', fontSize: '13px', color: s.muted }}>
+              This evaluation has already been submitted. To make changes, contact your organization administrator.
+            </div>
+
+            <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: '150px' }}>Player</th>
+                    {allFieldsFlat.map(f => (
+                      <th key={f.field_key} title={f.label} style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600, fontSize: '10px', color: s.dim, textTransform: 'uppercase', minWidth: '52px' }}>
+                        {f.label.length > 9 ? f.label.slice(0, 8) + '…' : f.label}
+                      </th>
+                    ))}
+                    <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', minWidth: '160px' }}>Comments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((p, i) => {
+                    const ps = scores[p.id] ?? {}
+                    return (
+                      <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
+                        <td style={{ padding: '7px 10px', fontWeight: 600 }}>{p.last_name}, {p.first_name}</td>
+                        {allFieldsFlat.map(f => {
+                          const v = ps[f.field_key] ?? null
+                          return (
+                            <td key={f.field_key} style={{ padding: '4px 2px', textAlign: 'center' }}>
+                              <span style={{ display: 'inline-block', width: '30px', height: '26px', lineHeight: '26px', borderRadius: '5px', fontWeight: 700, fontSize: '13px', background: scoreColor(v), color: v != null ? 'var(--fg)' : s.dim }}>
+                                {v ?? '—'}
+                              </span>
+                            </td>
+                          )
+                        })}
+                        <td style={{ padding: '7px 10px', fontSize: '12px', color: s.muted }}>
+                          {playerComments[p.id] ? playerComments[p.id] : <span style={{ opacity: 0.35, fontStyle: 'italic' }}>—</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {overallNotes.trim() && (
+              <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, marginBottom: '6px' }}>Overall season notes</div>
+                <div style={{ fontSize: '13px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{overallNotes}</div>
+              </div>
+            )}
+          </div>
+        </main>
+      )
+    }
+
+    // Just submitted this session — thank-you screen
+    return (
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '3rem 1.5rem' }}>
+        <div style={{ maxWidth: '520px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px' }}>Evaluations submitted!</h1>
+          <p style={{ fontSize: '14px', color: s.muted, lineHeight: 1.6 }}>
+            Thank you, {coachName}. Your evaluations for <strong>{formData.selected_team}</strong> have been received.
+          </p>
+        </div>
+      </main>
+    )
+  }
 
   // ── Step: identify ────────────────────────────────────────────────────────
-  if (step === 'identify') return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '560px', margin: '0 auto', padding: '3rem 1.5rem' }}>
-      <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>
-        {formData.org_name ?? 'Coach Evaluation'}
-      </div>
-      <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{formData.season.label} — Player Evaluations</h1>
-      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--fg)', marginBottom: '2px' }}>{formData.selected_team}</div>
-      <p style={{ fontSize: '13px', color: s.muted, marginBottom: '2rem' }}>
-        {players.length} player{players.length !== 1 ? 's' : ''} on this roster. Rate each player on a 1–5 scale.
-      </p>
+  if (step === 'identify') {
+    const draftSavedAt = formData.draft?.last_saved_at ? new Date(formData.draft.last_saved_at) : null
+    const hasDraftScores = formData.draft && Object.keys(formData.draft.scores ?? {}).length > 0
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '2rem' }}>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your name</label>
-          <input type="text" value={coachName} onChange={e => setCoachName(e.target.value)} placeholder="Coach Smith" style={inputStyle}
-            onKeyDown={e => { if (e.key === 'Enter' && coachName.trim()) { hasDraft ? resumeDraft() : setStep('score') } }}
-          />
+    return (
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '560px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '6px' }}>
+          {formData.org_name ?? 'Coach Evaluation'}
         </div>
-      </div>
+        <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{formData.season.label} — Player Evaluations</h1>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--fg)', marginBottom: '2px' }}>{formData.selected_team}</div>
+        <p style={{ fontSize: '13px', color: s.muted, marginBottom: '2rem' }}>
+          {players.length} player{players.length !== 1 ? 's' : ''} on this roster. Rate each player on a 1–5 scale.
+        </p>
 
-      {/* Resume draft banner */}
-      {hasDraft && (
-        <div style={{ padding: '12px 16px', background: 'rgba(80,160,232,0.1)', border: '0.5px solid rgba(80,160,232,0.3)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '2rem' }}>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 700 }}>In-progress evaluation found</div>
-            <div style={{ fontSize: '12px', color: s.muted, marginTop: '2px' }}>You have unsaved scores in this browser.</div>
+            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, display: 'block', marginBottom: '6px' }}>Your name</label>
+            <input type="text" value={coachName} onChange={e => setCoachName(e.target.value)} placeholder="Coach Smith" style={inputStyle}
+              onKeyDown={e => { if (e.key === 'Enter' && coachName.trim()) { hasDraft ? resumeDraft() : setStep('score') } }}
+            />
           </div>
-          <button onClick={resumeDraft} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'rgba(80,160,232,0.8)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-            Resume →
-          </button>
         </div>
-      )}
 
-      <button
-        onClick={() => setStep('score')}
-        disabled={!coachName.trim()}
-        style={{
-          width: '100%', padding: '14px', borderRadius: '8px', border: 'none',
-          background: 'var(--accent)', color: 'var(--accent-text)',
-          fontSize: '15px', fontWeight: 700, cursor: 'pointer',
-          opacity: !coachName.trim() ? 0.5 : 1,
-          marginBottom: '2rem',
-        }}
-      >
-        Start evaluations →
-      </button>
+        {/* Server draft banner */}
+        {serverDraftPending && (
+          <div style={{ padding: '12px 16px', background: 'rgba(80,160,232,0.1)', border: '0.5px solid rgba(80,160,232,0.3)', borderRadius: '10px', marginBottom: '1rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>In-progress evaluation found</div>
+            <div style={{ fontSize: '12px', color: s.muted, marginTop: '2px' }}>
+              {hasDraftScores ? 'Your scores are saved ' : 'A draft exists '}
+              {draftSavedAt && `— last saved ${draftSavedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`}
+              {' Enter your name above to continue.'}
+            </div>
+          </div>
+        )}
 
-      {/* Instructions */}
-      <div style={{ background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)', borderRadius: '10px', padding: '1.25rem' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '12px' }}>Before you start — please read</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: s.muted, lineHeight: 1.6 }}>
-          <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Scores are based on your age group, not your specific team.</strong> A player with a strong arm on your team but average across the age group should be scored a <strong style={{ color: 'var(--fg)' }}>3</strong>.</p>
-          <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Most players will live in the 3s.</strong> A 3 means "age appropriate" and is exactly where most players should be.</p>
-          <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Reserve a 5 for truly exceptional players</strong> — best-in-class out of everyone in your age group this year.</p>
-          <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Be objective and thorough in comments.</strong> Written commentary is often as valuable as the scores.</p>
+        {/* localStorage draft banner (only shown when no server draft) */}
+        {!serverDraftPending && hasDraft && (
+          <div style={{ padding: '12px 16px', background: 'rgba(80,160,232,0.1)', border: '0.5px solid rgba(80,160,232,0.3)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700 }}>In-progress evaluation found</div>
+              <div style={{ fontSize: '12px', color: s.muted, marginTop: '2px' }}>You have unsaved scores in this browser.</div>
+            </div>
+            <button onClick={resumeDraft} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'rgba(80,160,232,0.8)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+              Resume →
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={() => { if (hasDraft) { resumeDraft() } else { setStep('score') } }}
+          disabled={!coachName.trim()}
+          style={{
+            width: '100%', padding: '14px', borderRadius: '8px', border: 'none',
+            background: 'var(--accent)', color: 'var(--accent-text)',
+            fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+            opacity: !coachName.trim() ? 0.5 : 1,
+            marginBottom: '2rem',
+          }}
+        >
+          {hasDraft ? 'Continue evaluations →' : 'Start evaluations →'}
+        </button>
+
+        {/* Instructions */}
+        <div style={{ background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)', borderRadius: '10px', padding: '1.25rem' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '12px' }}>Before you start — please read</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: s.muted, lineHeight: 1.6 }}>
+            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Scores are based on your age group, not your specific team.</strong> A player with a strong arm on your team but average across the age group should be scored a <strong style={{ color: 'var(--fg)' }}>3</strong>.</p>
+            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Most players will live in the 3s.</strong> A 3 means "age appropriate" and is exactly where most players should be.</p>
+            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Reserve a 5 for truly exceptional players</strong> — best-in-class out of everyone in your age group this year.</p>
+            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Be objective and thorough in comments.</strong> Written commentary is often as valuable as the scores.</p>
+          </div>
+          <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
+            {[
+              { n: 1, label: 'Needs work' }, { n: 2, label: 'Below age' },
+              { n: 3, label: 'Age appropriate' }, { n: 4, label: 'Above age' },
+              { n: 5, label: 'Exceptional' },
+            ].map(({ n, label }) => (
+              <span key={n} style={{ padding: '3px 10px', borderRadius: '20px', fontWeight: 600, background: scoreColor(n), color: 'var(--fg)', border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
+                {n} — {label}
+              </span>
+            ))}
+          </div>
         </div>
-        <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
-          {[
-            { n: 1, label: 'Needs work' }, { n: 2, label: 'Below age' },
-            { n: 3, label: 'Age appropriate' }, { n: 4, label: 'Above age' },
-            { n: 5, label: 'Exceptional' },
-          ].map(({ n, label }) => (
-            <span key={n} style={{ padding: '3px 10px', borderRadius: '20px', fontWeight: 600, background: scoreColor(n), color: 'var(--fg)', border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
-              {n} — {label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </main>
-  )
+      </main>
+    )
+  }
 
   // ── Step: review ──────────────────────────────────────────────────────────
   if (step === 'review') {
