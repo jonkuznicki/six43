@@ -140,6 +140,7 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
       await supabase
         .from('tryout_players')
         .update({
+          ...(payload.ageGroup    ? { age_group:    payload.ageGroup }    : {}),
           ...(payload.dob         ? { dob:          payload.dob }         : {}),
           ...(payload.parentEmail ? { parent_email: payload.parentEmail } : {}),
           ...(payload.parentPhone ? { parent_phone: payload.parentPhone } : {}),
@@ -341,8 +342,12 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
         }, { onConflict: 'player_id,season_id' })
       }
     } else if (job.type === 'registration' && job.season_id && row.createPayload) {
-      // Write registration staging
       const payload = row.createPayload
+      // Update player record age_group from this season's registration
+      if (payload.ageGroup) {
+        await supabase.from('tryout_players').update({ age_group: payload.ageGroup }).eq('id', topCandidate.id)
+      }
+      // Write registration staging
       await upsertRegStaging(supabase, {
         player_id:            topCandidate.id,
         org_id:               job.org_id,

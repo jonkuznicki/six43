@@ -31,6 +31,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   const [checkins,         setCheckins]         = useState<Checkin[]>([])
   const [otherSessionsMax, setOtherSessionsMax] = useState(0)
   const [prefDateMap,      setPrefDateMap]      = useState<Map<string, string | null>>(new Map())
+  const [regAgeMap,        setRegAgeMap]        = useState<Map<string, string>>(new Map())
   const [search,           setSearch]           = useState('')
   const [ageFilter,        setAgeFilter]        = useState<string>('')   // '' = all
   const [loading,          setLoading]          = useState(true)
@@ -74,14 +75,16 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
         .not('tryout_number', 'is', null)
         .order('tryout_number', { ascending: false }).limit(1),
       supabase.from('tryout_registration_staging')
-        .select('player_id, preferred_tryout_date')
+        .select('player_id, age_group, preferred_tryout_date')
         .eq('org_id', params.orgId)
         .eq('season_id', sess.season_id),
     ])
     setPlayers(pDataRaw ?? [])
     setCheckins(cData ?? [])
     setOtherSessionsMax(otherData?.[0]?.tryout_number ?? 0)
-    setPrefDateMap(new Map((regData ?? []).map((r: any) => [r.player_id, r.preferred_tryout_date ?? null])))
+    const regRows = regData ?? []
+    setPrefDateMap(new Map(regRows.map((r: any) => [r.player_id, r.preferred_tryout_date ?? null])))
+    setRegAgeMap(new Map(regRows.filter((r: any) => r.age_group).map((r: any) => [r.player_id, r.age_group])))
     setLoading(false)
   }
 
@@ -96,19 +99,22 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     [checkins]
   )
 
-  // All age groups present in the player list (for the filter dropdown)
+  // All age groups present in registered players (prefer staging, fall back to player record)
   const allAgeGroups = useMemo(() => {
-    const groups = new Set(players.map(p => p.age_group).filter(Boolean))
+    const groups = new Set(players.map(p => regAgeMap.get(p.id) ?? p.age_group).filter(Boolean))
     return Array.from(groups).sort()
-  }, [players])
+  }, [players, regAgeMap])
 
   // Players without numbers yet
   const unassigned = useMemo(() => {
     const q = search.toLowerCase()
+    const hasStaging = regAgeMap.size > 0
     const list = players.filter(p => {
       if (assignedPlayerIds.has(p.id)) return false
+      // When staging data exists, only show players registered for this season
+      if (hasStaging && !regAgeMap.has(p.id) && !prefDateMap.has(p.id)) return false
       if (ageFilter) {
-        const effectiveAge = (p as any).tryout_age_group ?? p.age_group
+        const effectiveAge = regAgeMap.get(p.id) ?? (p as any).tryout_age_group ?? p.age_group
         if (effectiveAge !== ageFilter) return false
       }
       if (q && !`${p.first_name} ${p.last_name}`.toLowerCase().includes(q)) return false
@@ -122,7 +128,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
       }
       return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
     })
-  }, [players, assignedPlayerIds, search, ageFilter, unassignedSort, prefDateMap])
+  }, [players, assignedPlayerIds, search, ageFilter, unassignedSort, prefDateMap, regAgeMap])
 
   function nextNumber() {
     const nums = checkins.filter(c => c.tryout_number != null).map(c => c.tryout_number as number)
@@ -452,7 +458,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
                     <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
                       {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
-                      {p.age_group && <span style={{ padding: '1px 5px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.07)', fontWeight: 600 }}>{p.age_group}</span>}
+                      {(regAgeMap.get(p.id) ?? p.age_group) && <span style={{ padding: '1px 5px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.07)', fontWeight: 600 }}>{regAgeMap.get(p.id) ?? p.age_group}</span>}
                       <span>{p.prior_team ?? 'No prior team'}</span>
                     </div>
                   </div>

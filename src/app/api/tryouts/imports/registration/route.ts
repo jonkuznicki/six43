@@ -271,8 +271,17 @@ export async function POST(req: NextRequest) {
       .eq('id', job.id)
   }
 
-  // Write registration staging for auto-matched rows
+  // Update age_group on player records for auto-matched returning players
   const autoMatchedRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
+  if (autoMatchedRows.length > 0) {
+    await Promise.all(autoMatchedRows.map(r =>
+      r.resolvedPlayerId && r.createPayload.ageGroup
+        ? supabase.from('tryout_players').update({ age_group: r.createPayload.ageGroup }).eq('id', r.resolvedPlayerId)
+        : Promise.resolve()
+    ))
+  }
+
+  // Write registration staging for auto-matched rows
   if (autoMatchedRows.length > 0 && seasonId) {
     const stagingRows = autoMatchedRows.map(r => ({
       player_id:             r.resolvedPlayerId,
