@@ -32,6 +32,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   const [otherSessionsMax, setOtherSessionsMax] = useState(0)
   const [prefDateMap,      setPrefDateMap]      = useState<Map<string, string | null>>(new Map())
   const [search,           setSearch]           = useState('')
+  const [ageFilter,        setAgeFilter]        = useState<string>('')   // '' = all
   const [loading,          setLoading]          = useState(true)
   const [busy,             setBusy]             = useState<string | null>(null)
   const [checkinError,     setCheckinError]     = useState<string | null>(null)
@@ -58,6 +59,8 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setSession(sess)
     if (!sess) { setLoading(false); return }
 
+    setAgeFilter(sess.age_group)   // default to session's age group
+
     const [{ data: pDataRaw }, { data: cData }, { data: otherData }, { data: regData }] = await Promise.all([
       supabase.from('tryout_players').select('id, first_name, last_name, age_group, tryout_age_group, jersey_number, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true)
@@ -75,11 +78,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
         .eq('org_id', params.orgId)
         .eq('season_id', sess.season_id),
     ])
-    const pData = (pDataRaw ?? []).filter((p: any) =>
-      p.tryout_age_group === sess.age_group ||
-      (p.tryout_age_group == null && p.age_group === sess.age_group)
-    )
-    setPlayers(pData)
+    setPlayers(pDataRaw ?? [])
     setCheckins(cData ?? [])
     setOtherSessionsMax(otherData?.[0]?.tryout_number ?? 0)
     setPrefDateMap(new Map((regData ?? []).map((r: any) => [r.player_id, r.preferred_tryout_date ?? null])))
@@ -97,13 +96,24 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     [checkins]
   )
 
+  // All age groups present in the player list (for the filter dropdown)
+  const allAgeGroups = useMemo(() => {
+    const groups = new Set(players.map(p => p.age_group).filter(Boolean))
+    return Array.from(groups).sort()
+  }, [players])
+
   // Players without numbers yet
   const unassigned = useMemo(() => {
     const q = search.toLowerCase()
-    const list = players.filter(p =>
-      !assignedPlayerIds.has(p.id) &&
-      (q === '' || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q))
-    )
+    const list = players.filter(p => {
+      if (assignedPlayerIds.has(p.id)) return false
+      if (ageFilter) {
+        const effectiveAge = (p as any).tryout_age_group ?? p.age_group
+        if (effectiveAge !== ageFilter) return false
+      }
+      if (q && !`${p.first_name} ${p.last_name}`.toLowerCase().includes(q)) return false
+      return true
+    })
     return [...list].sort((a, b) => {
       if (unassignedSort === 'preferred_date') {
         const da = prefDateMap.get(a.id) ?? ''
@@ -112,7 +122,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
       }
       return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
     })
-  }, [players, assignedPlayerIds, search, unassignedSort, prefDateMap])
+  }, [players, assignedPlayerIds, search, ageFilter, unassignedSort, prefDateMap])
 
   function nextNumber() {
     const nums = checkins.filter(c => c.tryout_number != null).map(c => c.tryout_number as number)
@@ -371,6 +381,14 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
               <div style={{ fontSize: '14px', fontWeight: 700, flex: 1 }}>
                 Not Assigned <span style={{ fontSize: '13px', color: s.dim, fontWeight: 400 }}>({unassigned.length})</span>
               </div>
+              {/* Age group filter */}
+              <select value={ageFilter} onChange={e => setAgeFilter(e.target.value)} style={{
+                background: 'var(--bg-input)', border: `0.5px solid ${ageFilter ? 'var(--accent)' : 'var(--border-md)'}`,
+                borderRadius: '5px', padding: '3px 8px', fontSize: '12px', color: ageFilter ? 'var(--accent)' : s.muted, cursor: 'pointer',
+              }}>
+                <option value="">All ages</option>
+                {allAgeGroups.map(ag => <option key={ag} value={ag}>{ag}</option>)}
+              </select>
               {/* Sort */}
               {(['preferred_date', 'name'] as UnassignedSort[]).map(s2 => (
                 <button key={s2} onClick={() => setUnassignedSort(s2)} style={{
@@ -434,6 +452,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
                     <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
                       {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
+                      {p.age_group && <span style={{ padding: '1px 5px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.07)', fontWeight: 600 }}>{p.age_group}</span>}
                       <span>{p.prior_team ?? 'No prior team'}</span>
                     </div>
                   </div>
@@ -444,7 +463,11 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
             })}
             {unassigned.length === 0 && (
               <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>
-                {search ? 'No players match your search.' : 'All registered players have been assigned numbers.'}
+                {search
+                  ? 'No players match your search.'
+                  : ageFilter
+                    ? <>No players found for <strong>{ageFilter}</strong>. Try "All ages" to see everyone.</>
+                    : 'All registered players have been assigned numbers.'}
               </div>
             )}
           </div>
