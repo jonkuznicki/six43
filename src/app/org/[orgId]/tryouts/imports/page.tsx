@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -25,14 +26,6 @@ interface Season {
   year:  number
 }
 
-const TYPE_OPTIONS = [
-  { value: 'registration',  label: 'Registration',       hint: 'Player sign-up export (xlsx/csv)' },
-  { value: 'roster',        label: 'Team Roster',        hint: 'Current team assignments (First Name, Last Name, DOB, Team, Jersey #)' },
-  { value: 'gc_stats',      label: 'GameChanger Stats',  hint: 'Batting/pitching stats export (csv)' },
-  { value: 'coach_eval',    label: 'Coach Evaluations',  hint: 'End-of-season coach eval sheet (xlsx)' },
-  { value: 'tryout_scores', label: 'Tryout Scores',      hint: 'Tryout results file (xlsx/csv)' },
-]
-
 const STATUS_STYLES: Record<string, { color: string; label: string }> = {
   complete:     { color: '#6DB875', label: 'Complete' },
   needs_review: { color: '#E8A020', label: 'Needs review' },
@@ -41,22 +34,87 @@ const STATUS_STYLES: Record<string, { color: string; label: string }> = {
   pending:      { color: 'rgba(var(--fg-rgb),0.4)', label: 'Pending' },
 }
 
-export default function ImportsPage({ params }: { params: { orgId: string } }) {
-  const supabase = createClient()
-  const router   = useRouter()
-  const fileRef  = useRef<HTMLInputElement>(null)
+const TYPE_LABELS: Record<string, string> = {
+  registration:  'Tryout Registrations',
+  roster:        'Team Roster',
+  gc_stats:      'GameChanger Stats',
+  coach_eval:    'Coach Evaluations',
+  tryout_scores: 'Tryout Scores',
+}
 
+// Mode-specific config
+const MODE_CONFIG: Record<string, {
+  heading:    string
+  subheading: string
+  formatNote: React.ReactNode
+}> = {
+  registration: {
+    heading:    'Import Tryout Registrations',
+    subheading: 'Upload your registration spreadsheet exported from your sign-up platform.',
+    formatNote: (
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '6px' }}>Expected columns</div>
+        <div style={{ lineHeight: 1.8 }}>
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>First Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Last Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Date of Birth</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Age Group</span>{' (or Division)'}
+          <br />
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Parent Email</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Parent Phone</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Grade</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>School</span>
+          <br />
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Prior Organization</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Prior Team</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Preferred Tryout Date</span>
+        </div>
+        <div style={{ marginTop: '8px', opacity: 0.7 }}>Accepts .xlsx or .csv · Column names are flexible (case-insensitive)</div>
+      </div>
+    ),
+  },
+  gc_stats: {
+    heading:    'Import GameChanger Season Stats',
+    subheading: 'Upload a stats export from GameChanger for one team at a time.',
+    formatNote: (
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '6px' }}>How to export from GameChanger</div>
+        <div style={{ lineHeight: 1.8 }}>
+          In the GameChanger app: <strong>Team → Stats → Export as CSV</strong>
+        </div>
+        <div style={{ marginTop: '8px', lineHeight: 1.8 }}>
+          <strong>Team detection:</strong> The team name is read from the filename first
+          (e.g. <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Tigers 10U.csv</span>),
+          then matched against players already in the database.
+          Use the "Assign to team" dropdown below to override if needed.
+        </div>
+        <div style={{ marginTop: '8px', opacity: 0.7 }}>Accepts .csv only</div>
+      </div>
+    ),
+  },
+}
+
+function ImportsInner({ params }: { params: { orgId: string } }) {
+  const supabase      = createClient()
+  const router        = useRouter()
+  const fileRef       = useRef<HTMLInputElement>(null)
+  const searchParams  = useSearchParams()
+  const typeParam     = searchParams.get('type') as 'registration' | 'gc_stats' | null
+
+  // In focused mode, uploadType is fixed. In generic mode, user can switch.
   const [jobs,           setJobs]           = useState<ImportJob[]>([])
   const [seasons,        setSeasons]        = useState<Season[]>([])
   const [seasonId,       setSeasonId]       = useState('')
   const [seasonYear,     setSeasonYear]     = useState('')
-  const [uploadType,     setUploadType]     = useState('registration')
   const [uploading,      setUploading]      = useState(false)
   const [uploadError,    setUploadError]    = useState<string | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [gcTeamOverride, setGcTeamOverride] = useState('')
   const [priorTeams,     setPriorTeams]     = useState<string[]>([])
   const [uploadResult,   setUploadResult]   = useState<{ teamLabel: string | null; teamLabelSource: string | null } | null>(null)
+
+  const uploadType = typeParam ?? 'registration'
+  const mode = typeParam ? MODE_CONFIG[typeParam] : null
 
   useEffect(() => { loadData() }, [])
 
@@ -80,10 +138,9 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     setSeasons(s)
     if (s.length > 0) {
       setSeasonId(s[0].id)
-      setSeasonYear(String(s[0].year - 1))  // default eval year = previous year
+      setSeasonYear(String(s[0].year - 1))
     }
 
-    // Fetch distinct prior_team values for GC team override dropdown
     const { data: teamRows } = await supabase
       .from('tryout_players')
       .select('prior_team')
@@ -101,13 +158,13 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     if (!file) return
     setUploading(true)
     setUploadError(null)
-
     setUploadResult(null)
+
     const formData = new FormData()
     formData.append('file', file)
     formData.append('orgId', params.orgId)
     formData.append('seasonId', seasonId)
-    if (uploadType === 'coach_eval' || uploadType === 'gc_stats') {
+    if (uploadType === 'gc_stats') {
       formData.append('seasonYear', seasonYear)
     }
     if (uploadType === 'gc_stats' && gcTeamOverride.trim()) {
@@ -115,11 +172,9 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     }
 
     const endpoint =
-      uploadType === 'registration'  ? '/api/tryouts/imports/registration'  :
-      uploadType === 'roster'        ? '/api/tryouts/imports/roster'        :
-      uploadType === 'coach_eval'    ? '/api/tryouts/imports/coach-eval'    :
-      uploadType === 'gc_stats'      ? '/api/tryouts/imports/gc-stats'      :
-                                       '/api/tryouts/imports/tryout-scores'
+      uploadType === 'registration' ? '/api/tryouts/imports/registration' :
+      uploadType === 'gc_stats'     ? '/api/tryouts/imports/gc-stats'      :
+                                      '/api/tryouts/imports/registration'
 
     const res = await fetch(endpoint, { method: 'POST', body: formData })
     const json = await res.json()
@@ -134,16 +189,13 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ''
 
-    // Show team label result for GC stats
     if (uploadType === 'gc_stats') {
       setUploadResult({ teamLabel: json.teamLabel ?? null, teamLabelSource: json.teamLabelSource ?? null })
     }
 
-    // Navigate directly to review screen if there's anything to review
     if (json.jobId && (json.suggested > 0 || json.unresolved > 0)) {
       router.push(`/org/${params.orgId}/tryouts/imports/${json.jobId}`)
     } else {
-      // All auto-matched — just reload job list
       await loadData()
     }
   }
@@ -159,30 +211,49 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
     </main>
   )
 
+  // In focused mode, only show history for this import type
+  const visibleJobs = typeParam
+    ? jobs.filter(j => j.type === (typeParam === 'gc_stats' ? 'gc_stats' : 'registration'))
+    : jobs
+
   return (
     <main className="page-wide" style={{
       minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
-      fontFamily: 'sans-serif',
-      padding: '2rem 1.5rem 6rem',
+      fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem',
     }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{
         fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem',
       }}>‹ Tryouts</Link>
 
-      <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '0.25rem' }}>Import center</h1>
-      <p style={{ fontSize: '14px', color: s.muted, marginBottom: '2rem' }}>
-        Upload registration exports, coach evaluations, and tryout score files.
+      <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '0.25rem' }}>
+        {mode?.heading ?? 'Import center'}
+      </h1>
+      <p style={{ fontSize: '14px', color: s.muted, marginBottom: '2rem', margin: '0 0 2rem' }}>
+        {mode?.subheading ?? 'Upload registration exports, coach evaluations, and tryout score files.'}
       </p>
+
+      {/* ── Format hint (focused mode only) ── */}
+      {mode && (
+        <div style={{
+          background: 'rgba(80,160,232,0.05)', border: '0.5px solid rgba(80,160,232,0.2)',
+          borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.5rem',
+          fontSize: '12px', color: s.muted, lineHeight: 1.6,
+        }}>
+          {mode.formatNote}
+        </div>
+      )}
 
       {/* ── Upload panel ── */}
       <div style={{
         background: 'var(--bg-card)', border: '0.5px solid var(--border)',
         borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem',
       }}>
-        <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '1rem' }}>Upload a file</div>
+        <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '1rem' }}>
+          {typeParam ? 'Upload file' : 'Upload a file'}
+        </div>
 
-        {/* Season selector */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'flex-end' }}>
+          {/* Season selector */}
           <div>
             <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Season
@@ -192,17 +263,17 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
               borderRadius: '6px', padding: '7px 12px', fontSize: '13px',
               color: 'var(--fg)', cursor: 'pointer',
             }}>
-              {seasons.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+              {seasons.map(season => (
+                <option key={season.id} value={season.id}>{season.label}</option>
               ))}
             </select>
           </div>
 
-          {/* Stats year — for coach_eval and gc_stats */}
-          {(uploadType === 'coach_eval' || uploadType === 'gc_stats') && (
+          {/* Stats year — GC only */}
+          {uploadType === 'gc_stats' && (
             <div>
               <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                {uploadType === 'gc_stats' ? 'Stats season year' : 'Year being evaluated'}
+                Stats season year
               </label>
               <input
                 type="text" value={seasonYear}
@@ -217,7 +288,7 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
             </div>
           )}
 
-          {/* Team override for GC stats */}
+          {/* Team override — GC only */}
           {uploadType === 'gc_stats' && (
             <div>
               <label style={{ fontSize: '11px', color: s.dim, display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -233,18 +304,18 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
                     color: gcTeamOverride ? 'var(--fg)' : s.dim, cursor: 'pointer',
                   }}
                 >
-                  <option value="">Auto-detect</option>
+                  <option value="">Auto-detect from filename / matches</option>
                   {priorTeams.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               ) : (
                 <input
                   type="text" value={gcTeamOverride}
                   onChange={e => setGcTeamOverride(e.target.value)}
-                  placeholder="Auto-detect"
+                  placeholder="Auto-detect from filename"
                   style={{
                     background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
                     borderRadius: '6px', padding: '7px 12px', fontSize: '13px',
-                    color: 'var(--fg)', width: '160px',
+                    color: 'var(--fg)', width: '220px',
                   }}
                 />
               )}
@@ -260,31 +331,19 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
             {uploadResult.teamLabelSource && (
               <span style={{ marginLeft: '6px', color: s.dim }}>
                 ({uploadResult.teamLabelSource === 'override' ? 'manually set' :
-                  uploadResult.teamLabelSource === 'file' ? 'from file' : 'from player matches'})
+                  uploadResult.teamLabelSource === 'file' ? 'from filename' : 'from player matches'})
               </span>
             )}
           </div>
         )}
 
-        {/* Type selector */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          {TYPE_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => setUploadType(opt.value)} style={{
-              padding: '8px 16px', borderRadius: '8px', border: '0.5px solid',
-              borderColor: uploadType === opt.value ? 'var(--accent)' : 'var(--border)',
-              background: uploadType === opt.value ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
-              color: uploadType === opt.value ? 'var(--accent)' : s.muted,
-              fontSize: '13px', fontWeight: uploadType === opt.value ? 700 : 400,
-              cursor: 'pointer', textAlign: 'left',
-            }}>
-              <div>{opt.label}</div>
-              <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '1px' }}>{opt.hint}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Upload button */}
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleUpload} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={uploadType === 'gc_stats' ? '.csv' : '.xlsx,.xls,.csv'}
+          style={{ display: 'none' }}
+          onChange={handleUpload}
+        />
         <button onClick={() => fileRef.current?.click()} disabled={!seasonId || uploading} style={{
           padding: '10px 24px', borderRadius: '7px', border: 'none',
           background: 'var(--accent)', color: 'var(--accent-text)',
@@ -303,15 +362,17 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
       </div>
 
       {/* ── Import history ── */}
-      <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '0.75rem' }}>Import history</div>
+      <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '0.75rem' }}>
+        Import history
+      </div>
 
-      {jobs.length === 0 ? (
+      {visibleJobs.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '14px' }}>
-          No imports yet. Upload your registration file to get started.
+          No imports yet.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {jobs.map(job => {
+          {visibleJobs.map(job => {
             const st = STATUS_STYLES[job.status] ?? STATUS_STYLES.pending
             const needsReview = job.status === 'needs_review'
             return (
@@ -323,9 +384,11 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700 }}>{job.filename}</span>
-                    <span style={{ fontSize: '11px', color: s.dim }}>
-                      {job.type?.replace('_', ' ')}
-                    </span>
+                    {!typeParam && (
+                      <span style={{ fontSize: '11px', color: s.dim }}>
+                        {TYPE_LABELS[job.type] ?? job.type}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: '12px', color: s.dim }}>
                     {job.rows_total ?? '?'} rows
@@ -356,5 +419,17 @@ export default function ImportsPage({ params }: { params: { orgId: string } }) {
         </div>
       )}
     </main>
+  )
+}
+
+export default function ImportsPage({ params }: { params: { orgId: string } }) {
+  return (
+    <Suspense fallback={
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading…
+      </main>
+    }>
+      <ImportsInner params={params} />
+    </Suspense>
   )
 }

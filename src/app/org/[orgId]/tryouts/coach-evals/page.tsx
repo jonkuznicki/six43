@@ -491,7 +491,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Coach Evaluations</h1>
           {season && <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>}
@@ -516,6 +516,13 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
               opacity: saving ? 0.6 : 1,
             }}>{saving ? 'Saving…' : 'Save all'}</button>
         </div>
+      </div>
+
+      {/* How this works */}
+      <div style={{ fontSize: '13px', color: s.muted, marginBottom: '1.5rem', lineHeight: 1.6 }}>
+        Coaches submit evaluations through a shared form link — no account required.
+        Generate a link below and send it to each coach (or per-team links for locked rosters).
+        Submitted evals appear in the grid automatically.
       </div>
 
       {/* Share link — admin only */}

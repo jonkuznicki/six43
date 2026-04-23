@@ -46,9 +46,9 @@ const SECTIONS = [
     desc:  'Import all data sources, verify players are mapped correctly, and confirm everything is complete before tryouts begin.',
     color: 'rgba(80,160,232,0.05)',
     items: [
-      { href: 'imports',     label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
-      { href: 'imports',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats' },
-      { href: 'coach-evals', label: 'Coach Evaluations',    icon: '📝', desc: 'Collect and review end-of-season coach evaluations' },
+      { href: 'imports?type=registration', label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
+      { href: 'imports?type=gc_stats',    label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats per team' },
+      { href: 'coach-evals', label: 'Coach Evaluations',    icon: '📝', desc: 'Send eval forms to coaches and review submissions' },
       { href: 'data-hub',    label: 'Data Hub',             icon: '⊞',  desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
       { href: 'readiness',   label: 'Readiness Check',      icon: '✓',  desc: 'Confirm all data sources are complete before tryouts begin' },
     ],
