@@ -49,7 +49,6 @@ const SECTIONS = [
       { href: 'imports',     label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
       { href: 'imports',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats' },
       { href: 'coach-evals', label: 'Coach Evaluations',    icon: '📝', desc: 'Collect and review end-of-season coach evaluations' },
-      { href: 'players',     label: 'Players',              icon: '👥', desc: 'View and manage all registered players' },
       { href: 'data-hub',    label: 'Data Hub',             icon: '⊞',  desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
       { href: 'readiness',   label: 'Readiness Check',      icon: '✓',  desc: 'Confirm all data sources are complete before tryouts begin' },
     ],
@@ -169,77 +168,45 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
         </div>
         <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '4px' }}>Tryouts</h1>
         {season ? (
-          <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: s.muted, textDecoration: 'none' }}>
-            {season.label} · {season.age_groups.join(', ')}
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: s.muted, textDecoration: 'none' }}>
+              {season.label} · {season.age_groups.join(', ')}
+            </Link>
+            {stats && stats.players > 0 && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                  {stats.players} players
+                </span>
+                {stats.regCount > 0 && (
+                  <span style={{ fontSize: '11px', color: stats.regCount < stats.players ? '#E8A020' : s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                    {stats.regCount} registered
+                  </span>
+                )}
+                {stats.evalsSubmitted > 0 && (
+                  <span style={{ fontSize: '11px', color: s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                    {stats.evalsSubmitted} coach eval{stats.evalsSubmitted !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {stats.sessions > 0 && (
+                  <span style={{ fontSize: '11px', color: s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                    {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
+                    {stats.openSessions > 0 && <span style={{ color: 'var(--accent)', fontWeight: 600 }}> · {stats.openSessions} open</span>}
+                  </span>
+                )}
+                {stats.playersScored > 0 && (
+                  <span style={{ fontSize: '11px', color: s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                    {stats.playersScored} scored
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
           <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
             ⚠ No active season — set one up →
           </Link>
         )}
       </div>
-
-      {/* Data health widget */}
-      {stats && season && (
-        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.muted, marginBottom: '12px' }}>
-            Data Health
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-            {([
-              {
-                label: 'Players loaded',
-                value: stats.players, total: stats.players,
-                detail: `${stats.players} registered`,
-                color: '#6DB875', warn: stats.players === 0,
-              },
-              {
-                label: 'DOB coverage',
-                value: stats.playersWithDob, total: stats.players,
-                detail: stats.players > 0 ? `${stats.playersWithDob}/${stats.players} have date of birth` : 'No players yet',
-                color: stats.playersWithDob === stats.players && stats.players > 0 ? '#6DB875' : '#E8A020',
-                warn: stats.players > 0 && stats.playersWithDob < stats.players,
-              },
-              {
-                label: 'Registration data',
-                value: stats.regCount, total: stats.players,
-                detail: `${stats.regCount}/${stats.players} have registration`,
-                color: stats.regCount >= stats.players && stats.players > 0 ? '#6DB875' : '#E8A020',
-                warn: stats.players > 0 && stats.regCount < stats.players,
-              },
-              {
-                label: 'Coach evals submitted',
-                value: stats.evalsSubmitted, total: stats.players,
-                detail: stats.evalTeams > 0
-                  ? `${stats.evalsSubmitted} players · ${stats.evalTeams} team${stats.evalTeams !== 1 ? 's' : ''}`
-                  : 'No submissions yet',
-                color: stats.evalsSubmitted > 0 ? '#6DB875' : s.dim,
-                warn: false,
-              },
-              {
-                label: 'Tryout scores',
-                value: stats.playersScored, total: stats.players,
-                detail: `${stats.playersScored}/${stats.players} players scored`,
-                color: stats.playersScored > 0 ? '#6DB875' : s.dim,
-                warn: false,
-              },
-            ] as const).map(({ label, value, total, detail, color, warn }) => {
-              const pct = total > 0 ? Math.round(value / total * 100) : 0
-              return (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ fontSize: '12px', color: warn ? '#E8A020' : s.muted, minWidth: '160px', fontWeight: warn ? 600 : 400 }}>
-                    {warn && '⚠ '}{label}
-                  </div>
-                  <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.08)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '3px', transition: 'width 0.5s' }} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: s.dim, minWidth: '180px' }}>{detail}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Workflow sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

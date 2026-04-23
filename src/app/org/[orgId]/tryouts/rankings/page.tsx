@@ -756,11 +756,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#6DB875', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Coach Eval</th>
-                {/* Specialty */}
+                {/* Pitching & Hitting */}
                 <th colSpan={5} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#C080E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
-                }}>Specialty</th>
+                }}>Pitching & Hitting</th>
                 {/* GC + Notes + Comments */}
                 <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
               </tr>
@@ -806,7 +806,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('intangiblesRank')}>#Rank{sortArrow('intangiblesRank')}</th>
 
-                {/* Specialty */}
+                {/* Pitching & Hitting */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
                   onClick={() => toggleSort('teamPitching')}>T.Pitch{sortArrow('teamPitching')}</th>
                 <th style={{ ...th, color: '#C080E8' }}
@@ -940,7 +940,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                         {fmtRank(row.intangiblesRank)}
                       </td>
 
-                      {/* ── Specialty ── */}
+                      {/* ── Pitching & Hitting ── */}
                       <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.teamPitching != null ? '#C080E8' : s.dim }}>
                         {fmt(row.teamPitching)}
                       </td>
