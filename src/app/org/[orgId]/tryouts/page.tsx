@@ -32,44 +32,44 @@ const SECTIONS = [
   {
     step:  1,
     label: 'Setup',
-    desc:  'Configure the season before anything else — set age groups, invite staff, and define how players will be scored.',
+    desc:  'Configure before anything else — set the season and age groups, invite staff, and define how players will be scored.',
     color: 'rgba(var(--fg-rgb), 0.06)',
     items: [
-      { href: 'seasons',  label: 'Seasons',       icon: '📅', desc: 'Set the active season and age groups' },
-      { href: 'members',  label: 'Members',        icon: '🔑', desc: 'Invite coaches and evaluators' },
-      { href: 'scoring',  label: 'Scoring Setup',  icon: '⚙',  desc: 'Tryout categories, weights, and eval rubric' },
+      { href: 'seasons', label: 'Seasons',      icon: '📅', desc: 'Set the active season and age groups' },
+      { href: 'members', label: 'Members',       icon: '🔑', desc: 'Invite coaches and evaluators' },
+      { href: 'scoring', label: 'Scoring Setup', icon: '⚙',  desc: 'Define tryout categories, weights, and the eval rubric' },
     ],
   },
   {
     step:  2,
     label: 'Player Data',
-    desc:  'Bring in all data sources, verify each player is mapped correctly, and set tryout age groups before sessions begin.',
+    desc:  'Import all data sources, verify players are mapped correctly, and confirm everything is complete before tryouts begin.',
     color: 'rgba(80,160,232,0.05)',
     items: [
-      { href: 'imports',     label: 'Imports',     icon: '↑',  desc: 'Upload registration, rosters, and GameChanger stats' },
-      { href: 'players',     label: 'Players',     icon: '👥', desc: 'Registered players and identity management' },
-      { href: 'data-hub',    label: 'Data Hub',    icon: '⊞',  desc: 'Review all sources, resolve conflicts, set tryout age groups' },
-      { href: 'coach-evals', label: 'Coach Evals', icon: '📝', desc: 'End-of-season evaluations submitted by coaches' },
+      { href: 'imports',     label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
+      { href: 'imports',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats' },
+      { href: 'coach-evals', label: 'Coach Evaluations',    icon: '📝', desc: 'Collect and review end-of-season coach evaluations' },
+      { href: 'players',     label: 'Players',              icon: '👥', desc: 'View and manage all registered players' },
+      { href: 'data-hub',    label: 'Data Hub',             icon: '⊞',  desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
+      { href: 'readiness',   label: 'Readiness Check',      icon: '✓',  desc: 'Confirm all data sources are complete before tryouts begin' },
     ],
   },
   {
     step:  3,
-    label: 'Tryout Sessions',
-    desc:  'Create sessions, assign or check in players as they arrive, and collect scores in real time.',
+    label: 'Tryouts',
+    desc:  'Create sessions, check in players as they arrive, and collect evaluator scores in real time.',
     color: 'rgba(232,160,32,0.05)',
     items: [
-      { href: 'sessions', label: 'Sessions', icon: '📋', desc: 'Create sessions, assign evaluators, and score players' },
+      { href: 'sessions', label: 'Sessions', icon: '🗓', desc: 'Set up sessions, assign evaluators, check in players, and enter scores' },
     ],
   },
   {
     step:  4,
-    label: 'Team Making & Placement',
-    desc:  'Review combined scores, assign players to teams, and build rosters for the upcoming season.',
+    label: 'Team Making',
+    desc:  'Review combined scores and coach evaluations, then assign players to teams.',
     color: 'rgba(109,184,117,0.05)',
     items: [
-      { href: 'rankings',  label: 'Team Making',     icon: '🏆', desc: 'Assign players to Blue/White teams using combined scores, evals, and coach comments' },
-      { href: 'readiness', label: 'Readiness',        icon: '✓',  desc: 'Pre-placement checklist — confirm all data sources are in' },
-      { href: 'teams',     label: 'Teams & Rosters',  icon: '⚾', desc: 'Create teams and finalize player placements' },
+      { href: 'rankings', label: 'Team Making', icon: '🏆', desc: 'Assign players to teams using scores, evals, and coach comments' },
     ],
   },
 ]
@@ -145,13 +145,16 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
     if (!stats) return null
     const badges: { label: string; accent?: boolean }[] = []
     if (step === 2) {
-      if (stats.players > 0)        badges.push({ label: `${stats.players} players` })
-      if (stats.evalsSubmitted > 0)  badges.push({ label: `${stats.evalsSubmitted} eval${stats.evalsSubmitted !== 1 ? 's' : ''} submitted` })
-      if (stats.evalsDraft > 0)      badges.push({ label: `${stats.evalsDraft} eval draft${stats.evalsDraft !== 1 ? 's' : ''}` })
+      if (stats.players > 0)         badges.push({ label: `${stats.players} player${stats.players !== 1 ? 's' : ''}` })
+      if (stats.regCount > 0)        badges.push({ label: `${stats.regCount} registered` })
+      if (stats.evalsSubmitted > 0)  badges.push({ label: `${stats.evalsSubmitted} eval${stats.evalsSubmitted !== 1 ? 's' : ''}` })
     }
     if (step === 3) {
-      if (stats.sessions > 0)       badges.push({ label: `${stats.sessions} session${stats.sessions !== 1 ? 's' : ''}` })
-      if (stats.openSessions > 0)   badges.push({ label: `${stats.openSessions} open now`, accent: true })
+      if (stats.sessions > 0)        badges.push({ label: `${stats.sessions} session${stats.sessions !== 1 ? 's' : ''}` })
+      if (stats.openSessions > 0)    badges.push({ label: `${stats.openSessions} open now`, accent: true })
+    }
+    if (step === 4) {
+      if (stats.playersScored > 0)   badges.push({ label: `${stats.playersScored} scored` })
     }
     return badges
   }
@@ -290,7 +293,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
               }}>
                 {section.items.map(item => (
                   <Link
-                    key={item.href}
+                    key={item.label}
                     href={`/org/${params.orgId}/tryouts/${item.href}`}
                     style={{
                       display: 'block', padding: '1rem 1.1rem',
@@ -307,9 +310,15 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                 ))}
               </div>
 
-              {/* Divider (not after last) */}
+              {/* Divider with next-step hint */}
               {section.step < SECTIONS.length && (
-                <div style={{ marginTop: '2rem', marginLeft: '42px', height: '0.5px', background: 'var(--border)' }} />
+                <div style={{ marginTop: '2rem', marginLeft: '42px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                    then Step {section.step + 1}
+                  </div>
+                  <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
+                </div>
               )}
             </div>
           )
