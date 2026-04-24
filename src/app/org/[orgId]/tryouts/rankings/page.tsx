@@ -380,7 +380,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
     const base: Array<Omit<RankedPlayer, 'combinedRank' | 'tryoutRank' | 'coachRank' | 'intangiblesRank'>> =
       players.map(player => {
-        const ag = player.tryout_age_group ?? player.age_group
+        const ag = (player.tryout_age_group ?? player.age_group).toUpperCase()
 
         // Tryout
         const tRows = tryoutByPlayer.get(player.id) ?? []
@@ -598,11 +598,13 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
   // ── Derived stats ─────────────────────────────────────────────────────────────
 
-  // Derive age groups from actual player data (avoids casing mismatches with season config)
-  const ageGroups = useMemo(
-    () => Array.from(new Set(ranked.map(r => r.ageGroup).filter(Boolean))).sort() as string[],
-    [ranked]
-  )
+  // Derive age groups from actual player data, normalized uppercase, sorted numerically, 8U–14U only
+  const ageGroups = useMemo(() => {
+    const groups = Array.from(new Set(ranked.map(r => r.ageGroup).filter(Boolean))) as string[]
+    return groups
+      .filter(ag => { const n = parseInt(ag); return n >= 8 && n <= 14 })
+      .sort((a, b) => parseInt(a) - parseInt(b))
+  }, [ranked])
   const priorYear     = season ? season.year - 1 : null
   const assignedCount = filtered.filter(r => r.assignedTeamId).length
   const teamOptions   = (ag: string) => {
