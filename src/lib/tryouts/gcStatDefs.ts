@@ -27,9 +27,14 @@ export const GC_STAT_DEFS: GcStatDef[] = [
   // ── Pitching ─────────────────────────────────────────────────────────────
   { key: 'era',        label: 'ERA',             category: 'pitching', higherBetter: false, defaultIncluded: true,  defaultWeight: 2.0 },
   { key: 'whip',       label: 'WHIP',            category: 'pitching', higherBetter: false, defaultIncluded: true,  defaultWeight: 2.0 },
+  { key: 'baa',        label: 'BAA',             category: 'pitching', higherBetter: false, defaultIncluded: true,  defaultWeight: 2.0 },
+  { key: 'k',          label: 'Strikeouts (P)',  category: 'pitching', higherBetter: true,  defaultIncluded: true,  defaultWeight: 1.5 },
+  { key: 'bb_per_inn', label: 'BB/INN',          category: 'pitching', higherBetter: false, defaultIncluded: true,  defaultWeight: 1.5 },
+  { key: 'strike_pct', label: 'Strike %',        category: 'pitching', higherBetter: true,  defaultIncluded: true,  defaultWeight: 1.0 },
   { key: 'ip',         label: 'Innings Pitched', category: 'pitching', higherBetter: true,  defaultIncluded: true,  defaultWeight: 1.0 },
   { key: 'k_bb',       label: 'K/BB',            category: 'pitching', higherBetter: true,  defaultIncluded: false, defaultWeight: 1.5 },
-  { key: 'strike_pct', label: 'Strike %',        category: 'pitching', higherBetter: true,  defaultIncluded: false, defaultWeight: 1.0 },
+  { key: 'bb_allowed', label: 'Walks Allowed',   category: 'pitching', higherBetter: false, defaultIncluded: false, defaultWeight: 1.0 },
+  { key: 'bf',         label: 'Batters Faced',   category: 'pitching', higherBetter: true,  defaultIncluded: false, defaultWeight: 0.5 },
   { key: 'w',          label: 'Wins',            category: 'pitching', higherBetter: true,  defaultIncluded: false, defaultWeight: 0.5 },
   { key: 'sv',         label: 'Saves',           category: 'pitching', higherBetter: true,  defaultIncluded: false, defaultWeight: 0.5 },
 ]

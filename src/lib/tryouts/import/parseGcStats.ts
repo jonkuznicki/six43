@@ -40,14 +40,19 @@ export interface GcStatsRow {
     sac?:     number
     tb?:      number
     // Pitching
-    ip?:      number
-    gs?:      number
-    w?:       number
-    l?:       number
-    sv?:      number
-    era?:     number
-    whip?:    number
-    k_bb?:    number
+    ip?:        number
+    gs?:        number
+    w?:         number
+    l?:         number
+    sv?:        number
+    era?:       number
+    whip?:      number
+    k?:         number   // pitching strikeouts (distinct from batting so)
+    bb_allowed?: number  // walks allowed as pitcher (distinct from batting bb)
+    bf?:        number
+    baa?:       number
+    bb_per_inn?: number
+    k_bb?:      number
     strike_pct?: number
   }
 }
@@ -97,11 +102,16 @@ const PITCHING_MAP: Record<string, string> = {
   'sv': 'sv', 'saves': 'sv',
   'era': 'era', 'earned run avg': 'era', 'earned run average': 'era',
   'whip': 'whip',
-  'so': 'so', 'k': 'so', 'strikeouts': 'so',
-  'bb': 'bb', 'walks': 'bb',
+  // Pitching Ks use 'k' column (distinct from batting 'so')
+  'so': 'k', 'k': 'k', 'strikeouts': 'k', 'ks': 'k',
+  // Pitching walks use 'bb_allowed' column (distinct from batting 'bb')
+  'bb': 'bb_allowed', 'walks': 'bb_allowed', 'base on balls': 'bb_allowed',
   'h': 'h', 'hits': 'h', 'hits allowed': 'h',
   'er': 'er', 'earned runs': 'er',
-  'strike%': 'strike_pct', 'strike %': 'strike_pct', 'strike pct': 'strike_pct',
+  'bf': 'bf', 'batters faced': 'bf', 'bfp': 'bf',
+  'baa': 'baa', 'batting avg against': 'baa', 'batting average against': 'baa', 'opp avg': 'baa', 'opp ba': 'baa',
+  'bb/inn': 'bb_per_inn', 'bb/ip': 'bb_per_inn', 'bb per inn': 'bb_per_inn', 'bbinn': 'bb_per_inn',
+  'strike%': 'strike_pct', 'strike %': 'strike_pct', 'strike pct': 'strike_pct', 'str%': 'strike_pct',
   'k/bb': 'k_bb', 'k bb': 'k_bb',
 }
 

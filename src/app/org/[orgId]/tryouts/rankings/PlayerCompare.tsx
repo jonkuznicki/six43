@@ -34,6 +34,8 @@ interface GcStatRow {
   rbi: number | null; r: number | null; hr: number | null; sb: number | null
   bb: number | null; so: number | null
   era: number | null; whip: number | null; ip: number | null
+  k: number | null; bb_allowed: number | null; bf: number | null
+  baa: number | null; bb_per_inn: number | null
   k_bb: number | null; strike_pct: number | null; w: number | null; sv: number | null
 }
 interface Team { id: string; name: string; age_group: string; color: string | null }
@@ -55,9 +57,9 @@ function best(vals: (number | null)[], higherBetter: boolean): number | null {
 }
 
 function fmtStat(key: string, v: number): string {
-  if (['avg', 'obp', 'slg', 'ops'].includes(key)) return v.toFixed(3)
+  if (['avg', 'obp', 'slg', 'ops', 'baa'].includes(key)) return v.toFixed(3)
   if (['strike_pct'].includes(key)) return `${(v * 100).toFixed(0)}%`
-  if (['era', 'whip', 'k_bb'].includes(key)) return v.toFixed(2)
+  if (['era', 'whip', 'k_bb', 'bb_per_inn'].includes(key)) return v.toFixed(2)
   if (key === 'ip') return v.toFixed(1)
   return String(Math.round(v))
 }

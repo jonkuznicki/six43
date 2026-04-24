@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     .select(`
       player_id,
       avg, obp, slg, ops, rbi, r, hr, sb, bb, so,
-      era, whip, ip, k_bb, strike_pct, w, sv
+      era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv
     `)
     .eq('org_id', orgId)
     .eq('season_year', seasonYear)
@@ -67,10 +67,12 @@ export async function POST(req: NextRequest) {
     age_group:  ageGroupById.get(r.player_id) ?? null,
     avg:        r.avg,   obp:  r.obp,  slg: r.slg, ops: r.ops,
     rbi:        r.rbi,   r:    r.r,    hr:  r.hr,  sb:  r.sb,
-    bb:         r.bb,    so:   r.so,
-    era:        r.era,   whip: r.whip, ip:  r.ip,
+    bb:         r.bb,    so:         r.so,
+    era:        r.era,   whip:       r.whip,       ip:    r.ip,
+    k:          r.k,     bb_allowed: r.bb_allowed, bf:    r.bf,
+    baa:        r.baa,   bb_per_inn: r.bb_per_inn,
     k_bb:       r.k_bb,  strike_pct: r.strike_pct,
-    w:          r.w,     sv:   r.sv,
+    w:          r.w,     sv:         r.sv,
   }))
 
   // If no config at all, bail out — admin needs to set up scoring first

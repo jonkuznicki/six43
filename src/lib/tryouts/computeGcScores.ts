@@ -33,6 +33,11 @@ export interface GcPlayerStat {
   era?:         number | null
   whip?:        number | null
   ip?:          number | null
+  k?:           number | null
+  bb_allowed?:  number | null
+  bf?:          number | null
+  baa?:         number | null
+  bb_per_inn?:  number | null
   k_bb?:        number | null
   strike_pct?:  number | null
   w?:           number | null

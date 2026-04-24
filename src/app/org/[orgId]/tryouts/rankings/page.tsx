@@ -57,6 +57,11 @@ interface GcStatRow {
   era:               number | null
   whip:              number | null
   ip:                number | null
+  k:                 number | null
+  bb_allowed:        number | null
+  bf:                number | null
+  baa:               number | null
+  bb_per_inn:        number | null
   k_bb:              number | null
   strike_pct:        number | null
   w:                 number | null
@@ -233,7 +238,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .order('sort_order'),
 
       supabase.from('tryout_gc_stats')
-        .select('player_id, gc_computed_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k_bb, strike_pct, w, sv')
+        .select('player_id, gc_computed_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv')
         .eq('org_id', params.orgId),
 
       supabase.from('tryout_teams')

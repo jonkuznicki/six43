@@ -162,14 +162,23 @@ export async function POST(req: NextRequest) {
       sac:    r.stats.sac        ?? null,
       tb:     r.stats.tb         ?? null,
       // Pitching
-      ip:     r.stats.ip         ?? null,
-      gs:     r.stats.gs         ?? null,
-      w:      r.stats.w          ?? null,
-      l:      r.stats.l          ?? null,
-      sv:     r.stats.sv         ?? null,
-      era:    r.stats.era        ?? null,
-      whip:   r.stats.whip       ?? null,
-      k_bb:   r.stats.k_bb       ?? null,
+      ip:         r.stats.ip         ?? null,
+      gs:         r.stats.gs         ?? null,
+      w:          r.stats.w          ?? null,
+      l:          r.stats.l          ?? null,
+      sv:         r.stats.sv         ?? null,
+      era:        r.stats.era        ?? null,
+      whip:       r.stats.whip       ?? null,
+      k:          r.stats.k          ?? null,
+      bb_allowed: r.stats.bb_allowed ?? null,
+      bf:         r.stats.bf         ?? null,
+      baa:        r.stats.baa        ?? null,
+      bb_per_inn: r.stats.bb_per_inn != null
+        ? r.stats.bb_per_inn
+        : (r.stats.bb_allowed != null && r.stats.ip != null && r.stats.ip > 0)
+          ? Math.round((r.stats.bb_allowed / r.stats.ip) * 1000) / 1000
+          : null,
+      k_bb:       r.stats.k_bb       ?? null,
       strike_pct: r.stats.strike_pct ?? null,
     }))
 
@@ -204,9 +213,16 @@ export async function POST(req: NextRequest) {
             avg:        r.stats.avg,    obp: r.stats.obp, slg: r.stats.slg, ops: r.stats.ops,
             rbi:        r.stats.rbi,    r:   r.stats.r,   hr:  r.stats.hr,  sb:  r.stats.sb,
             bb:         r.stats.bb,     so:  r.stats.so,
-            era:        r.stats.era,    whip:r.stats.whip, ip: r.stats.ip,
+            era:        r.stats.era,    whip:       r.stats.whip,       ip:    r.stats.ip,
+            k:          r.stats.k,      bb_allowed: r.stats.bb_allowed, bf:    r.stats.bf,
+            baa:        r.stats.baa,
+            bb_per_inn: r.stats.bb_per_inn != null
+              ? r.stats.bb_per_inn
+              : (r.stats.bb_allowed != null && r.stats.ip != null && r.stats.ip > 0)
+                ? Math.round((r.stats.bb_allowed / r.stats.ip) * 1000) / 1000
+                : undefined,
             k_bb:       r.stats.k_bb,   strike_pct: r.stats.strike_pct,
-            w:          r.stats.w,      sv:  r.stats.sv,
+            w:          r.stats.w,      sv:         r.stats.sv,
           }))
 
         const scores = computeGcScores(playerStats, scoringCfg as GcScoringConfigRow[])
