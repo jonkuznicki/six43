@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import PlayerCard from './PlayerCard'
+import type { GcStatDef } from '../../../../../lib/tryouts/gcStatDefs'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -37,11 +39,27 @@ interface EvalConfigRow {
 }
 
 interface GcStatRow {
-  player_id:        string
+  player_id:         string
   gc_computed_score: number | null
-  ops:              number | null
-  era:              number | null
-  ip:               number | null
+  // Batting
+  avg:               number | null
+  obp:               number | null
+  slg:               number | null
+  ops:               number | null
+  rbi:               number | null
+  r:                 number | null
+  hr:                number | null
+  sb:                number | null
+  bb:                number | null
+  so:                number | null
+  // Pitching
+  era:               number | null
+  whip:              number | null
+  ip:                number | null
+  k_bb:              number | null
+  strike_pct:        number | null
+  w:                 number | null
+  sv:                number | null
 }
 
 interface Season {
@@ -143,6 +161,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   // Cutoff lines per age group
   const [cutoffs, setCutoffs] = useState<Record<string, { blue: number; white: number }>>({})
 
+  // Player card panel
+  const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
+
   // Inline notes edit
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
   const [notesVal,     setNotesVal]     = useState('')
@@ -201,7 +222,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .order('sort_order'),
 
       supabase.from('tryout_gc_stats')
-        .select('player_id, gc_computed_score, ops, era, ip')
+        .select('player_id, gc_computed_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k_bb, strike_pct, w, sv')
         .eq('org_id', params.orgId),
 
       supabase.from('tryout_teams')
@@ -895,7 +916,12 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
                       {/* ── Player name (sticky) ── */}
                       <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
-                        <div style={{ fontWeight: 700, fontSize: '13px' }}>
+                        <div
+                          onClick={() => setPanelPlayerId(row.player.id)}
+                          style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--fg)' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg)')}
+                        >
                           {row.player.last_name}, {row.player.first_name}
                         </div>
                       </td>
@@ -1020,6 +1046,28 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           </table>
         </div>
       )}
+
+      {/* ── Player Card panel ── */}
+      {panelPlayerId && (() => {
+        const rp = ranked.find(r => r.player.id === panelPlayerId)
+        if (!rp) return null
+        const gc = gcRows.find(g => g.player_id === panelPlayerId) ?? null
+        const ageGroup = rp.ageGroup
+        const ageGroupPlayerIds = new Set(ranked.filter(r => r.ageGroup === ageGroup).map(r => r.player.id))
+        const ageGroupGcRows = gcRows.filter(g => ageGroupPlayerIds.has(g.player_id))
+        const totalInAge = ranked.filter(r => r.ageGroup === ageGroup).length
+        return (
+          <PlayerCard
+            player={rp}
+            gcRow={gc}
+            ageGroupGcRows={ageGroupGcRows}
+            teams={teams}
+            totalInAge={totalInAge}
+            onClose={() => setPanelPlayerId(null)}
+          />
+        )
+      })()}
+
     </main>
   )
 }

@@ -774,6 +774,32 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
                 opacity: savingGc ? 0.6 : 1,
               }}>{savingGc ? 'Saving…' : 'Save GC Config'}</button>
 
+              {ageGroups.length > 1 && gcAgeGroup && (
+                <button
+                  onClick={() => {
+                    const source = gcConfig[gcAgeGroup]
+                    if (!source) return
+                    setGcConfig(prev => {
+                      const next = { ...prev }
+                      for (const g of ageGroups) {
+                        if (g === gcAgeGroup) continue
+                        next[g] = { ...source }
+                      }
+                      return next
+                    })
+                    setGcMsg(`Config from ${gcAgeGroup} copied to all age groups — click Save to apply.`)
+                  }}
+                  style={{
+                    padding: '9px 22px', borderRadius: '7px',
+                    border: '0.5px solid var(--border-md)',
+                    background: 'var(--bg-input)', color: s.muted,
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  Copy {gcAgeGroup} → all ages
+                </button>
+              )}
+
               <button onClick={recomputeGcScores} disabled={recomputing} style={{
                 padding: '9px 22px', borderRadius: '7px',
                 border: '0.5px solid var(--border-md)',
