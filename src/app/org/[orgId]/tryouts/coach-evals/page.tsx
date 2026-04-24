@@ -418,7 +418,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       org_id:      params.orgId,
       season_year: String(evalYear),
       team_label:  player.prior_team ?? '',
-      coach_name:  evalMeta[player.id]?.coach_name ?? myName || 'Admin',
+      coach_name:  evalMeta[player.id]?.coach_name || myName || 'Admin',
       status:      evalMeta[player.id]?.status ?? 'draft',
       scores:      gridScores[player.id] ?? {},
       comments:    text,
