@@ -136,10 +136,10 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     return Math.max(localMax, otherSessionsMax) + 1
   }
 
-  async function assignNumber(playerId: string) {
+  async function assignNumber(playerId: string, precomputedNum?: number | null) {
     setBusy(playerId)
     setCheckinError(null)
-    const num = session?.numbering_method === 'alphabetical' ? null : nextNumber()
+    const num = precomputedNum !== undefined ? precomputedNum : (session?.numbering_method === 'alphabetical' ? null : nextNumber())
 
     // Check if a pre-assignment row exists (arrived=false) — update it, else insert
     const existing = checkins.find(c => c.player_id === playerId)
@@ -185,9 +185,17 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     if (selected.size === 0) return
     setBulkBusy(true)
     setCheckinError(null)
-    for (const playerId of Array.from(selected)) {
-      await assignNumber(playerId)
+
+    const ids = Array.from(selected)
+    // Pre-compute all numbers before the loop — nextNumber() reads React state
+    // which doesn't update between await calls, so every iteration would
+    // return the same number and hit the unique constraint.
+    let counter = nextNumber()
+    for (const playerId of ids) {
+      const num = session?.numbering_method === 'alphabetical' ? null : counter++
+      await assignNumber(playerId, num)
     }
+
     setSelected(new Set())
     if (session?.numbering_method === 'alphabetical') {
       const all = checkins.filter(c => c.tryout_number != null || c.is_write_in)
