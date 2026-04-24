@@ -293,6 +293,13 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
         })}
       </div>
 
+      {/* Dev tools link — unobtrusive footer */}
+      <div style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '0.5px solid var(--border)', textAlign: 'right' }}>
+        <Link href={`/org/${params.orgId}/tryouts/dev`} style={{ fontSize: '11px', color: s.dim, textDecoration: 'none' }}>
+          Test data →
+        </Link>
+      </div>
+
     </main>
   )
 }
