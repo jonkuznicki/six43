@@ -81,6 +81,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
   const [gcMsg,        setGcMsg]        = useState<string | null>(null)
   const [recomputing,  setRecomputing]  = useState(false)
   const [recomputeMsg, setRecomputeMsg] = useState<string | null>(null)
+  const [showFormulas, setShowFormulas] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -464,8 +465,92 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
 
-      <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>Scoring Setup</h1>
-      <p style={{ fontSize: '14px', color: s.muted, marginBottom: '2.5rem' }}>{season.label}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px', flexWrap: 'wrap', gap: '8px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Scoring Setup</h1>
+        <button onClick={() => setShowFormulas(v => !v)} style={{
+          background: 'none', border: '0.5px solid var(--border-md)', borderRadius: '6px',
+          padding: '4px 12px', fontSize: '12px', color: s.muted, cursor: 'pointer',
+        }}>
+          {showFormulas ? 'Hide formulas ▴' : 'How scores are calculated ▾'}
+        </button>
+      </div>
+      <p style={{ fontSize: '14px', color: s.muted, marginBottom: showFormulas ? '1rem' : '2.5rem' }}>{season.label}</p>
+
+      {/* ── Score formula reference ── */}
+      {showFormulas && (
+        <div style={{
+          marginBottom: '2.5rem', display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px',
+        }}>
+          {[
+            {
+              label: 'Combined Score', color: 'var(--accent)',
+              lines: [
+                'Shown as the primary rank on Team Making.',
+                'Both scores available → 33% Tryout + 67% Coach Eval',
+                'Only one available → uses whichever exists',
+                'Neither available → no combined score',
+              ],
+            },
+            {
+              label: 'Tryout Score', color: '#80B0E8',
+              lines: [
+                'Evaluators score each subcategory 1–5 during tryouts.',
+                'Category score = weighted avg of its subcategories.',
+                'Tryout Score = weighted avg across all categories.',
+                'Category weights auto-normalize to 100% on save.',
+              ],
+            },
+            {
+              label: 'Coach Eval Score', color: '#6DB875',
+              lines: [
+                'Coaches score each eval field 1–5.',
+                'Coach Eval = weighted avg of all fields with weight > 0.',
+                'The Weight column amplifies or dampens each field\'s impact.',
+                'Set weight to 0 to exclude a field from the score.',
+              ],
+            },
+            {
+              label: 'Intangibles Score', color: '#6DB875',
+              lines: [
+                'Computed from the Intangibles section fields only.',
+                'Same weighted-average formula as Coach Eval.',
+                'Shown as its own column on Team Making.',
+              ],
+            },
+            {
+              label: 'Team Hitting / Team Pitching', color: '#C080E8',
+              lines: [
+                'Team Hitting = weighted avg of Fielding & Hitting fields.',
+                'Team Pitching = weighted avg of Pitching & Catching fields.',
+                'These give a view of how a player fits a specific team role.',
+              ],
+            },
+            {
+              label: 'GC Score', color: s.muted,
+              lines: [
+                'Percentile-ranked within each age group separately.',
+                'Each stat: rank among peers → 0–1 percentile → scaled 1–5.',
+                'Lower-is-better stats (ERA, WHIP, BAA…) are inverted.',
+                'GC Score = weighted avg across all included stats.',
+                'Solo player in a stat gets 3.0 (midpoint). Ties share rank.',
+              ],
+            },
+          ].map(({ label, color, lines }) => (
+            <div key={label} style={{
+              background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+              borderRadius: '10px', padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color, marginBottom: '8px' }}>{label}</div>
+              <ul style={{ margin: 0, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {lines.map((line, i) => (
+                  <li key={i} style={{ fontSize: '11px', color: s.muted, lineHeight: 1.5 }}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Tryout Scoring Categories ───────────────────────────────────────── */}
       <div style={{ marginBottom: '3rem' }}>
