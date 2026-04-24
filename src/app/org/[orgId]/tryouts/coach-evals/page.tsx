@@ -546,9 +546,9 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
       {/* Team eval links — admin only */}
       {isAdmin && season && (() => {
-        const teamsFromPlayers = new Set(players.map(p => p.prior_team).filter(Boolean) as string[])
-        const teamsFromTokens  = new Set(Object.keys(teamTokens))
-        const teams = Array.from(new Set([...teamsFromPlayers, ...teamsFromTokens]))
+        const teamsFromPlayers = players.map(p => p.prior_team).filter(Boolean) as string[]
+        const teamsFromTokens  = Object.keys(teamTokens)
+        const teams = Array.from(new Set(teamsFromPlayers.concat(teamsFromTokens)))
           .sort((a, b) => {
             const na = parseInt(a.match(/^(\d+)/)?.[1] ?? '999')
             const nb = parseInt(b.match(/^(\d+)/)?.[1] ?? '999')
