@@ -40,8 +40,10 @@ interface EvalConfigRow {
 }
 
 interface GcStatRow {
-  player_id:         string
-  gc_computed_score: number | null
+  player_id:          string
+  gc_computed_score:  number | null
+  gc_hitting_score:   number | null
+  gc_pitching_score:  number | null
   // Batting
   avg:               number | null
   obp:               number | null
@@ -98,7 +100,8 @@ interface RankedPlayer {
   teamHitting:     number | null   // avg of fielding_hitting section
   coachComments:   string | null
   // GC
-  gcScore:         number | null
+  gcHittingScore:  number | null
+  gcPitchingScore: number | null
   // Combined (33% tryout + 67% eval; falls back to whichever is available)
   combinedScore:   number | null
   // Ranks within age group (populated by computeRanks)
@@ -232,7 +235,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .order('sort_order'),
 
       supabase.from('tryout_gc_stats')
-        .select('player_id, gc_computed_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv')
+        .select('player_id, gc_computed_score, gc_hitting_score, gc_pitching_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv')
         .eq('org_id', params.orgId),
 
       supabase.from('tryout_teams')
@@ -415,8 +418,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         const coachComments = evalRow?.comments ?? null
 
         // GC
-        const gcRow   = gcByPlayer.get(player.id) ?? null
-        const gcScore = gcRow?.gc_computed_score ?? null
+        const gcRow          = gcByPlayer.get(player.id) ?? null
+        const gcHittingScore  = gcRow?.gc_hitting_score  ?? null
+        const gcPitchingScore = gcRow?.gc_pitching_score ?? null
 
         // Combined: 33% tryout + 67% eval; falls back to whichever is available
         let combinedScore: number | null = null
@@ -441,7 +445,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           teamPitching,
           teamHitting,
           coachComments,
-          gcScore,
+          gcHittingScore,
+          gcPitchingScore,
           combinedScore,
           assignedTeamId: assignments[player.id] ?? null,
           adminNotes:     notesMap[player.id] ?? null,
@@ -505,7 +510,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         case 'teamHitting':     return r.teamHitting     ?? -1
         case 'tryoutHitting':   return r.tryoutHitting   ?? -1
         case 'speed':           return r.speed           ?? 9999  // lower = faster = better
-        case 'gcScore':         return r.gcScore         ?? -1
+        case 'gcHittingScore':  return r.gcHittingScore  ?? -1
+        case 'gcPitchingScore': return r.gcPitchingScore ?? -1
         case 'name': return 0  // handled below
         default:                return r.combinedRank    ?? 9999
       }
@@ -580,7 +586,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           r.teamHitting?.toFixed(2)      ?? '',
           r.tryoutHitting?.toFixed(2)    ?? '',
           r.speed?.toFixed(2)            ?? '',
-          r.gcScore?.toFixed(2)          ?? '',
+          r.gcHittingScore?.toFixed(2)   ?? '',
+          r.gcPitchingScore?.toFixed(2)  ?? '',
           r.coachComments ?? '',
         ]
       }),
@@ -893,7 +900,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
                 {/* GC */}
                 <th style={{ ...th }}
-                  onClick={() => toggleSort('gcScore')}>GC{sortArrow('gcScore')}</th>
+                  onClick={() => toggleSort('gcHittingScore')}>GC Hit{sortArrow('gcHittingScore')}</th>
+                <th style={{ ...th }}
+                  onClick={() => toggleSort('gcPitchingScore')}>GC Pit{sortArrow('gcPitchingScore')}</th>
 
                 {/* Notes */}
                 <th style={{ ...th, textAlign: 'left', minWidth: '120px', cursor: 'default' }}>Notes</th>
@@ -1048,8 +1057,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                       </td>
 
                       {/* ── GC ── */}
-                      <td style={{ ...td, color: row.gcScore != null ? s.muted : s.dim, fontSize: '11px' }}>
-                        {fmt(row.gcScore)}
+                      <td style={{ ...td, color: row.gcHittingScore != null ? s.muted : s.dim, fontSize: '11px' }}>
+                        {fmt(row.gcHittingScore)}
+                      </td>
+                      <td style={{ ...td, color: row.gcPitchingScore != null ? s.muted : s.dim, fontSize: '11px' }}>
+                        {fmt(row.gcPitchingScore)}
                       </td>
 
                       {/* ── Notes (inline edit) ── */}

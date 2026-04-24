@@ -1,14 +1,14 @@
 /**
- * Computes a 1–5 GC score for each player within their age group.
+ * Computes GC hitting and pitching scores for each player within their age group.
  *
- * Algorithm:
- *   1. For each included stat, rank the player among peers in the same age group.
+ * Algorithm (applied separately to batting stats and pitching stats):
+ *   1. For each included stat in the category, rank the player among peers.
  *   2. Convert rank → percentile (0–1). Invert for lower-is-better stats.
  *   3. Scale percentile → 1–5.
- *   4. Weighted average across all scored stats.
+ *   4. Weighted average across all scored stats in the category.
  *
- * Players with no scorable stats get null.
- * Age groups with only one player with a given stat get 3.0 (midpoint).
+ * A player with no batting data gets null for hitting; no pitching data → null for pitching.
+ * A solo player in a stat gets 3.0 (midpoint). Ties share an averaged rank.
  */
 
 import { GC_STAT_DEF_MAP } from './gcStatDefs'
@@ -16,7 +16,6 @@ import { GC_STAT_DEF_MAP } from './gcStatDefs'
 export interface GcPlayerStat {
   player_id: string
   age_group: string | null
-  // Nullable stat columns (all optional — only populate what you have)
   avg?:         number | null
   obp?:         number | null
   slg?:         number | null
@@ -51,12 +50,17 @@ export interface GcScoringConfigRow {
   weight:    number
 }
 
-/** Map of playerId → computed score (1–5, null if no data) */
+export interface GcScores {
+  hitting:  number | null
+  pitching: number | null
+}
+
+/** Map of playerId → { hitting, pitching } scores (1–5 each, null if no data) */
 export function computeGcScores(
   stats:  GcPlayerStat[],
   config: GcScoringConfigRow[],
-): Map<string, number | null> {
-  const result = new Map<string, number | null>()
+): Map<string, GcScores> {
+  const result = new Map<string, GcScores>()
 
   // Index config: age_group → stat_key → { included, weight }
   const cfgMap = new Map<string, Map<string, { included: boolean; weight: number }>>()
@@ -76,17 +80,20 @@ export function computeGcScores(
   for (const [ageGroup, groupStats] of Array.from(byGroup)) {
     const statCfg = cfgMap.get(ageGroup)
     if (!statCfg) {
-      // No config for this age group — no scores
-      for (const s of groupStats) result.set(s.player_id, null)
+      for (const s of groupStats) result.set(s.player_id, { hitting: null, pitching: null })
       continue
     }
 
-    // For each player, accumulate weighted stat scores
-    const playerWeightedSums = new Map<string, number>()
-    const playerWeightTotals = new Map<string, number>()
+    // Accumulators per player per category
+    const sums:   Record<'batting' | 'pitching', Map<string, number>> = {
+      batting:  new Map(), pitching: new Map(),
+    }
+    const totals: Record<'batting' | 'pitching', Map<string, number>> = {
+      batting:  new Map(), pitching: new Map(),
+    }
     for (const s of groupStats) {
-      playerWeightedSums.set(s.player_id, 0)
-      playerWeightTotals.set(s.player_id, 0)
+      sums.batting.set(s.player_id, 0);   totals.batting.set(s.player_id, 0)
+      sums.pitching.set(s.player_id, 0);  totals.pitching.set(s.player_id, 0)
     }
 
     for (const [statKey, { included, weight }] of Array.from(statCfg)) {
@@ -95,56 +102,45 @@ export function computeGcScores(
       const def = GC_STAT_DEF_MAP[statKey]
       if (!def) continue
 
-      // Collect (playerId, value) pairs where value is not null
+      const cat = def.category  // 'batting' | 'pitching'
+
       const pairs: { playerId: string; val: number }[] = []
       for (const s of groupStats) {
         const val = (s as any)[statKey]
-        if (val != null && isFinite(val)) {
-          pairs.push({ playerId: s.player_id, val })
-        }
+        if (val != null && isFinite(val)) pairs.push({ playerId: s.player_id, val })
       }
-
       if (pairs.length === 0) continue
 
-      // Sort ascending for ranking
       pairs.sort((a, b) => a.val - b.val)
       const n = pairs.length
 
       for (let i = 0; i < n; i++) {
         const { playerId } = pairs[i]
-
         let percentile: number
         if (n === 1) {
-          percentile = 0.5  // Only one data point → midpoint
+          percentile = 0.5
         } else {
-          // Handle ties: average rank of all tied players
-          // Find range of indices with same value
           const v = pairs[i].val
           let lo = i, hi = i
           while (lo > 0 && pairs[lo - 1].val === v) lo--
           while (hi < n - 1 && pairs[hi + 1].val === v) hi++
-          const avgRank = (lo + hi) / 2
-          percentile = avgRank / (n - 1)
+          percentile = ((lo + hi) / 2) / (n - 1)
         }
-
-        // Invert for lower-is-better stats
         if (!def.higherBetter) percentile = 1 - percentile
 
-        const statScore = 1 + percentile * 4  // 1–5
-
-        playerWeightedSums.set(playerId, (playerWeightedSums.get(playerId) ?? 0) + statScore * weight)
-        playerWeightTotals.set(playerId, (playerWeightTotals.get(playerId) ?? 0) + weight)
+        const statScore = 1 + percentile * 4
+        sums[cat].set(playerId, (sums[cat].get(playerId) ?? 0) + statScore * weight)
+        totals[cat].set(playerId, (totals[cat].get(playerId) ?? 0) + weight)
       }
     }
 
     for (const s of groupStats) {
-      const total = playerWeightTotals.get(s.player_id) ?? 0
-      if (total === 0) {
-        result.set(s.player_id, null)
-      } else {
-        const raw = (playerWeightedSums.get(s.player_id) ?? 0) / total
-        result.set(s.player_id, Math.round(raw * 100) / 100)
-      }
+      const hTotal = totals.batting.get(s.player_id) ?? 0
+      const pTotal = totals.pitching.get(s.player_id) ?? 0
+      result.set(s.player_id, {
+        hitting:  hTotal > 0 ? Math.round(((sums.batting.get(s.player_id)  ?? 0) / hTotal) * 100) / 100 : null,
+        pitching: pTotal > 0 ? Math.round(((sums.pitching.get(s.player_id) ?? 0) / pTotal) * 100) / 100 : null,
+      })
     }
   }
 

@@ -18,7 +18,8 @@ interface RankedPlayer {
   tryoutPitching:  number | null
   tryoutHitting:   number | null
   speed:           number | null
-  gcScore:         number | null
+  gcHittingScore:  number | null
+  gcPitchingScore: number | null
   combinedScore:   number | null
   combinedRank:    number | null
   tryoutRank:      number | null
@@ -87,7 +88,8 @@ export default function PlayerCompare({ players, gcRows, teams, ranked, onClose 
     { label: 'Intangibles', color: '#6DB875',       getValue: p => p.intangibles,    getRank: p => p.intangiblesRank, higherBetter: true },
     { label: 'T. Pitching', color: '#C080E8',       getValue: p => p.teamPitching,   getRank: _ => null,              higherBetter: true },
     { label: 'T. Hitting',  color: '#C080E8',       getValue: p => p.teamHitting,    getRank: _ => null,              higherBetter: true },
-    { label: 'GC Score',    color: s.muted,         getValue: p => p.gcScore,        getRank: _ => null,              higherBetter: true },
+    { label: 'GC Hitting',  color: s.muted,         getValue: p => p.gcHittingScore,  getRank: _ => null,              higherBetter: true },
+    { label: 'GC Pitching', color: s.muted,         getValue: p => p.gcPitchingScore, getRank: _ => null,              higherBetter: true },
   ]
 
   // GC stat rows that have at least one non-null value across the compared players

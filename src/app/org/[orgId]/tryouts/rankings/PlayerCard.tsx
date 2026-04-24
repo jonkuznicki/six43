@@ -15,7 +15,8 @@ interface RankedPlayer {
   teamPitching:    number | null
   teamHitting:     number | null
   coachComments:   string | null
-  gcScore:         number | null
+  gcHittingScore:  number | null
+  gcPitchingScore: number | null
   combinedScore:   number | null
   combinedRank:    number | null
   tryoutRank:      number | null
@@ -280,8 +281,11 @@ export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, t
             {rp.coachEval != null && (
               <StatChip label="Coach Eval" value={rp.coachEval.toFixed(2)}   color="#6DB875" />
             )}
-            {rp.gcScore != null && (
-              <StatChip label="GC Score"   value={rp.gcScore.toFixed(2)} />
+            {rp.gcHittingScore != null && (
+              <StatChip label="GC Hit"  value={rp.gcHittingScore.toFixed(2)} />
+            )}
+            {rp.gcPitchingScore != null && (
+              <StatChip label="GC Pit"  value={rp.gcPitchingScore.toFixed(2)} />
             )}
           </div>
 

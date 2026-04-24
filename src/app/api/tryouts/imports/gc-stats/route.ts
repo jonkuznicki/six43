@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
         const scores = computeGcScores(playerStats, scoringCfg as GcScoringConfigRow[])
 
         const scoreUpdates = Array.from(scores.entries()).map(([pid, score]) => ({
-          player_id: pid, org_id: orgId, season_year: seasonYear!, gc_computed_score: score,
+          player_id: pid, org_id: orgId, season_year: seasonYear!, gc_hitting_score: score.hitting, gc_pitching_score: score.pitching,
         }))
         if (scoreUpdates.length > 0) {
           await supabase.from('tryout_gc_stats')

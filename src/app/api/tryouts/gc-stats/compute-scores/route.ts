@@ -87,9 +87,9 @@ export async function POST(req: NextRequest) {
 
   // Write scores back
   let updated = 0
-  const updates: Array<{ player_id: string; season_year: string; gc_computed_score: number | null }> = []
+  const updates: Array<{ player_id: string; season_year: string; gc_hitting_score: number | null; gc_pitching_score: number | null }> = []
   for (const [playerId, score] of Array.from(scores)) {
-    updates.push({ player_id: playerId, season_year: seasonYear, gc_computed_score: score })
+    updates.push({ player_id: playerId, season_year: seasonYear, gc_hitting_score: score.hitting, gc_pitching_score: score.pitching })
     updated++
   }
 

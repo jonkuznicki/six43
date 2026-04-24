@@ -527,12 +527,13 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
               ],
             },
             {
-              label: 'GC Score', color: s.muted,
+              label: 'GC Hitting / GC Pitching', color: s.muted,
               lines: [
+                'Two separate scores — batting stats feed GC Hitting, pitching stats feed GC Pitching.',
                 'Percentile-ranked within each age group separately.',
                 'Each stat: rank among peers → 0–1 percentile → scaled 1–5.',
                 'Lower-is-better stats (ERA, WHIP, BAA…) are inverted.',
-                'GC Score = weighted avg across all included stats.',
+                'Score = weighted avg of included stats in that category.',
                 'Solo player in a stat gets 3.0 (midpoint). Ties share rank.',
               ],
             },
