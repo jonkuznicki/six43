@@ -15,6 +15,7 @@
 
 /* ── Color tokens (dark = default) ── */
 :root {
+  color-scheme: dark;
   --bg: #0B1F3A;
   --bg2: #132844;
   --bg-card: rgba(255,255,255,0.04);
@@ -32,6 +33,7 @@
 }
 
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #EBF0F7;
   --bg2: #ffffff;
   --bg-card: rgba(0,0,0,0.04);
@@ -46,6 +48,17 @@ html[data-theme="light"] {
   --border-md: rgba(11,31,58,0.14);
   --border-strong: rgba(11,31,58,0.2);
   --nav-bg: rgba(235,240,247,0.96);
+}
+
+/* ── Native select/option dark mode fix ── */
+/* color-scheme tells the browser to render native controls (dropdowns,
+   scrollbars, etc.) using dark-mode OS colors so option text is readable. */
+select {
+  color-scheme: inherit;
+}
+select option {
+  background-color: var(--bg);
+  color: var(--fg);
 }
 
 /* ── Sidebar (hidden on mobile, shown on desktop) ── */
@@ -205,6 +218,7 @@ body.eval-standalone .app-content { margin-left: 0 !important; }
 
 /* Light theme token overrides for the eval form */
 body.eval-standalone {
+  color-scheme:    light;
   --bg:            #ffffff;
   --bg2:           #f8fafc;
   --bg-card:       #f8fafc;
