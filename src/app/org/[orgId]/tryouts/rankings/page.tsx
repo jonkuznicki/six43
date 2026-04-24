@@ -193,12 +193,6 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     if (editingNotes && notesInputRef.current) notesInputRef.current.focus()
   }, [editingNotes])
 
-  // Hide sidebar + zero margin on this page for maximum table width
-  useEffect(() => {
-    document.body.classList.add('tryout-fullscreen')
-    return () => document.body.classList.remove('tryout-fullscreen')
-  }, [])
-
   async function loadData() {
     const { data: seasonData } = await supabase
       .from('tryout_seasons')
