@@ -25,6 +25,7 @@ const TEAM_COLORS = [
 ]
 
 const BLANK_FORM = { name: '', age_group: '', color: TEAM_COLORS[0] }
+const FALLBACK_AGE_GROUPS = ['8U','9U','10U','11U','12U','13U','14U']
 
 export default function TeamsPage({ params }: { params: { orgId: string } }) {
   const supabase = createClient()
@@ -114,7 +115,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</main>
   )
 
-  const ageGroups   = season?.age_groups ?? []
+  const ageGroups   = (season?.age_groups?.length ? season.age_groups : FALLBACK_AGE_GROUPS)
   const filtered    = teams.filter(t => ageFilter === 'all' || t.age_group === ageFilter)
   const activeTeams = filtered.filter(t => t.is_active)
 
@@ -131,12 +132,19 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Teams</h1>
-          {season && <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>}
+          {season
+            ? <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>
+            : <div style={{ fontSize: '13px', color: '#E87060', marginTop: '2px' }}>
+                No active season — <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: '#E87060', fontWeight: 700 }}>set up a season first</Link>
+              </div>
+          }
         </div>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm(BLANK_FORM) }} style={{
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm(BLANK_FORM) }} disabled={!season} style={{
           padding: '8px 18px', borderRadius: '7px', border: 'none',
-          background: 'var(--accent)', color: 'var(--accent-text)',
-          fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+          background: season ? 'var(--accent)' : 'var(--bg-input)',
+          color: season ? 'var(--accent-text)' : s.dim,
+          fontSize: '13px', fontWeight: 700, cursor: season ? 'pointer' : 'default',
+          opacity: season ? 1 : 0.5,
         }}>+ New team</button>
       </div>
 

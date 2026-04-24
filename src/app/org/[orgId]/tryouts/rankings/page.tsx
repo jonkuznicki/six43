@@ -682,31 +682,19 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
-      <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
+    <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '1rem 1.5rem 6rem' }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>Team Making</h1>
-          <div style={{ fontSize: '13px', color: s.muted }}>{season.label}</div>
+      {/* ── Row 1: title + actions ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '12px', color: s.dim, textDecoration: 'none' }}>‹ Tryouts</Link>
+          <span style={{ fontSize: '18px', fontWeight: 800 }}>Team Making</span>
+          <span style={{ fontSize: '12px', color: s.muted }}>{season.label}</span>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={handleShare} disabled={sharingBusy} style={{
-            padding: '7px 14px', borderRadius: '6px',
-            border: `0.5px solid ${shareToken ? 'rgba(109,184,117,0.5)' : 'var(--border-md)'}`,
-            background: shareToken ? 'rgba(109,184,117,0.1)' : 'var(--bg-input)',
-            color: shareToken ? '#6DB875' : s.muted, fontSize: '12px', cursor: sharingBusy ? 'default' : 'pointer',
-          }}>{shareCopied ? '✓ Copied!' : shareToken ? '⎋ Copy link' : '⎋ Share'}</button>
-          {shareToken && (
-            <button onClick={revokeShare} disabled={sharingBusy} style={{
-              padding: '7px 14px', borderRadius: '6px', border: '0.5px solid rgba(232,112,96,0.4)',
-              background: 'rgba(232,112,96,0.08)', color: '#E87060', fontSize: '12px', cursor: 'pointer',
-            }}>Revoke</button>
-          )}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
           {compareIds.length >= 2 && (
             <button onClick={() => setShowCompare(true)} style={{
-              padding: '7px 14px', borderRadius: '6px',
+              padding: '5px 12px', borderRadius: '6px',
               border: '0.5px solid rgba(232,160,32,0.5)',
               background: 'rgba(232,160,32,0.12)', color: 'var(--accent)',
               fontSize: '12px', fontWeight: 700, cursor: 'pointer',
@@ -714,102 +702,106 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           )}
           {compareIds.length > 0 && (
             <button onClick={() => setCompareIds([])} style={{
-              padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              padding: '5px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
               background: 'var(--bg-input)', color: s.dim, fontSize: '12px', cursor: 'pointer',
             }}>Clear</button>
           )}
+          <button onClick={handleShare} disabled={sharingBusy} style={{
+            padding: '5px 12px', borderRadius: '6px',
+            border: `0.5px solid ${shareToken ? 'rgba(109,184,117,0.5)' : 'var(--border-md)'}`,
+            background: shareToken ? 'rgba(109,184,117,0.1)' : 'var(--bg-input)',
+            color: shareToken ? '#6DB875' : s.muted, fontSize: '12px', cursor: sharingBusy ? 'default' : 'pointer',
+          }}>{shareCopied ? '✓ Copied!' : shareToken ? '⎋ Copy link' : '⎋ Share'}</button>
+          {shareToken && (
+            <button onClick={revokeShare} disabled={sharingBusy} style={{
+              padding: '5px 12px', borderRadius: '6px', border: '0.5px solid rgba(232,112,96,0.4)',
+              background: 'rgba(232,112,96,0.08)', color: '#E87060', fontSize: '12px', cursor: 'pointer',
+            }}>Revoke</button>
+          )}
           <button onClick={exportCsv} style={{
-            padding: '7px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+            padding: '5px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
           }}>↓ CSV</button>
         </div>
       </div>
 
-      {/* ── No teams warning ── */}
+      {/* ── Row 2: age filters + search + summary ── */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px', alignItems: 'center' }}>
+        {['all', ...ageGroups].map(ag => (
+          <button key={ag} onClick={() => setAgeFilter(ag)} style={{
+            padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
+            borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
+            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+            color: ageFilter === ag ? 'var(--accent)' : s.muted,
+            fontSize: '11px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
+          }}>{ag === 'all' ? 'All ages' : ag}</button>
+        ))}
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search…"
+          style={{
+            background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
+            borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: 'var(--fg)', width: '130px',
+          }}
+        />
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+          {[
+            { label: 'Total',     val: ranked.length,                color: undefined as string | undefined },
+            { label: 'Assigned',  val: assignedCount,                color: '#6DB875' },
+            { label: 'Left',      val: ranked.length - assignedCount, color: ranked.length - assignedCount > 0 ? '#E8A020' : undefined },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{
+              padding: '3px 10px', borderRadius: '6px',
+              background: color ? `${color}18` : 'var(--bg-card)',
+              border: `0.5px solid ${color ? `${color}55` : 'var(--border)'}`,
+              display: 'flex', alignItems: 'center', gap: '4px',
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: color ?? 'var(--fg)' }}>{val}</span>
+              <span style={{ fontSize: '10px', color: color ?? s.dim }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── No teams warning (compact) ── */}
       {teams.length === 0 && (
         <div style={{
-          marginBottom: '1rem', padding: '10px 14px', borderRadius: '8px',
+          marginBottom: '6px', padding: '6px 12px', borderRadius: '6px',
           background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
-          fontSize: '12px', color: 'var(--accent)',
-          display: 'flex', alignItems: 'center', gap: '10px',
+          fontSize: '11px', color: 'var(--accent)',
+          display: 'flex', alignItems: 'center', gap: '8px',
         }}>
-          <span>⚠ No teams set up yet — the assignment dropdown will be empty.</span>
+          <span>⚠ No teams set up yet — assignment dropdown will be empty.</span>
           <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
             Set up teams →
           </Link>
         </div>
       )}
 
-      {/* ── Summary chips ── */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-        {[
-          { label: 'Players',  val: ranked.length,  color: undefined as string | undefined },
-          { label: 'Assigned', val: assignedCount,  color: '#6DB875' },
-          { label: `Unassigned`, val: ranked.length - assignedCount, color: ranked.length - assignedCount > 0 ? '#E8A020' : undefined },
-        ].map(({ label, val, color }) => (
-          <div key={label} style={{
-            padding: '6px 14px', borderRadius: '8px',
-            background: color ? `${color}18` : 'var(--bg-card)',
-            border: `0.5px solid ${color ? `${color}55` : 'var(--border)'}`,
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}>
-            <span style={{ fontSize: '15px', fontWeight: 800, color: color ?? 'var(--fg)' }}>{val}</span>
-            <span style={{ fontSize: '11px', color: color ?? s.muted }}>{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Age filters + search ── */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
-        {['all', ...ageGroups].map(ag => (
-          <button key={ag} onClick={() => setAgeFilter(ag)} style={{
-            padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
-            borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
-            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
-            color: ageFilter === ag ? 'var(--accent)' : s.muted,
-            fontSize: '12px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
-          }}>{ag === 'all' ? 'All ages' : ag}</button>
-        ))}
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search players…"
-          style={{
-            marginLeft: '4px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)',
-            borderRadius: '6px', padding: '5px 10px', fontSize: '12px', color: 'var(--fg)', width: '180px',
-          }}
-        />
-      </div>
-
       {/* ── Cutoff controls (single age group only) ── */}
       {ageFilter !== 'all' && filtered.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1rem',
-          padding: '10px 14px', background: 'var(--bg-card)', border: '0.5px solid var(--border)',
-          borderRadius: '10px', flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px',
+          padding: '6px 12px', background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+          borderRadius: '8px', flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: '12px', fontWeight: 700 }}>Cutoff lines</span>
+          <span style={{ fontSize: '11px', fontWeight: 700 }}>Cutoffs</span>
           {([
             { key: 'blue' as const, label: 'Blue',  color: '#4090E0' },
             { key: 'white' as const, label: 'White', color: s.muted },
           ]).map(({ key, label, color }) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color, minWidth: '36px' }}>{label}</span>
-              <button onClick={() => setCutoff(key, ageCutoff[key] - 1)} style={{ width: '22px', height: '22px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, fontSize: '14px', cursor: 'pointer', lineHeight: 1 }}>−</button>
-              <span style={{ fontSize: '13px', fontWeight: 800, minWidth: '24px', textAlign: 'center' }}>{ageCutoff[key]}</span>
-              <button onClick={() => setCutoff(key, ageCutoff[key] + 1)} style={{ width: '22px', height: '22px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, fontSize: '14px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color, minWidth: '32px' }}>{label}</span>
+              <button onClick={() => setCutoff(key, ageCutoff[key] - 1)} style={{ width: '20px', height: '20px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer', lineHeight: 1 }}>−</button>
+              <span style={{ fontSize: '12px', fontWeight: 800, minWidth: '20px', textAlign: 'center' }}>{ageCutoff[key]}</span>
+              <button onClick={() => setCutoff(key, ageCutoff[key] + 1)} style={{ width: '20px', height: '20px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer', lineHeight: 1 }}>+</button>
             </div>
           ))}
-          <span style={{ fontSize: '11px', color: s.dim }}>
+          <span style={{ fontSize: '10px', color: s.dim }}>
             Blue: {ageCutoff.blue} · White: {ageCutoff.white} · Cut: {Math.max(0, filtered.length - ageCutoff.blue - ageCutoff.white)}
           </span>
         </div>
       )}
-
-      {/* ── Combined score formula note ── */}
-      <div style={{ fontSize: '11px', color: s.dim, marginBottom: '10px' }}>
-        Combined = 33% Tryout + 67% Coach Eval when both exist; falls back to whichever is available.
-        GC score shown for reference only.
-      </div>
 
       {/* ── Table ── */}
       {filtered.length === 0 ? (
