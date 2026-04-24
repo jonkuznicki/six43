@@ -315,6 +315,16 @@ export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, t
           )}
 
           {/* GC Stats */}
+          {!gcRow && (
+            <Section label="GameChanger Stats" color={s.muted}>
+              <div style={{ fontSize: '12px', color: s.dim }}>No GC stats imported for this player.</div>
+            </Section>
+          )}
+          {gcRow && gcBatting.length === 0 && gcPitching.length === 0 && (
+            <Section label="GameChanger Stats" color={s.muted}>
+              <div style={{ fontSize: '12px', color: s.dim }}>GC stats row exists but all values are null.</div>
+            </Section>
+          )}
           {gcRow && (gcBatting.length > 0 || gcPitching.length > 0) && (
             <Section label="GameChanger Stats" color={s.muted}>
               {gcBatting.length > 0 && (

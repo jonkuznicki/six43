@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import PlayerCard from './PlayerCard'
+import PlayerCompare from './PlayerCompare'
 import type { GcStatDef } from '../../../../../lib/tryouts/gcStatDefs'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -164,6 +165,10 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   // Player card panel
   const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
 
+  // Compare
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [showCompare, setShowCompare] = useState(false)
+
   // Inline notes edit
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
   const [notesVal,     setNotesVal]     = useState('')
@@ -182,6 +187,12 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   useEffect(() => {
     if (editingNotes && notesInputRef.current) notesInputRef.current.focus()
   }, [editingNotes])
+
+  // Hide sidebar + zero margin on this page for maximum table width
+  useEffect(() => {
+    document.body.classList.add('tryout-fullscreen')
+    return () => document.body.classList.remove('tryout-fullscreen')
+  }, [])
 
   async function loadData() {
     const { data: seasonData } = await supabase
@@ -295,6 +306,16 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       setAssignments(prev => { const n = { ...prev }; delete n[playerId]; return n })
     }
     setAssigning(null)
+  }
+
+  // ── Compare toggle ───────────────────────────────────────────────────────────
+
+  function toggleCompare(playerId: string) {
+    setCompareIds(prev =>
+      prev.includes(playerId)
+        ? prev.filter(id => id !== playerId)
+        : prev.length < 4 ? [...prev, playerId] : prev
+    )
   }
 
   // ── Share link ────────────────────────────────────────────────────────────────
@@ -577,10 +598,17 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
   // ── Derived stats ─────────────────────────────────────────────────────────────
 
-  const ageGroups     = season?.age_groups ?? []
+  // Derive age groups from actual player data (avoids casing mismatches with season config)
+  const ageGroups = useMemo(
+    () => Array.from(new Set(ranked.map(r => r.ageGroup).filter(Boolean))).sort() as string[],
+    [ranked]
+  )
   const priorYear     = season ? season.year - 1 : null
   const assignedCount = filtered.filter(r => r.assignedTeamId).length
-  const teamOptions   = (ag: string) => teams.filter(t => t.age_group === ag || t.age_group === 'all')
+  const teamOptions   = (ag: string) => {
+    const matched = teams.filter(t => t.age_group.toLowerCase() === ag.toLowerCase() || t.age_group === 'all')
+    return matched.length > 0 ? matched : teams  // fallback: show all teams
+  }
 
   // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -669,12 +697,41 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
               background: 'rgba(232,112,96,0.08)', color: '#E87060', fontSize: '12px', cursor: 'pointer',
             }}>Revoke</button>
           )}
+          {compareIds.length >= 2 && (
+            <button onClick={() => setShowCompare(true)} style={{
+              padding: '7px 14px', borderRadius: '6px',
+              border: '0.5px solid rgba(232,160,32,0.5)',
+              background: 'rgba(232,160,32,0.12)', color: 'var(--accent)',
+              fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+            }}>Compare {compareIds.length}</button>
+          )}
+          {compareIds.length > 0 && (
+            <button onClick={() => setCompareIds([])} style={{
+              padding: '7px 10px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.dim, fontSize: '12px', cursor: 'pointer',
+            }}>Clear</button>
+          )}
           <button onClick={exportCsv} style={{
             padding: '7px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
           }}>↓ CSV</button>
         </div>
       </div>
+
+      {/* ── No teams warning ── */}
+      {teams.length === 0 && (
+        <div style={{
+          marginBottom: '1rem', padding: '10px 14px', borderRadius: '8px',
+          background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
+          fontSize: '12px', color: 'var(--accent)',
+          display: 'flex', alignItems: 'center', gap: '10px',
+        }}>
+          <span>⚠ No teams set up yet — the assignment dropdown will be empty.</span>
+          <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
+            Set up teams →
+          </Link>
+        </div>
+      )}
 
       {/* ── Summary chips ── */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
@@ -758,8 +815,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
             <thead>
               {/* ── Section header row ── */}
               <tr style={{ borderBottom: 'none' }}>
-                {/* Sticky columns - no section label */}
-                <th colSpan={2} style={{ ...th, top: 0, zIndex: 4, borderBottom: 'none', padding: '4px 8px' }} />
+                {/* Sticky columns - no section label (includes checkbox col) */}
+                <th colSpan={3} style={{ ...th, top: 0, zIndex: 4, borderBottom: 'none', padding: '4px 8px' }} />
                 {/* Combined */}
                 <th colSpan={2} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
@@ -788,6 +845,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
               {/* ── Column header row ── */}
               <tr>
+                {/* Compare checkbox */}
+                <th style={{ ...th, width: '28px', minWidth: '28px', padding: '6px 4px', cursor: 'default' }} />
                 {/* Sticky: Team */}
                 <th style={{ ...stickyTeamTh, width: `${TEAM_W}px`, minWidth: `${TEAM_W}px` }}
                   onClick={() => toggleSort('team')}>
@@ -871,7 +930,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   <>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
-                        <td colSpan={20} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={21} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -882,7 +941,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                     )}
                     {showWhiteLine && (
                       <tr key={`cut-w-${idx}`}>
-                        <td colSpan={20} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={21} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -893,6 +952,18 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                     )}
 
                     <tr key={row.player.id} style={{ borderLeft: `3px solid ${borderC}`, background: rowBg }}>
+
+                      {/* ── Compare checkbox ── */}
+                      <td style={{ ...td, padding: '7px 4px', textAlign: 'center', width: '28px' }}>
+                        <input
+                          type="checkbox"
+                          checked={compareIds.includes(row.player.id)}
+                          onChange={() => toggleCompare(row.player.id)}
+                          title={compareIds.length >= 4 && !compareIds.includes(row.player.id) ? 'Max 4 players' : 'Compare'}
+                          disabled={compareIds.length >= 4 && !compareIds.includes(row.player.id)}
+                          style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+                        />
+                      </td>
 
                       {/* ── Next Season Team (sticky) ── */}
                       <td style={{ ...stickyTeamTd, background: rowBg !== 'transparent' ? 'var(--bg)' : 'var(--bg)', width: `${TEAM_W}px` }}>
@@ -1045,6 +1116,17 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ── Player Compare modal ── */}
+      {showCompare && compareIds.length >= 2 && (
+        <PlayerCompare
+          players={compareIds.map(id => ranked.find(r => r.player.id === id)!).filter(Boolean)}
+          gcRows={gcRows}
+          teams={teams}
+          ranked={ranked}
+          onClose={() => setShowCompare(false)}
+        />
       )}
 
       {/* ── Player Card panel ── */}

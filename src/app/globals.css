@@ -191,6 +191,11 @@ html[data-theme="light"] {
 .fairness-desktop-table { display: none; }
 .fairness-mobile-cards  { display: block; }
 
+/* ── Tryout full-screen mode (team making page) ── */
+/* Hides the sidebar so the wide data table can use the full viewport */
+body.tryout-fullscreen .sidebar      { display: none !important; }
+body.tryout-fullscreen .app-content  { margin-left: 0 !important; }
+
 /* ── Standalone eval form (public coach link) ── */
 /* Hides all Six43 chrome so the page is a clean org-branded experience */
 body.eval-standalone .sidebar,
