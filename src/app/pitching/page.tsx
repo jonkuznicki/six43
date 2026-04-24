@@ -68,6 +68,7 @@ export default function PitchingPage() {
   const [addPitcherInnings, setAddPitcherInnings]     = useState('1')
   const [addPitcherPitches, setAddPitcherPitches]     = useState('')
   const [addPitcherSaving, setAddPitcherSaving]       = useState(false)
+  const [addPitcherError, setAddPitcherError]         = useState<string | null>(null)
   const [pitchingView, setPitchingView] = useState<'grid' | 'planner'>(() =>
     typeof window !== 'undefined'
       ? (localStorage.getItem('six43_pitching_view') as 'grid' | 'planner' | null) ?? 'planner'
@@ -328,24 +329,38 @@ export default function PitchingPage() {
     const innings = parseInt(addPitcherInnings) || 1
     const pitches = addPitcherPitches === '' ? null : parseInt(addPitcherPitches)
     setAddPitcherSaving(true)
-    const { data, error } = await supabase
+    setAddPitcherError(null)
+
+    // Insert first (join in .select() can silently return null even on success)
+    const { data: insertData, error: insertError } = await supabase
       .from('game_extra_pitchers')
       .insert({ game_id: gameId, player_id: addPitcherPlayerId, innings, pitch_count: pitches })
-      .select('id, player_id, innings, pitch_count, player:players(first_name, last_name, jersey_number)')
+      .select('id')
       .single()
+
     setAddPitcherSaving(false)
-    if (error || !data) return
+
+    if (insertError) {
+      setAddPitcherError(insertError.message)
+      return
+    }
+
+    const newId = insertData?.id ?? `tmp-${Date.now()}`
+    const playerObj = players.find(pl => pl.id === addPitcherPlayerId)
+
     setActualPitching(prev => ({
       ...prev,
       [gameId]: [...(prev[gameId] ?? []), {
-        player: data.player,
-        playerId: data.player_id,
-        slotId: `extra-${data.id}`,
-        innings: data.innings,
-        pitchCount: data.pitch_count ?? null,
+        player: playerObj
+          ? { first_name: playerObj.first_name, last_name: playerObj.last_name, jersey_number: playerObj.jersey_number }
+          : null,
+        playerId: addPitcherPlayerId,
+        slotId: `extra-${newId}`,
+        innings,
+        pitchCount: pitches,
         firstInning: 999,
         isExtra: true,
-        extraId: data.id,
+        extraId: newId,
       }],
     }))
     setAddingPitcherGameId(null)
@@ -782,6 +797,9 @@ export default function PitchingPage() {
                   />
                 </div>
               </div>
+              {addPitcherError && (
+                <div style={{ fontSize: '11px', color: '#E87070', marginTop: 4 }}>Error: {addPitcherError}</div>
+              )}
               <div style={{ display: 'flex', gap: '8px', marginTop: 2 }}>
                 <button
                   onClick={() => addExtraPitcher(game.id)}
@@ -796,7 +814,7 @@ export default function PitchingPage() {
                   {addPitcherSaving ? 'Saving…' : 'Add'}
                 </button>
                 <button
-                  onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+                  onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches(''); setAddPitcherError(null) }}
                   style={{
                     padding: '8px 14px', borderRadius: '7px', cursor: 'pointer',
                     border: '0.5px solid var(--border-md)', background: 'transparent',
@@ -1010,6 +1028,9 @@ export default function PitchingPage() {
                                   onChange={e => setAddPitcherPitches(e.target.value.replace(/\D/g, ''))}
                                   style={{ ...CELL_SEL, textAlign: 'center' }} />
                               </div>
+                              {addPitcherError && (
+                                <div style={{ fontSize: '11px', color: '#E87070', width: '100%' }}>Error: {addPitcherError}</div>
+                              )}
                               <button
                                 onClick={() => addExtraPitcher(game.id)}
                                 disabled={!addPitcherPlayerId || addPitcherSaving}
@@ -1023,7 +1044,7 @@ export default function PitchingPage() {
                                 {addPitcherSaving ? 'Saving…' : 'Add'}
                               </button>
                               <button
-                                onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches('') }}
+                                onClick={() => { setAddingPitcherGameId(null); setAddPitcherPlayerId(''); setAddPitcherInnings('1'); setAddPitcherPitches(''); setAddPitcherError(null) }}
                                 style={{
                                   padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
                                   border: '0.5px solid var(--border-md)', background: 'transparent',
