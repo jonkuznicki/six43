@@ -13,10 +13,11 @@ interface EvalField {
 }
 
 interface Submission {
-  team_label:  string
-  coach_name:  string | null
-  submitted_at: string | null
-  player_count: number
+  team_label:    string
+  coach_name:    string | null
+  submitted_at:  string | null
+  player_count:  number
+  overall_notes: string | null
 }
 
 interface Player {
@@ -28,11 +29,10 @@ interface Player {
 }
 
 interface Season {
-  id:               string
-  label:            string
-  year:             number
-  age_groups:       string[]
-  eval_share_token: string | null
+  id:         string
+  label:      string
+  year:       number
+  age_groups: string[]
 }
 
 interface EvalMeta {
@@ -116,10 +116,16 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [ageFilter,   setAgeFilter]   = useState('all')
   const [teamFilter,  setTeamFilter]  = useState('')
 
-  // Share token
-  const [shareToken,  setShareToken]  = useState<string | null>(null)
-  const [shareBusy,   setShareBusy]   = useState(false)
-  const [shareCopied, setShareCopied] = useState(false)
+  // Per-team link management
+  const [newTeamLabel, setNewTeamLabel] = useState('')
+
+  // Admin edit of submission notes
+  const [editingTeam,     setEditingTeam]     = useState<string | null>(null)
+  const [editingTeamText, setEditingTeamText] = useState('')
+  const [savingTeamNote,  setSavingTeamNote]  = useState(false)
+  const [editingPlayerNote,     setEditingPlayerNote]     = useState<string | null>(null)
+  const [editingPlayerNoteText, setEditingPlayerNoteText] = useState('')
+  const [savingPlayerNote,      setSavingPlayerNote]      = useState(false)
 
   // Keyboard-driven cell selection
   const [selected, setSelected] = useState<{ rowIdx: number; colIdx: number } | null>(null)
@@ -153,13 +159,12 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       { data: memberData },
       { data: orgData },
     ] = await Promise.all([
-      supabase.from('tryout_seasons').select('id, label, year, age_groups, eval_share_token').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
+      supabase.from('tryout_seasons').select('id, label, year, age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
       user ? supabase.from('tryout_org_members').select('id, name, email, role').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
       user ? supabase.from('tryout_orgs').select('admin_user_id').eq('id', params.orgId).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
     setSeason(seasonData)
-    setShareToken(seasonData?.eval_share_token ?? null)
 
     // Try fetching with weight column; fall back without it if column not yet migrated
     let rawFields: any[] | null = null
@@ -196,7 +201,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: evalData }, { data: playerData }] = await Promise.all([
+    const [{ data: evalData }, { data: playerData }, { data: submissionData }] = await Promise.all([
       supabase.from('tryout_coach_evals')
         .select('player_id, coach_name, team_label, season_year, status, scores, comments, submitted_at')
         .eq('org_id', params.orgId)
@@ -205,6 +210,9 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
         .select('id, first_name, last_name, age_group, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true)
         .order('last_name').order('first_name'),
+      supabase.from('tryout_coach_eval_submissions')
+        .select('team_label, overall_notes')
+        .eq('org_id', params.orgId),
     ])
 
     setPlayers(playerData ?? [])
@@ -222,6 +230,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setEvalMeta(meta)
 
     // Build submission summary: one row per team that has submitted evals
+    const overallNotesMap = new Map((submissionData ?? []).map((s: any) => [s.team_label, s.overall_notes as string | null]))
     const submittedEvs = (evalData ?? []).filter((e: any) => e.status === 'submitted')
     const subMap = new Map<string, { coach: string | null; at: string | null; count: number }>()
     for (const ev of submittedEvs) {
@@ -233,6 +242,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     }
     setSubmissions(Array.from(subMap.entries()).map(([team, v]) => ({
       team_label: team, coach_name: v.coach, submitted_at: v.at, player_count: v.count,
+      overall_notes: overallNotesMap.get(team) ?? null,
     })).sort((a, b) => (b.submitted_at ?? '').localeCompare(a.submitted_at ?? '')))
 
     // Load existing team tokens if season is available
@@ -383,23 +393,39 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setSaving(false)
   }
 
-  async function handleShare(action: 'generate' | 'revoke') {
+  async function saveTeamOverallNotes(teamLabel: string) {
     if (!season) return
-    setShareBusy(true)
-    const res = await fetch('/api/tryouts/eval-share', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seasonId: season.id, orgId: params.orgId, action }),
-    })
-    const data = await res.json()
-    setShareToken(data.token ?? null)
-    setShareBusy(false)
+    setSavingTeamNote(true)
+    await supabase.from('tryout_coach_eval_submissions').upsert({
+      org_id:      params.orgId,
+      season_year: String(evalYear),
+      team_label:  teamLabel,
+      overall_notes: editingTeamText.trim() || null,
+    }, { onConflict: 'org_id,season_year,team_label' })
+    setSubmissions(prev => prev.map(s =>
+      s.team_label === teamLabel ? { ...s, overall_notes: editingTeamText.trim() || null } : s
+    ))
+    setEditingTeam(null)
+    setSavingTeamNote(false)
   }
 
-  function copyShareLink() {
-    if (!shareToken) return
-    navigator.clipboard.writeText(`${window.location.origin}/tryouts/eval/${shareToken}`)
-    setShareCopied(true)
-    setTimeout(() => setShareCopied(false), 2000)
+  async function savePlayerNote(player: Player) {
+    if (!season) return
+    setSavingPlayerNote(true)
+    const text = editingPlayerNoteText.trim() || null
+    await supabase.from('tryout_coach_evals').upsert({
+      player_id:   player.id,
+      org_id:      params.orgId,
+      season_year: String(evalYear),
+      team_label:  player.prior_team ?? '',
+      coach_name:  evalMeta[player.id]?.coach_name ?? myName || 'Admin',
+      status:      evalMeta[player.id]?.status ?? 'draft',
+      scores:      gridScores[player.id] ?? {},
+      comments:    text,
+    }, { onConflict: 'player_id,org_id,season_year' })
+    setEvalMeta(prev => ({ ...prev, [player.id]: { ...(prev[player.id] ?? { status: 'draft', coach_name: null, submitted_at: null }), comments: text } }))
+    setEditingPlayerNote(null)
+    setSavingPlayerNote(false)
   }
 
   async function generateTeamToken(teamLabel: string, regenerate: boolean) {
@@ -518,60 +544,28 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
         </div>
       </div>
 
-      {/* How this works */}
-      <div style={{ fontSize: '13px', color: s.muted, marginBottom: '1.5rem', lineHeight: 1.6 }}>
-        Coaches submit evaluations through a shared form link — no account required.
-        Generate a link below and send it to each coach (or per-team links for locked rosters).
-        Submitted evals appear in the grid automatically.
-      </div>
-
-      {/* Share link — admin only */}
-      {isAdmin && season && (
-        <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Coach eval form link</div>
-          <div style={{ fontSize: '12px', color: s.muted, marginBottom: '12px' }}>
-            Send this to coaches — they pick their team, rate players (1–5), and submit without an account.
-          </div>
-          {shareToken ? (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <code style={{ fontSize: '11px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '5px 10px', color: s.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {typeof window !== 'undefined' ? `${window.location.origin}/tryouts/eval/${shareToken}` : `/tryouts/eval/${shareToken}`}
-              </code>
-              <button onClick={copyShareLink} style={{ padding: '6px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: shareCopied ? 'rgba(109,184,117,0.12)' : 'var(--bg-input)', color: shareCopied ? '#6DB875' : s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                {shareCopied ? '✓ Copied' : '⎘ Copy'}
-              </button>
-              <button onClick={() => handleShare('revoke')} disabled={shareBusy} style={{ padding: '6px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}>Revoke</button>
-            </div>
-          ) : (
-            <button onClick={() => handleShare('generate')} disabled={shareBusy}
-              style={{ padding: '8px 18px', borderRadius: '7px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: shareBusy ? 0.6 : 1 }}>
-              {shareBusy ? 'Generating…' : 'Generate eval form link'}
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Team eval links — admin only */}
       {isAdmin && season && (() => {
-        const teams = Array.from(new Set(players.map(p => p.prior_team).filter(Boolean) as string[]))
+        const teamsFromPlayers = new Set(players.map(p => p.prior_team).filter(Boolean) as string[])
+        const teamsFromTokens  = new Set(Object.keys(teamTokens))
+        const teams = Array.from(new Set([...teamsFromPlayers, ...teamsFromTokens]))
           .sort((a, b) => {
             const na = parseInt(a.match(/^(\d+)/)?.[1] ?? '999')
             const nb = parseInt(b.match(/^(\d+)/)?.[1] ?? '999')
             return na !== nb ? na - nb : a.localeCompare(b)
           })
-        if (teams.length === 0) return null
         return (
           <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Team eval links</div>
             <div style={{ fontSize: '12px', color: s.muted, marginBottom: '12px' }}>
-              Each team gets a unique link that locks the form to their roster. Copy and send directly to the coach.
+              Each link locks the form to that team's roster. Copy and send to the coach — no account required.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {teams.map(team => {
-                const token = teamTokens[team]
-                const isBusy = tokenBusy === team
+                const token   = teamTokens[team]
+                const isBusy  = tokenBusy === team
                 const isCopied = copiedTeam === team
-                const link = token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/tryouts/eval/team/${token}` : null
+                const link    = token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/tryouts/eval/team/${token}` : null
                 return (
                   <div key={team} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-card-alt)', border: '0.5px solid var(--border-subtle)' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '90px' }}>{team}</span>
@@ -595,6 +589,25 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                   </div>
                 )
               })}
+
+              {/* Add a new team manually */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', paddingTop: '8px', borderTop: '0.5px solid var(--border)' }}>
+                <input
+                  type="text"
+                  value={newTeamLabel}
+                  onChange={e => setNewTeamLabel(e.target.value)}
+                  placeholder="New team name (e.g. 12U Gold)"
+                  onKeyDown={e => { if (e.key === 'Enter' && newTeamLabel.trim()) { generateTeamToken(newTeamLabel.trim(), false); setNewTeamLabel('') } }}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '7px 12px', fontSize: '13px', color: 'var(--fg)' }}
+                />
+                <button
+                  onClick={() => { if (newTeamLabel.trim()) { generateTeamToken(newTeamLabel.trim(), false); setNewTeamLabel('') } }}
+                  disabled={!newTeamLabel.trim() || !!tokenBusy}
+                  style={{ padding: '7px 16px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, opacity: !newTeamLabel.trim() ? 0.5 : 1 }}
+                >
+                  + Add team
+                </button>
+              </div>
             </div>
           </div>
         )
@@ -609,20 +622,68 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
               {submissions.length} team{submissions.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {submissions.map(sub => (
-              <div key={sub.team_label} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '7px 10px', borderRadius: '8px', background: 'rgba(109,184,117,0.06)', border: '0.5px solid rgba(109,184,117,0.2)' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, flex: 1 }}>{sub.team_label}</span>
-                {sub.coach_name && <span style={{ fontSize: '12px', color: s.muted }}>{sub.coach_name}</span>}
-                <span style={{ fontSize: '11px', color: s.dim }}>{sub.player_count} player{sub.player_count !== 1 ? 's' : ''}</span>
-                {sub.submitted_at && (
-                  <span style={{ fontSize: '11px', color: s.dim }}>
-                    {new Date(sub.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
-                <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {submissions.map(sub => {
+              const isEditing = editingTeam === sub.team_label
+              return (
+                <div key={sub.team_label} style={{ borderRadius: '8px', background: 'rgba(109,184,117,0.06)', border: '0.5px solid rgba(109,184,117,0.2)', overflow: 'hidden' }}>
+                  {/* Summary row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, flex: 1 }}>{sub.team_label}</span>
+                    {sub.coach_name && <span style={{ fontSize: '12px', color: s.muted }}>{sub.coach_name}</span>}
+                    <span style={{ fontSize: '11px', color: s.dim }}>{sub.player_count} player{sub.player_count !== 1 ? 's' : ''}</span>
+                    {sub.submitted_at && (
+                      <span style={{ fontSize: '11px', color: s.dim }}>
+                        {new Date(sub.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                    <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          if (isEditing) { setEditingTeam(null) }
+                          else { setEditingTeam(sub.team_label); setEditingTeamText(sub.overall_notes ?? '') }
+                        }}
+                        style={{ padding: '3px 10px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                      >
+                        {isEditing ? 'Cancel' : '✎ Edit notes'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Overall notes display (when not editing) */}
+                  {!isEditing && sub.overall_notes && (
+                    <div style={{ padding: '0 10px 10px', fontSize: '12px', color: s.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', borderTop: '0.5px solid rgba(109,184,117,0.15)', paddingTop: '8px' }}>
+                      {sub.overall_notes}
+                    </div>
+                  )}
+
+                  {/* Edit panel */}
+                  {isEditing && (
+                    <div style={{ padding: '0 10px 10px', borderTop: '0.5px solid rgba(109,184,117,0.2)' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, margin: '8px 0 6px' }}>Overall season notes</div>
+                      <textarea
+                        value={editingTeamText}
+                        onChange={e => setEditingTeamText(e.target.value)}
+                        placeholder="Coach's overall season notes…"
+                        rows={3}
+                        style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '7px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', fontFamily: 'inherit', lineHeight: 1.5, resize: 'vertical', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          onClick={() => saveTeamOverallNotes(sub.team_label)}
+                          disabled={savingTeamNote}
+                          style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: savingTeamNote ? 0.6 : 1 }}
+                        >
+                          {savingTeamNote ? 'Saving…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingTeam(null)} style={{ padding: '6px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -883,12 +944,30 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
                     {/* Notes cell */}
                     <td style={{ padding: '4px 8px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', borderLeft: '0.5px solid var(--border)', minWidth: '160px', maxWidth: '260px' }}>
-                      {note ? (
-                        <button onClick={() => setExpandedNote(noteOpen ? null : player.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                      {editingPlayerNote === player.id ? (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                          <textarea
+                            autoFocus
+                            value={editingPlayerNoteText}
+                            onChange={e => setEditingPlayerNoteText(e.target.value)}
+                            rows={2}
+                            style={{ flex: 1, background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '4px 8px', fontSize: '12px', color: 'var(--fg)', fontFamily: 'inherit', resize: 'vertical' }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flexShrink: 0 }}>
+                            <button onClick={() => savePlayerNote(player)} disabled={savingPlayerNote} style={{ padding: '3px 8px', borderRadius: '4px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                              {savingPlayerNote ? '…' : '✓'}
+                            </button>
+                            <button onClick={() => setEditingPlayerNote(null)} style={{ padding: '3px 8px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', cursor: 'pointer' }}>✕</button>
+                          </div>
+                        </div>
+                      ) : note ? (
+                        <button onClick={() => { setExpandedNote(noteOpen ? null : player.id) }} onDoubleClick={() => { setEditingPlayerNote(player.id); setEditingPlayerNoteText(note ?? '') }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                           <span style={{ fontSize: '12px', color: noteOpen ? 'var(--fg)' : s.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
                             {note}
                           </span>
                         </button>
+                      ) : isAdmin ? (
+                        <button onClick={() => { setEditingPlayerNote(player.id); setEditingPlayerNoteText('') }} style={{ fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontStyle: 'italic' }}>+ add note</button>
                       ) : (
                         <span style={{ fontSize: '11px', color: s.dim, fontStyle: 'italic' }}>—</span>
                       )}
