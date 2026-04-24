@@ -47,19 +47,20 @@ const SECTIONS = [
     color: 'rgba(80,160,232,0.05)',
     items: [
       { href: 'imports?type=registration', label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
-      { href: 'imports?type=gc_stats',    label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats per team' },
-      { href: 'coach-evals', label: 'Coach Evaluations',    icon: '📝', desc: 'Send eval forms to coaches and review submissions' },
-      { href: 'data-hub',    label: 'Data Hub',             icon: '⊞',  desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
-      { href: 'readiness',   label: 'Readiness Check',      icon: '✓',  desc: 'Confirm all data sources are complete before tryouts begin' },
+      { href: 'imports?type=rosters',      label: 'Import Rosters',       icon: '📁', desc: 'Upload current season rosters to assign players to teams' },
+      { href: 'imports?type=gc_stats',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats per team' },
+      { href: 'data-hub',  label: 'Data Hub',      icon: '⊞', desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
+      { href: 'readiness', label: 'Readiness Check', icon: '✓', desc: 'Confirm all data sources are complete before tryouts begin' },
     ],
   },
   {
     step:  3,
     label: 'Tryouts',
-    desc:  'Create sessions, check in players as they arrive, and collect evaluator scores in real time.',
+    desc:  'Create sessions, check in players as they arrive, collect evaluator scores, and gather season evaluations from coaches.',
     color: 'rgba(232,160,32,0.05)',
     items: [
-      { href: 'sessions', label: 'Sessions', icon: '🗓', desc: 'Set up sessions, assign evaluators, check in players, and enter scores' },
+      { href: 'sessions',    label: 'Sessions',                          icon: '🗓', desc: 'Set up sessions, assign evaluators, check in players, and enter scores' },
+      { href: 'coach-evals', label: 'Season Evaluations & Tryout Scores', icon: '📝', desc: 'Send eval forms to coaches and review submitted evaluations' },
     ],
   },
   {
@@ -144,13 +145,13 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
     if (!stats) return null
     const badges: { label: string; accent?: boolean }[] = []
     if (step === 2) {
-      if (stats.players > 0)         badges.push({ label: `${stats.players} player${stats.players !== 1 ? 's' : ''}` })
-      if (stats.regCount > 0)        badges.push({ label: `${stats.regCount} registered` })
-      if (stats.evalsSubmitted > 0)  badges.push({ label: `${stats.evalsSubmitted} eval${stats.evalsSubmitted !== 1 ? 's' : ''}` })
+      if (stats.players > 0)   badges.push({ label: `${stats.players} player${stats.players !== 1 ? 's' : ''}` })
+      if (stats.regCount > 0)  badges.push({ label: `${stats.regCount} registered` })
     }
     if (step === 3) {
-      if (stats.sessions > 0)        badges.push({ label: `${stats.sessions} session${stats.sessions !== 1 ? 's' : ''}` })
-      if (stats.openSessions > 0)    badges.push({ label: `${stats.openSessions} open now`, accent: true })
+      if (stats.sessions > 0)       badges.push({ label: `${stats.sessions} session${stats.sessions !== 1 ? 's' : ''}` })
+      if (stats.openSessions > 0)   badges.push({ label: `${stats.openSessions} open now`, accent: true })
+      if (stats.evalsSubmitted > 0) badges.push({ label: `${stats.evalsSubmitted} eval${stats.evalsSubmitted !== 1 ? 's' : ''}` })
     }
     if (step === 4) {
       if (stats.playersScored > 0)   badges.push({ label: `${stats.playersScored} scored` })
@@ -184,7 +185,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                 )}
                 {stats.evalsSubmitted > 0 && (
                   <span style={{ fontSize: '11px', color: s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
-                    {stats.evalsSubmitted} coach eval{stats.evalsSubmitted !== 1 ? 's' : ''}
+                    {stats.evalsSubmitted} eval{stats.evalsSubmitted !== 1 ? 's' : ''}
                   </span>
                 )}
                 {stats.sessions > 0 && (

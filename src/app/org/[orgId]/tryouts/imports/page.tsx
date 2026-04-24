@@ -92,6 +92,28 @@ const MODE_CONFIG: Record<string, {
       </div>
     ),
   },
+  rosters: {
+    heading:    'Import Season Rosters',
+    subheading: 'Upload your current season rosters to assign players to their teams.',
+    formatNote: (
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '6px' }}>Expected columns</div>
+        <div style={{ lineHeight: 1.8 }}>
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>First Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Last Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>DOB</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Team</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Jersey #</span>{' (optional)'}
+        </div>
+        <div style={{ marginTop: '8px', lineHeight: 1.8 }}>
+          <strong>What this does:</strong> Sets each player's current team assignment (Prior Team),
+          which drives coach eval forms — coaches see exactly their team's roster.
+          You can upload one file per team or a single combined file.
+        </div>
+        <div style={{ marginTop: '8px', opacity: 0.7 }}>Accepts .xlsx, .xls, or .csv · Players must be imported via Registrations first</div>
+      </div>
+    ),
+  },
 }
 
 function ImportsInner({ params }: { params: { orgId: string } }) {
@@ -99,7 +121,7 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
   const router        = useRouter()
   const fileRef       = useRef<HTMLInputElement>(null)
   const searchParams  = useSearchParams()
-  const typeParam     = searchParams.get('type') as 'registration' | 'gc_stats' | null
+  const typeParam     = searchParams.get('type') as 'registration' | 'gc_stats' | 'rosters' | null
 
   // In focused mode, uploadType is fixed. In generic mode, user can switch.
   const [jobs,           setJobs]           = useState<ImportJob[]>([])
@@ -174,6 +196,7 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
     const endpoint =
       uploadType === 'registration' ? '/api/tryouts/imports/registration' :
       uploadType === 'gc_stats'     ? '/api/tryouts/imports/gc-stats'      :
+      uploadType === 'rosters'      ? '/api/tryouts/imports/roster'        :
                                       '/api/tryouts/imports/registration'
 
     const res = await fetch(endpoint, { method: 'POST', body: formData })
@@ -213,7 +236,11 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
 
   // In focused mode, only show history for this import type
   const visibleJobs = typeParam
-    ? jobs.filter(j => j.type === (typeParam === 'gc_stats' ? 'gc_stats' : 'registration'))
+    ? jobs.filter(j => j.type === (
+        typeParam === 'gc_stats' ? 'gc_stats' :
+        typeParam === 'rosters'  ? 'roster'   :
+        'registration'
+      ))
     : jobs
 
   return (
