@@ -199,38 +199,52 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
   async function loadData() {
     const { data: seasonData } = await supabase.from('tryout_seasons').select('id,year,age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
-    setSeasonId(seasonData?.id ?? null)
-    setSeasonYear(seasonData?.year ?? null)
+    const sid   = seasonData?.id   ?? null
+    const syear = seasonData?.year ?? null
+    setSeasonId(sid)
+    setSeasonYear(syear)
     setSeasonAgeGroups(seasonData?.age_groups ?? [])
+
+    // Get session IDs for the active season so we can filter tryout_scores
+    const sessionIds: string[] = []
+    if (sid) {
+      const { data: sessions } = await supabase.from('tryout_sessions').select('id').eq('season_id', sid)
+      sessionIds.push(...(sessions ?? []).map((s: any) => s.id))
+    }
 
     const [
       { data: playerData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: scoreData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
-      supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('org_id', params.orgId),
-      supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId),
-      supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('status', 'submitted'),
-      supabase.from('tryout_scores').select('player_id').eq('org_id', params.orgId),
+      sid
+        ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('season_id', sid)
+        : Promise.resolve({ data: [] as any[] }),
+      syear
+        ? supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear))
+        : Promise.resolve({ data: [] as any[] }),
+      sid
+        ? supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('season_id', sid).eq('status', 'submitted')
+        : Promise.resolve({ data: [] as any[] }),
+      sessionIds.length > 0
+        ? supabase.from('tryout_scores').select('player_id').in('session_id', sessionIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
 
-    // Load registration staging for the whole org (not season-filtered) so data
-    // shows even if the import season doesn't match the current active season.
-    // Try with preferred_tryout_date first; fall back without it if the column
-    // hasn't been migrated yet (migration 051).
+    // Registration staging — season-scoped
     let regData: any[] = []
-    {
+    if (sid) {
       const { data, error } = await supabase
         .from('tryout_registration_staging')
         .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org')
-        .eq('org_id', params.orgId)
+        .eq('season_id', sid)
       if (!error) {
         regData = data ?? []
       } else {
         const { data: fallback } = await supabase
           .from('tryout_registration_staging')
           .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,grade,school,prior_org')
-          .eq('org_id', params.orgId)
+          .eq('season_id', sid)
         regData = fallback ?? []
       }
     }
@@ -310,25 +324,33 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     await loadData()
   }
 
-  async function lazyLoad(target: 'gc' | 'evals' | 'scores') {
+  async function lazyLoad(target: 'gc' | 'evals' | 'scores', sid = seasonId, syear = seasonYear) {
     setLazyLoading(true)
     if (target === 'gc') {
-      const { data } = await supabase
+      const q = supabase
         .from('tryout_gc_stats')
         .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score')
         .eq('org_id', params.orgId)
+      const { data } = syear ? await q.eq('season_year', String(syear)) : await q
       setGcFull(data ?? [])
     }
     if (target === 'evals') {
+      const evalQ = supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('status', 'submitted')
+      const cfgQ  = supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order')
       const [{ data: fields }, { data: evals }] = await Promise.all([
-        supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order'),
-        supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('status', 'submitted'),
+        sid ? cfgQ.eq('season_id', sid) : cfgQ,
+        sid ? evalQ.eq('season_id', sid) : evalQ,
       ])
       setEvalFields((fields ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
       setEvalFull(evals ?? [])
     }
     if (target === 'scores') {
-      const { data } = await supabase.from('tryout_scores').select('player_id,tryout_score,evaluator_name,session_id').eq('org_id', params.orgId)
+      if (!sid) { setScoresFull([]); setLazyLoading(false); return }
+      const { data: sessions } = await supabase.from('tryout_sessions').select('id').eq('season_id', sid)
+      const sids = (sessions ?? []).map((s: any) => s.id)
+      const { data } = sids.length > 0
+        ? await supabase.from('tryout_scores').select('player_id,tryout_score,evaluator_name,session_id').in('session_id', sids)
+        : { data: [] as any[] }
       setScoresFull(data ?? [])
     }
     setLazyLoading(false)
