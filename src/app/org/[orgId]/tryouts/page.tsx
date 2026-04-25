@@ -70,6 +70,7 @@ const SECTIONS = [
     color: 'rgba(109,184,117,0.05)',
     items: [
       { href: 'rankings', label: 'Team Making', icon: '🏆', desc: 'Assign players to teams using scores, evals, and coach comments' },
+      { href: 'teams',    label: 'Teams',       icon: '⚾',  desc: 'View and manage teams and their assigned rosters' },
     ],
   },
 ]
