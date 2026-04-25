@@ -37,6 +37,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
   const [form,      setForm]      = useState(BLANK_FORM)
   const [editId,    setEditId]    = useState<string | null>(null)
   const [saving,    setSaving]    = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [ageFilter, setAgeFilter] = useState('all')
 
   useEffect(() => { loadData() }, [])
@@ -68,21 +69,23 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
   async function saveTeam() {
     if (!season || !form.name.trim() || !form.age_group) return
     setSaving(true)
+    setSaveError(null)
 
     if (editId) {
-      await supabase.from('tryout_teams').update({
+      const { error } = await supabase.from('tryout_teams').update({
         name: form.name.trim(), age_group: form.age_group, color: form.color,
       }).eq('id', editId)
-      setTeams(prev => prev.map(t => t.id === editId ? { ...t, ...form, name: form.name.trim() } : t))
+      if (error) { setSaveError(error.message); setSaving(false); return }
     } else {
-      const { data } = await supabase.from('tryout_teams').insert({
+      const { error } = await supabase.from('tryout_teams').insert({
         org_id: params.orgId, season_id: season.id,
         name: form.name.trim(), age_group: form.age_group, color: form.color,
         is_active: true,
-      }).select('id, name, age_group, color, is_active').single()
-      if (data) setTeams(prev => [...prev, { ...data, _playerCount: 0 }])
+      })
+      if (error) { setSaveError(error.message); setSaving(false); return }
     }
 
+    await loadData()
     setForm(BLANK_FORM)
     setEditId(null)
     setShowForm(false)
@@ -194,7 +197,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={saveTeam} disabled={saving || !form.name.trim() || !form.age_group} style={{
               padding: '8px 18px', borderRadius: '6px', border: 'none',
               background: 'var(--accent)', color: 'var(--accent-text)',
@@ -205,6 +208,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
               padding: '8px 18px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
               background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer',
             }}>Cancel</button>
+            {saveError && <span style={{ fontSize: '12px', color: '#E87060' }}>Error: {saveError}</span>}
           </div>
         </div>
       )}
