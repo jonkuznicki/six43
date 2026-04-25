@@ -9,7 +9,6 @@ interface Team {
   name:      string
   age_group: string
   color:     string | null
-  is_active: boolean
   _playerCount?: number
 }
 
@@ -51,7 +50,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
     if (!seasonData) { setLoading(false); return }
 
     const [{ data: teamData }, { data: assignData }] = await Promise.all([
-      supabase.from('tryout_teams').select('id, name, age_group, color, is_active')
+      supabase.from('tryout_teams').select('id, name, age_group, color')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('age_group').order('name'),
       supabase.from('tryout_team_assignments').select('team_id')
@@ -80,7 +79,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
       const { error } = await supabase.from('tryout_teams').insert({
         org_id: params.orgId, season_id: season.id,
         name: form.name.trim(), age_group: form.age_group, color: form.color,
-        is_active: true,
       })
       if (error) { setSaveError(error.message); setSaving(false); return }
     }
@@ -90,11 +88,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
     setEditId(null)
     setShowForm(false)
     setSaving(false)
-  }
-
-  async function toggleActive(team: Team) {
-    await supabase.from('tryout_teams').update({ is_active: !team.is_active }).eq('id', team.id)
-    setTeams(prev => prev.map(t => t.id === team.id ? { ...t, is_active: !t.is_active } : t))
   }
 
   function startEdit(team: Team) {
@@ -120,7 +113,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
 
   const ageGroups   = (season?.age_groups?.length ? season.age_groups : FALLBACK_AGE_GROUPS)
   const filtered    = teams.filter(t => ageFilter === 'all' || t.age_group === ageFilter)
-  const activeTeams = filtered.filter(t => t.is_active)
 
   // Group by age group for display
   const byAge = ageGroups.map(ag => ({
@@ -241,7 +233,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
                       display: 'flex', alignItems: 'center', gap: '12px',
                       background: 'var(--bg-card)', border: '0.5px solid var(--border)',
                       borderRadius: '10px', padding: '12px 14px',
-                      opacity: team.is_active ? 1 : 0.5,
                     }}>
                       {/* Color swatch */}
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: team.color ?? '#888', flexShrink: 0 }} />
@@ -249,7 +240,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
                         <div style={{ fontWeight: 700, fontSize: '14px' }}>{team.name}</div>
                         <div style={{ fontSize: '12px', color: s.dim, marginTop: '1px' }}>
                           {team._playerCount ?? 0} player{(team._playerCount ?? 0) !== 1 ? 's' : ''} assigned
-                          {!team.is_active && <span style={{ marginLeft: '8px', color: s.dim }}>· Inactive</span>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -263,11 +253,6 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
                           border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
                           color: s.muted, cursor: 'pointer',
                         }}>Edit</button>
-                        <button onClick={() => toggleActive(team)} style={{
-                          fontSize: '12px', padding: '4px 10px', borderRadius: '5px',
-                          border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
-                          color: s.dim, cursor: 'pointer',
-                        }}>{team.is_active ? 'Deactivate' : 'Activate'}</button>
                       </div>
                     </div>
                   ))}
