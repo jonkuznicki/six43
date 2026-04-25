@@ -211,8 +211,13 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
 
       {/* Team list grouped by age */}
       {teams.length === 0 && !showForm ? (
-        <div style={{ textAlign: 'center', padding: '4rem', color: s.dim, fontSize: '14px' }}>
-          No teams yet. Create teams here, then assign players from the Rankings page.
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: s.dim }}>
+          <div style={{ fontSize: '14px', marginBottom: '16px' }}>No teams yet for this season.</div>
+          <button onClick={() => { setShowForm(true); setEditId(null); setForm(BLANK_FORM) }} disabled={!season} style={{
+            padding: '10px 22px', borderRadius: '7px', border: 'none',
+            background: 'var(--accent)', color: 'var(--accent-text)',
+            fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+          }}>+ Create your first team</button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

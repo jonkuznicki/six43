@@ -772,9 +772,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           fontSize: '11px', color: 'var(--accent)',
           display: 'flex', alignItems: 'center', gap: '8px',
         }}>
-          <span>⚠ No teams set up yet — assignment dropdown will be empty.</span>
+          <span>⚠ No teams set up yet.</span>
           <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
-            Set up teams →
+            Create teams → (use the "+ New team" button)
           </Link>
         </div>
       )}
