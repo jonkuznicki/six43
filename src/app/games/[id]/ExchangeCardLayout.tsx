@@ -3,18 +3,10 @@ import { formatTime } from '../../../lib/formatTime'
 const NAVY = '#0B1F3A'
 const GOLD  = '#E8A020'
 
+// Only P and C get colour; all other positions print on white
 const POS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-  P:    { bg: '#FFF8E1', color: '#7a4800', border: '#e0c060' },
-  C:    { bg: '#FCE4EC', color: '#7a1040', border: '#d080a0' },
-  '1B': { bg: '#E3F2FD', color: '#1a3f7a', border: '#90b8e0' },
-  '2B': { bg: '#E3F2FD', color: '#1a3f7a', border: '#90b8e0' },
-  SS:   { bg: '#E3F2FD', color: '#1a3f7a', border: '#90b8e0' },
-  '3B': { bg: '#E3F2FD', color: '#1a3f7a', border: '#90b8e0' },
-  LF:   { bg: '#E8F5E9', color: '#1a5c20', border: '#80c880' },
-  CF:   { bg: '#E8F5E9', color: '#1a5c20', border: '#80c880' },
-  LC:   { bg: '#E8F5E9', color: '#1a5c20', border: '#80c880' },
-  RC:   { bg: '#E8F5E9', color: '#1a5c20', border: '#80c880' },
-  RF:   { bg: '#E8F5E9', color: '#1a5c20', border: '#80c880' },
+  P: { bg: '#FFF8E1', color: '#7a4800', border: '#e0c060' },
+  C: { bg: '#FCE4EC', color: '#7a1040', border: '#d080a0' },
 }
 
 export default function ExchangeCardLayout({ game, activeSlots, teamName }: {
@@ -115,29 +107,27 @@ export default function ExchangeCardLayout({ game, activeSlots, teamName }: {
           {activeSlots.map((slot: any, idx: number) => {
             const player = slot.player as any
             const pos: string | null = (slot.inning_positions ?? [])[0] ?? null
-            const ps = pos && pos !== 'Bench' ? POS_STYLE[pos] : null
-            const rowBg = idx % 2 === 0 ? '#fff' : '#fafbfc'
+            const ps = pos ? POS_STYLE[pos] : null
+            const isBench = pos === 'Bench'
             return (
-              <tr key={slot.id} style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties}>
-                <td style={{ ...cell, background: rowBg, color: '#aaa', fontSize: '10px', textAlign: 'center', fontWeight: 600 }}>
+              <tr key={slot.id}>
+                <td style={{ ...cell, background: '#fff', color: '#aaa', fontSize: '10px', textAlign: 'center', fontWeight: 600 }}>
                   {idx + 1}
                 </td>
-                <td style={{ ...cell, background: rowBg, color: '#555', textAlign: 'center', fontSize: '12px', fontWeight: 700 }}>
+                <td style={{ ...cell, background: '#fff', color: '#333', textAlign: 'center', fontSize: '12px', fontWeight: 700 }}>
                   {player?.jersey_number}
                 </td>
-                <td style={{ ...cell, background: rowBg, paddingLeft: '10px', fontSize: '13px', fontWeight: 600 }}>
+                <td style={{ ...cell, background: '#fff', paddingLeft: '10px', fontSize: '13px', fontWeight: 600 }}>
                   {player?.first_name} {player?.last_name}
                 </td>
                 <td style={{
                   ...cell,
                   textAlign: 'center', fontWeight: 800, fontSize: '13px',
-                  background: ps ? ps.bg : (pos === 'Bench' ? '#f0f0f0' : rowBg),
-                  color: ps ? ps.color : (pos === 'Bench' ? '#bbb' : '#ccc'),
+                  background: ps ? ps.bg : isBench ? '#f0f0f0' : '#fff',
+                  color: ps ? ps.color : isBench ? '#999' : '#333',
                   borderLeft: ps ? `2px solid ${ps.border}` : '1px solid #eee',
-                  WebkitPrintColorAdjust: 'exact',
-                  printColorAdjust: 'exact',
                 } as React.CSSProperties}>
-                  {pos === 'Bench' ? 'B' : (pos ?? '—')}
+                  {isBench ? 'B' : (pos ?? '—')}
                 </td>
               </tr>
             )

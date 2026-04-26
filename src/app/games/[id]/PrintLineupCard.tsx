@@ -7,18 +7,10 @@ function readUserNotes(raw: string | null): string {
   try { return JSON.parse(raw ?? '{}')._notes ?? '' } catch { return '' }
 }
 
+// Only P and C get colour; all other positions print on white
 const POS_STYLE: Record<string, { bg: string; color: string }> = {
-  P:    { bg: '#FFF8E1', color: '#7a4800' },
-  C:    { bg: '#FCE4EC', color: '#7a1040' },
-  '1B': { bg: '#E3F2FD', color: '#1a3f7a' },
-  '2B': { bg: '#E3F2FD', color: '#1a3f7a' },
-  SS:   { bg: '#E3F2FD', color: '#1a3f7a' },
-  '3B': { bg: '#E3F2FD', color: '#1a3f7a' },
-  LF:   { bg: '#E8F5E9', color: '#1a5c20' },
-  CF:   { bg: '#E8F5E9', color: '#1a5c20' },
-  LC:   { bg: '#E8F5E9', color: '#1a5c20' },
-  RC:   { bg: '#E8F5E9', color: '#1a5c20' },
-  RF:   { bg: '#E8F5E9', color: '#1a5c20' },
+  P: { bg: '#FFF8E1', color: '#7a4800' },
+  C: { bg: '#FCE4EC', color: '#7a1040' },
 }
 
 const NAVY = '#0B1F3A'
@@ -120,30 +112,30 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
         <tbody>
           {activeSlots.map((slot: any, idx: number) => {
             const player = slot.player as any
-            const rowBg = idx % 2 === 0 ? '#f7f8fa' : '#fff'
             return (
               <tr key={slot.id}>
-                <td style={{ ...cell, background: rowBg, color: '#999', fontSize: '10px', textAlign: 'center' }}>
+                <td style={{ ...cell, background: '#fff', color: '#999', fontSize: '10px', textAlign: 'center' }}>
                   {idx + 1}
                 </td>
-                <td style={{ ...cell, background: rowBg, color: '#555', fontWeight: 600, textAlign: 'center', fontSize: '11px' }}>
+                <td style={{ ...cell, background: '#fff', color: '#333', fontWeight: 700, textAlign: 'center', fontSize: '11px' }}>
                   {player?.jersey_number}
                 </td>
-                <td style={{ ...cell, background: rowBg, paddingLeft: '8px', fontSize: '13px', fontWeight: 600 }}>
+                <td style={{ ...cell, background: '#fff', paddingLeft: '8px', fontSize: '13px', fontWeight: 600 }}>
                   {player?.first_name} {player?.last_name}
                 </td>
                 {innings.map(i => {
                   const pos = slot.inning_positions[i]
                   const displayPos = pos === 'Bench' ? 'B' : (pos ?? '')
-                  const ps = pos && pos !== 'Bench' ? POS_STYLE[pos] : null
+                  const ps = pos ? POS_STYLE[pos] : null
+                  const isBench = pos === 'Bench'
                   return (
                     <td key={i} style={{
                       ...cell,
                       textAlign: 'center',
                       fontSize: '12px',
                       fontWeight: 800,
-                      background: ps ? ps.bg : (pos === 'Bench' ? '#f0f0f0' : rowBg),
-                      color: ps ? ps.color : (pos === 'Bench' ? '#aaa' : '#ccc'),
+                      background: ps ? ps.bg : isBench ? '#f0f0f0' : '#fff',
+                      color: ps ? ps.color : isBench ? '#999' : '#333',
                     }}>
                       {displayPos}
                     </td>
