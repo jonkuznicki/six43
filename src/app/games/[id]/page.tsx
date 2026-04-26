@@ -54,10 +54,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   const hasPositions = activeSlots.some((s: any) =>
     (s.inning_positions ?? []).some((p: string | null) => p !== null)
   )
-  // Always go through attendance unless positions are already set (editing existing lineup)
-  const lineupHref = hasPositions
-    ? `/games/${game.id}/lineup`
-    : `/games/${game.id}/attendance`
+  const lineupHref = `/games/${game.id}/lineup`
 
   return (
     <>
@@ -191,18 +188,6 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             innings_played: game.innings_played,
             game_time: game.game_time ?? null,
           }} />
-          {hasLineup && (
-            <Link href={`/games/${game.id}/gameday`} style={{ textDecoration: 'none' }}>
-              <div style={{
-                fontSize: '13px', padding: '10px 16px', borderRadius: '8px',
-                border: '0.5px solid var(--border-strong)', background: 'transparent',
-                color: `rgba(var(--fg-rgb), 0.55)`, cursor: 'pointer',
-                textAlign: 'center',
-              }}>
-                ⚾ Game day view
-              </div>
-            </Link>
-          )}
           {hasLineup && (
             <Link
               href={`/games/${game.id}/print`}

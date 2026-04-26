@@ -8,11 +8,11 @@ import { createClient } from '../lib/supabase'
 import { getSelectedTeamId, setSelectedTeamId } from '../lib/selectedTeam'
 
 const TABS = [
-  { href: '/dashboard', label: 'Home',         icon: '⌂' },
-  { href: '/games',     label: 'Games',        icon: '⚾' },
-  { href: '/pitching',  label: 'Pitching',     icon: '🎯' },
-  { href: '/fairness',  label: 'Playing Time', icon: '📊' },
-  { href: '/roster',    label: 'Roster',       icon: '👥' },
+  { href: '/games',       label: 'Games',        icon: '⚾' },
+  { href: '/pitching',    label: 'Pitching',     icon: '🎯' },
+  { href: '/fairness',    label: 'Playing Time', icon: '📊' },
+  { href: '/roster',      label: 'Roster',       icon: '👥' },
+  { href: '/depth-chart', label: 'Depth Chart',  icon: '⬦' },
 ]
 
 const HIDDEN_PATHS = ['/', '/login']
@@ -78,7 +78,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <div style={{ padding: '1.5rem 1.25rem 1rem', flexShrink: 0 }}>
-        <Link href="/dashboard" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
+        <Link href="/games" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
           <span style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.01em' }}>
             Six<span style={{ color: 'var(--accent)' }}>43</span>
           </span>
@@ -88,9 +88,7 @@ export default function Sidebar() {
       {/* Main nav */}
       <nav style={{ flex: 1, padding: '0.25rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {TABS.map(tab => {
-          const active = tab.href === '/dashboard'
-            ? pathname === '/dashboard'
-            : pathname.startsWith(tab.href)
+          const active = pathname.startsWith(tab.href)
           return (
             <Link key={tab.href} href={tab.href} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
