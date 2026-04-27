@@ -140,43 +140,45 @@ export default function GamePreviewPanel({
             </span>
           </div>
 
-          {/* ── Pitchers ── */}
-          {pitcherRuns.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={sectionLabel}>Pitchers</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {pitcherRuns.map((run, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      fontSize: '10px', fontWeight: 700, color: '#4B9CD3',
-                      background: 'rgba(75,156,211,0.12)', padding: '2px 6px', borderRadius: '3px', flexShrink: 0,
-                    }}>
-                      {run.start === run.end ? `Inn ${run.start}` : `Inn ${run.start}–${run.end}`}
-                    </span>
-                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>{run.name}</span>
+          {/* ── Pitchers & Catchers — 2 columns ── */}
+          {(pitcherRuns.length > 0 || catcherRuns.length > 0) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px', marginBottom: '1rem' }}>
+              {pitcherRuns.length > 0 && (
+                <div>
+                  <div style={sectionLabel}>Pitchers</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {pitcherRuns.map((run, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, color: '#4B9CD3',
+                          background: 'rgba(75,156,211,0.12)', padding: '2px 5px', borderRadius: '3px', flexShrink: 0,
+                        }}>
+                          {run.start === run.end ? `${run.start}` : `${run.start}–${run.end}`}
+                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Catchers ── */}
-          {catcherRuns.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={sectionLabel}>Catchers</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {catcherRuns.map((run, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      fontSize: '10px', fontWeight: 700, color: '#E090B0',
-                      background: 'rgba(192,80,120,0.12)', padding: '2px 6px', borderRadius: '3px', flexShrink: 0,
-                    }}>
-                      {run.start === run.end ? `Inn ${run.start}` : `Inn ${run.start}–${run.end}`}
-                    </span>
-                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>{run.name}</span>
+                </div>
+              )}
+              {catcherRuns.length > 0 && (
+                <div>
+                  <div style={sectionLabel}>Catchers</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {catcherRuns.map((run, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, color: '#E090B0',
+                          background: 'rgba(192,80,120,0.12)', padding: '2px 5px', borderRadius: '3px', flexShrink: 0,
+                        }}>
+                          {run.start === run.end ? `${run.start}` : `${run.start}–${run.end}`}
+                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
