@@ -83,10 +83,15 @@ export default function PitchingPage() {
       // Auto-select first upcoming for desktop detail panel
       const first = upcoming[0] ?? finalized[finalized.length - 1] ?? null
       if (first && !selectedGameId) setSelectedGameId(first.id)
-      // Scroll to upcoming section on all screen sizes (past games are above)
+      // Scroll to the first visible upcoming anchor (mobile + desktop each render one)
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        const el = document.getElementById('pitching-upcoming-anchor')
-        if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
+        const els = document.querySelectorAll('[data-upcoming-anchor]')
+        for (const el of Array.from(els)) {
+          if ((el as HTMLElement).offsetParent !== null) {
+            window.scrollTo({ top: (el as HTMLElement).getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
+            break
+          }
+        }
       }))
     }
   }, [loading])
@@ -497,7 +502,7 @@ export default function PitchingPage() {
         )}
 
         {upcoming.length > 0 && (
-          <div id="pitching-upcoming-anchor">
+          <div data-upcoming-anchor="true">
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
               color: `rgba(var(--fg-rgb), 0.3)`, padding: '4px 10px', marginBottom: '4px',
               marginTop: finalized.length > 0 ? '0.25rem' : 0 }}>
@@ -1067,7 +1072,7 @@ export default function PitchingPage() {
 
         {/* ── Upcoming games ── */}
         {upcoming.length > 0 && (
-          <div id="pitching-upcoming-anchor" style={{ marginBottom: '2rem' }}>
+          <div data-upcoming-anchor="true" style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
                 textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)` }}>
@@ -1476,7 +1481,7 @@ export default function PitchingPage() {
 
           {/* ── UPCOMING ── */}
           {upcoming.length > 0 && (
-            <div id="pitching-upcoming-anchor" style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
+            <div data-upcoming-anchor="true" style={{ marginTop: finalized.length > 0 ? '1.75rem' : seasons.length <= 1 ? '1rem' : 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{
                   fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
