@@ -24,9 +24,9 @@ export default function GamePreviewPanel({
   game: any
   inningsPerGame: number
 }) {
-  const supabase   = createClient()
-  const [slots,    setSlots]   = useState<any[]>([])
-  const [loading,  setLoading] = useState(true)
+  const supabase  = createClient()
+  const [slots,   setSlots]   = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
@@ -52,31 +52,33 @@ export default function GamePreviewPanel({
     game.location  ? game.location : null,
   ].filter(Boolean)
 
-  const activeSlots   = slots.filter(s => s.availability !== 'absent')
-  const hasLineup     = activeSlots.some(s => (s.inning_positions ?? []).some(Boolean))
-  const inningCount   = game.innings_played ?? inningsPerGame ?? 6
-  const innings       = Array.from({ length: inningCount }, (_, i) => i)
+  const activeSlots  = slots.filter(s => s.availability !== 'absent')
+  const absentSlots  = slots.filter(s => s.availability === 'absent')
+  const hasLineup    = activeSlots.some(s => (s.inning_positions ?? []).some(Boolean))
+  const inningCount  = game.innings_played ?? inningsPerGame ?? 6
+  const innings      = Array.from({ length: inningCount }, (_, i) => i)
 
-  // P/C by inning — find who plays each role each inning
-  const pcByInning = innings.map(ii => {
-    const pitcher = activeSlots.find(s => (s.inning_positions ?? [])[ii] === 'P')
-    const catcher = activeSlots.find(s => (s.inning_positions ?? [])[ii] === 'C')
-    return {
-      inning: ii + 1,
-      pitcher: pitcher ? lastName(pitcher.player) : null,
-      catcher: catcher ? lastName(catcher.player) : null,
+  // How many innings are fully assigned (at least one position set per active player)
+  const inningsFilled = innings.filter(ii =>
+    activeSlots.length > 0 && activeSlots.some(s => (s.inning_positions ?? [])[ii])
+  ).length
+
+  // P/C runs — collapse consecutive same-name innings into ranges
+  function buildRuns(position: string) {
+    const runs: { name: string; start: number; end: number }[] = []
+    for (const ii of innings) {
+      const match = activeSlots.find(s => (s.inning_positions ?? [])[ii] === position)
+      const name  = match ? lastName(match.player) : null
+      if (!name) continue
+      const last = runs[runs.length - 1]
+      if (last && last.name === name) last.end = ii + 1
+      else runs.push({ name, start: ii + 1, end: ii + 1 })
     }
-  })
-
-  // Collapse consecutive same-pitcher runs into ranges for compact display
-  // e.g. Smith pitches inn 1-3, Jones inn 4-6
-  const pitcherRuns: { name: string; start: number; end: number }[] = []
-  for (const { inning, pitcher } of pcByInning) {
-    if (!pitcher) continue
-    const last = pitcherRuns[pitcherRuns.length - 1]
-    if (last && last.name === pitcher) { last.end = inning }
-    else pitcherRuns.push({ name: pitcher, start: inning, end: inning })
+    return runs
   }
+
+  const pitcherRuns = buildRuns('P')
+  const catcherRuns = buildRuns('C')
 
   return (
     <div style={{
@@ -115,93 +117,75 @@ export default function GamePreviewPanel({
       </div>
 
       {loading ? (
-        <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.25)`, marginBottom: '1.25rem' }}>
-          Loading…
-        </div>
+        <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.25)`, marginBottom: '1.25rem' }}>Loading…</div>
       ) : !hasLineup ? (
-        <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.25rem' }}>
-          No lineup yet
-        </div>
+        <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.35)`, marginBottom: '1.25rem' }}>No lineup yet</div>
       ) : (
         <>
-          {/* ── Batting order ── */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={sectionLabel}>Batting order</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px 16px' }}>
-              {activeSlots.map((slot, idx) => (
-                <div key={slot.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '7px',
-                  padding: '3px 0',
-                  borderBottom: '0.5px solid var(--border-subtle)',
-                }}>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 700, color: `rgba(var(--fg-rgb), 0.3)`,
-                    width: '14px', textAlign: 'right', flexShrink: 0,
-                  }}>{idx + 1}</span>
-                  {slot.player?.jersey_number != null && (
-                    <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, flexShrink: 0 }}>
-                      #{slot.player.jersey_number}
-                    </span>
-                  )}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {slot.player?.first_name} {slot.player?.last_name}
-                  </span>
-                </div>
-              ))}
+          {/* ── Innings filled ── */}
+          <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '3px' }}>
+              {innings.map(ii => {
+                const filled = activeSlots.some(s => (s.inning_positions ?? [])[ii])
+                return (
+                  <div key={ii} style={{
+                    width: '18px', height: '6px', borderRadius: '2px',
+                    background: filled ? 'var(--accent)' : 'var(--border-md)',
+                  }} />
+                )
+              })}
             </div>
+            <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>
+              {inningsFilled}/{inningCount} innings filled
+            </span>
           </div>
 
-          {/* ── Pitcher summary ── */}
+          {/* ── Pitchers ── */}
           {pitcherRuns.length > 0 && (
-            <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
               <div style={sectionLabel}>Pitchers</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {pitcherRuns.map((run, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       fontSize: '10px', fontWeight: 700, color: '#4B9CD3',
-                      background: 'rgba(75,156,211,0.12)', padding: '2px 6px',
-                      borderRadius: '3px', flexShrink: 0,
+                      background: 'rgba(75,156,211,0.12)', padding: '2px 6px', borderRadius: '3px', flexShrink: 0,
                     }}>
                       {run.start === run.end ? `Inn ${run.start}` : `Inn ${run.start}–${run.end}`}
                     </span>
-                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
-                      {run.name}
-                    </span>
+                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>{run.name}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ── C by inning (compact inline) ── */}
-          {pcByInning.some(r => r.catcher) && (
-            <div style={{ marginBottom: '1.25rem' }}>
+          {/* ── Catchers ── */}
+          {catcherRuns.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
               <div style={sectionLabel}>Catchers</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {(() => {
-                  const catcherRuns: { name: string; start: number; end: number }[] = []
-                  for (const { inning, catcher } of pcByInning) {
-                    if (!catcher) continue
-                    const last = catcherRuns[catcherRuns.length - 1]
-                    if (last && last.name === catcher) { last.end = inning }
-                    else catcherRuns.push({ name: catcher, start: inning, end: inning })
-                  }
-                  return catcherRuns.map((run, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{
-                        fontSize: '10px', fontWeight: 700, color: '#E090B0',
-                        background: 'rgba(192,80,120,0.12)', padding: '2px 6px',
-                        borderRadius: '3px', flexShrink: 0,
-                      }}>
-                        {run.start === run.end ? `Inn ${run.start}` : `Inn ${run.start}–${run.end}`}
-                      </span>
-                      <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>
-                        {run.name}
-                      </span>
-                    </div>
-                  ))
-                })()}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {catcherRuns.map((run, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      fontSize: '10px', fontWeight: 700, color: '#E090B0',
+                      background: 'rgba(192,80,120,0.12)', padding: '2px 6px', borderRadius: '3px', flexShrink: 0,
+                    }}>
+                      {run.start === run.end ? `Inn ${run.start}` : `Inn ${run.start}–${run.end}`}
+                    </span>
+                    <span style={{ fontSize: '13px', color: 'var(--fg)', fontWeight: 500 }}>{run.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Absent players ── */}
+          {absentSlots.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={sectionLabel}>Absent</div>
+              <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.5)` }}>
+                {absentSlots.map(s => `${s.player?.first_name} ${s.player?.last_name}`).join(', ')}
               </div>
             </div>
           )}
@@ -209,7 +193,7 @@ export default function GamePreviewPanel({
       )}
 
       {/* ── Actions ── */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '1.25rem' }}>
         <Link href={lineupHref} style={{
           fontSize: '14px', fontWeight: 700,
           background: 'var(--accent)', color: 'var(--accent-text)',
