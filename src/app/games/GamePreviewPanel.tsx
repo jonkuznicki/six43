@@ -238,7 +238,7 @@ export default function GamePreviewPanel({
 }
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
-  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)`,
-  marginBottom: '6px',
+  fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em',
+  textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.3)`,
+  marginBottom: '7px',
 }
