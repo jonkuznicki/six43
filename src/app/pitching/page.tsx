@@ -80,15 +80,14 @@ export default function PitchingPage() {
   useEffect(() => {
     if (!loading && !didScrollRef.current) {
       didScrollRef.current = true
-      // Mobile: scroll to upcoming anchor
-      if (window.innerWidth < 768) {
+      // Auto-select first upcoming for desktop detail panel
+      const first = upcoming[0] ?? finalized[finalized.length - 1] ?? null
+      if (first && !selectedGameId) setSelectedGameId(first.id)
+      // Scroll to upcoming section on all screen sizes (past games are above)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
         const el = document.getElementById('pitching-upcoming-anchor')
-        if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: 'instant' })
-      } else {
-        // Desktop: auto-select first upcoming (or last finalized)
-        const first = upcoming[0] ?? finalized[finalized.length - 1] ?? null
-        if (first && !selectedGameId) setSelectedGameId(first.id)
-      }
+        if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
+      }))
     }
   }, [loading])
   useEffect(() => {
@@ -1068,7 +1067,7 @@ export default function PitchingPage() {
 
         {/* ── Upcoming games ── */}
         {upcoming.length > 0 && (
-          <div style={{ marginBottom: '2rem' }}>
+          <div id="pitching-upcoming-anchor" style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
                 textTransform: 'uppercase', color: `rgba(var(--fg-rgb), 0.35)` }}>
