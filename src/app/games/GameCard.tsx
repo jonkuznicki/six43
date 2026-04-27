@@ -42,10 +42,7 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
   const formatted = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
   const isFinished = status === 'final' || status === 'in_progress'
-  // For lineup_ready games, go straight to the lineup; otherwise start at attendance
-  const lineupHref = status === 'lineup_ready'
-    ? `/games/${game.id}/lineup`
-    : `/games/${game.id}/attendance`
+  const lineupHref = `/games/${game.id}/lineup`
   const lineupLabel = status === 'lineup_ready' ? 'View lineup' : 'Lineup'
 
   function openScore() {
@@ -96,7 +93,7 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
         opacity: isFinal ? 0.7 : 1,
       }}>
         {/* Main card area */}
-        <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
+        <Link href={`/games/${game.id}/lineup`} style={{ textDecoration: 'none', flex: 1, padding: '14px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
@@ -227,13 +224,13 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
             </div>
 
             {/* Actions */}
-            <Link href={`/games/${game.id}`} style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
+            <Link href={`/games/${game.id}/lineup`} style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
               <div style={{
                 padding: '12px 14px', borderRadius: '8px',
                 border: '0.5px solid var(--border-md)', background: 'transparent',
                 fontSize: '14px', color: 'var(--fg)',
               }}>
-                View / edit game →
+                Open Lineup →
               </div>
             </Link>
 
@@ -251,18 +248,6 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
 
             {status === 'lineup_ready' && (
               <>
-                <Link
-                  href={`/games/${game.id}/gameday`}
-                  style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}
-                >
-                  <div style={{
-                    padding: '12px 14px', borderRadius: '8px',
-                    border: '0.5px solid var(--border-md)', background: 'transparent',
-                    fontSize: '14px', color: 'var(--fg)',
-                  }}>
-                    ⚾ Game day view →
-                  </div>
-                </Link>
                 <Link
                   href={`/games/${game.id}/print`}
                   target="_blank"

@@ -6,21 +6,6 @@ import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
 import { parseScore, gameResult } from '../../lib/parseScore'
 
-const POS_COLOR: Record<string, { bg: string; color: string }> = {
-  P:     { bg: 'rgba(75,156,211,0.22)',  color: '#4B9CD3' },
-  C:     { bg: 'rgba(192,80,120,0.22)', color: '#E090B0' },
-  '1B':  { bg: 'transparent', color: '#80B0E8' },
-  '2B':  { bg: 'transparent', color: '#80B0E8' },
-  SS:    { bg: 'transparent', color: '#80B0E8' },
-  '3B':  { bg: 'transparent', color: '#80B0E8' },
-  LF:    { bg: 'transparent', color: '#6DB875' },
-  CF:    { bg: 'transparent', color: '#6DB875' },
-  LC:    { bg: 'transparent', color: '#6DB875' },
-  RC:    { bg: 'transparent', color: '#6DB875' },
-  RF:    { bg: 'transparent', color: '#6DB875' },
-  Bench: { bg: 'transparent', color: 'rgba(160,160,160,0.75)' },
-}
-
 const STATUS_LABEL: Record<string, { color: string; label: string }> = {
   scheduled:    { color: `rgba(var(--fg-rgb), 0.45)`, label: 'Scheduled' },
   lineup_ready: { color: '#80B0E8',                   label: 'Lineup Ready' },
@@ -36,20 +21,16 @@ export default function GamePreviewPanel({
   inningsPerGame: number
 }) {
   const supabase = createClient()
-  const [slots,   setSlots]   = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
 
   useEffect(() => {
-    setLoading(true)
+    setPlayerCount(null)
     supabase
       .from('lineup_slots')
-      .select('*, player:players(first_name, last_name, jersey_number)')
+      .select('id', { count: 'exact', head: true })
       .eq('game_id', game.id)
-      .order('batting_order', { ascending: true, nullsFirst: false })
-      .then(({ data }) => {
-        setSlots(data ?? [])
-        setLoading(false)
-      })
+      .neq('availability', 'absent')
+      .then(({ count }) => setPlayerCount(count ?? 0))
   }, [game.id])
 
   const date      = new Date(game.game_date + 'T12:00:00')
@@ -58,187 +39,97 @@ export default function GamePreviewPanel({
   const score     = game.status === 'final' ? parseScore(game.notes) : null
   const result    = score ? gameResult(score) : null
   const resultColor = result === 'W' ? '#6DB875' : result === 'L' ? '#E87060' : `rgba(var(--fg-rgb), 0.45)`
-
-  const activeSlots = slots.filter(s => s.availability !== 'absent')
-  const hasLineup   = activeSlots.some(s => (s.inning_positions ?? []).some(Boolean))
-  const innings     = Array.from({ length: inningsPerGame }, (_, i) => i)
-
-  const lineupHref    = `/games/${game.id}/lineup/desktop`
   const isPlaceholder = !!game.is_placeholder
+  const lineupHref = `/games/${game.id}/lineup/desktop`
+
+  const metaParts = [
+    game.game_time ? formatTime(game.game_time) : null,
+    game.location  ? game.location : null,
+  ].filter(Boolean)
 
   return (
-    <div>
-      {/* Game header */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px', flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '0.5px solid var(--border)',
+      borderRadius: '12px',
+      padding: '1.5rem',
+    }}>
+      {/* ── Header ── */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
             {isPlaceholder ? game.opponent : `vs ${game.opponent}`}
           </h2>
           {score ? (
-            /* Final score + W/L */
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               <span style={{
-                fontSize: '12px', fontWeight: 800, padding: '2px 7px', borderRadius: '4px',
-                color: resultColor, border: `0.5px solid ${resultColor}55`, background: 'transparent',
-              }}>
-                {result}
-              </span>
-              <span style={{ fontSize: '20px', fontWeight: 800, color: resultColor, lineHeight: 1 }}>
+                fontSize: '11px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                color: resultColor, border: `0.5px solid ${resultColor}55`,
+              }}>{result}</span>
+              <span style={{ fontSize: '22px', fontWeight: 800, color: resultColor, lineHeight: 1 }}>
                 {score.us}–{score.them}
               </span>
             </div>
           ) : !isPlaceholder ? (
             <span style={{
               fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px',
-              color: sc.color, border: `0.5px solid ${sc.color}55`, background: 'transparent',
-            }}>
-              {sc.label}
-            </span>
-          ) : (
-            <span style={{
-              fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-              background: 'rgba(var(--fg-rgb),0.06)', color: `rgba(var(--fg-rgb), 0.4)`,
-              border: '0.5px solid rgba(var(--fg-rgb), 0.15)',
-            }}>
-              TBD
-            </span>
-          )}
+              color: sc.color, border: `0.5px solid ${sc.color}55`, flexShrink: 0,
+              marginTop: '3px',
+            }}>{sc.label}</span>
+          ) : null}
         </div>
+
         <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)` }}>
           {formatted}
-          {game.game_time ? ` · ${formatTime(game.game_time)}` : ''}
-          {game.location  ? ` · ${game.location}`              : ''}
+          {metaParts.length > 0 && ` · ${metaParts.join(' · ')}`}
         </div>
       </div>
 
-      {/* Lineup content */}
-      {loading ? (
-        <div style={{ fontSize: '13px', color: `rgba(var(--fg-rgb), 0.3)`, padding: '2.5rem 0' }}>
-          Loading…
-        </div>
-      ) : !hasLineup ? (
-        <div style={{
-          background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px',
-          padding: '2.5rem', textAlign: 'center', marginBottom: '1.5rem',
-        }}>
-          <div style={{ fontSize: '14px', color: `rgba(var(--fg-rgb), 0.4)` }}>
-            No lineup built yet.
-          </div>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
-            <thead>
-              <tr>
-                <th style={{
-                  padding: '4px 6px 6px', textAlign: 'left', fontWeight: 600,
-                  fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em',
-                  color: `rgba(var(--fg-rgb), 0.3)`,
-                  borderBottom: '0.5px solid var(--border)',
-                }}>
-                  #
-                </th>
-                <th style={{
-                  padding: '4px 8px 6px', textAlign: 'left', fontWeight: 600,
-                  fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em',
-                  color: `rgba(var(--fg-rgb), 0.3)`, minWidth: '130px',
-                  borderBottom: '0.5px solid var(--border)',
-                }}>
-                  Player
-                </th>
-                {innings.map(ii => (
-                  <th key={ii} style={{
-                    padding: '4px 4px 6px', textAlign: 'center', fontWeight: 600,
-                    fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, width: '38px',
-                    borderBottom: '0.5px solid var(--border)',
-                  }}>
-                    {ii + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {activeSlots.map(slot => {
-                const p    = slot.player
-                const name = p ? `${p.last_name}, ${p.first_name[0]}.` : '—'
-                return (
-                  <tr key={slot.id} style={{ borderBottom: '0.5px solid var(--border-subtle)' }}>
-                    <td style={{
-                      padding: '5px 6px',
-                      color: `rgba(var(--fg-rgb), 0.3)`,
-                      fontSize: '11px', fontWeight: 600,
-                    }}>
-                      {slot.batting_order ?? '—'}
-                    </td>
-                    <td style={{
-                      padding: '5px 8px', whiteSpace: 'nowrap',
-                      color: 'var(--fg)', fontSize: '13px', fontWeight: 500,
-                    }}>
-                      {p?.jersey_number != null && (
-                        <span style={{ fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginRight: '4px' }}>
-                          #{p.jersey_number}
-                        </span>
-                      )}
-                      {name}
-                    </td>
-                    {innings.map(ii => {
-                      const pos = (slot.inning_positions ?? [])[ii] ?? null
-                      const col = pos ? (POS_COLOR[pos] ?? { bg: 'transparent', color: 'var(--fg)' }) : null
-                      return (
-                        <td key={ii} style={{
-                          padding: '3px 2px', textAlign: 'center',
-                          background: col?.bg ?? 'transparent', borderRadius: '3px',
-                        }}>
-                          {pos ? (
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: col?.color }}>
-                              {pos === 'Bench' ? 'BN' : pos}
-                            </span>
-                          ) : (
-                            <span style={{ color: `rgba(var(--fg-rgb), 0.12)` }}>·</span>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* ── Player count ── */}
+      <div style={{
+        fontSize: '13px',
+        color: playerCount === null
+          ? `rgba(var(--fg-rgb), 0.25)`
+          : playerCount > 0
+            ? `rgba(var(--fg-rgb), 0.5)`
+            : `rgba(var(--fg-rgb), 0.3)`,
+        marginBottom: '1.25rem',
+        fontStyle: playerCount === null ? 'italic' : 'normal',
+      }}>
+        {playerCount === null
+          ? 'Loading…'
+          : playerCount > 0
+            ? `${playerCount} player${playerCount !== 1 ? 's' : ''} in lineup`
+            : 'No lineup yet'}
+      </div>
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {/* ── Actions ── */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
         <Link href={lineupHref} style={{
           fontSize: '14px', fontWeight: 700,
           background: 'var(--accent)', color: 'var(--accent-text)',
-          padding: '10px 18px', borderRadius: '8px', textDecoration: 'none',
-          display: 'inline-block',
+          padding: '10px 20px', borderRadius: '8px', textDecoration: 'none',
+          display: 'inline-block', flexShrink: 0,
         }}>
-          {hasLineup ? 'Edit Lineup →' : 'Build Lineup →'}
+          {playerCount ? 'Edit Lineup →' : 'Build Lineup →'}
         </Link>
-        {hasLineup && (
+
+        {game.status === 'lineup_ready' && (
           <Link
             href={`/games/${game.id}/print`}
             target="_blank" rel="noopener noreferrer"
             style={{
-              fontSize: '14px', fontWeight: 600,
-              border: '0.5px solid var(--border-md)', color: `rgba(var(--fg-rgb), 0.65)`,
-              padding: '10px 18px', borderRadius: '8px', textDecoration: 'none',
-              display: 'inline-block', background: 'transparent',
+              fontSize: '13px', fontWeight: 600,
+              border: '0.5px solid var(--border-md)',
+              color: `rgba(var(--fg-rgb), 0.6)`,
+              padding: '10px 16px', borderRadius: '8px',
+              textDecoration: 'none', display: 'inline-block',
+              background: 'transparent', flexShrink: 0,
             }}
           >
             🖨 Print
           </Link>
         )}
-        <Link href={`/games/${game.id}`} style={{
-          fontSize: '14px', fontWeight: 600,
-          border: '0.5px solid var(--border-md)', color: `rgba(var(--fg-rgb), 0.65)`,
-          padding: '10px 18px', borderRadius: '8px', textDecoration: 'none',
-          display: 'inline-block', background: 'transparent',
-        }}>
-          Game Details
-        </Link>
       </div>
     </div>
   )

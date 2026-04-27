@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -53,6 +53,12 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   )
   const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
   const [dcWarning, setDcWarning] = useState<string | null>(null)
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [gameScore, setGameScore] = useState<{ us: number; them: number } | null>(null)
+  const [showScoreEdit, setShowScoreEdit] = useState(false)
+  const [scoreUs, setScoreUs] = useState('')
+  const [scoreThem, setScoreThem] = useState('')
+  const notesRawRef = useRef<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -62,6 +68,12 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       .select('*, season:seasons(team:teams(name, positions))')
       .eq('id', params.id).single()
     setGame(gameData)
+    const rawNotes = (gameData as any)?.notes ?? null
+    notesRawRef.current = rawNotes
+    try {
+      const parsed = JSON.parse(rawNotes ?? '{}')
+      if (parsed._score) setGameScore({ us: parsed._score.us, them: parsed._score.them })
+    } catch {}
     const team = (gameData as any)?.season?.team
     if (team?.name) setTeamName(team.name)
     if (team?.positions?.length) {
@@ -166,6 +178,27 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPositions } : s
     ))
     await supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPositions }).eq('id', slotId)
+  }
+
+  // ── STATUS & SCORE ─────────────────────────────────────────
+  async function saveStatus(newStatus: string) {
+    setStatusSaving(true)
+    setGame((g: any) => ({ ...g, status: newStatus }))
+    await supabase.from('games').update({ status: newStatus }).eq('id', params.id)
+    setStatusSaving(false)
+  }
+
+  async function saveScore() {
+    const us   = parseInt(scoreUs)   || 0
+    const them = parseInt(scoreThem) || 0
+    let parsed: any = {}
+    try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
+    parsed._score = { us, them }
+    const newRaw = JSON.stringify(parsed)
+    await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
+    notesRawRef.current = newRaw
+    setGameScore({ us, them })
+    setShowScoreEdit(false)
   }
 
   // ── INNINGS COUNT ──────────────────────────────────────────
@@ -372,31 +405,111 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
 
         {/* ── HEADER ── */}
         <div style={{ padding: '1rem 1rem 0' }}>
-          <Link href={`/games/${params.id}`} style={{
+          <Link href="/games" style={{
             fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
             textDecoration: 'none', display: 'block', marginBottom: '0.75rem',
           }}>
-            ‹ vs {game?.opponent}
+            ‹ All games
           </Link>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Lineup builder</h1>
-              <button onClick={() => setShowHelp(true)} style={{
-                width: '22px', height: '22px', borderRadius: '50%',
-                border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
-                color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', fontWeight: 700,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>?</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
+                vs {game?.opponent}
+              </h1>
+              {game?.game_date && (
+                <div style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)`, marginTop: '2px' }}>
+                  {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
+                    weekday: 'short', month: 'short', day: 'numeric',
+                  })}
+                </div>
+              )}
             </div>
-            <Link href={`/games/${params.id}`} style={{
+            <Link href="/games" style={{
               padding: '8px 16px', borderRadius: '6px',
               background: 'var(--accent)', color: 'var(--accent-text)',
               fontSize: '13px', fontWeight: 700, textDecoration: 'none',
             }}>
               Done
             </Link>
+          </div>
+
+          {/* Status + score row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            <select
+              value={game?.status ?? 'scheduled'}
+              onChange={e => !statusSaving && saveStatus(e.target.value)}
+              disabled={statusSaving}
+              style={{
+                padding: '5px 8px', borderRadius: '5px', fontSize: '12px', fontWeight: 700,
+                border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
+                color: 'var(--fg)', cursor: 'pointer',
+              }}
+            >
+              <option value="scheduled">Scheduled</option>
+              <option value="lineup_ready">Lineup Ready</option>
+              <option value="final">Final</option>
+            </select>
+
+            {game?.status === 'final' && !showScoreEdit && (
+              <button
+                onClick={() => {
+                  setScoreUs(gameScore ? String(gameScore.us) : '')
+                  setScoreThem(gameScore ? String(gameScore.them) : '')
+                  setShowScoreEdit(true)
+                }}
+                style={{
+                  fontSize: '13px', fontWeight: gameScore ? 700 : 400, padding: '5px 10px',
+                  borderRadius: '5px', border: '0.5px solid var(--border-md)',
+                  background: 'var(--bg-input)', color: gameScore ? '#6DB875' : `rgba(var(--fg-rgb), 0.4)`,
+                  cursor: 'pointer',
+                }}
+              >
+                {gameScore ? `${gameScore.us}–${gameScore.them}` : '+ Score'}
+              </button>
+            )}
+            {game?.status === 'final' && showScoreEdit && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="text" inputMode="numeric" value={scoreUs}
+                  onChange={e => setScoreUs(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Us"
+                  style={{
+                    width: '40px', padding: '5px 4px', textAlign: 'center', fontWeight: 700,
+                    fontSize: '14px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+                    background: 'var(--bg-input)', color: 'var(--fg)',
+                  }}
+                />
+                <span style={{ color: `rgba(var(--fg-rgb), 0.4)`, fontSize: '12px' }}>–</span>
+                <input
+                  type="text" inputMode="numeric" value={scoreThem}
+                  onChange={e => setScoreThem(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Them"
+                  style={{
+                    width: '40px', padding: '5px 4px', textAlign: 'center', fontWeight: 700,
+                    fontSize: '14px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+                    background: 'var(--bg-input)', color: 'var(--fg)',
+                  }}
+                />
+                <button onClick={saveScore} style={{
+                  padding: '5px 10px', borderRadius: '5px', border: 'none',
+                  background: '#6DB875', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                }}>Save</button>
+                <button onClick={() => setShowScoreEdit(false)} style={{
+                  padding: '5px 8px', borderRadius: '5px',
+                  border: '0.5px solid var(--border-md)', background: 'transparent',
+                  color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', cursor: 'pointer',
+                }}>✕</button>
+              </div>
+            )}
+
+            <button onClick={() => setShowHelp(true)} style={{
+              width: '22px', height: '22px', borderRadius: '50%',
+              border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
+              color: `rgba(var(--fg-rgb), 0.5)`, fontSize: '12px', fontWeight: 700,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, marginLeft: 'auto',
+            }}>?</button>
           </div>
 
           {/* Save error banner */}
