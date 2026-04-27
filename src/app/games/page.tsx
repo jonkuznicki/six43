@@ -240,8 +240,8 @@ export default async function GamesPage({
                 </Link>
               </div>
 
-              {/* Row 2: Tournament + Playing time */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              {/* Row 2: Tournament + GameChanger */}
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <Link
                   href={`/tournaments/new${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`}
                   style={{ textDecoration: 'none', flex: 1 }}
@@ -252,27 +252,20 @@ export default async function GamesPage({
                     fontSize: '13px', border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
                   }}>🏆 Tournament</div>
                 </Link>
-                <Link href="/fairness" style={{ textDecoration: 'none', flex: 1 }}>
-                  <div style={{
-                    background: 'var(--bg-card)', color: `rgba(var(--fg-rgb), 0.7)`,
-                    borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
-                    fontSize: '13px', border: '0.5px solid var(--border-md)', whiteSpace: 'nowrap',
-                  }}>Playing time</div>
-                </Link>
+                {(season as any).webcal_url ? (
+                  <div style={{ flex: 1, marginTop: '-6px' }}>
+                    <SyncPanel seasonId={season.id} teamId={selectedTeamId} />
+                  </div>
+                ) : (
+                  <Link href={`/games/import${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', flex: 1 }}>
+                    <div style={{
+                      borderRadius: '8px', padding: '12px 16px', textAlign: 'center',
+                      fontSize: '13px', border: '0.5px solid var(--border-md)',
+                      color: `rgba(var(--fg-rgb), 0.6)`, background: 'transparent', whiteSpace: 'nowrap',
+                    }}>↓ GameChanger</div>
+                  </Link>
+                )}
               </div>
-
-              {/* Row 2: GameChanger sync (if connected) or import link */}
-              {(season as any).webcal_url ? (
-                <SyncPanel seasonId={season.id} teamId={selectedTeamId} />
-              ) : (
-                <Link href={`/games/import${selectedTeamId ? `?teamId=${selectedTeamId}` : ''}`} style={{ textDecoration: 'none', display: 'block' }}>
-                  <div style={{
-                    borderRadius: '8px', padding: '10px 16px', textAlign: 'center',
-                    fontSize: '13px', border: '0.5px solid var(--border-md)',
-                    color: `rgba(var(--fg-rgb), 0.6)`, background: 'transparent',
-                  }}>↓ Import / connect GameChanger</div>
-                </Link>
-              )}
             </div>
           )}
 
