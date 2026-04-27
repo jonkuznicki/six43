@@ -58,9 +58,9 @@ export default function GamePreviewPanel({
   const inningCount  = game.innings_played ?? inningsPerGame ?? 6
   const innings      = Array.from({ length: inningCount }, (_, i) => i)
 
-  // How many innings are fully assigned (at least one position set per active player)
+  // An inning is "filled" only when every active player has a position assigned
   const inningsFilled = innings.filter(ii =>
-    activeSlots.length > 0 && activeSlots.some(s => (s.inning_positions ?? [])[ii])
+    activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii] != null)
   ).length
 
   // P/C runs — collapse consecutive same-name innings into ranges
@@ -126,7 +126,7 @@ export default function GamePreviewPanel({
           <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '3px' }}>
               {innings.map(ii => {
-                const filled = activeSlots.some(s => (s.inning_positions ?? [])[ii])
+                const filled = activeSlots.length > 0 && activeSlots.every(s => (s.inning_positions ?? [])[ii] != null)
                 return (
                   <div key={ii} style={{
                     width: '18px', height: '6px', borderRadius: '2px',
