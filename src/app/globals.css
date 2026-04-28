@@ -204,6 +204,25 @@ select option {
 .fairness-desktop-table { display: none; }
 .fairness-mobile-cards  { display: block; }
 
+/* ── Games fullscreen mode (game detail / lineup builder pages) ── */
+/* Hides the global sidebar and replaces it with the games-left-nav */
+body.games-fullscreen .sidebar     { display: none !important; }
+body.games-fullscreen .app-content { margin-left: 0 !important; }
+
+/* Games left nav: hidden on mobile, visible on desktop */
+.games-left-nav         { display: none !important; }
+.games-fullscreen-content { margin-left: 0 !important; }
+
+@media (min-width: 768px) {
+  .games-left-nav {
+    display: flex !important;
+    flex-direction: column;
+  }
+  .games-fullscreen-content {
+    margin-left: 188px !important;
+  }
+}
+
 /* ── Tryout full-screen mode (team making page) ── */
 /* Hides the sidebar so the wide data table can use the full viewport */
 body.tryout-fullscreen .sidebar      { display: none !important; }
