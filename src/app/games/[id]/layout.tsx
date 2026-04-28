@@ -130,15 +130,16 @@ export default function GameLayout({
       })
   }, [params.id])
 
-  // Scroll the list to the upcoming section once games load
+  // Scroll the list to the upcoming section once games load.
+  // Double rAF ensures layout has settled before measuring offsetTop.
   useEffect(() => {
     if (games.length === 0 || didScrollRef.current) return
     didScrollRef.current = true
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       if (scrollRef.current && upcomingRef.current) {
         scrollRef.current.scrollTop = upcomingRef.current.offsetTop - 8
       }
-    })
+    }))
   }, [games])
 
   // Print page — render without sidebar chrome
