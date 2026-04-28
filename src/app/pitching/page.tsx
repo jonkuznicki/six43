@@ -60,6 +60,7 @@ export default function PitchingPage() {
   const [pitchLimit, setPitchLimit]         = useState<number | null>(null)
   const [pitchLimitDraft, setPitchLimitDraft] = useState('')
   const [lineupPitchers, setLineupPitchers] = useState<Record<string, string[]>>({}) // gameId → ordered player_ids
+  const [gamesWithLineup, setGamesWithLineup] = useState<Set<string>>(new Set()) // gameIds that have any lineup slots
   // Each entry = a scheduled (non-final) game where the player actually has P innings in the lineup
   const [scheduledPitchHistory, setScheduledPitchHistory] = useState<Array<{ playerId: string; gameDate: string }>>([])
   const [addingPitcherGameId, setAddingPitcherGameId] = useState<string | null>(null)
@@ -179,10 +180,12 @@ export default function PitchingPage() {
 
       // lineupPitchers: who has actual P innings in each upcoming game's saved lineup
       const lpMap: Record<string, string[]> = {}
+      const lineupSet = new Set<string>()
       for (const game of upcomingGames) {
         const gameSlots = upLineupSlotsData.filter(
           (s: any) => s.game_id === game.id && s.availability !== 'absent'
         )
+        if (gameSlots.length > 0) lineupSet.add(game.id)
         const pitchers: { playerId: string; firstInning: number }[] = []
         for (const slot of gameSlots) {
           const pos = slot.inning_positions ?? []
@@ -193,6 +196,7 @@ export default function PitchingPage() {
         if (pitchers.length) lpMap[game.id] = pitchers.map(p => p.playerId)
       }
       setLineupPitchers(lpMap)
+      setGamesWithLineup(lineupSet)
 
       // scheduledPitchHistory: one entry per (player, game) with actual P innings in non-final lineup
       const sph: Array<{ playerId: string; gameDate: string }> = []
@@ -688,6 +692,7 @@ export default function PitchingPage() {
                   {upcoming.map(game => {
                     const gamePlans = plans[game.id] ?? {}
                     const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
+                    const hasLineup   = gamesWithLineup.has(game.id)
                     return (
                       <tr key={game.id}>
                         <td style={tdGame}>
@@ -708,14 +713,14 @@ export default function PitchingPage() {
                               Edit Lineup →
                             </Link>
                             <button
-                              onClick={() => hasPitchers && syncFromLineup(game.id)}
-                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : 'No pitchers in lineup yet'}
+                              onClick={() => hasLineup && syncFromLineup(game.id)}
+                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : hasLineup ? 'No pitchers assigned in lineup yet' : 'No lineup built yet'}
                               style={{
                                 fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: 4,
-                                cursor: hasPitchers ? 'pointer' : 'default',
-                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.35)' : 'var(--border-subtle)'}`,
+                                cursor: hasLineup ? 'pointer' : 'default',
+                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.35)' : hasLineup ? 'rgba(75,156,211,0.2)' : 'var(--border-subtle)'}`,
                                 background: hasPitchers ? 'rgba(75,156,211,0.07)' : 'transparent',
-                                color: hasPitchers ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.22)`,
+                                color: hasPitchers ? 'var(--accent)' : hasLineup ? `rgba(var(--fg-rgb), 0.4)` : `rgba(var(--fg-rgb), 0.22)`,
                               }}
                             >
                               ↓ from lineup
@@ -1117,17 +1122,18 @@ export default function PitchingPage() {
                         </Link>
                         {(() => {
                           const hasPitchers = (lineupPitchers[game.id]?.length ?? 0) > 0
+                          const hasLineup   = gamesWithLineup.has(game.id)
                           return (
                             <button
-                              onClick={() => hasPitchers && syncFromLineup(game.id)}
-                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : 'No pitchers assigned in lineup yet — build a lineup first'}
+                              onClick={() => hasLineup && syncFromLineup(game.id)}
+                              title={hasPitchers ? 'Copy pitcher order from saved lineup' : hasLineup ? 'No pitchers assigned in lineup yet' : 'No lineup built yet'}
                               style={{
                                 marginTop: '5px', fontSize: '9px', fontWeight: 700,
                                 padding: '2px 6px', borderRadius: '4px',
-                                cursor: hasPitchers ? 'pointer' : 'default',
-                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.4)' : 'var(--border-subtle)'}`,
+                                cursor: hasLineup ? 'pointer' : 'default',
+                                border: `0.5px solid ${hasPitchers ? 'rgba(75,156,211,0.4)' : hasLineup ? 'rgba(75,156,211,0.2)' : 'var(--border-subtle)'}`,
                                 background: hasPitchers ? 'rgba(75,156,211,0.08)' : 'transparent',
-                                color: hasPitchers ? '#4B9CD3' : `rgba(var(--fg-rgb), 0.22)`,
+                                color: hasPitchers ? '#4B9CD3' : hasLineup ? `rgba(var(--fg-rgb), 0.4)` : `rgba(var(--fg-rgb), 0.22)`,
                               }}
                             >
                               ↓ from lineup
