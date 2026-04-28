@@ -5,43 +5,49 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../../lib/supabase'
 import { parseScore, gameResult } from '../../../lib/parseScore'
+import { useTheme } from '../../ThemeProvider'
 
-// Print page renders without sidebar
+// Print page renders without sidebar chrome
 const STANDALONE = ['/print']
 
-function formatDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+const TABS = [
+  { href: '/games',       label: 'Games',        icon: '⚾' },
+  { href: '/pitching',    label: 'Pitching',     icon: '🎯' },
+  { href: '/fairness',    label: 'Playing Time', icon: '📊' },
+  { href: '/roster',      label: 'Roster',       icon: '👥' },
+  { href: '/depth-chart', label: 'Depth Chart',  icon: '⬦' },
+]
 
 const STATUS_DOT: Record<string, string> = {
   lineup_ready: '#80B0E8',
   in_progress:  '#4B9CD3',
 }
 
+function formatDate(d: string) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function GameNavItem({ game, currentId }: { game: any; currentId: string }) {
-  const isActive   = game.id === currentId
-  const isFinal    = game.status === 'final'
-  const score      = isFinal ? parseScore(game.notes) : null
-  const result     = score ? gameResult(score) : null
+  const isActive    = game.id === currentId
+  const isFinal     = game.status === 'final'
+  const score       = isFinal ? parseScore(game.notes) : null
+  const result      = score ? gameResult(score) : null
   const resultColor = result === 'W' ? '#6DB875' : result === 'L' ? '#E87060' : `rgba(var(--fg-rgb), 0.45)`
-  const dotColor   = STATUS_DOT[game.status]
+  const dotColor    = STATUS_DOT[game.status]
 
   return (
     <Link
       href={`/games/${game.id}/lineup/desktop`}
       style={{
         display: 'block',
-        padding: '7px 14px 7px 16px',
+        padding: '6px 12px 6px 14px',
         textDecoration: 'none',
-        background: isActive ? 'rgba(75,156,211,0.08)' : 'transparent',
+        background: isActive ? 'rgba(75,156,211,0.1)' : 'transparent',
         borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
       }}
     >
-      {/* Opponent row */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px',
-      }}>
-        {/* Status/result indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '1px' }}>
+        {/* Status / result indicator */}
         {result ? (
           <span style={{
             fontSize: '9px', fontWeight: 800, color: resultColor,
@@ -49,40 +55,28 @@ function GameNavItem({ game, currentId }: { game: any; currentId: string }) {
           }}>
             {result}
           </span>
-        ) : dotColor ? (
-          <div style={{
-            width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-            background: dotColor,
-          }} />
         ) : (
           <div style={{
             width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-            background: isActive ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`,
+            background: dotColor ?? (isActive ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.18)`),
           }} />
         )}
         <span style={{
           fontSize: '13px',
           fontWeight: isActive ? 600 : 400,
-          color: isActive ? 'var(--accent)' : isFinal ? `rgba(var(--fg-rgb), 0.55)` : `rgba(var(--fg-rgb), 0.75)`,
+          color: isActive ? 'var(--accent)' : isFinal ? `rgba(var(--fg-rgb), 0.5)` : `rgba(var(--fg-rgb), 0.75)`,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          flex: 1,
+          flex: 1, minWidth: 0,
         }}>
           {game.is_placeholder ? game.opponent : `vs ${game.opponent}`}
         </span>
-        {/* Score */}
         {score && (
-          <span style={{
-            fontSize: '11px', fontWeight: 700, color: resultColor, flexShrink: 0,
-          }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: resultColor, flexShrink: 0 }}>
             {score.us}–{score.them}
           </span>
         )}
       </div>
-      {/* Date row */}
-      <div style={{
-        fontSize: '11px', color: `rgba(var(--fg-rgb), 0.3)`,
-        paddingLeft: '11px',
-      }}>
+      <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.28)`, paddingLeft: '12px' }}>
         {formatDate(game.game_date)}
       </div>
     </Link>
@@ -96,18 +90,19 @@ export default function GameLayout({
   children: React.ReactNode
   params: { id: string }
 }) {
-  const pathname   = usePathname()
-  const [games,       setGames]      = useState<any[]>([])
-  const [seasonName,  setSeasonName] = useState<string | null>(null)
-  const [teamName,    setTeamName]   = useState<string | null>(null)
+  const pathname              = usePathname()
+  const { theme, toggle }     = useTheme()
+  const [games,      setGames]      = useState<any[]>([])
+  const [seasonName, setSeasonName] = useState<string | null>(null)
+  const [teamName,   setTeamName]   = useState<string | null>(null)
 
-  // Add body class to hide global sidebar and remove its margin
+  // Hide the global sidebar and remove its margin offset
   useEffect(() => {
     document.body.classList.add('games-fullscreen')
     return () => document.body.classList.remove('games-fullscreen')
   }, [])
 
-  // Fetch the current game's season, then all games in that season
+  // Fetch this game's season → then all games in that season
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -139,8 +134,7 @@ export default function GameLayout({
   const upcoming = games.filter(g => g.game_date >= today && g.status !== 'final')
   const past     = [...games.filter(g => g.game_date < today || g.status === 'final')].reverse()
 
-  const dim   = 'rgba(var(--fg-rgb), 0.35)' as const
-  const muted = 'rgba(var(--fg-rgb), 0.4)'  as const
+  const dim = 'rgba(var(--fg-rgb), 0.35)' as const
 
   return (
     <div style={{
@@ -148,92 +142,172 @@ export default function GameLayout({
       background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif',
     }}>
 
-      {/* ── Left nav (desktop only, CSS-controlled) ── */}
-      <nav className="games-left-nav" style={{
-        width: '188px', flexShrink: 0,
+      {/* ── Left sidebar (desktop only, controlled by CSS) ── */}
+      <aside className="games-left-nav" style={{
+        width: '220px', flexShrink: 0,
         position: 'fixed', top: 0, left: 0, bottom: 0,
-        background: 'var(--bg-card)',
+        display: 'flex', flexDirection: 'column',
+        background: 'var(--nav-bg)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
         borderRight: '0.5px solid var(--border)',
-        zIndex: 10,
-        overflowY: 'auto',
+        zIndex: 100,
       }}>
 
-        {/* Header */}
-        <div style={{ padding: '1rem 1rem 0.85rem', borderBottom: '0.5px solid var(--border)', flexShrink: 0 }}>
-          <Link href="/games" style={{
-            fontSize: '15px', fontWeight: 800,
-            color: 'var(--fg)',
-            textDecoration: 'none', display: 'block', marginBottom: '2px',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {teamName ?? 'Games'}
+        {/* ── Logo ── */}
+        <div style={{ padding: '1.5rem 1.25rem 1rem', flexShrink: 0 }}>
+          <Link href="/games" style={{ textDecoration: 'none', color: 'var(--fg)' }}>
+            <span style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.01em' }}>
+              Six<span style={{ color: 'var(--accent)' }}>43</span>
+            </span>
           </Link>
-          <div style={{ fontSize: '11px', color: dim, fontWeight: 500, minHeight: '14px' }}>
-            {seasonName ?? ''}
+        </div>
+
+        {/* ── Main nav tabs ── */}
+        <nav style={{ padding: '0 0.75rem', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {TABS.map(tab => {
+            const active = pathname.startsWith(tab.href)
+            return (
+              <Link key={tab.href} href={tab.href} style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 12px', borderRadius: '8px',
+                textDecoration: 'none',
+                background: active ? 'rgba(75,156,211,0.12)' : 'transparent',
+                color: active ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.6)`,
+                fontSize: '14px', fontWeight: active ? 700 : 400,
+                transition: 'background 0.15s, color 0.15s',
+              }}>
+                <span style={{ fontSize: '18px', lineHeight: 1, width: '22px', textAlign: 'center' }}>
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* ── Schedule section (scrollable) ── */}
+        <div style={{
+          flex: 1, minHeight: 0, overflowY: 'auto',
+          borderTop: '0.5px solid var(--border)',
+          marginTop: '0.5rem',
+        }}>
+          <div style={{ padding: '6px 0 1.5rem' }}>
+
+            {/* Section label */}
+            <div style={{
+              padding: '8px 14px 4px',
+              fontSize: '9px', fontWeight: 800,
+              color: dim,
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+            }}>
+              Schedule
+            </div>
+
+            {upcoming.length > 0 && (
+              <div style={{ marginBottom: '4px' }}>
+                <div style={{
+                  padding: '6px 14px 2px',
+                  fontSize: '9px', fontWeight: 700,
+                  color: `rgba(var(--fg-rgb), 0.25)`,
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                }}>
+                  Upcoming
+                </div>
+                {upcoming.map(g => (
+                  <GameNavItem key={g.id} game={g} currentId={params.id} />
+                ))}
+              </div>
+            )}
+
+            {past.length > 0 && (
+              <div style={{ marginTop: upcoming.length > 0 ? '6px' : 0 }}>
+                <div style={{
+                  padding: '6px 14px 2px',
+                  fontSize: '9px', fontWeight: 700,
+                  color: `rgba(var(--fg-rgb), 0.25)`,
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                }}>
+                  Past
+                </div>
+                {past.map(g => (
+                  <GameNavItem key={g.id} game={g} currentId={params.id} />
+                ))}
+              </div>
+            )}
+
+            {games.length === 0 && (
+              <div style={{ padding: '1rem 14px', fontSize: '12px', color: dim }}>
+                Loading…
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Game list */}
-        <div style={{ flex: 1, paddingTop: '4px', paddingBottom: '1rem' }}>
-          {upcoming.length > 0 && (
-            <div style={{ marginBottom: '4px' }}>
-              <div style={{
-                padding: '8px 14px 3px',
-                fontSize: '9px', fontWeight: 800,
-                color: dim,
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-              }}>
-                Upcoming
-              </div>
-              {upcoming.map(g => (
-                <GameNavItem key={g.id} game={g} currentId={params.id} />
-              ))}
+        {/* ── Bottom: team/season + settings ── */}
+        {(teamName || seasonName) && (
+          <div style={{
+            padding: '0.75rem 1.25rem',
+            borderTop: '0.5px solid var(--border)',
+            flexShrink: 0,
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: `rgba(var(--fg-rgb), 0.75)`, marginBottom: '3px' }}>
+              {teamName}
             </div>
-          )}
-          {past.length > 0 && (
-            <div>
-              <div style={{
-                padding: '8px 14px 3px',
-                fontSize: '9px', fontWeight: 800,
-                color: dim,
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                marginTop: upcoming.length > 0 ? '6px' : 0,
-              }}>
-                Past
+            {seasonName && (
+              <div style={{ fontSize: '11px', color: `rgba(var(--fg-rgb), 0.38)` }}>
+                {seasonName}
               </div>
-              {past.map(g => (
-                <GameNavItem key={g.id} game={g} currentId={params.id} />
-              ))}
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {games.length === 0 && (
-            <div style={{ padding: '1.5rem 14px', fontSize: '12px', color: muted }}>
-              Loading…
-            </div>
-          )}
+        <div style={{
+          padding: '0.75rem 1.25rem 1rem',
+          borderTop: '0.5px solid var(--border)',
+          flexShrink: 0,
+          display: 'flex', flexDirection: 'column', gap: '2px',
+        }}>
+          <Link href="/settings" style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            color: pathname.startsWith('/settings') ? 'var(--accent)' : `rgba(var(--fg-rgb), 0.45)`,
+            fontSize: '13px', padding: '4px 2px',
+            textDecoration: 'none',
+            fontWeight: pathname.startsWith('/settings') ? 600 : 400,
+          }}>
+            <span style={{ fontSize: '15px', width: '18px', textAlign: 'center' }}>⚙️</span>
+            <span>Team Settings</span>
+          </Link>
+          <button onClick={toggle} style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: `rgba(var(--fg-rgb), 0.45)`, fontSize: '13px', padding: '4px 2px',
+            width: '100%',
+          }}>
+            <span style={{ fontSize: '15px', width: '18px', textAlign: 'center' }}>
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </span>
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+          <Link href="/help" style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            color: `rgba(var(--fg-rgb), 0.35)`, fontSize: '13px', padding: '4px 2px',
+            textDecoration: 'none',
+          }}>
+            <span style={{ fontSize: '14px', width: '18px', textAlign: 'center' }}>?</span>
+            <span>Help &amp; FAQ</span>
+          </Link>
+          <Link href="/" style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            color: `rgba(var(--fg-rgb), 0.25)`, fontSize: '12px', padding: '4px 2px',
+            textDecoration: 'none',
+          }}>
+            <span style={{ fontSize: '13px', width: '18px', textAlign: 'center' }}>←</span>
+            <span>Back to six43.com</span>
+          </Link>
         </div>
 
-        {/* Footer: quick nav links */}
-        <div style={{ borderTop: '0.5px solid var(--border)', padding: '6px 0 10px', flexShrink: 0 }}>
-          {[
-            { href: '/pitching', label: 'Pitching',     icon: '🎯' },
-            { href: '/fairness', label: 'Playing Time',  icon: '📊' },
-            { href: '/roster',   label: 'Roster',        icon: '👥' },
-          ].map(link => (
-            <Link key={link.href} href={link.href} style={{
-              display: 'flex', alignItems: 'center', gap: '7px',
-              padding: '5px 14px',
-              fontSize: '12px',
-              color: muted,
-              textDecoration: 'none',
-            }}>
-              <span style={{ fontSize: '11px' }}>{link.icon}</span>
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </nav>
+      </aside>
 
       {/* ── Content area ── */}
       <div className="games-fullscreen-content" style={{ flex: 1, minWidth: 0 }}>
