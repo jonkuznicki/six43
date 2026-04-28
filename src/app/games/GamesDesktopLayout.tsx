@@ -141,10 +141,23 @@ export default function GamesDesktopLayout({
   const [selectedGame, setSelectedGame] = useState<any>(null)
 
   // On desktop mount, pre-select the first upcoming (or most recent) game
+  // and scroll the list panel to the upcoming section
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth >= 768 && games.length > 0) {
       const upcoming = firstUpcomingIdx >= 0 ? games[firstUpcomingIdx] : null
       setSelectedGame(upcoming ?? games[games.length - 1])
+
+      if (firstUpcomingIdx > 0) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const panel  = document.querySelector('.games-list-panel')
+          const anchor = document.getElementById('today-anchor-desktop')
+          if (panel && anchor) {
+            const panelRect  = panel.getBoundingClientRect()
+            const anchorRect = anchor.getBoundingClientRect()
+            panel.scrollTop += anchorRect.top - panelRect.top - 8
+          }
+        }))
+      }
     }
   }, [])
 
