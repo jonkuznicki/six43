@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../../lib/supabase'
@@ -95,6 +95,9 @@ export default function GameLayout({
   const [games,      setGames]      = useState<any[]>([])
   const [seasonName, setSeasonName] = useState<string | null>(null)
   const [teamName,   setTeamName]   = useState<string | null>(null)
+  const scrollRef    = useRef<HTMLDivElement>(null)
+  const upcomingRef  = useRef<HTMLDivElement>(null)
+  const didScrollRef = useRef(false)
 
   // Hide the global sidebar and remove its margin offset
   useEffect(() => {
@@ -127,12 +130,24 @@ export default function GameLayout({
       })
   }, [params.id])
 
+  // Scroll the list to the upcoming section once games load
+  useEffect(() => {
+    if (games.length === 0 || didScrollRef.current) return
+    didScrollRef.current = true
+    requestAnimationFrame(() => {
+      if (scrollRef.current && upcomingRef.current) {
+        scrollRef.current.scrollTop = upcomingRef.current.offsetTop - 8
+      }
+    })
+  }, [games])
+
   // Print page — render without sidebar chrome
   if (STANDALONE.some(p => pathname.includes(p))) return <>{children}</>
 
   const today    = new Date().toISOString().split('T')[0]
   const upcoming = games.filter(g => g.game_date >= today && g.status !== 'final')
-  const past     = [...games.filter(g => g.game_date < today || g.status === 'final')].reverse()
+  // Past in chronological order (oldest → newest, top → bottom) so upcoming lands below
+  const past     = games.filter(g => g.game_date < today || g.status === 'final')
 
   const dim = 'rgba(var(--fg-rgb), 0.35)' as const
 
@@ -187,11 +202,14 @@ export default function GameLayout({
         </nav>
 
         {/* ── Schedule section (scrollable) ── */}
-        <div style={{
-          flex: 1, minHeight: 0, overflowY: 'auto',
-          borderTop: '0.5px solid var(--border)',
-          marginTop: '0.5rem',
-        }}>
+        <div
+          ref={scrollRef}
+          style={{
+            flex: 1, minHeight: 0, overflowY: 'auto',
+            borderTop: '0.5px solid var(--border)',
+            marginTop: '0.5rem',
+          }}
+        >
           <div style={{ padding: '6px 0 1.5rem' }}>
 
             {/* Section label */}
@@ -204,24 +222,9 @@ export default function GameLayout({
               Schedule
             </div>
 
-            {upcoming.length > 0 && (
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{
-                  padding: '6px 14px 2px',
-                  fontSize: '9px', fontWeight: 700,
-                  color: `rgba(var(--fg-rgb), 0.25)`,
-                  textTransform: 'uppercase', letterSpacing: '0.08em',
-                }}>
-                  Upcoming
-                </div>
-                {upcoming.map(g => (
-                  <GameNavItem key={g.id} game={g} currentId={params.id} />
-                ))}
-              </div>
-            )}
-
+            {/* Past games — chronological, scroll up to see */}
             {past.length > 0 && (
-              <div style={{ marginTop: upcoming.length > 0 ? '6px' : 0 }}>
+              <div style={{ marginBottom: upcoming.length > 0 ? '6px' : 0 }}>
                 <div style={{
                   padding: '6px 14px 2px',
                   fontSize: '9px', fontWeight: 700,
@@ -231,6 +234,23 @@ export default function GameLayout({
                   Past
                 </div>
                 {past.map(g => (
+                  <GameNavItem key={g.id} game={g} currentId={params.id} />
+                ))}
+              </div>
+            )}
+
+            {/* Upcoming games — page lands here on load */}
+            {upcoming.length > 0 && (
+              <div ref={upcomingRef}>
+                <div style={{
+                  padding: '6px 14px 2px',
+                  fontSize: '9px', fontWeight: 700,
+                  color: `rgba(var(--fg-rgb), 0.25)`,
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                }}>
+                  Upcoming
+                </div>
+                {upcoming.map(g => (
                   <GameNavItem key={g.id} game={g} currentId={params.id} />
                 ))}
               </div>
