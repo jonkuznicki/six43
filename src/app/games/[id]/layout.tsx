@@ -137,7 +137,9 @@ export default function GameLayout({
     didScrollRef.current = true
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (scrollRef.current && upcomingRef.current) {
-        scrollRef.current.scrollTop = upcomingRef.current.offsetTop - 8
+        const containerTop = scrollRef.current.getBoundingClientRect().top
+        const upcomingTop  = upcomingRef.current.getBoundingClientRect().top
+        scrollRef.current.scrollTop += upcomingTop - containerTop - 8
       }
     }))
   }, [games])
