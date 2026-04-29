@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
@@ -25,8 +26,11 @@ export default function GamePreviewPanel({
   inningsPerGame: number
 }) {
   const supabase  = createClient()
-  const [slots,   setSlots]   = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const router    = useRouter()
+  const [slots,          setSlots]          = useState<any[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [confirmDelete,  setConfirmDelete]  = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -79,6 +83,12 @@ export default function GamePreviewPanel({
 
   const pitcherRuns = buildRuns('P')
   const catcherRuns = buildRuns('C')
+
+  async function deleteGame() {
+    setDeleting(true)
+    await supabase.from('games').delete().eq('id', game.id)
+    router.refresh()
+  }
 
   return (
     <div style={{
@@ -217,6 +227,28 @@ export default function GamePreviewPanel({
           >
             🖨 Print
           </Link>
+        )}
+        <div style={{ flex: 1 }} />
+        {confirmDelete ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', color: `rgba(var(--fg-rgb), 0.45)` }}>Delete this game?</span>
+            <button onClick={deleteGame} disabled={deleting} style={{
+              fontSize: '12px', fontWeight: 700, padding: '6px 12px', borderRadius: '6px',
+              border: 'none', background: '#C0392B', color: 'white',
+              cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1,
+            }}>{deleting ? 'Deleting…' : 'Yes, delete'}</button>
+            <button onClick={() => setConfirmDelete(false)} style={{
+              fontSize: '12px', padding: '6px 10px', borderRadius: '6px',
+              border: '0.5px solid var(--border-md)', background: 'transparent',
+              color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
+            }}>Cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDelete(true)} style={{
+            fontSize: '12px', padding: '6px 10px', borderRadius: '6px',
+            border: '0.5px solid var(--border-subtle)', background: 'transparent',
+            color: `rgba(var(--fg-rgb), 0.28)`, cursor: 'pointer',
+          }}>Delete game</button>
         )}
       </div>
     </div>
