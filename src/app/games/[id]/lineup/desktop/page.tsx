@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import { formatTime } from '../../../../../lib/formatTime'
 
@@ -56,6 +57,7 @@ function assignedInnings(slot: any, inningCount: number): number {
 
 export default function DesktopLineupEditor({ params }: { params: { id: string } }) {
   const supabase = createClient()
+  const router = useRouter()
 
   const [loading, setLoading]           = useState(true)
   const [game, setGame]                 = useState<any>(null)
@@ -89,8 +91,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard]         = useState<Array<{si: number; ii: number; pos: string | null}> | null>(null)
   const [copiedKeys, setCopiedKeys]       = useState<Set<string>>(new Set())
-  const [confirmClear, setConfirmClear] = useState(false)
-  const [readOnly, setReadOnly]         = useState(false)
+  const [confirmClear, setConfirmClear]   = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+  const [readOnly, setReadOnly]           = useState(false)
   const [locked, setLocked]             = useState(false)
   const [isOwner, setIsOwner]           = useState(false)
   const [showBattingOrderModal, setShowBattingOrderModal] = useState(false)
@@ -737,7 +741,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     setCopying(false); setCopyOpen(false)
   }
 
-  // ── Game status ───────────────────────────────────────────────────────────
+  // ── Game status / delete ──────────────────────────────────────────────────
+
+  async function deleteGame() {
+    setDeleting(true)
+    await supabase.from('games').delete().eq('id', params.id)
+    router.push('/games')
+  }
 
   async function saveStatus(newStatus: string) {
     setStatusSaving(true)
@@ -1221,6 +1231,20 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                 {gameScore ? `${gameScore.us}–${gameScore.them}` : '+ Score'}
               </button>
             )
+          )}
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          {confirmDelete ? (
+            <>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Delete this game?</span>
+              <button onClick={deleteGame} disabled={deleting} style={{ ...topBtn(true), color: '#E87060' }}>
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} style={topBtn(true)}>Cancel</button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} style={{ ...topBtn(true), color: 'rgba(255,255,255,0.3)' }}>
+              Delete
+            </button>
           )}
           </>)}
         </div>
