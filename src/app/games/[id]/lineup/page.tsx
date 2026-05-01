@@ -489,8 +489,31 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             >
               <option value="scheduled">Scheduled</option>
               <option value="lineup_ready">Lineup Ready</option>
+              <option value="in_progress">In Game</option>
               <option value="final">Final</option>
             </select>
+
+            {/* Play Game button */}
+            {(game?.status === 'scheduled' || game?.status === 'lineup_ready' || game?.status === 'in_progress') && (
+              <a
+                href={`/games/${params.id}/in-game`}
+                onClick={async () => {
+                  if (game?.status !== 'in_progress') {
+                    await supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id)
+                  }
+                }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '5px 12px', borderRadius: '5px', fontSize: '12px', fontWeight: 700,
+                  textDecoration: 'none', flexShrink: 0,
+                  background: game?.status === 'in_progress' ? 'rgba(232,160,32,0.18)' : 'rgba(109,184,117,0.14)',
+                  border: game?.status === 'in_progress' ? '0.5px solid rgba(232,160,32,0.4)' : '0.5px solid rgba(109,184,117,0.4)',
+                  color: game?.status === 'in_progress' ? '#E8A020' : '#6DB875',
+                }}
+              >
+                {game?.status === 'in_progress' ? '▶ In Game' : '▶ Play Game'}
+              </a>
+            )}
 
             {game?.status === 'final' && !showScoreEdit && (
               <button

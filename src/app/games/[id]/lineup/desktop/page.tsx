@@ -1217,6 +1217,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             const statusStyles: Record<string, { color: string; border: string }> = {
               scheduled:    { color: 'rgba(255,255,255,0.7)', border: 'rgba(255,255,255,0.25)' },
               lineup_ready: { color: '#80B0E8',               border: '#80B0E8' },
+              in_progress:  { color: '#E8A020',               border: '#E8A020' },
               final:        { color: '#6DB875',               border: '#6DB875' },
             }
             const s = statusStyles[status] ?? statusStyles.scheduled
@@ -1236,10 +1237,32 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               >
                 <option value="scheduled">Scheduled</option>
                 <option value="lineup_ready">Lineup Ready</option>
+                <option value="in_progress">In Game</option>
                 <option value="final">Final</option>
               </select>
             )
           })()}
+          {/* Play Game button — visible when status is scheduled or lineup_ready */}
+          {(game?.status === 'scheduled' || game?.status === 'lineup_ready' || game?.status === 'in_progress') && (
+            <a
+              href={`/games/${params.id}/in-game`}
+              onClick={async () => {
+                if (game?.status !== 'in_progress') {
+                  await supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id)
+                }
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                textDecoration: 'none', flexShrink: 0,
+                background: game?.status === 'in_progress' ? 'rgba(232,160,32,0.2)' : 'rgba(109,184,117,0.15)',
+                border: game?.status === 'in_progress' ? '1px solid rgba(232,160,32,0.5)' : '1px solid rgba(109,184,117,0.4)',
+                color: game?.status === 'in_progress' ? '#E8A020' : '#6DB875',
+              }}
+            >
+              {game?.status === 'in_progress' ? '▶ In Game' : '▶ Play Game'}
+            </a>
+          )}
           {/* Score entry — only when Final */}
           {game?.status === 'final' && (
             showScoreEdit ? (
@@ -1302,6 +1325,26 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </>)}
         </div>
       </div>
+
+      {/* ─── IN-GAME LIVE BANNER ─── */}
+      {game?.status === 'in_progress' && (
+        <div style={{
+          background: 'rgba(232,160,32,0.1)', borderBottom: '1px solid rgba(232,160,32,0.25)',
+          padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 12, color: '#E8A020', fontWeight: 700 }}>▶ Game in progress</span>
+          <a
+            href={`/games/${params.id}/in-game`}
+            style={{
+              fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 5,
+              background: 'rgba(232,160,32,0.18)', border: '1px solid rgba(232,160,32,0.4)',
+              color: '#E8A020', textDecoration: 'none',
+            }}
+          >
+            Open in-game view →
+          </a>
+        </div>
+      )}
 
       {/* ─── INSTRUCTION BANNER ─── */}
       {tipVisible && viewMode === 'grid' && (
