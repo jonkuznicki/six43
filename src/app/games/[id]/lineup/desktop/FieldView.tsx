@@ -81,8 +81,6 @@ function FieldSVG() {
       {/* Infield dirt — the diamond */}
       <polygon points="200,420 280,340 200,260 120,340" fill="#7a4f2a" opacity="0.75" />
 
-      {/* Inner grass — centered at diamond midpoint (200, 340) */}
-      <circle cx="200" cy="340" r="72" fill="#236023" opacity="0.5" />
 
       {/* Base paths */}
       <line x1="200" y1="420" x2="280" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
