@@ -65,13 +65,13 @@ function FieldSVG() {
       <rect width="400" height="440" fill="#162b16" />
 
       {/* Fair territory — home → left foul corner → outfield arc → right foul corner → home */}
-      <path d="M 200 420 L 0 220 A 260 260 0 0 0 400 220 Z" fill="#1e4020" />
+      <path d="M 200 420 L 0 220 A 260 260 0 0 1 400 220 Z" fill="#1e4020" />
 
       {/* Warning track */}
-      <path d="M 0 220 A 260 260 0 0 0 400 220"
+      <path d="M 0 220 A 260 260 0 0 1 400 220"
         fill="none" stroke="rgba(155,105,45,0.65)" strokeWidth="22" />
       {/* Outfield fence line */}
-      <path d="M 0 220 A 260 260 0 0 0 400 220"
+      <path d="M 0 220 A 260 260 0 0 1 400 220"
         fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
 
       {/* Foul lines at exactly 45° — pass through 3B (120,340) and 1B (280,340) */}
