@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import { formatTime } from '../../../../../lib/formatTime'
+import FieldView from './FieldView'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [confirmClear, setConfirmClear]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting]           = useState(false)
+  const [viewMode, setViewMode]           = useState<'grid' | 'field'>('grid')
   const [readOnly, setReadOnly]           = useState(false)
   const [locked, setLocked]             = useState(false)
   const [isOwner, setIsOwner]           = useState(false)
@@ -1157,6 +1159,28 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           >
             🖨 Print
           </a>
+          {/* View toggle */}
+          <div style={{ display: 'flex', borderRadius: 5, border: '1px solid rgba(255,255,255,0.12)', overflow: 'hidden', flexShrink: 0 }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{
+                padding: '5px 10px', fontSize: 12, border: 'none', cursor: 'pointer',
+                borderRight: '1px solid rgba(255,255,255,0.12)',
+                background: viewMode === 'grid'  ? 'rgba(255,255,255,0.15)' : 'transparent',
+                color:      viewMode === 'grid'  ? 'rgba(255,255,255,0.9)'  : 'rgba(255,255,255,0.4)',
+                fontWeight: viewMode === 'grid'  ? 600 : 400,
+              }}
+            >Grid</button>
+            <button
+              onClick={() => setViewMode('field')}
+              style={{
+                padding: '5px 10px', fontSize: 12, border: 'none', cursor: 'pointer',
+                background: viewMode === 'field' ? 'rgba(255,255,255,0.15)' : 'transparent',
+                color:      viewMode === 'field' ? 'rgba(255,255,255,0.9)'  : 'rgba(255,255,255,0.4)',
+                fontWeight: viewMode === 'field' ? 600 : 400,
+              }}
+            >⚾ Field</button>
+          </div>
           {!readOnly && (<>
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           {/* Status dropdown */}
@@ -1252,7 +1276,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       </div>
 
       {/* ─── INSTRUCTION BANNER ─── */}
-      {tipVisible && (
+      {tipVisible && viewMode === 'grid' && (
         <div style={{
           background: 'rgba(232,160,32,0.09)', borderBottom: '1px solid rgba(232,160,32,0.2)',
           padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0,
@@ -1317,8 +1341,19 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         </div>
       )}
 
-      {/* ─── TWO PANELS ─── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* ─── FIELD VIEW ─── */}
+      {viewMode === 'field' && (
+        <FieldView
+          slots={slots}
+          inningCount={inningCount}
+          teamPositions={teamPositions}
+          readOnly={readOnly}
+          onAssign={assignPosition}
+        />
+      )}
+
+      {/* ─── TWO PANELS (grid) ─── */}
+      <div style={{ flex: 1, display: viewMode === 'grid' ? 'flex' : 'none', overflow: 'hidden' }}>
 
         {/* ── CENTER: Grid + Palette ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
