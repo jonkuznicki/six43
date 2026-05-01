@@ -479,20 +479,49 @@ export default function FieldView({
                   (e.currentTarget as HTMLElement).style.transform = 'translate(-50%, -50%)'
                 }}
               >
-                <div style={{
-                  fontSize: 8, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
-                  color: slot ? (pc?.text ?? 'rgba(255,255,255,0.9)') : 'rgba(255,255,255,0.38)',
-                  lineHeight: 1.3,
-                }}>
-                  {pos}
-                </div>
-                <div style={{
-                  fontSize: 11, fontWeight: slot ? 700 : 400, whiteSpace: 'nowrap',
-                  color: slot ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.28)',
-                  lineHeight: 1.2,
-                }}>
-                  {slot ? lastName(slot.player) : '—'}
-                </div>
+                {slot ? (
+                  <>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      gap: 5, lineHeight: 1.3,
+                    }}>
+                      <span style={{
+                        fontSize: 8, fontWeight: 700,
+                        color: 'rgba(255,255,255,0.5)', minWidth: 8,
+                      }}>
+                        {slot.batting_order ?? ''}
+                      </span>
+                      <span style={{
+                        fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
+                        textTransform: 'uppercase', color: pc?.text ?? 'rgba(255,255,255,0.9)',
+                      }}>
+                        {pos}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                      color: 'rgba(255,255,255,0.95)', lineHeight: 1.2, textAlign: 'center',
+                    }}>
+                      {lastName(slot.player)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{
+                      fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
+                      textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)',
+                      lineHeight: 1.3, textAlign: 'center',
+                    }}>
+                      {pos}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'rgba(255,255,255,0.25)',
+                      lineHeight: 1.2, textAlign: 'center',
+                    }}>
+                      +
+                    </div>
+                  </>
+                )}
               </div>
             )
           })}
@@ -521,6 +550,9 @@ export default function FieldView({
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
+                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, minWidth: 14, flexShrink: 0 }}>
+                      {s.batting_order ?? ''}
+                    </span>
                     <span style={{ flex: 1 }}>
                       {s.player?.first_name?.[0]}. {lastName(s.player)}
                     </span>
@@ -555,6 +587,9 @@ export default function FieldView({
                       cursor: readOnly ? 'default' : 'pointer',
                     }}
                   >
+                    <span style={{ fontSize: 10, color: 'rgba(232,160,32,0.6)', marginRight: 4, flexShrink: 0 }}>
+                      {s.batting_order ?? ''}
+                    </span>
                     {s.player?.first_name?.[0]}. {lastName(s.player)}
                   </div>
                 ))}
