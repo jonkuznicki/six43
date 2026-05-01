@@ -22,7 +22,7 @@ const FIELD_COORDS: Record<string, { top: number; left: number }> = {
   '2B': { top: 63.0, left: 62.0 },  // (248, 277) second baseman
   '3B': { top: 79.5, left: 23.5 },  // ( 94, 350) third base
   '1B': { top: 79.5, left: 76.5 },  // (306, 350) first base
-  P:    { top: 73.5, left: 50.0 },  // (200, 323) pitcher's mound
+  P:    { top: 77.5, left: 50.0 },  // (200, 323) pitcher's mound
   C:    { top: 93.5, left: 50.0 },  // (200, 411) catcher
 }
 
@@ -339,6 +339,33 @@ export default function FieldView({
                 }}
               >
                 Clear (unassign)
+              </button>
+            )}
+            {slot.batting_order != null && (
+              <button
+                onClick={() => {
+                  if (highlightedOrder === slot.batting_order) {
+                    setHighlightedOrder(null)
+                  } else {
+                    setHighlightedOrder(slot.batting_order)
+                  }
+                  setPopover(null)
+                }}
+                style={{
+                  marginTop: 4, width: '100%', padding: '5px 0', borderRadius: 5,
+                  background: highlightedOrder === slot.batting_order
+                    ? 'rgba(75,156,211,0.15)'
+                    : 'transparent',
+                  border: highlightedOrder === slot.batting_order
+                    ? '1px solid rgba(75,156,211,0.4)'
+                    : '1px solid var(--border)',
+                  color: highlightedOrder === slot.batting_order
+                    ? 'var(--accent)'
+                    : `rgba(var(--fg-rgb),0.5)`,
+                  fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                {highlightedOrder === slot.batting_order ? '✓ Up to bat' : '⚡ Set as up to bat'}
               </button>
             )}
           </div>
@@ -659,8 +686,8 @@ export default function FieldView({
                   position: 'absolute',
                   top: `${coords.top}%`, left: `${coords.left}%`,
                   transform: 'translate(-50%, -50%)',
-                  minWidth: 58, padding: '3px 7px', borderRadius: 7,
-                  textAlign: 'center', zIndex: 10,
+                  width: 70, padding: '3px 5px', borderRadius: 7,
+                  textAlign: 'center', zIndex: 10, overflow: 'hidden',
                   cursor: readOnly ? 'default' : 'pointer',
                   backdropFilter: 'blur(6px)',
                   WebkitBackdropFilter: 'blur(6px)',
@@ -719,6 +746,7 @@ export default function FieldView({
                     </div>
                     <div style={{
                       fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                      overflow: 'hidden', textOverflow: 'ellipsis',
                       color: isUp ? '#fff' : 'rgba(255,255,255,0.95)',
                       lineHeight: 1.2, textAlign: 'center',
                     }}>
@@ -763,8 +791,74 @@ export default function FieldView({
           })}
         </div>
 
-        {/* ── Sidebar: bench / unassigned / absent ── */}
+        {/* ── Sidebar: batting order + bench / unassigned / absent ── */}
         <div style={{ flex: 1, minWidth: 160, paddingTop: 4 }}>
+
+          {/* Batting order */}
+          {sortedOrders.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={sectionLabel}>Batting Order</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {[...activeSlots]
+                  .sort((a, b) => (a.batting_order ?? 99) - (b.batting_order ?? 99))
+                  .map(s => {
+                    const pos    = (s.inning_positions ?? [])[inning] as string | null
+                    const pc     = pos ? POS_COLOR[pos] : null
+                    const isUpR  = highlightedOrder != null && s.batting_order === highlightedOrder
+                    const isNextR = onDeckOrder != null && s.batting_order === onDeckOrder && !isUpR
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={e => openPlayerPopover(s, e)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          padding: '5px 8px', borderRadius: 6, cursor: readOnly ? 'default' : 'pointer',
+                          background: isUpR
+                            ? 'rgba(75,156,211,0.14)'
+                            : 'transparent',
+                          border: isUpR
+                            ? '0.5px solid rgba(75,156,211,0.3)'
+                            : '0.5px solid transparent',
+                        }}
+                      >
+                        <span
+                          onClick={e => handleBattingOrderClick(s, e)}
+                          style={{
+                            fontSize: 11, fontWeight: 700, minWidth: 18, textAlign: 'right',
+                            color: isUpR ? 'var(--accent)' : `rgba(var(--fg-rgb),0.3)`,
+                            cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          {s.batting_order}
+                        </span>
+                        <span style={{
+                          flex: 1, fontSize: 13, fontWeight: isUpR ? 700 : 400,
+                          color: isUpR ? 'var(--fg)' : `rgba(var(--fg-rgb),0.75)`,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {s.player?.first_name?.[0]}. {lastName(s.player)}
+                        </span>
+                        {isUpR && (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', flexShrink: 0 }}>UP</span>
+                        )}
+                        {isNextR && (
+                          <span style={{ fontSize: 9, color: 'rgba(75,156,211,0.6)', flexShrink: 0 }}>next</span>
+                        )}
+                        {pos && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
+                            color: pc?.text ?? `rgba(var(--fg-rgb),0.4)`,
+                            background: pc?.bg ?? 'transparent',
+                          }}>
+                            {pos === 'Bench' ? 'B' : pos}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
 
           {/* Bench */}
           <div style={{ marginBottom: 18 }}>
