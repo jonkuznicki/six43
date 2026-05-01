@@ -44,7 +44,8 @@ export default function GameEditButton({ game }: { game: any }) {
 
   async function deleteGame() {
     setDeleting(true)
-    await supabase.from('games').delete().eq('id', game.id)
+    const { error } = await supabase.from('games').delete().eq('id', game.id)
+    if (error) { setDeleting(false); return }
     router.push('/games')
   }
 

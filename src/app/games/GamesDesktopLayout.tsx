@@ -294,6 +294,7 @@ export default function GamesDesktopLayout({
             <GamePreviewPanel
               game={selectedGame}
               inningsPerGame={inningsPerGame}
+              onDeleted={() => setSelectedGame(null)}
             />
           ) : (
             <div style={{

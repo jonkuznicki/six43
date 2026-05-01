@@ -745,7 +745,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
   async function deleteGame() {
     setDeleting(true)
-    await supabase.from('games').delete().eq('id', params.id)
+    const { error } = await supabase.from('games').delete().eq('id', params.id)
+    if (error) { setDeleting(false); return }
     router.push('/games')
   }
 

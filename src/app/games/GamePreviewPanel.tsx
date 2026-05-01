@@ -21,9 +21,11 @@ function lastName(player: any) {
 export default function GamePreviewPanel({
   game,
   inningsPerGame,
+  onDeleted,
 }: {
   game: any
   inningsPerGame: number
+  onDeleted?: () => void
 }) {
   const supabase  = createClient()
   const router    = useRouter()
@@ -86,7 +88,9 @@ export default function GamePreviewPanel({
 
   async function deleteGame() {
     setDeleting(true)
-    await supabase.from('games').delete().eq('id', game.id)
+    const { error } = await supabase.from('games').delete().eq('id', game.id)
+    if (error) { setDeleting(false); return }
+    onDeleted?.()
     router.refresh()
   }
 

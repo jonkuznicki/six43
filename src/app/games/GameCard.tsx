@@ -70,7 +70,8 @@ export default function GameCard({ game, teamName }: { game: any; teamName: stri
 
   async function deleteGame() {
     setDeleting(true)
-    await supabase.from('games').delete().eq('id', game.id)
+    const { error } = await supabase.from('games').delete().eq('id', game.id)
+    if (error) { setDeleting(false); return }
     router.refresh()
   }
 
