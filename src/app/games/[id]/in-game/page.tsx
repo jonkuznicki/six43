@@ -41,12 +41,15 @@ export default async function InGamePage({ params }: { params: { id: string } })
   const teamName = team?.name ?? 'Us'
   const activeSlots = (slots ?? []).filter((s: any) => s.availability !== 'absent')
 
+  const teamPositions: string[] = (team?.positions ?? []) as string[]
+
   return (
     <InGameView
       game={game}
       slots={activeSlots}
       inningCount={inningCount}
       teamName={teamName}
+      teamPositions={teamPositions}
       isOwner={isOwner}
     />
   )

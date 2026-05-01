@@ -209,6 +209,10 @@ select option {
 body.games-fullscreen .sidebar     { display: none !important; }
 body.games-fullscreen .app-content { margin-left: 0 !important; }
 
+/* ── In-game mode: hide games-left-nav so the in-game view uses full width ── */
+body.ingame-mode .games-left-nav         { display: none !important; }
+body.ingame-mode .games-fullscreen-content { margin-left: 0 !important; }
+
 /* Games left nav: hidden on mobile, visible on desktop */
 .games-left-nav         { display: none !important; }
 .games-fullscreen-content { margin-left: 0 !important; }

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import FieldView from '../lineup/desktop/FieldView'
 
 // ── Score storage helpers (same format as BoxScoreInput: game.notes._box) ──────
 
@@ -57,12 +58,14 @@ export default function InGameView({
   slots,
   inningCount,
   teamName,
+  teamPositions,
   isOwner,
 }: {
   game: any
   slots: any[]
   inningCount: number
   teamName: string
+  teamPositions: string[]
   isOwner: boolean
 }) {
   const supabase  = createClient()
@@ -85,6 +88,36 @@ export default function InGameView({
   const [status,          setStatus]          = useState<string>(game.status ?? 'in_progress')
   const [savingStatus,    setSavingStatus]    = useState(false)
   const [showEndConfirm,  setShowEndConfirm]  = useState(false)
+
+  // ── View mode (list = batting order, field = FieldView) ──────────────────
+  const [viewMode, setViewMode] = useState<'list' | 'field'>('list')
+  const [localSlots, setLocalSlots] = useState<any[]>(slots)
+
+  // ── Body class: hide games-left-nav while in-game view is open ───────────
+  useEffect(() => {
+    document.body.classList.add('ingame-mode')
+    return () => document.body.classList.remove('ingame-mode')
+  }, [])
+
+  function assignPosition(slotId: string, ii: number, pos: string | null) {
+    if (locked) return
+    setLocalSlots(prev => {
+      const next = prev.map(s => {
+        if (s.id !== slotId) return s
+        const positions = [...(s.inning_positions ?? [])]
+        positions[ii] = pos
+        return { ...s, inning_positions: positions }
+      })
+      const updated = next.find(s => s.id === slotId)
+      if (updated) {
+        supabase.from('lineup_slots')
+          .update({ inning_positions: updated.inning_positions })
+          .eq('id', slotId)
+          .then(() => {})
+      }
+      return next
+    })
+  }
 
   // ── Scoreboard ────────────────────────────────────────────────────────────
   const notesRawRef                                  = useRef<string | null>(game.notes ?? null)
@@ -222,12 +255,18 @@ export default function InGameView({
         flexShrink: 0, flexWrap: 'wrap',
         position: 'sticky', top: 0, zIndex: 100, background: BG,
       }}>
-        {/* Back to lineup */}
+        {/* Back to lineup — visible, intentional exit */}
         <a
           href={`/games/${game.id}/lineup/desktop`}
-          style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', flexShrink: 0 }}
+          style={{
+            fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
+            textDecoration: 'none', flexShrink: 0,
+            padding: '5px 10px', borderRadius: 6,
+            border: `1px solid rgba(255,255,255,0.12)`,
+            background: 'rgba(255,255,255,0.05)',
+          }}
         >
-          ‹ Lineup
+          ← Edit Lineup
         </a>
 
         <div style={{ width: 1, height: 18, background: BORDER, flexShrink: 0 }} />
@@ -293,6 +332,24 @@ export default function InGameView({
         >
           {isFullscreen ? '⊡' : '⛶'}
         </button>
+
+        {/* View mode toggle: list ↔ field */}
+        <div style={{ display: 'flex', gap: 2, flexShrink: 0, border: `1px solid ${BORDER}`, borderRadius: 7, overflow: 'hidden' }}>
+          {(['list', 'field'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: '5px 11px', border: 'none', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer',
+                background: viewMode === mode ? 'rgba(255,255,255,0.14)' : 'transparent',
+                color: viewMode === mode ? FG : 'rgba(255,255,255,0.38)',
+              }}
+            >
+              {mode === 'list' ? '≡ List' : '◈ Field'}
+            </button>
+          ))}
+        </div>
 
         {/* End game — owner only */}
         {isOwner && status !== 'final' && (
@@ -412,7 +469,8 @@ export default function InGameView({
         overflowY: 'auto',
       }}>
 
-        {/* ── BATTING ORDER ── */}
+        {/* ── BATTING ORDER (list mode) ── */}
+        {viewMode === 'list' && (
         <div style={{
           flex: '1 1 320px', minWidth: 0,
           borderRight: `1px solid ${BORDER}`,
@@ -531,6 +589,20 @@ export default function InGameView({
             )}
           </div>
         </div>
+        )}
+
+        {/* ── FIELD VIEW (field mode) ── */}
+        {viewMode === 'field' && (
+        <div style={{ flex: '1 1 400px', minWidth: 0, borderRight: `1px solid ${BORDER}`, overflowY: 'auto' }}>
+          <FieldView
+            slots={localSlots}
+            inningCount={inningCount}
+            teamPositions={teamPositions}
+            readOnly={locked}
+            onAssign={assignPosition}
+          />
+        </div>
+        )}
 
         {/* ── SCOREBOARD + CONTROLS ── */}
         <div style={{ flex: '0 1 320px', minWidth: 260, padding: '14px 16px' }}>
