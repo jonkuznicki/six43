@@ -35,20 +35,20 @@ function writeBoxScores(
   }
 }
 
-// ── Position colours (dark theme) ─────────────────────────────────────────────
+// ── Position colors — matches the lineup editor exactly ───────────────────────
 
-const POS_COLORS: Record<string, { bg: string; color: string }> = {
-  P:    { bg: '#7C4D00', color: '#FFC040' },
-  C:    { bg: '#6B1040', color: '#FFB0D0' },
-  '1B': { bg: '#0F3070', color: '#80C0FF' },
-  '2B': { bg: '#0F3070', color: '#80C0FF' },
-  SS:   { bg: '#0F3070', color: '#80C0FF' },
-  '3B': { bg: '#0F3070', color: '#80C0FF' },
-  LF:   { bg: '#0D4020', color: '#60D080' },
-  CF:   { bg: '#0D4020', color: '#60D080' },
-  LC:   { bg: '#0D4020', color: '#60D080' },
-  RC:   { bg: '#0D4020', color: '#60D080' },
-  RF:   { bg: '#0D4020', color: '#60D080' },
+const POS_COLOR: Record<string, { bg: string; color: string }> = {
+  P:    { bg: 'rgba(75,156,211,0.22)',  color: '#4B9CD3' },
+  C:    { bg: 'rgba(192,80,120,0.22)', color: '#E090B0' },
+  '1B': { bg: 'rgba(128,176,232,0.1)', color: '#80B0E8' },
+  '2B': { bg: 'rgba(128,176,232,0.1)', color: '#80B0E8' },
+  SS:   { bg: 'rgba(128,176,232,0.1)', color: '#80B0E8' },
+  '3B': { bg: 'rgba(128,176,232,0.1)', color: '#80B0E8' },
+  LF:   { bg: 'rgba(109,184,117,0.1)', color: '#6DB875' },
+  CF:   { bg: 'rgba(109,184,117,0.1)', color: '#6DB875' },
+  LC:   { bg: 'rgba(109,184,117,0.1)', color: '#6DB875' },
+  RC:   { bg: 'rgba(109,184,117,0.1)', color: '#6DB875' },
+  RF:   { bg: 'rgba(109,184,117,0.1)', color: '#6DB875' },
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -68,37 +68,62 @@ export default function InGameView({
   teamPositions: string[]
   isOwner: boolean
 }) {
-  const supabase  = createClient()
-  const router    = useRouter()
+  const supabase = createClient()
+  const router   = useRouter()
 
   // ── Inning & batting order ─────────────────────────────────────────────────
   const [inning,           setInning]           = useState(0)
   const [highlightedOrder, setHighlightedOrder] = useState<number | null>(null)
 
-  // ── Lock mode (UI-only; intentional tap required to unlock) ────────────────
-  const [locked,           setLocked]           = useState(false)
-  const [showUnlockModal,  setShowUnlockModal]  = useState(false)
+  // ── Lock mode ─────────────────────────────────────────────────────────────
+  const [locked,          setLocked]          = useState(false)
+  const [showUnlockModal, setShowUnlockModal] = useState(false)
 
-  // ── Fullscreen (native + CSS fallback for iPad Safari) ────────────────────
+  // ── Fullscreen ────────────────────────────────────────────────────────────
   const [isNativeFullscreen, setIsNativeFullscreen] = useState(false)
   const [isCssFullscreen,    setIsCssFullscreen]    = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Status / game-end ─────────────────────────────────────────────────────
-  const [status,          setStatus]          = useState<string>(game.status ?? 'in_progress')
-  const [savingStatus,    setSavingStatus]    = useState(false)
-  const [showEndConfirm,  setShowEndConfirm]  = useState(false)
+  const [status,         setStatus]         = useState<string>(game.status ?? 'in_progress')
+  const [savingStatus,   setSavingStatus]   = useState(false)
+  const [showEndConfirm, setShowEndConfirm] = useState(false)
 
-  // ── View mode (list = batting order, field = FieldView) ──────────────────
-  const [viewMode, setViewMode] = useState<'list' | 'field'>('field')
-  const [localSlots, setLocalSlots] = useState<any[]>(slots)
+  // ── View mode ─────────────────────────────────────────────────────────────
+  const [viewMode,    setViewMode]    = useState<'list' | 'field'>('field')
+  const [localSlots,  setLocalSlots]  = useState<any[]>(slots)
 
-  // ── Body class: hide games-left-nav while in-game view is open ───────────
+  // ── Hide games-left-nav while in-game view is mounted ────────────────────
   useEffect(() => {
     document.body.classList.add('ingame-mode')
     return () => document.body.classList.remove('ingame-mode')
   }, [])
 
+  // ── Native fullscreen listener ────────────────────────────────────────────
+  useEffect(() => {
+    const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const isFullscreen = isNativeFullscreen || isCssFullscreen
+
+  function toggleFullscreen() {
+    if (isNativeFullscreen) { document.exitFullscreen().catch(() => {}); return }
+    if (isCssFullscreen)    { setIsCssFullscreen(false); return }
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => setIsCssFullscreen(true))
+    } else {
+      setIsCssFullscreen(true)
+    }
+  }
+
+  function exitFullscreen() {
+    if (isNativeFullscreen) document.exitFullscreen().catch(() => {})
+    setIsCssFullscreen(false)
+  }
+
+  // ── Position assignment ───────────────────────────────────────────────────
   function assignPosition(slotId: string, ii: number, pos: string | null) {
     if (locked) return
     setLocalSlots(prev => {
@@ -120,45 +145,11 @@ export default function InGameView({
   }
 
   // ── Scoreboard ────────────────────────────────────────────────────────────
-  const notesRawRef                                  = useRef<string | null>(game.notes ?? null)
+  const notesRawRef = useRef<string | null>(game.notes ?? null)
   const [us,   setUs]   = useState<(number | null)[]>(() => readBoxScores(game.notes, inningCount)[0])
   const [them, setThem] = useState<(number | null)[]>(() => readBoxScores(game.notes, inningCount)[1])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── Native fullscreen listener ─────────────────────────────────────────────
-  useEffect(() => {
-    const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
-
-  const isFullscreen = isNativeFullscreen || isCssFullscreen
-
-  function toggleFullscreen() {
-    if (isNativeFullscreen) {
-      document.exitFullscreen().catch(() => {})
-      return
-    }
-    if (isCssFullscreen) {
-      setIsCssFullscreen(false)
-      return
-    }
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {
-        // iPad Safari: fall back to CSS overlay
-        setIsCssFullscreen(true)
-      })
-    } else {
-      setIsCssFullscreen(true)
-    }
-  }
-
-  function exitFullscreen() {
-    if (isNativeFullscreen) document.exitFullscreen().catch(() => {})
-    setIsCssFullscreen(false)
-  }
-
-  // ── Score save (debounced, 800 ms) ─────────────────────────────────────────
   function scheduleSave(nextUs: (number | null)[], nextThem: (number | null)[]) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -181,7 +172,7 @@ export default function InGameView({
   const usTotal   = us.reduce<number>((a, v)   => a + (v ?? 0), 0)
   const themTotal = them.reduce<number>((a, v) => a + (v ?? 0), 0)
 
-  // ── Status helpers ─────────────────────────────────────────────────────────
+  // ── Game end ──────────────────────────────────────────────────────────────
   async function endGame() {
     setSavingStatus(true)
     setStatus('final')
@@ -191,8 +182,8 @@ export default function InGameView({
     router.push(`/games/${game.id}/lineup/desktop`)
   }
 
-  // ── Batting order helpers ──────────────────────────────────────────────────
-  const sortedSlots = [...slots].sort((a, b) => (a.batting_order ?? 99) - (b.batting_order ?? 99))
+  // ── Batting order ─────────────────────────────────────────────────────────
+  const sortedSlots  = [...slots].sort((a, b) => (a.batting_order ?? 99) - (b.batting_order ?? 99))
   const sortedOrders = sortedSlots.map(s => s.batting_order).filter((o): o is number => o != null)
 
   function nextOrder(cur: number): number | null {
@@ -208,210 +199,229 @@ export default function InGameView({
 
   function tapPlayer(s: any) {
     if (!s.batting_order) return
-    if (highlightedOrder === s.batting_order) {
-      setHighlightedOrder(nextOrder(s.batting_order))
-    } else {
-      setHighlightedOrder(s.batting_order)
-    }
+    setHighlightedOrder(highlightedOrder === s.batting_order ? nextOrder(s.batting_order) : s.batting_order)
   }
 
-  // ── Inning completion dots ─────────────────────────────────────────────────
+  // ── Inning fill statuses (for score dots) ────────────────────────────────
   const inningStatuses = Array.from({ length: inningCount }, (_, ii) => {
     const filled = slots.filter(s => !!(s.inning_positions ?? [])[ii]).length
     return { filled, total: slots.length }
   })
 
-  // ── Common styles ──────────────────────────────────────────────────────────
-  const BG     = '#050D1A'
-  const FG     = '#F0F4FF'
-  const BORDER = 'rgba(255,255,255,0.08)'
-  const ACCENT = '#E8A020'
-
-  // ── Container style: fullscreen overlay when using CSS fallback ────────────
+  // ── Container: CSS fullscreen fallback for iPad Safari ───────────────────
   const containerStyle: React.CSSProperties = isCssFullscreen
-    ? {
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: BG, color: FG, overflowY: 'auto',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        display: 'flex', flexDirection: 'column',
-      }
-    : {
-        minHeight: '100vh', background: BG, color: FG,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        display: 'flex', flexDirection: 'column',
-      }
+    ? { position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto',
+        background: 'var(--bg)', color: 'var(--fg)', display: 'flex', flexDirection: 'column' }
+    : { minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)',
+        display: 'flex', flexDirection: 'column' }
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div ref={containerRef} style={containerStyle}>
 
-      {/* ── HEADER ── */}
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '10px 14px',
-        borderBottom: `1px solid ${BORDER}`,
-        flexShrink: 0, flexWrap: 'wrap',
-        position: 'sticky', top: 0, zIndex: 100, background: BG,
+        padding: '0 16px', height: 52,
+        borderBottom: '0.5px solid var(--border)',
+        background: 'var(--bg2)',
+        flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto',
+        position: 'sticky', top: 0, zIndex: 100,
       }}>
-        {/* Back to lineup — visible, intentional exit */}
+
+        {/* Back */}
         <a
           href={`/games/${game.id}/lineup/desktop`}
           style={{
-            fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
+            display: 'flex', alignItems: 'center', gap: 5,
+            fontSize: 13, fontWeight: 600,
+            color: 'rgba(var(--fg-rgb),0.5)',
             textDecoration: 'none', flexShrink: 0,
             padding: '5px 10px', borderRadius: 6,
-            border: `1px solid rgba(255,255,255,0.12)`,
-            background: 'rgba(255,255,255,0.05)',
+            border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-card)',
+            whiteSpace: 'nowrap',
           }}
         >
-          ← Edit Lineup
+          ← Lineup
         </a>
 
-        <div style={{ width: 1, height: 18, background: BORDER, flexShrink: 0 }} />
+        <div style={{ width: '0.5px', height: 20, background: 'var(--border)', flexShrink: 0 }} />
 
-        {/* Opponent */}
-        <div style={{ flex: 1, minWidth: 120, fontWeight: 700, fontSize: 15, color: FG }}>
-          vs {game.opponent}
+        {/* Opponent + Live badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <span style={{
+            fontSize: 14, fontWeight: 700, color: 'var(--fg)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            vs {game.opponent}
+          </span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+            letterSpacing: '0.07em', textTransform: 'uppercase', flexShrink: 0,
+            background: status === 'in_progress'
+              ? 'rgba(232,160,32,0.15)'
+              : status === 'final'
+              ? 'rgba(109,184,117,0.15)'
+              : 'var(--bg-card)',
+            color: status === 'in_progress'
+              ? '#E8A020'
+              : status === 'final'
+              ? '#6DB875'
+              : 'rgba(var(--fg-rgb),0.4)',
+            border: status === 'in_progress'
+              ? '0.5px solid rgba(232,160,32,0.35)'
+              : status === 'final'
+              ? '0.5px solid rgba(109,184,117,0.35)'
+              : '0.5px solid var(--border)',
+          }}>
+            {status === 'in_progress' ? '● Live' : status === 'final' ? 'Final' : status}
+          </span>
         </div>
 
-        {/* Score summary */}
+        {/* Score */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 18, fontWeight: 800, flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: 5,
+          flexShrink: 0,
+          padding: '4px 10px', borderRadius: 6,
+          background: 'var(--bg-card)',
+          border: '0.5px solid var(--border)',
         }}>
-          <span style={{ color: usTotal > themTotal ? '#60D080' : usTotal < themTotal ? '#E87060' : FG }}>
+          <span style={{
+            fontSize: 17, fontWeight: 800, lineHeight: 1,
+            color: usTotal > themTotal ? '#6DB875' : usTotal < themTotal ? '#E87060' : 'var(--fg)',
+          }}>
             {usTotal}
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>–</span>
-          <span style={{ color: usTotal < themTotal ? '#60D080' : usTotal > themTotal ? '#E87060' : FG }}>
+          <span style={{ fontSize: 12, color: 'rgba(var(--fg-rgb),0.25)', fontWeight: 400 }}>–</span>
+          <span style={{
+            fontSize: 17, fontWeight: 800, lineHeight: 1,
+            color: usTotal < themTotal ? '#6DB875' : usTotal > themTotal ? '#E87060' : 'var(--fg)',
+          }}>
             {themTotal}
           </span>
         </div>
 
-        {/* Status badge */}
+        {/* View toggle */}
         <div style={{
-          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-          letterSpacing: '0.07em', textTransform: 'uppercase', flexShrink: 0,
-          background: status === 'in_progress'
-            ? 'rgba(232,160,32,0.18)'
-            : status === 'final'
-            ? 'rgba(109,184,117,0.18)'
-            : 'rgba(255,255,255,0.08)',
-          color: status === 'in_progress' ? ACCENT : status === 'final' ? '#6DB875' : 'rgba(255,255,255,0.5)',
-          border: `1px solid ${status === 'in_progress' ? 'rgba(232,160,32,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          display: 'flex', flexShrink: 0,
+          border: '0.5px solid var(--border-md)', borderRadius: 7, overflow: 'hidden',
         }}>
-          {status === 'in_progress' ? 'Live' : status === 'final' ? 'Final' : status}
+          {(['field', 'list'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: '5px 12px', border: 'none', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', lineHeight: 1,
+                background: viewMode === mode ? 'var(--accent)' : 'transparent',
+                color: viewMode === mode ? 'var(--accent-text)' : 'rgba(var(--fg-rgb),0.45)',
+              }}
+            >
+              {mode === 'field' ? '◈ Field' : '≡ List'}
+            </button>
+          ))}
         </div>
 
-        {/* Lock button */}
+        {/* Lock */}
         <button
           onClick={() => locked ? setShowUnlockModal(true) : setLocked(true)}
-          title={locked ? 'Locked — tap to unlock' : 'Lock screen to prevent accidental changes'}
+          title={locked ? 'Screen locked — tap to unlock' : 'Lock screen'}
           style={{
             flexShrink: 0, padding: '5px 10px', borderRadius: 6, fontSize: 13,
-            border: locked ? '1px solid rgba(232,112,96,0.4)' : `1px solid ${BORDER}`,
-            background: locked ? 'rgba(232,112,96,0.12)' : 'transparent',
-            color: locked ? '#E87060' : 'rgba(255,255,255,0.4)',
+            border: locked ? '0.5px solid rgba(232,160,32,0.45)' : '0.5px solid var(--border-md)',
+            background: locked ? 'rgba(232,160,32,0.12)' : 'var(--bg-card)',
+            color: locked ? '#E8A020' : 'rgba(var(--fg-rgb),0.45)',
             cursor: 'pointer', fontWeight: 600,
           }}
         >
           {locked ? '🔒' : '🔓'}
         </button>
 
-        {/* Fullscreen button */}
+        {/* Fullscreen */}
         <button
           onClick={isFullscreen ? exitFullscreen : toggleFullscreen}
-          title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           style={{
             flexShrink: 0, padding: '5px 10px', borderRadius: 6, fontSize: 13,
-            border: `1px solid ${BORDER}`, background: 'transparent',
-            color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+            border: isFullscreen ? '0.5px solid var(--accent)' : '0.5px solid var(--border-md)',
+            background: isFullscreen ? 'rgba(75,156,211,0.12)' : 'var(--bg-card)',
+            color: isFullscreen ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.45)',
+            cursor: 'pointer',
           }}
         >
           {isFullscreen ? '⊡' : '⛶'}
         </button>
 
-        {/* View mode toggle: list ↔ field */}
-        <div style={{ display: 'flex', gap: 2, flexShrink: 0, border: `1px solid ${BORDER}`, borderRadius: 7, overflow: 'hidden' }}>
-          {(['list', 'field'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: '5px 11px', border: 'none', fontSize: 12, fontWeight: 600,
-                cursor: 'pointer',
-                background: viewMode === mode ? 'rgba(255,255,255,0.14)' : 'transparent',
-                color: viewMode === mode ? FG : 'rgba(255,255,255,0.38)',
-              }}
-            >
-              {mode === 'list' ? '≡ List' : '◈ Field'}
-            </button>
-          ))}
-        </div>
-
-        {/* End game — owner only */}
+        {/* End game */}
         {isOwner && status !== 'final' && (
           <button
             onClick={() => setShowEndConfirm(true)}
             style={{
               flexShrink: 0, padding: '5px 12px', borderRadius: 6, fontSize: 12,
-              fontWeight: 700, border: '1px solid rgba(109,184,117,0.35)',
-              background: 'rgba(109,184,117,0.1)', color: '#6DB875', cursor: 'pointer',
+              fontWeight: 700, whiteSpace: 'nowrap',
+              border: '0.5px solid rgba(109,184,117,0.4)',
+              background: 'rgba(109,184,117,0.1)',
+              color: '#6DB875', cursor: 'pointer',
             }}
           >
-            End game
+            End Game
           </button>
         )}
       </div>
 
-      {/* ── LOCKED BANNER ── */}
+      {/* ── LOCK NOTICE (subtle — below header, not alarming) ───────────────── */}
       {locked && (
         <div style={{
-          background: 'rgba(232,112,96,0.1)', borderBottom: '1px solid rgba(232,112,96,0.2)',
-          padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 10,
+          padding: '6px 16px',
+          background: 'rgba(232,160,32,0.07)',
+          borderBottom: '0.5px solid rgba(232,160,32,0.2)',
+          display: 'flex', alignItems: 'center', gap: 8,
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: 12, color: '#E87060', fontWeight: 600, flex: 1 }}>
-            🔒 Screen is locked — tap 🔒 to unlock
+          <span style={{ fontSize: 11, color: '#E8A020', fontWeight: 600 }}>
+            🔒 Positions locked — score is still editable · tap 🔒 to unlock
           </span>
         </div>
       )}
 
-      {/* ── INNING SELECTOR ── */}
+      {/* ── INNING SELECTOR ──────────────────────────────────────────────────── */}
       <div style={{
-        display: 'flex', gap: 6, padding: '10px 14px',
-        borderBottom: `1px solid ${BORDER}`,
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '10px 16px',
+        borderBottom: '0.5px solid var(--border)',
         flexShrink: 0, overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch' as any,
+        background: 'var(--bg2)',
       }}>
         <span style={{
-          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em',
-          color: 'rgba(255,255,255,0.25)', alignSelf: 'center', marginRight: 4, flexShrink: 0,
+          fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.09em', color: 'rgba(var(--fg-rgb),0.3)',
+          alignSelf: 'center', marginRight: 4, flexShrink: 0,
         }}>
-          Inn
+          Inning
         </span>
         {Array.from({ length: inningCount }, (_, i) => {
-          const s = inningStatuses[i]
           const hasSomeScore = (us[i] != null || them[i] != null)
           return (
             <button
               key={i}
               onClick={() => setInning(i)}
               style={{
-                minWidth: 48, height: 48, borderRadius: 8, border: 'none',
-                background: inning === i ? ACCENT : 'rgba(255,255,255,0.07)',
-                color: inning === i ? BG : 'rgba(255,255,255,0.55)',
-                fontSize: 17, fontWeight: 800, cursor: 'pointer', flexShrink: 0,
                 position: 'relative',
+                minWidth: 38, height: 38, borderRadius: 7,
+                border: inning === i ? '1.5px solid var(--accent)' : '0.5px solid var(--border)',
+                background: inning === i ? 'rgba(75,156,211,0.15)' : 'var(--bg-card)',
+                color: inning === i ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.55)',
+                fontSize: 14, fontWeight: inning === i ? 700 : 400,
+                cursor: 'pointer', flexShrink: 0,
               }}
             >
               {i + 1}
-              {/* Dot: score entered for this inning */}
               {hasSomeScore && (
                 <span style={{
-                  position: 'absolute', top: 4, right: 4, width: 6, height: 6,
-                  borderRadius: '50%',
-                  background: inning === i ? 'rgba(0,0,0,0.4)' : ACCENT,
+                  position: 'absolute', top: 3, right: 3,
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: inning === i ? 'var(--accent)' : '#E8A020',
                 }} />
               )}
             </button>
@@ -419,21 +429,24 @@ export default function InGameView({
         })}
       </div>
 
-      {/* ── UP-TO-BAT BANNER (when active) ── */}
+      {/* ── UP-TO-BAT BANNER ─────────────────────────────────────────────────── */}
       {upSlot && (
         <div style={{
           padding: '8px 16px', flexShrink: 0,
-          background: `rgba(232,160,32,0.12)`,
-          borderBottom: `1px solid rgba(232,160,32,0.2)`,
+          background: 'rgba(232,160,32,0.08)',
+          borderBottom: '0.5px solid rgba(232,160,32,0.2)',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT, letterSpacing: '0.09em' }}>UP</span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: FG }}>
+          <span style={{
+            fontSize: 10, fontWeight: 800, color: '#E8A020',
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+          }}>Up</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>
             #{highlightedOrder} {upSlot.player?.first_name} {upSlot.player?.last_name}
           </span>
           {onDeckSlot && (
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-              · on deck: #{onDeckOrder} {onDeckSlot.player?.last_name}
+            <span style={{ fontSize: 12, color: 'rgba(var(--fg-rgb),0.4)' }}>
+              on deck: #{onDeckOrder} {onDeckSlot.player?.last_name}
             </span>
           )}
           <div style={{ flex: 1 }} />
@@ -441,8 +454,9 @@ export default function InGameView({
             onClick={() => highlightedOrder != null && setHighlightedOrder(nextOrder(highlightedOrder))}
             style={{
               padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-              background: `rgba(232,160,32,0.2)`, border: `1px solid rgba(232,160,32,0.4)`,
-              color: ACCENT, cursor: 'pointer',
+              background: 'rgba(232,160,32,0.15)',
+              border: '0.5px solid rgba(232,160,32,0.4)',
+              color: '#E8A020', cursor: 'pointer',
             }}
           >
             Next →
@@ -450,9 +464,9 @@ export default function InGameView({
           <button
             onClick={() => setHighlightedOrder(null)}
             style={{
-              padding: '5px 10px', borderRadius: 6, fontSize: 14,
-              background: 'transparent', border: `1px solid ${BORDER}`,
-              color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
+              padding: '5px 10px', borderRadius: 6, fontSize: 16, lineHeight: 1,
+              background: 'transparent', border: '0.5px solid var(--border)',
+              color: 'rgba(var(--fg-rgb),0.3)', cursor: 'pointer',
             }}
           >
             ×
@@ -460,184 +474,188 @@ export default function InGameView({
         </div>
       )}
 
-      {/* ── MAIN CONTENT: batting order + scoreboard ── */}
+      {/* ── MAIN CONTENT ─────────────────────────────────────────────────────── */}
       <div style={{
-        flex: 1, display: 'flex', gap: 0,
-        flexWrap: 'wrap', alignItems: 'flex-start',
-        overflowY: 'auto',
+        flex: 1, display: 'flex', flexWrap: 'wrap',
+        alignItems: 'flex-start', minHeight: 0,
       }}>
 
         {/* ── BATTING ORDER (list mode) ── */}
         {viewMode === 'list' && (
-        <div style={{
-          flex: '1 1 320px', minWidth: 0,
-          borderRight: `1px solid ${BORDER}`,
-          overflowY: 'auto',
-        }}>
           <div style={{
-            padding: '10px 16px 4px',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)',
+            flex: '1 1 340px', minWidth: 0,
+            borderRight: '0.5px solid var(--border)',
+            overflowY: 'auto', height: '100%',
           }}>
-            Batting Order — Inning {inning + 1}
-          </div>
+            <div style={{
+              padding: '12px 16px 6px',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: 'rgba(var(--fg-rgb),0.3)',
+            }}>
+              Batting Order · Inning {inning + 1}
+            </div>
 
-          <div style={{ padding: '4px 10px 24px' }}>
-            {sortedSlots.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>
-                No lineup built yet.
-              </div>
-            ) : (
-              sortedSlots.map(s => {
-                const pos     = (s.inning_positions ?? [])[inning] as string | null
-                const isBench = pos === 'Bench' || pos === null
-                const pc      = pos && !isBench ? (POS_COLORS[pos] ?? null) : null
-                const isUp    = highlightedOrder != null && s.batting_order === highlightedOrder
-                const isNext  = onDeckOrder != null && s.batting_order === onDeckOrder && !isUp
+            <div style={{ padding: '4px 12px 32px' }}>
+              {sortedSlots.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '3rem 0',
+                  color: 'rgba(var(--fg-rgb),0.2)', fontSize: 14,
+                }}>
+                  No lineup built yet.
+                </div>
+              ) : (
+                sortedSlots.map(s => {
+                  const pos     = (s.inning_positions ?? [])[inning] as string | null
+                  const isBench = pos === 'Bench' || pos === null
+                  const pc      = pos && !isBench ? (POS_COLOR[pos] ?? null) : null
+                  const isUp    = highlightedOrder != null && s.batting_order === highlightedOrder
+                  const isNext  = onDeckOrder != null && s.batting_order === onDeckOrder && !isUp
 
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => tapPlayer(s)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 8px', marginBottom: 3,
-                      borderRadius: 10, cursor: 'pointer',
-                      background: isUp
-                        ? 'rgba(232,160,32,0.15)'
-                        : isNext
-                        ? 'rgba(232,160,32,0.06)'
-                        : isBench
-                        ? 'rgba(255,255,255,0.02)'
-                        : 'rgba(255,255,255,0.04)',
-                      border: isUp
-                        ? '1px solid rgba(232,160,32,0.4)'
-                        : isNext
-                        ? `1px solid rgba(232,160,32,0.2)`
-                        : `1px solid ${isBench ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)'}`,
-                      opacity: isBench ? 0.45 : 1,
-                      transition: 'background 0.12s',
-                    }}
-                  >
-                    {/* Batting number */}
-                    <div style={{
-                      width: 26, textAlign: 'center', flexShrink: 0,
-                      fontSize: 13, fontWeight: 700,
-                      color: isUp ? ACCENT : 'rgba(255,255,255,0.22)',
-                    }}>
-                      {s.batting_order ?? '·'}
-                    </div>
-
-                    {/* Jersey */}
-                    <div style={{
-                      width: 32, textAlign: 'center', flexShrink: 0,
-                      fontSize: 13, fontWeight: 700,
-                      color: isUp ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)',
-                    }}>
-                      {s.player?.jersey_number ?? '—'}
-                    </div>
-
-                    {/* Name */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => tapPlayer(s)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '10px 8px', marginBottom: 3, borderRadius: 8,
+                        cursor: 'pointer',
+                        background: isUp
+                          ? 'rgba(232,160,32,0.1)'
+                          : isNext
+                          ? 'rgba(232,160,32,0.05)'
+                          : 'var(--bg-card)',
+                        border: isUp
+                          ? '0.5px solid rgba(232,160,32,0.4)'
+                          : isNext
+                          ? '0.5px solid rgba(232,160,32,0.2)'
+                          : '0.5px solid var(--border-subtle)',
+                        opacity: isBench ? 0.45 : 1,
+                        transition: 'background 0.1s',
+                      }}
+                    >
+                      {/* Batting number */}
                       <div style={{
-                        fontSize: 22, fontWeight: 700, lineHeight: 1.1,
-                        letterSpacing: '-0.3px',
-                        color: isUp ? FG : isBench ? 'rgba(255,255,255,0.28)' : FG,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        width: 24, textAlign: 'center', flexShrink: 0,
+                        fontSize: 12, fontWeight: 700,
+                        color: isUp ? '#E8A020' : 'rgba(var(--fg-rgb),0.22)',
                       }}>
-                        {s.player?.first_name} {s.player?.last_name}
+                        {s.batting_order ?? '·'}
                       </div>
-                      {isUp && (
-                        <div style={{ fontSize: 10, fontWeight: 800, color: ACCENT, letterSpacing: '0.1em', marginTop: 1 }}>
-                          UP TO BAT
-                        </div>
-                      )}
-                      {isNext && !isUp && (
-                        <div style={{ fontSize: 10, color: 'rgba(232,160,32,0.55)', letterSpacing: '0.07em', marginTop: 1 }}>
-                          on deck
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Position badge */}
-                    <div style={{ flexShrink: 0 }}>
-                      {isBench ? (
-                        <span style={{
-                          fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 6,
-                          background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.18)',
-                          letterSpacing: '0.05em',
+                      {/* Jersey */}
+                      <div style={{
+                        width: 30, textAlign: 'center', flexShrink: 0,
+                        fontSize: 12, fontWeight: 700,
+                        color: isUp ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.3)',
+                      }}>
+                        #{s.player?.jersey_number ?? '—'}
+                      </div>
+
+                      {/* Name */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 20, fontWeight: 700, lineHeight: 1.15,
+                          color: isBench ? 'rgba(var(--fg-rgb),0.3)' : 'var(--fg)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
-                          {pos === 'Bench' ? 'BENCH' : '—'}
-                        </span>
-                      ) : (
-                        <span style={{
-                          fontSize: 18, fontWeight: 800, padding: '6px 12px', borderRadius: 8,
-                          background: pc ? pc.bg : 'rgba(255,255,255,0.1)',
-                          color: pc ? pc.color : FG,
-                          minWidth: 52, display: 'inline-block', textAlign: 'center',
-                          letterSpacing: '0.02em',
-                        }}>
-                          {pos}
-                        </span>
-                      )}
+                          {s.player?.first_name} {s.player?.last_name}
+                        </div>
+                        {isUp && (
+                          <div style={{ fontSize: 9, fontWeight: 800, color: '#E8A020', letterSpacing: '0.1em', marginTop: 1 }}>
+                            UP TO BAT
+                          </div>
+                        )}
+                        {isNext && !isUp && (
+                          <div style={{ fontSize: 9, color: 'rgba(232,160,32,0.5)', letterSpacing: '0.07em', marginTop: 1 }}>
+                            on deck
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Position badge */}
+                      <div style={{ flexShrink: 0 }}>
+                        {isBench ? (
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, padding: '4px 8px', borderRadius: 5,
+                            background: 'var(--bg-card-alt)',
+                            color: 'rgba(var(--fg-rgb),0.2)',
+                            letterSpacing: '0.04em',
+                          }}>
+                            {pos === 'Bench' ? 'BENCH' : '—'}
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: 15, fontWeight: 800, padding: '5px 10px', borderRadius: 6,
+                            background: pc ? pc.bg : 'var(--bg-card)',
+                            color: pc ? pc.color : 'var(--fg)',
+                            minWidth: 44, display: 'inline-block', textAlign: 'center',
+                          }}>
+                            {pos}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })
-            )}
+                  )
+                })
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* ── FIELD VIEW (field mode) ── */}
         {viewMode === 'field' && (
-        <div style={{ flex: '1 1 400px', minWidth: 0, borderRight: `1px solid ${BORDER}`, overflowY: 'auto' }}>
-          <FieldView
-            slots={localSlots}
-            inningCount={inningCount}
-            teamPositions={teamPositions}
-            readOnly={locked}
-            onAssign={assignPosition}
-            activeInning={inning}
-          />
-        </div>
+          <div style={{
+            flex: '1 1 400px', minWidth: 0,
+            borderRight: '0.5px solid var(--border)',
+            overflowY: 'auto', height: '100%',
+          }}>
+            <FieldView
+              slots={localSlots}
+              inningCount={inningCount}
+              teamPositions={teamPositions}
+              readOnly={locked}
+              onAssign={assignPosition}
+              activeInning={inning}
+            />
+          </div>
         )}
 
         {/* ── SCOREBOARD + CONTROLS ── */}
-        <div style={{ flex: '0 1 320px', minWidth: 260, padding: '14px 16px' }}>
+        <div style={{
+          flex: '0 1 300px', minWidth: 260,
+          padding: '16px 16px 32px',
+          overflowY: 'auto',
+        }}>
 
-          {/* Score section label */}
+          {/* Section label */}
           <div style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)',
-            marginBottom: 12,
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'rgba(var(--fg-rgb),0.3)',
+            marginBottom: 10,
           }}>
             Score by Inning
           </div>
 
           {/* Inning header row */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, paddingRight: 4 }}>
-            <div style={{ width: 72, flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, paddingRight: 2 }}>
+            <div style={{ width: 68, flexShrink: 0 }} />
             {Array.from({ length: inningCount }, (_, i) => (
-              <div
-                key={i}
-                style={{
-                  flex: 1, textAlign: 'center', fontSize: 11,
-                  fontWeight: i === inning ? 700 : 400,
-                  color: i === inning ? ACCENT : 'rgba(255,255,255,0.28)',
-                  minWidth: 28,
-                }}
-              >
+              <div key={i} style={{
+                flex: 1, textAlign: 'center', fontSize: 10,
+                fontWeight: i === inning ? 700 : 400,
+                color: i === inning ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.3)',
+                minWidth: 24,
+              }}>
                 {i + 1}
               </div>
             ))}
             <div style={{
-              width: 36, textAlign: 'center', flexShrink: 0,
-              fontSize: 11, color: 'rgba(255,255,255,0.28)', marginLeft: 4,
+              width: 34, textAlign: 'center', flexShrink: 0,
+              fontSize: 10, color: 'rgba(var(--fg-rgb),0.3)', marginLeft: 2,
             }}>R</div>
           </div>
 
-          {/* Our team row */}
+          {/* Score rows */}
           <ScoreRow
             label={teamName}
             isUs
@@ -645,60 +663,62 @@ export default function InGameView({
             total={usTotal}
             inningCount={inningCount}
             activeInning={inning}
-            locked={false}
             onChange={setUsInning}
           />
-
-          {/* Opponent row */}
           <ScoreRow
             label={game.opponent}
             values={them}
             total={themTotal}
             inningCount={inningCount}
             activeInning={inning}
-            locked={false}
             onChange={setThemInning}
           />
 
           {locked && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 8, textAlign: 'center' }}>
-              🔒 Position changes are locked
+            <div style={{
+              fontSize: 10, color: 'rgba(var(--fg-rgb),0.25)',
+              marginTop: 6, textAlign: 'center',
+            }}>
+              Score is always editable
             </div>
           )}
 
-          {/* ── End-game button (owner only, not yet final) ── */}
+          {/* ── End Game ── */}
           {isOwner && status !== 'final' && (
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 28 }}>
               {!showEndConfirm ? (
                 <button
                   onClick={() => setShowEndConfirm(true)}
                   style={{
-                    width: '100%', padding: '14px 0', borderRadius: 10, fontSize: 15,
-                    fontWeight: 700, border: '1px solid rgba(109,184,117,0.3)',
-                    background: 'rgba(109,184,117,0.08)', color: '#6DB875', cursor: 'pointer',
+                    width: '100%', padding: '12px 0', borderRadius: 8, fontSize: 14,
+                    fontWeight: 700,
+                    border: '0.5px solid rgba(109,184,117,0.35)',
+                    background: 'rgba(109,184,117,0.08)',
+                    color: '#6DB875', cursor: 'pointer',
                   }}
                 >
-                  End game
+                  End Game
                 </button>
               ) : (
                 <div style={{
                   padding: 16, borderRadius: 10,
-                  background: 'rgba(109,184,117,0.08)',
-                  border: '1px solid rgba(109,184,117,0.3)',
+                  background: 'var(--bg-card)',
+                  border: '0.5px solid var(--border-md)',
                 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: FG, marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', marginBottom: 6 }}>
                     Mark this game as Final?
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
-                    Final score: {usTotal}–{themTotal}. You'll be returned to the lineup editor.
+                  <div style={{ fontSize: 12, color: 'rgba(var(--fg-rgb),0.4)', marginBottom: 14, lineHeight: 1.5 }}>
+                    Final score: {usTotal}–{themTotal}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => setShowEndConfirm(false)}
                       style={{
                         flex: 1, padding: '10px 0', borderRadius: 7, fontSize: 13,
-                        border: `1px solid ${BORDER}`, background: 'transparent',
-                        color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+                        border: '0.5px solid var(--border-md)',
+                        background: 'transparent',
+                        color: 'rgba(var(--fg-rgb),0.5)', cursor: 'pointer',
                       }}
                     >
                       Cancel
@@ -709,7 +729,7 @@ export default function InGameView({
                       style={{
                         flex: 2, padding: '10px 0', borderRadius: 7, fontSize: 13,
                         fontWeight: 700, border: 'none',
-                        background: '#6DB875', color: '#050D1A',
+                        background: '#6DB875', color: '#0B1F3A',
                         cursor: savingStatus ? 'not-allowed' : 'pointer',
                         opacity: savingStatus ? 0.7 : 1,
                       }}
@@ -722,37 +742,40 @@ export default function InGameView({
             </div>
           )}
 
+          {/* ── Final card ── */}
           {status === 'final' && (
             <div style={{
-              marginTop: 32, padding: '14px 16px', borderRadius: 10,
-              background: 'rgba(109,184,117,0.1)', border: '1px solid rgba(109,184,117,0.25)',
+              marginTop: 28, padding: '16px', borderRadius: 10,
+              background: 'var(--bg-card)',
+              border: '0.5px solid rgba(109,184,117,0.3)',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#6DB875' }}>Game Final</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: FG, margin: '8px 0' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6DB875', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Game Final
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--fg)', margin: '8px 0 4px', letterSpacing: '-1px' }}>
                 {usTotal} – {themTotal}
               </div>
               <a
                 href={`/games/${game.id}/lineup/desktop`}
                 style={{
-                  display: 'inline-block', marginTop: 4, fontSize: 12,
-                  color: 'rgba(255,255,255,0.4)', textDecoration: 'none',
+                  fontSize: 12, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600,
                 }}
               >
-                Back to lineup →
+                Back to Lineup →
               </a>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── UNLOCK MODAL ── */}
+      {/* ── UNLOCK MODAL ─────────────────────────────────────────────────────── */}
       {showUnlockModal && (
         <div
           onClick={() => setShowUnlockModal(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(0,0,0,0.6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
           }}
@@ -760,23 +783,26 @@ export default function InGameView({
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#0D1F3C', border: `1px solid rgba(255,255,255,0.12)`,
-              borderRadius: 16, padding: '24px 20px', maxWidth: 320, width: '100%',
+              background: 'var(--bg2)',
+              border: '0.5px solid var(--border-md)',
+              borderRadius: 14, padding: '24px 20px',
+              maxWidth: 320, width: '100%',
             }}
           >
-            <div style={{ fontSize: 16, fontWeight: 700, color: FG, marginBottom: 8 }}>
-              Unlock screen?
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 8 }}>
+              Unlock positions?
             </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20, lineHeight: 1.5 }}>
-              This will allow the score and lineup to be edited. Unlock only if you need to make changes.
+            <div style={{ fontSize: 13, color: 'rgba(var(--fg-rgb),0.45)', marginBottom: 20, lineHeight: 1.55 }}>
+              This will allow field position changes. The score is always editable.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setShowUnlockModal(false)}
                 style={{
                   flex: 1, padding: '11px 0', borderRadius: 8, fontSize: 14,
-                  border: `1px solid ${BORDER}`, background: 'transparent',
-                  color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+                  border: '0.5px solid var(--border-md)',
+                  background: 'transparent',
+                  color: 'rgba(var(--fg-rgb),0.5)', cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -786,10 +812,11 @@ export default function InGameView({
                 style={{
                   flex: 2, padding: '11px 0', borderRadius: 8, fontSize: 14,
                   fontWeight: 700, border: 'none',
-                  background: '#E87060', color: '#fff', cursor: 'pointer',
+                  background: 'var(--accent)', color: 'var(--accent-text)',
+                  cursor: 'pointer',
                 }}
               >
-                Unlock
+                Unlock Positions
               </button>
             </div>
           </div>
@@ -800,10 +827,10 @@ export default function InGameView({
   )
 }
 
-// ── Score row sub-component ────────────────────────────────────────────────────
+// ── ScoreRow ──────────────────────────────────────────────────────────────────
 
 function ScoreRow({
-  label, isUs, values, total, inningCount, activeInning, locked, onChange,
+  label, isUs, values, total, inningCount, activeInning, onChange,
 }: {
   label: string
   isUs?: boolean
@@ -811,84 +838,69 @@ function ScoreRow({
   total: number
   inningCount: number
   activeInning: number
-  locked: boolean
   onChange: (i: number, val: string) => void
 }) {
-  const BG     = '#050D1A'
-  const FG     = '#F0F4FF'
-  const ACCENT = '#E8A020'
-
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', marginBottom: 6,
-      background: 'rgba(255,255,255,0.04)',
-      border: '0.5px solid rgba(255,255,255,0.08)',
+      display: 'flex', alignItems: 'center', marginBottom: 5,
+      background: 'var(--bg-card)',
+      border: '0.5px solid var(--border)',
       borderRadius: 8, overflow: 'hidden',
     }}>
-      {/* Team name */}
+      {/* Team label */}
       <div style={{
-        width: 72, flexShrink: 0, padding: '10px 8px 10px 12px',
-        fontSize: 13, fontWeight: isUs ? 700 : 500,
-        color: isUs ? FG : 'rgba(255,255,255,0.5)',
+        width: 68, flexShrink: 0, padding: '10px 8px 10px 10px',
+        fontSize: 12, fontWeight: isUs ? 700 : 500,
+        color: isUs ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.5)',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        borderRight: '0.5px solid rgba(255,255,255,0.07)',
+        borderRight: '0.5px solid var(--border)',
       }}>
         {label}
       </div>
 
-      {/* Inning cells */}
+      {/* Per-inning cells */}
       {Array.from({ length: inningCount }, (_, i) => {
         const isActive = i === activeInning
         const val = values[i]
         return (
-          <div
-            key={i}
-            style={{
-              flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center',
-              minWidth: 28, padding: '6px 2px',
-              background: isActive ? (isUs ? 'rgba(232,160,32,0.1)' : 'rgba(255,255,255,0.04)') : 'transparent',
-              borderLeft: isActive ? '0.5px solid rgba(232,160,32,0.2)' : '0.5px solid rgba(255,255,255,0.04)',
-              borderRight: isActive ? '0.5px solid rgba(232,160,32,0.2)' : '0.5px solid rgba(255,255,255,0.04)',
-            }}
-          >
-            {locked ? (
-              <span style={{
-                fontSize: 16, fontWeight: val != null ? 700 : 400,
-                color: val != null ? (isUs ? ACCENT : FG) : 'rgba(255,255,255,0.18)',
-                minWidth: 24, textAlign: 'center', display: 'block',
-              }}>
-                {val != null ? val : '·'}
-              </span>
-            ) : (
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={val ?? ''}
-                onChange={e => onChange(i, e.target.value)}
-                style={{
-                  width: 28, height: 32, textAlign: 'center',
-                  background: 'transparent',
-                  border: isActive
-                    ? `1px solid rgba(232,160,32,${isUs ? '0.5' : '0.25'})`
-                    : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 5,
-                  color: isUs ? ACCENT : FG,
-                  fontSize: 16, fontWeight: 700, padding: 0,
-                  outline: 'none',
-                }}
-              />
-            )}
+          <div key={i} style={{
+            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center',
+            minWidth: 24, padding: '5px 1px',
+            background: isActive
+              ? isUs ? 'rgba(75,156,211,0.1)' : 'var(--bg-card-alt)'
+              : 'transparent',
+            borderLeft:  isActive ? '0.5px solid rgba(75,156,211,0.25)' : '0.5px solid var(--border-subtle)',
+            borderRight: isActive ? '0.5px solid rgba(75,156,211,0.25)' : '0.5px solid var(--border-subtle)',
+          }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={val ?? ''}
+              onChange={e => onChange(i, e.target.value)}
+              style={{
+                width: 26, height: 30, textAlign: 'center',
+                background: 'transparent',
+                border: isActive
+                  ? `0.5px solid ${isUs ? 'rgba(75,156,211,0.5)' : 'rgba(75,156,211,0.2)'}`
+                  : '0.5px solid var(--border)',
+                borderRadius: 4,
+                color: isUs ? 'var(--accent)' : 'var(--fg)',
+                fontSize: 14, fontWeight: 700, padding: 0,
+                outline: 'none',
+              }}
+            />
           </div>
         )
       })}
 
       {/* Total */}
       <div style={{
-        width: 36, textAlign: 'center', flexShrink: 0,
-        fontSize: 20, fontWeight: 800, padding: '0 4px',
-        color: isUs ? ACCENT : 'rgba(255,255,255,0.55)',
-        borderLeft: '1px solid rgba(255,255,255,0.1)',
+        width: 34, textAlign: 'center', flexShrink: 0,
+        fontSize: 18, fontWeight: 800, padding: '0 2px',
+        color: isUs ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.6)',
+        borderLeft: '0.5px solid var(--border)',
+        marginLeft: 2,
       }}>
         {total}
       </div>
