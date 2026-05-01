@@ -169,13 +169,11 @@ export default function InGameView({
   }
 
   function setUsInning(i: number, val: string) {
-    if (locked) return
     const n = val === '' ? null : Math.max(0, Math.min(99, parseInt(val) || 0))
     const next = [...us]; next[i] = n; setUs(next); scheduleSave(next, them)
   }
 
   function setThemInning(i: number, val: string) {
-    if (locked) return
     const n = val === '' ? null : Math.max(0, Math.min(99, parseInt(val) || 0))
     const next = [...them]; next[i] = n; setThem(next); scheduleSave(us, next)
   }
@@ -647,7 +645,7 @@ export default function InGameView({
             total={usTotal}
             inningCount={inningCount}
             activeInning={inning}
-            locked={locked}
+            locked={false}
             onChange={setUsInning}
           />
 
@@ -658,13 +656,13 @@ export default function InGameView({
             total={themTotal}
             inningCount={inningCount}
             activeInning={inning}
-            locked={locked}
+            locked={false}
             onChange={setThemInning}
           />
 
           {locked && (
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 8, textAlign: 'center' }}>
-              Tap 🔒 in the header to edit the score
+              🔒 Position changes are locked
             </div>
           )}
 
