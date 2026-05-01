@@ -124,6 +124,7 @@ export default function FieldView({
   onAssign,
   onSwap,
   onCopyInning,
+  activeInning,
 }: {
   slots: any[]
   inningCount: number
@@ -132,8 +133,10 @@ export default function FieldView({
   onAssign: (slotId: string, ii: number, pos: string | null) => void
   onSwap?: (slotId1: string, slotId2: string, ii: number) => void
   onCopyInning?: (from: number, to: number[]) => void
+  activeInning?: number
 }) {
-  const [inning,          setInning]          = useState(0)
+  const [internalInning, setInning] = useState(0)
+  const inning = activeInning ?? internalInning
   const [popover,         setPopover]         = useState<Popover | null>(null)
   const [swapMode,        setSwapMode]        = useState(false)
   const [swapFirst,       setSwapFirst]       = useState<string | null>(null)
@@ -499,8 +502,8 @@ export default function FieldView({
     <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column',
       background: 'var(--bg)', padding: '14px 20px 40px' }}>
 
-      {/* ── Inning selector ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
+      {/* ── Inning selector (hidden when controlled externally via activeInning) ── */}
+      {activeInning === undefined && <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
           letterSpacing: '0.09em', color: `rgba(var(--fg-rgb),0.35)`,
@@ -589,7 +592,7 @@ export default function FieldView({
             marginBottom: 3,
           }}
         >›</button>
-      </div>
+      </div>}
 
       {/* ── Toolbar: swap mode ── */}
       {!readOnly && (

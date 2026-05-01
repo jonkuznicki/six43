@@ -90,7 +90,7 @@ export default function InGameView({
   const [showEndConfirm,  setShowEndConfirm]  = useState(false)
 
   // ── View mode (list = batting order, field = FieldView) ──────────────────
-  const [viewMode, setViewMode] = useState<'list' | 'field'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'field'>('field')
   const [localSlots, setLocalSlots] = useState<any[]>(slots)
 
   // ── Body class: hide games-left-nav while in-game view is open ───────────
@@ -600,6 +600,7 @@ export default function InGameView({
             teamPositions={teamPositions}
             readOnly={locked}
             onAssign={assignPosition}
+            activeInning={inning}
           />
         </div>
         )}
