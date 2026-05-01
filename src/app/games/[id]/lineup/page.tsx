@@ -327,6 +327,45 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     }
   }
 
+  async function swapPositions(slotId1: string, slotId2: string, ii: number) {
+    const s1 = slots.find(s => s.id === slotId1)
+    const s2 = slots.find(s => s.id === slotId2)
+    if (!s1 || !s2) return
+    const pos1 = (s1.inning_positions ?? [])[ii] as string | null
+    const pos2 = (s2.inning_positions ?? [])[ii] as string | null
+    setSlots(prev => {
+      const next = prev.map(s => ({ ...s, inning_positions: [...(s.inning_positions ?? [])] }))
+      const n1 = next.find(s => s.id === slotId1)
+      const n2 = next.find(s => s.id === slotId2)
+      if (n1) n1.inning_positions[ii] = pos2 ?? null
+      if (n2) n2.inning_positions[ii] = pos1 ?? null
+      return next
+    })
+    const upd1 = [...(s1.inning_positions ?? [])]; upd1[ii] = pos2 ?? null
+    const upd2 = [...(s2.inning_positions ?? [])]; upd2[ii] = pos1 ?? null
+    await Promise.all([
+      supabase.from('lineup_slots').update({ inning_positions: upd1 }).eq('id', slotId1),
+      supabase.from('lineup_slots').update({ inning_positions: upd2 }).eq('id', slotId2),
+    ])
+  }
+
+  async function copyInningToAll(from: number, to: number[]) {
+    const activeS = slots.filter(s => s.availability !== 'absent')
+    const updates = activeS.map(s => {
+      const sourcePos = (s.inning_positions ?? [])[from] ?? null
+      const newPositions = [...(s.inning_positions ?? [])]
+      for (const ii of to) newPositions[ii] = sourcePos
+      return { id: s.id, inning_positions: newPositions }
+    })
+    setSlots(prev => prev.map(s => {
+      const u = updates.find(u => u.id === s.id)
+      return u ? { ...s, inning_positions: u.inning_positions } : s
+    }))
+    await Promise.all(updates.map(u =>
+      supabase.from('lineup_slots').update({ inning_positions: u.inning_positions }).eq('id', u.id)
+    ))
+  }
+
   // ── PAINT CELL (paint mode: toggle active position) ────────
   function paintCell(slotId: string, inningIndex: number) {
     const slot = slots.find(s => s.id === slotId)
@@ -673,6 +712,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             teamPositions={teamPositions}
             readOnly={false}
             onAssign={assignPosition}
+            onSwap={swapPositions}
+            onCopyInning={copyInningToAll}
           />
         )}
 

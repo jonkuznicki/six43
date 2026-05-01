@@ -555,6 +555,34 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     commit(next, changedIds)
   }
 
+  function swapPositions(slotId1: string, slotId2: string, ii: number) {
+    const s1 = slotsRef.current.find(s => s.id === slotId1)
+    const s2 = slotsRef.current.find(s => s.id === slotId2)
+    if (!s1 || !s2) return
+    const pos1 = (s1.inning_positions ?? [])[ii] as string | null
+    const pos2 = (s2.inning_positions ?? [])[ii] as string | null
+    const next = slotsRef.current.map(s => ({
+      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
+    }))
+    const n1 = next.find(s => s.id === slotId1)
+    const n2 = next.find(s => s.id === slotId2)
+    if (n1) n1.inning_positions[ii] = pos2 ?? null
+    if (n2) n2.inning_positions[ii] = pos1 ?? null
+    commit(next, [slotId1, slotId2])
+  }
+
+  function copyInningToAll(from: number, to: number[]) {
+    const next = slotsRef.current.map(s => {
+      if (s.availability === 'absent') return { ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])] }
+      const sourcePos = (s.inning_positions ?? [])[from] ?? null
+      const newPositions = [...(s.inning_positions ?? [...BLANK])]
+      for (const ii of to) newPositions[ii] = sourcePos
+      return { ...s, inning_positions: newPositions }
+    })
+    const changedIds = next.filter(s => s.availability !== 'absent').map(s => s.id)
+    commit(next, changedIds)
+  }
+
   // Fill all currently selected cells with a position (called from palette or key shortcut)
   function fillSelected(pos: string) {
     if (readOnly) return
@@ -1349,6 +1377,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           teamPositions={teamPositions}
           readOnly={readOnly}
           onAssign={assignPosition}
+          onSwap={swapPositions}
+          onCopyInning={copyInningToAll}
         />
       )}
 

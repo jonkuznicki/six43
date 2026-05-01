@@ -81,7 +81,6 @@ function FieldSVG() {
       {/* Infield dirt — the diamond */}
       <polygon points="200,420 280,340 200,260 120,340" fill="#7a4f2a" opacity="0.75" />
 
-
       {/* Base paths */}
       <line x1="200" y1="420" x2="280" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
       <line x1="280" y1="340" x2="200" y2="260" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
@@ -123,30 +122,42 @@ export default function FieldView({
   teamPositions,
   readOnly,
   onAssign,
+  onSwap,
+  onCopyInning,
 }: {
   slots: any[]
   inningCount: number
   teamPositions: string[]
   readOnly: boolean
   onAssign: (slotId: string, ii: number, pos: string | null) => void
+  onSwap?: (slotId1: string, slotId2: string, ii: number) => void
+  onCopyInning?: (from: number, to: number[]) => void
 }) {
-  const [inning,  setInning]  = useState(0)
-  const [popover, setPopover] = useState<Popover | null>(null)
+  const [inning,          setInning]          = useState(0)
+  const [popover,         setPopover]         = useState<Popover | null>(null)
+  const [swapMode,        setSwapMode]        = useState(false)
+  const [swapFirst,       setSwapFirst]       = useState<string | null>(null)
+  const [highlightedOrder, setHighlightedOrder] = useState<number | null>(null)
+  const [isMobile,        setIsMobile]        = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 600)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const activeSlots    = slots.filter(s => s.availability !== 'absent')
   const absentSlots    = slots.filter(s => s.availability === 'absent')
-  // Positions this component can show on the field diagram
   const fieldPositions = teamPositions.filter(p => p !== 'Bench' && p in FIELD_COORDS)
 
-  // Player at each field position for the current inning
   const posToSlot: Record<string, any> = {}
   for (const s of activeSlots) {
     const p = (s.inning_positions ?? [])[inning]
     if (p && p !== 'Bench' && p in FIELD_COORDS) posToSlot[p] = s
   }
 
-  // Bench = explicitly assigned 'Bench', or a position the field diagram doesn't cover
   const benchSlots = activeSlots.filter(s => {
     const p = (s.inning_positions ?? [])[inning]
     return p === 'Bench' || (p && !(p in FIELD_COORDS))
@@ -156,7 +167,6 @@ export default function FieldView({
     return p === null || p === undefined
   })
 
-  // Positions with duplicates this inning (for red border)
   const dupePosSet = new Set<string>()
   const counts: Record<string, number> = {}
   for (const s of activeSlots) {
@@ -165,17 +175,39 @@ export default function FieldView({
   }
   for (const [p, c] of Object.entries(counts)) if (c > 1) dupePosSet.add(p)
 
-  // Per-inning completion dots for the inning selector
   const inningStatuses = Array.from({ length: inningCount }, (_, ii) => {
     const c: Record<string, number> = {}
+    let filled = 0
     for (const s of activeSlots) {
       const p = (s.inning_positions ?? [])[ii]
-      if (p) c[p] = (c[p] ?? 0) + 1
+      if (p) { filled++; if (p !== 'Bench') c[p] = (c[p] ?? 0) + 1 }
     }
-    const hasDupe = Object.entries(c).some(([p, v]) => p !== 'Bench' && v > 1)
-    const missing = activeSlots.filter(s => !(s.inning_positions ?? [])[ii]).length
-    return { complete: !hasDupe && missing === 0 && activeSlots.length > 0, hasDupe }
+    const hasDupe = Object.entries(c).some(([, v]) => v > 1)
+    const missing = activeSlots.length - filled
+    return {
+      complete: !hasDupe && missing === 0 && activeSlots.length > 0,
+      hasDupe,
+      filled,
+      total: activeSlots.length,
+    }
   })
+
+  // Sorted active slots by batting order for highlight cycling
+  const sortedOrders = [...activeSlots]
+    .map(s => s.batting_order)
+    .filter((o): o is number => o != null)
+    .sort((a, b) => a - b)
+
+  function nextBattingOrder(current: number): number | null {
+    if (!sortedOrders.length) return null
+    const idx = sortedOrders.indexOf(current)
+    if (idx === -1) return sortedOrders[0]
+    return sortedOrders[(idx + 1) % sortedOrders.length]
+  }
+
+  const upSlot     = highlightedOrder != null ? activeSlots.find(s => s.batting_order === highlightedOrder) : null
+  const onDeckOrder = highlightedOrder != null ? nextBattingOrder(highlightedOrder) : null
+  const onDeckSlot  = onDeckOrder != null ? activeSlots.find(s => s.batting_order === onDeckOrder) : null
 
   // Dismiss popover on outside click
   useEffect(() => {
@@ -206,36 +238,56 @@ export default function FieldView({
     setPopover(null)
   }
 
-  // ── Popover ────────────────────────────────────────────────────────────────
+  function handleChipClick(pos: string, slot: any | null, e: React.MouseEvent) {
+    if (swapMode) {
+      if (!slot) { setSwapFirst(null); return }
+      if (!swapFirst) { setSwapFirst(slot.id); return }
+      if (swapFirst === slot.id) { setSwapFirst(null); return }
+      // Execute the swap
+      if (onSwap) {
+        onSwap(swapFirst, slot.id, inning)
+      } else {
+        const s1 = slots.find(s => s.id === swapFirst)
+        const pos1 = (s1?.inning_positions ?? [])[inning] as string | null
+        const pos2 = (slot.inning_positions ?? [])[inning] as string | null
+        onAssign(swapFirst, inning, pos2)
+        onAssign(slot.id,   inning, pos1)
+      }
+      setSwapFirst(null)
+      return
+    }
+    if (slot) openPlayerPopover(slot, e)
+    else openPositionPopover(pos, e)
+  }
 
-  function renderPopover() {
+  function handleBattingOrderClick(slot: any, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (slot.batting_order == null) return
+    if (highlightedOrder === slot.batting_order) {
+      setHighlightedOrder(nextBattingOrder(slot.batting_order))
+    } else {
+      setHighlightedOrder(slot.batting_order)
+    }
+  }
+
+  function slotInningCount(slot: any): number {
+    return (slot.inning_positions ?? []).slice(0, inningCount)
+      .filter((p: string | null) => p != null).length
+  }
+
+  const currentInningHasCoverage = activeSlots.some(s => !!(s.inning_positions ?? [])[inning])
+
+  // ── Popover content (shared between floating and bottom-sheet) ─────────────
+
+  function renderPopoverContent() {
     if (!popover) return null
 
-    const { rect } = popover
-    const vpW = window.innerWidth
-    const vpH = window.innerHeight
-    const w   = 232
-    let left  = rect.left
-    let top   = rect.bottom + 6
-    if (left + w > vpW - 8) left = vpW - w - 8
-    if (left < 8) left = 8
-    if (top + 260 > vpH) top = Math.max(8, rect.top - 260)
-
-    const panelStyle: React.CSSProperties = {
-      position: 'fixed', left, top, width: w, zIndex: 400,
-      background: 'var(--bg2)', border: '0.5px solid var(--border-md)',
-      borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
-      overflow: 'hidden',
-    }
-
-    // ── Player-first: move this player somewhere ────────────────────────────
     if (popover.kind === 'player') {
       const slot       = slots.find(s => s.id === popover.slotId)
       if (!slot) return null
       const currentPos = (slot.inning_positions ?? [])[inning] as string | null
-
       return (
-        <div ref={popoverRef} style={panelStyle}>
+        <>
           <div style={{ padding: '9px 11px 6px', borderBottom: '0.5px solid var(--border)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>
               {slot.player?.first_name} {slot.player?.last_name}
@@ -248,10 +300,10 @@ export default function FieldView({
           <div style={{ padding: 8 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {teamPositions.map(pos => {
-                const isCurrent  = currentPos === pos
-                const occupant   = pos !== 'Bench' && pos in FIELD_COORDS ? posToSlot[pos] : null
-                const willSwap   = occupant && occupant.id !== slot.id
-                const pc         = POS_COLOR[pos]
+                const isCurrent = currentPos === pos
+                const occupant  = pos !== 'Bench' && pos in FIELD_COORDS ? posToSlot[pos] : null
+                const willSwap  = occupant && occupant.id !== slot.id
+                const pc        = POS_COLOR[pos]
                 return (
                   <button
                     key={pos}
@@ -267,7 +319,7 @@ export default function FieldView({
                       color:      isCurrent ? (pc?.text ?? 'var(--fg)')    : `rgba(var(--fg-rgb),0.7)`,
                     }}
                   >
-                    {pos === 'Bench' ? 'Bench' : pos}
+                    {pos}
                     {willSwap && (
                       <span style={{ display: 'block', fontSize: 8, fontWeight: 400, color: `rgba(var(--fg-rgb),0.38)`, lineHeight: 1.2 }}>
                         ↕ {lastName(occupant.player)}
@@ -290,18 +342,16 @@ export default function FieldView({
               </button>
             )}
           </div>
-        </div>
+        </>
       )
     }
 
-    // ── Position-first: who plays here ─────────────────────────────────────
     if (popover.kind === 'position') {
-      const { pos }   = popover
-      const pc        = POS_COLOR[pos]
-      const current   = posToSlot[pos]
-
+      const { pos } = popover
+      const pc      = POS_COLOR[pos]
+      const current = posToSlot[pos]
       return (
-        <div ref={popoverRef} style={panelStyle}>
+        <>
           <div style={{ padding: '9px 11px 6px', borderBottom: '0.5px solid var(--border)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: pc?.text ?? 'var(--fg)' }}>
               {pos} · Inning {inning + 1}
@@ -314,7 +364,7 @@ export default function FieldView({
           </div>
           <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
             {activeSlots.map(s => {
-              const sPos     = (s.inning_positions ?? [])[inning] as string | null
+              const sPos      = (s.inning_positions ?? [])[inning] as string | null
               const isCurrent = s.id === current?.id
               return (
                 <button
@@ -322,7 +372,8 @@ export default function FieldView({
                   onClick={() => applyAssign(s.id, pos)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                    padding: '7px 11px', background: isCurrent ? (pc?.bg ?? 'var(--bg-card)') : 'transparent',
+                    padding: '7px 11px',
+                    background: isCurrent ? (pc?.bg ?? 'var(--bg-card)') : 'transparent',
                     border: 'none', cursor: 'pointer', textAlign: 'left',
                     color: isCurrent ? (pc?.text ?? 'var(--fg)') : 'var(--fg)',
                     fontSize: 13, fontWeight: isCurrent ? 700 : 400,
@@ -357,11 +408,62 @@ export default function FieldView({
               </button>
             )}
           </div>
-        </div>
+        </>
       )
     }
 
     return null
+  }
+
+  function renderPopover() {
+    if (!popover) return null
+
+    if (isMobile) {
+      return (
+        <div
+          onClick={() => setPopover(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            zIndex: 500, display: 'flex', alignItems: 'flex-end',
+          }}
+        >
+          <div
+            ref={popoverRef}
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxHeight: '70vh', overflowY: 'auto',
+              background: 'var(--bg2)', borderRadius: '16px 16px 0 0',
+              border: '0.5px solid var(--border-md)',
+              boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }}
+          >
+            {renderPopoverContent()}
+          </div>
+        </div>
+      )
+    }
+
+    const { rect } = popover
+    const vpW = window.innerWidth
+    const vpH = window.innerHeight
+    const w   = 232
+    let left  = rect.left
+    let top   = rect.bottom + 6
+    if (left + w > vpW - 8) left = vpW - w - 8
+    if (left < 8) left = 8
+    if (top + 260 > vpH) top = Math.max(8, rect.top - 260)
+
+    return (
+      <div ref={popoverRef} style={{
+        position: 'fixed', left, top, width: w, zIndex: 400,
+        background: 'var(--bg2)', border: '0.5px solid var(--border-md)',
+        borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+        overflow: 'hidden',
+      }}>
+        {renderPopoverContent()}
+      </div>
+    )
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -371,51 +473,82 @@ export default function FieldView({
       background: 'var(--bg)', padding: '14px 20px 40px' }}>
 
       {/* ── Inning selector ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.09em', color: `rgba(var(--fg-rgb),0.35)`, marginRight: 6,
+          letterSpacing: '0.09em', color: `rgba(var(--fg-rgb),0.35)`,
+          marginRight: 6, marginBottom: 3,
         }}>
           Inning
         </span>
         {Array.from({ length: inningCount }, (_, i) => {
           const s = inningStatuses[i]
+          const fillPct = s.total > 0 ? s.filled / s.total : 0
           return (
-            <button
-              key={i}
-              onClick={() => setInning(i)}
-              style={{
-                position: 'relative', width: 34, height: 34, borderRadius: 7,
-                border: inning === i ? '1.5px solid var(--accent)' : '0.5px solid var(--border)',
-                background: inning === i ? 'rgba(75,156,211,0.12)' : 'transparent',
-                color: inning === i ? 'var(--accent)' : `rgba(var(--fg-rgb),0.55)`,
-                fontSize: 13, fontWeight: inning === i ? 700 : 400, cursor: 'pointer',
-              }}
-            >
-              {i + 1}
-              {s.complete && !s.hasDupe && (
-                <span style={{
-                  position: 'absolute', top: -3, right: -3, width: 8, height: 8,
-                  borderRadius: '50%', background: '#6DB875', border: '1.5px solid var(--bg)',
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <button
+                onClick={() => setInning(i)}
+                style={{
+                  position: 'relative', width: 34, height: 34, borderRadius: 7,
+                  border: inning === i ? '1.5px solid var(--accent)' : '0.5px solid var(--border)',
+                  background: inning === i ? 'rgba(75,156,211,0.12)' : 'transparent',
+                  color: inning === i ? 'var(--accent)' : `rgba(var(--fg-rgb),0.55)`,
+                  fontSize: 13, fontWeight: inning === i ? 700 : 400, cursor: 'pointer',
+                }}
+              >
+                {i + 1}
+                {s.complete && !s.hasDupe && (
+                  <span style={{
+                    position: 'absolute', top: -3, right: -3, width: 8, height: 8,
+                    borderRadius: '50%', background: '#6DB875', border: '1.5px solid var(--bg)',
+                  }} />
+                )}
+                {s.hasDupe && (
+                  <span style={{
+                    position: 'absolute', top: -3, right: -3, width: 8, height: 8,
+                    borderRadius: '50%', background: '#E87060', border: '1.5px solid var(--bg)',
+                  }} />
+                )}
+              </button>
+              {/* Fill progress bar */}
+              <div style={{ width: 34, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${fillPct * 100}%`,
+                  borderRadius: 2,
+                  background: s.hasDupe ? '#E87060' : s.complete ? '#6DB875' : 'rgba(75,156,211,0.55)',
+                  transition: 'width 0.2s',
                 }} />
-              )}
-              {s.hasDupe && (
-                <span style={{
-                  position: 'absolute', top: -3, right: -3, width: 8, height: 8,
-                  borderRadius: '50%', background: '#E87060', border: '1.5px solid var(--bg)',
-                }} />
-              )}
-            </button>
+              </div>
+            </div>
           )
         })}
         <div style={{ flex: 1 }} />
+        {!readOnly && onCopyInning && currentInningHasCoverage && (
+          <button
+            onClick={() => {
+              const targets = Array.from({ length: inningCount }, (_, i) => i).filter(i => i !== inning)
+              onCopyInning(inning, targets)
+            }}
+            title="Copy this inning's assignments to all other innings"
+            style={{
+              padding: '5px 9px', background: 'transparent', fontSize: 11,
+              border: '0.5px solid var(--border)', borderRadius: 6, cursor: 'pointer',
+              color: `rgba(var(--fg-rgb),0.5)`, marginBottom: 3,
+            }}
+          >
+            Copy to all
+          </button>
+        )}
         <button
           onClick={() => setInning(i => Math.max(0, i - 1))}
           disabled={inning === 0}
           style={{
             padding: '5px 9px', background: 'transparent', fontSize: 15,
-            border: '0.5px solid var(--border)', borderRadius: 6, cursor: inning > 0 ? 'pointer' : 'default',
+            border: '0.5px solid var(--border)', borderRadius: 6,
+            cursor: inning > 0 ? 'pointer' : 'default',
             color: inning > 0 ? `rgba(var(--fg-rgb),0.6)` : `rgba(var(--fg-rgb),0.2)`,
+            marginBottom: 3,
           }}
         >‹</button>
         <button
@@ -426,9 +559,74 @@ export default function FieldView({
             border: '0.5px solid var(--border)', borderRadius: 6,
             cursor: inning < inningCount - 1 ? 'pointer' : 'default',
             color: inning < inningCount - 1 ? `rgba(var(--fg-rgb),0.6)` : `rgba(var(--fg-rgb),0.2)`,
+            marginBottom: 3,
           }}
         >›</button>
       </div>
+
+      {/* ── Toolbar: swap mode ── */}
+      {!readOnly && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={() => { setSwapMode(m => !m); setSwapFirst(null) }}
+            style={{
+              padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+              background: swapMode ? 'rgba(75,156,211,0.2)' : 'transparent',
+              border: swapMode ? '1px solid var(--accent)' : '0.5px solid var(--border)',
+              color: swapMode ? 'var(--accent)' : `rgba(var(--fg-rgb),0.45)`,
+            }}
+          >
+            ↔ Swap
+          </button>
+          {swapMode && (
+            <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.38)` }}>
+              {swapFirst
+                ? 'Now tap the player to swap with'
+                : 'Tap a player to select'}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Game-day batter highlight bar ── */}
+      {highlightedOrder != null && upSlot && (
+        <div style={{
+          marginBottom: 12, padding: '8px 14px',
+          background: 'rgba(75,156,211,0.1)', borderRadius: 8,
+          border: '0.5px solid rgba(75,156,211,0.28)',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#4B9CD3', letterSpacing: '0.08em' }}>UP</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)' }}>
+            #{highlightedOrder} {upSlot.player?.first_name} {lastName(upSlot.player)}
+          </span>
+          {onDeckSlot && (
+            <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.4)` }}>
+              · on deck: #{onDeckOrder} {lastName(onDeckSlot.player)}
+            </span>
+          )}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={() => setHighlightedOrder(nextBattingOrder(highlightedOrder))}
+            style={{
+              padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600,
+              background: 'rgba(75,156,211,0.18)', border: '0.5px solid rgba(75,156,211,0.35)',
+              color: 'var(--accent)', cursor: 'pointer',
+            }}
+          >
+            Next →
+          </button>
+          <button
+            onClick={() => setHighlightedOrder(null)}
+            style={{
+              padding: '3px 8px', borderRadius: 5, fontSize: 12,
+              background: 'transparent', border: '0.5px solid var(--border)',
+              color: `rgba(var(--fg-rgb),0.35)`, cursor: 'pointer',
+            }}
+          >×</button>
+        </div>
+      )}
 
       {/* ── Main layout: field + sidebar ── */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -443,18 +641,20 @@ export default function FieldView({
         }}>
           <FieldSVG />
 
-          {/* Player chips + empty position markers */}
           {fieldPositions.map(pos => {
             const coords = FIELD_COORDS[pos]
             if (!coords) return null
-            const slot   = posToSlot[pos]
-            const pc     = POS_COLOR[pos]
-            const isDupe = dupePosSet.has(pos)
+            const slot          = posToSlot[pos]
+            const pc            = POS_COLOR[pos]
+            const isDupe        = dupePosSet.has(pos)
+            const isSwapSelect  = swapMode && swapFirst === slot?.id
+            const isUp          = slot != null && highlightedOrder != null && slot.batting_order === highlightedOrder
+            const isOnDeck      = slot != null && onDeckOrder != null && slot.batting_order === onDeckOrder && !isUp
 
             return (
               <div
                 key={pos}
-                onClick={e => slot ? openPlayerPopover(slot, e) : openPositionPopover(pos, e)}
+                onClick={e => handleChipClick(pos, slot ?? null, e)}
                 style={{
                   position: 'absolute',
                   top: `${coords.top}%`, left: `${coords.left}%`,
@@ -464,12 +664,25 @@ export default function FieldView({
                   cursor: readOnly ? 'default' : 'pointer',
                   backdropFilter: 'blur(6px)',
                   WebkitBackdropFilter: 'blur(6px)',
-                  background: slot
+                  background: isUp
+                    ? 'rgba(75,156,211,0.55)'
+                    : slot
                     ? (pc?.bg ?? 'rgba(0,0,0,0.5)')
                     : 'rgba(0,0,0,0.3)',
-                  border: slot
+                  border: isSwapSelect
+                    ? '2px solid var(--accent)'
+                    : isUp
+                    ? '2px solid #4B9CD3'
+                    : isOnDeck
+                    ? '1.5px solid rgba(75,156,211,0.45)'
+                    : slot
                     ? `1.5px solid ${isDupe ? '#E87060' : (pc?.text ?? 'rgba(255,255,255,0.35)')}`
                     : '1.5px dashed rgba(255,255,255,0.22)',
+                  boxShadow: isUp
+                    ? '0 0 14px rgba(75,156,211,0.55)'
+                    : isSwapSelect
+                    ? '0 0 8px rgba(75,156,211,0.4)'
+                    : 'none',
                   transition: 'transform 0.1s, box-shadow 0.1s',
                 }}
                 onMouseEnter={e => {
@@ -485,25 +698,48 @@ export default function FieldView({
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       gap: 5, lineHeight: 1.3,
                     }}>
-                      <span style={{
-                        fontSize: 8, fontWeight: 700,
-                        color: 'rgba(255,255,255,0.5)', minWidth: 8,
-                      }}>
+                      {/* Batting order — click to activate game-day highlight */}
+                      <span
+                        onClick={e => handleBattingOrderClick(slot, e)}
+                        style={{
+                          fontSize: 8, fontWeight: 700, minWidth: 8,
+                          color: isUp ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)',
+                          cursor: 'pointer',
+                        }}
+                      >
                         {slot.batting_order ?? ''}
                       </span>
                       <span style={{
                         fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
-                        textTransform: 'uppercase', color: pc?.text ?? 'rgba(255,255,255,0.9)',
+                        textTransform: 'uppercase',
+                        color: isUp ? '#fff' : (pc?.text ?? 'rgba(255,255,255,0.9)'),
                       }}>
                         {pos}
                       </span>
                     </div>
                     <div style={{
                       fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-                      color: 'rgba(255,255,255,0.95)', lineHeight: 1.2, textAlign: 'center',
+                      color: isUp ? '#fff' : 'rgba(255,255,255,0.95)',
+                      lineHeight: 1.2, textAlign: 'center',
                     }}>
                       {lastName(slot.player)}
                     </div>
+                    {isUp && (
+                      <div style={{
+                        fontSize: 7, fontWeight: 800, color: 'rgba(255,255,255,0.9)',
+                        letterSpacing: '0.12em', textAlign: 'center', marginTop: 2,
+                      }}>
+                        UP
+                      </div>
+                    )}
+                    {isOnDeck && (
+                      <div style={{
+                        fontSize: 7, color: 'rgba(75,156,211,0.85)',
+                        letterSpacing: '0.08em', textAlign: 'center', marginTop: 2,
+                      }}>
+                        next
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -535,26 +771,43 @@ export default function FieldView({
             <div style={sectionLabel}>Bench</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {benchSlots.map(s => {
-                const sPos = (s.inning_positions ?? [])[inning] as string
+                const sPos    = (s.inning_positions ?? [])[inning] as string
+                const innCnt  = slotInningCount(s)
+                const isUpB   = highlightedOrder != null && s.batting_order === highlightedOrder
                 return (
                   <div
                     key={s.id}
                     onClick={e => openPlayerPopover(s, e)}
                     style={{
                       padding: '6px 10px', borderRadius: 6,
-                      background: 'rgba(160,160,160,0.1)',
-                      border: '0.5px solid rgba(160,160,160,0.25)',
+                      background: isUpB ? 'rgba(75,156,211,0.12)' : 'rgba(160,160,160,0.1)',
+                      border: isUpB
+                        ? '0.5px solid rgba(75,156,211,0.35)'
+                        : '0.5px solid rgba(160,160,160,0.25)',
                       fontSize: 13, fontWeight: 500,
                       color: `rgba(var(--fg-rgb),0.65)`,
                       cursor: readOnly ? 'default' : 'pointer',
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
-                    <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.3)`, minWidth: 14, flexShrink: 0 }}>
+                    <span
+                      onClick={e => handleBattingOrderClick(s, e)}
+                      style={{
+                        fontSize: 10,
+                        color: isUpB ? 'var(--accent)' : `rgba(var(--fg-rgb),0.3)`,
+                        minWidth: 14, flexShrink: 0, cursor: 'pointer',
+                      }}
+                    >
                       {s.batting_order ?? ''}
                     </span>
                     <span style={{ flex: 1 }}>
                       {s.player?.first_name?.[0]}. {lastName(s.player)}
+                    </span>
+                    {isUpB && (
+                      <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)' }}>UP</span>
+                    )}
+                    <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.25)` }}>
+                      {innCnt}/{inningCount}
                     </span>
                     {sPos && sPos !== 'Bench' && (
                       <span style={{ fontSize: 9, color: `rgba(var(--fg-rgb),0.35)` }}>{sPos}</span>
@@ -575,24 +828,41 @@ export default function FieldView({
             <div style={{ marginBottom: 18 }}>
               <div style={{ ...sectionLabel, color: '#E8A020' }}>⚠ Unassigned</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {unassigned.map(s => (
-                  <div
-                    key={s.id}
-                    onClick={e => openPlayerPopover(s, e)}
-                    style={{
-                      padding: '6px 10px', borderRadius: 6,
-                      background: 'rgba(232,160,32,0.08)',
-                      border: '0.5px solid rgba(232,160,32,0.3)',
-                      fontSize: 13, fontWeight: 600, color: '#E8A020',
-                      cursor: readOnly ? 'default' : 'pointer',
-                    }}
-                  >
-                    <span style={{ fontSize: 10, color: 'rgba(232,160,32,0.6)', marginRight: 4, flexShrink: 0 }}>
-                      {s.batting_order ?? ''}
-                    </span>
-                    {s.player?.first_name?.[0]}. {lastName(s.player)}
-                  </div>
-                ))}
+                {unassigned.map(s => {
+                  const innCnt = slotInningCount(s)
+                  const isUpU  = highlightedOrder != null && s.batting_order === highlightedOrder
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={e => openPlayerPopover(s, e)}
+                      style={{
+                        padding: '6px 10px', borderRadius: 6,
+                        background: 'rgba(232,160,32,0.08)',
+                        border: '0.5px solid rgba(232,160,32,0.3)',
+                        fontSize: 13, fontWeight: 600, color: '#E8A020',
+                        cursor: readOnly ? 'default' : 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}
+                    >
+                      <span
+                        onClick={e => handleBattingOrderClick(s, e)}
+                        style={{
+                          fontSize: 10,
+                          color: isUpU ? 'var(--accent)' : 'rgba(232,160,32,0.6)',
+                          flexShrink: 0, cursor: 'pointer',
+                        }}
+                      >
+                        {s.batting_order ?? ''}
+                      </span>
+                      <span style={{ flex: 1 }}>
+                        {s.player?.first_name?.[0]}. {lastName(s.player)}
+                      </span>
+                      <span style={{ fontSize: 9, color: 'rgba(232,160,32,0.45)' }}>
+                        {innCnt}/{inningCount}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
