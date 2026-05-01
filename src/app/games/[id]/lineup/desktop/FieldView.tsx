@@ -6,18 +6,24 @@ import { useState, useEffect, useRef } from 'react'
 // Container aspect ratio matches the SVG viewBox: 400 × 440
 // Home plate is at bottom-center; CF is at the top.
 
+// ViewBox: 400 × 440
+// Home plate:  (200, 420)   Diamond side: 80 SVG units (45° so each base ±80 on both axes)
+// 3B: (120, 340)   1B: (280, 340)   2B: (200, 260)
+// Foul lines extend at 45° to fence corners: (0, 220) and (400, 220)
+// Outfield arc: M 0 220 A 260 260 0 0 0 400 220 — peaks at y≈126
+// All top/left values are %-of-container (height=440, width=400)
 const FIELD_COORDS: Record<string, { top: number; left: number }> = {
-  CF:   { top: 29.5, left: 50.0 },
-  LF:   { top: 39.8, left: 20.0 },
-  RF:   { top: 39.8, left: 80.0 },
-  LC:   { top: 35.2, left: 35.0 },
-  RC:   { top: 35.2, left: 65.0 },
-  SS:   { top: 59.8, left: 37.0 },
-  '2B': { top: 59.8, left: 63.8 },
-  '3B': { top: 76.1, left: 21.8 },
-  '1B': { top: 76.1, left: 77.5 },
-  P:    { top: 63.6, left: 50.0 },
-  C:    { top: 88.2, left: 50.0 },
+  CF:   { top: 34.0, left: 50.0 },  // (200, 150) deep center
+  LF:   { top: 48.0, left: 13.5 },  // ( 54, 211) left field
+  RF:   { top: 48.0, left: 86.5 },  // (346, 211) right field
+  LC:   { top: 41.5, left: 31.5 },  // (126, 183) left-center
+  RC:   { top: 41.5, left: 68.5 },  // (274, 183) right-center
+  SS:   { top: 66.0, left: 38.5 },  // (154, 290) shortstop
+  '2B': { top: 63.0, left: 62.0 },  // (248, 277) second baseman
+  '3B': { top: 79.5, left: 23.5 },  // ( 94, 350) third base
+  '1B': { top: 79.5, left: 76.5 },  // (306, 350) first base
+  P:    { top: 73.5, left: 50.0 },  // (200, 323) pitcher's mound
+  C:    { top: 93.5, left: 50.0 },  // (200, 411) catcher
 }
 
 const POS_COLOR: Record<string, { bg: string; text: string }> = {
@@ -39,7 +45,15 @@ function lastName(player: any): string {
   return player?.last_name ?? player?.first_name ?? '?'
 }
 
-// ── SVG field background ──────────────────────────────────────────────────────
+// ── SVG anchor points ──────────────────────────────────────────────────────────
+// Home:  (200, 420)
+// 1B:    (280, 340)  — home+(80,−80), sits on right foul line
+// 2B:    (200, 260)  — home+(0,−160), directly above home
+// 3B:    (120, 340)  — home+(−80,−80), sits on left foul line
+// Mound: (200, 324)  — 60.5/127 of home→2B = 96 px above home
+// Left foul line:  (200,420)→(0,220)   passes through 3B ✓
+// Right foul line: (200,420)→(400,220) passes through 1B ✓
+// Arc:   M 0 220 A 260 260 0 0 0 400 220   peaks at y≈126
 
 function FieldSVG() {
   return (
@@ -47,38 +61,52 @@ function FieldSVG() {
       viewBox="0 0 400 440"
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     >
-      {/* Background / foul territory */}
+      {/* Foul territory background */}
       <rect width="400" height="440" fill="#162b16" />
-      {/* Fair territory grass — wedge from home to fence arc */}
-      <path d="M 200 415 L 30 80 A 280 280 0 0 0 370 80 Z" fill="#1d4020" />
-      {/* Warning track (thick stroke on fence arc) */}
-      <path d="M 30 80 A 280 280 0 0 0 370 80" fill="none" stroke="rgba(160,110,50,0.6)" strokeWidth="22" />
-      {/* Fence line */}
-      <path d="M 30 80 A 280 280 0 0 0 370 80" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
-      {/* Foul lines — endpoints match arc endpoints exactly */}
-      <line x1="200" y1="415" x2="30"  y2="80" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-      <line x1="200" y1="415" x2="370" y2="80" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-      {/* Infield dirt */}
-      <polygon points="200,415 307,308 200,200 93,308" fill="#7a4f2a" opacity="0.78" />
-      {/* Inner grass */}
-      <circle cx="200" cy="308" r="73" fill="#256025" opacity="0.5" />
+
+      {/* Fair territory — home → left foul corner → outfield arc → right foul corner → home */}
+      <path d="M 200 420 L 0 220 A 260 260 0 0 0 400 220 Z" fill="#1e4020" />
+
+      {/* Warning track */}
+      <path d="M 0 220 A 260 260 0 0 0 400 220"
+        fill="none" stroke="rgba(155,105,45,0.65)" strokeWidth="22" />
+      {/* Outfield fence line */}
+      <path d="M 0 220 A 260 260 0 0 0 400 220"
+        fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
+
+      {/* Foul lines at exactly 45° — pass through 3B (120,340) and 1B (280,340) */}
+      <line x1="200" y1="420" x2="0"   y2="220" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+      <line x1="200" y1="420" x2="400" y2="220" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+
+      {/* Infield dirt — the diamond */}
+      <polygon points="200,420 280,340 200,260 120,340" fill="#7a4f2a" opacity="0.75" />
+
+      {/* Inner grass — centered at diamond midpoint (200, 340) */}
+      <circle cx="200" cy="340" r="72" fill="#236023" opacity="0.5" />
+
       {/* Base paths */}
-      <line x1="200" y1="415" x2="307" y2="308" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
-      <line x1="307" y1="308" x2="200" y2="200" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
-      <line x1="200" y1="200" x2="93"  y2="308" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
-      <line x1="93"  y1="308" x2="200" y2="415" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
-      {/* 1B bag */}
-      <rect x="300" y="301" width="14" height="14" rx="1" fill="white" opacity="0.9" transform="rotate(45 307 308)" />
-      {/* 2B bag */}
-      <rect x="193" y="193" width="14" height="14" rx="1" fill="white" opacity="0.9" transform="rotate(45 200 200)" />
-      {/* 3B bag */}
-      <rect x="86"  y="301" width="14" height="14" rx="1" fill="white" opacity="0.9" transform="rotate(45 93 308)"  />
+      <line x1="200" y1="420" x2="280" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+      <line x1="280" y1="340" x2="200" y2="260" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+      <line x1="200" y1="260" x2="120" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+      <line x1="120" y1="340" x2="200" y2="420" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+
+      {/* 1B bag at (280, 340) */}
+      <rect x="273" y="333" width="14" height="14" rx="1" fill="white" opacity="0.92"
+        transform="rotate(45 280 340)" />
+      {/* 2B bag at (200, 260) */}
+      <rect x="193" y="253" width="14" height="14" rx="1" fill="white" opacity="0.92"
+        transform="rotate(45 200 260)" />
+      {/* 3B bag at (120, 340) */}
+      <rect x="113" y="333" width="14" height="14" rx="1" fill="white" opacity="0.92"
+        transform="rotate(45 120 340)" />
+
       {/* Home plate */}
-      <polygon points="192,413 208,413 213,425 200,432 187,425" fill="white" opacity="0.9" />
-      {/* Pitcher's mound */}
-      <circle cx="200" cy="280" r="14" fill="#8b5a2b" opacity="0.85" />
-      <circle cx="200" cy="280" r="4"  fill="#a06832" />
-      <rect x="194" y="277" width="12" height="4" rx="1" fill="white" opacity="0.85" />
+      <polygon points="193,418 207,418 212,429 200,436 188,429" fill="white" opacity="0.92" />
+
+      {/* Pitcher's mound at (200, 324) */}
+      <circle cx="200" cy="324" r="13" fill="#8b5a2b" opacity="0.88" />
+      <circle cx="200" cy="324" r="4"  fill="#a06832" />
+      <rect x="194" y="321" width="12" height="4" rx="1" fill="white" opacity="0.85" />
     </svg>
   )
 }
