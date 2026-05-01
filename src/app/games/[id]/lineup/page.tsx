@@ -5,6 +5,7 @@ import { createClient } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
+import FieldView from './desktop/FieldView'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
   P:     { bg: 'rgba(75,156,211,0.25)',    color: '#4B9CD3' },
@@ -46,6 +47,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [copyGameId, setCopyGameId] = useState<string>('')
   const [copyMode, setCopyMode] = useState<'full' | 'order'>('full')
   const [copying, setCopying] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'field'>('grid')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [teamName, setTeamName] = useState<string | undefined>(undefined)
   const [teamPositions, setTeamPositions] = useState<string[]>(
@@ -611,13 +613,25 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
               }}>
               🖨 Print
             </button>
+            <div style={{ display: 'flex', borderRadius: '4px', border: '0.5px solid var(--border-strong)', overflow: 'hidden', marginLeft: 'auto' }}>
+              {(['grid', 'field'] as const).map(mode => (
+                <button key={mode} onClick={() => setViewMode(mode)} style={{
+                  fontSize: '11px', padding: '5px 10px', border: 'none', cursor: 'pointer',
+                  background: viewMode === mode ? 'rgba(59,109,177,0.2)' : 'transparent',
+                  color: viewMode === mode ? '#80B0E8' : `rgba(var(--fg-rgb), 0.5)`,
+                  fontWeight: viewMode === mode ? 700 : 500,
+                }}>
+                  {mode === 'grid' ? '▦ Grid' : '⚾ Field'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* ── POSITION PALETTE (sticky, paint mode only) ── */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 20,
-          display: editorMode === 'paint' ? 'flex' : 'none',
+          display: editorMode === 'paint' && viewMode === 'grid' ? 'flex' : 'none',
           background: 'var(--bg)',
           borderBottom: '0.5px solid var(--border-subtle)',
           padding: '8px 1rem 10px',
@@ -651,7 +665,19 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
           })}
         </div>
 
+        {/* ── FIELD VIEW ── */}
+        {viewMode === 'field' && (
+          <FieldView
+            slots={slots}
+            inningCount={inningCount}
+            teamPositions={teamPositions}
+            readOnly={false}
+            onAssign={assignPosition}
+          />
+        )}
+
         {/* ── GRID ── */}
+        <div style={{ display: viewMode === 'grid' ? 'block' : 'none' }}>
         <div style={{ padding: '8px 1rem 1.5rem', overflowX: 'auto' }}>
 
           {/* Column headers */}
@@ -879,6 +905,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             <div style={{ width: COL_STATUS, flexShrink: 0 }} />
           </div>
         </div>
+        </div>{/* end grid wrapper */}
 
         {/* ── COPY PREVIOUS GAME ── */}
         {showCopyPicker && (
