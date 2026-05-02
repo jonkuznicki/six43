@@ -761,22 +761,6 @@ export default function FieldView({
                     }}>
                       {lastName(slot.player)}
                     </div>
-                    {isUp && (
-                      <div style={{
-                        fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.95)',
-                        letterSpacing: '0.1em', textAlign: 'center', marginTop: 2,
-                      }}>
-                        UP
-                      </div>
-                    )}
-                    {isOnDeck && (
-                      <div style={{
-                        fontSize: 8, color: 'rgba(75,156,211,0.9)',
-                        letterSpacing: '0.06em', textAlign: 'center', marginTop: 2,
-                      }}>
-                        next
-                      </div>
-                    )}
                   </>
                 ) : (
                   <>

@@ -485,7 +485,6 @@ export default function InGameView({
                           : isNext
                           ? `4px solid rgba(245,166,35,0.3)`
                           : '4px solid transparent',
-                        opacity: isBench && !isUp ? 0.5 : 1,
                       }}
                     >
                       {/* Batting # */}
@@ -516,7 +515,7 @@ export default function InGameView({
                         </div>
                         {isUp && (
                           <div style={{ fontSize: 11, fontWeight: 900, color: GM_AMBER, letterSpacing: '0.12em', marginTop: 2 }}>
-                            UP TO BAT — TAP NEXT WHEN DONE
+                            UP TO BAT
                           </div>
                         )}
                         {isNext && !isUp && (
@@ -528,24 +527,14 @@ export default function InGameView({
 
                       {/* Position */}
                       <div style={{ flexShrink: 0 }}>
-                        {isBench ? (
-                          <span style={{
-                            fontSize: 14, fontWeight: 700, padding: '6px 12px', borderRadius: 7,
-                            background: 'rgba(238,244,255,0.06)',
-                            color: 'rgba(238,244,255,0.3)',
-                          }}>
-                            {pos === 'Bench' ? 'BENCH' : '—'}
-                          </span>
-                        ) : (
-                          <span style={{
-                            fontSize: 22, fontWeight: 900, padding: '7px 16px', borderRadius: 8,
-                            background: pc ? pc.bg : 'rgba(238,244,255,0.08)',
-                            color: pc ? pc.color : GM_FG,
-                            minWidth: 60, display: 'inline-block', textAlign: 'center',
-                          }}>
-                            {pos}
-                          </span>
-                        )}
+                        <span style={{
+                          fontSize: 22, fontWeight: 900, padding: '7px 16px', borderRadius: 8,
+                          background: pc ? pc.bg : 'rgba(238,244,255,0.08)',
+                          color: pc ? pc.color : 'rgba(238,244,255,0.35)',
+                          minWidth: 60, display: 'inline-block', textAlign: 'center',
+                        }}>
+                          {pos === 'Bench' ? 'B' : (pos ?? '—')}
+                        </span>
                       </div>
                     </div>
                   )
