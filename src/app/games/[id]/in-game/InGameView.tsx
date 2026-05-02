@@ -407,6 +407,47 @@ export default function InGameView({
           </div>
         )}
 
+        {/* ── GM SCOREBOARD ── */}
+        <div style={{
+          padding: '10px 16px 12px',
+          borderBottom: `1px solid ${GM_BORDER}`,
+          background: GM_BG2,
+          flexShrink: 0,
+        }}>
+          {/* Inning header */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <div style={{ width: 80, flexShrink: 0 }} />
+            {Array.from({ length: inningCount }, (_, i) => (
+              <div key={i} style={{
+                flex: 1, textAlign: 'center', minWidth: 28,
+                fontSize: 12, fontWeight: i === inning ? 800 : 500,
+                color: i === inning ? GM_AMBER : 'rgba(238,244,255,0.35)',
+              }}>
+                {i + 1}
+              </div>
+            ))}
+            <div style={{ width: 40, textAlign: 'center', flexShrink: 0, fontSize: 12, color: 'rgba(238,244,255,0.35)', fontWeight: 700 }}>R</div>
+          </div>
+
+          {/* Us row */}
+          <GmScoreRow
+            label={teamName} isUs
+            values={us} total={usTotal}
+            inningCount={inningCount} activeInning={inning}
+            onChange={setUsInning}
+            gmBg={GM_BG} gmBorder={GM_BORDER} gmAmber={GM_AMBER} gmFg={GM_FG} gmFgDim={GM_FG_DIM}
+          />
+
+          {/* Them row */}
+          <GmScoreRow
+            label={game.opponent}
+            values={them} total={themTotal}
+            inningCount={inningCount} activeInning={inning}
+            onChange={setThemInning}
+            gmBg={GM_BG} gmBorder={GM_BORDER} gmAmber={GM_AMBER} gmFg={GM_FG} gmFgDim={GM_FG_DIM}
+          />
+        </div>
+
         {/* ── GM MAIN CONTENT ── */}
         <div style={{ flex: 1, overflow: 'auto' }}>
 
@@ -1209,6 +1250,76 @@ export default function InGameView({
         </div>
       )}
 
+    </div>
+  )
+}
+
+// ── GmScoreRow — high-contrast score row for Game Mode ───────────────────────
+
+function GmScoreRow({
+  label, isUs, values, total, inningCount, activeInning, onChange,
+  gmBg, gmBorder, gmAmber, gmFg, gmFgDim,
+}: {
+  label: string; isUs?: boolean
+  values: (number | null)[]; total: number
+  inningCount: number; activeInning: number
+  onChange: (i: number, val: string) => void
+  gmBg: string; gmBorder: string; gmAmber: string; gmFg: string; gmFgDim: string
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', marginBottom: 5,
+      background: 'rgba(238,244,255,0.04)',
+      border: `0.5px solid ${gmBorder}`,
+      borderRadius: 8, overflow: 'hidden',
+    }}>
+      <div style={{
+        width: 80, flexShrink: 0, padding: '8px 8px 8px 12px',
+        fontSize: 14, fontWeight: isUs ? 800 : 600,
+        color: isUs ? gmFg : gmFgDim,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        borderRight: `0.5px solid ${gmBorder}`,
+      }}>
+        {label}
+      </div>
+      {Array.from({ length: inningCount }, (_, i) => {
+        const isActive = i === activeInning
+        const val = values[i]
+        return (
+          <div key={i} style={{
+            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center',
+            minWidth: 28, padding: '5px 1px',
+            background: isActive ? (isUs ? 'rgba(245,166,35,0.1)' : 'rgba(238,244,255,0.04)') : 'transparent',
+            borderLeft:  isActive ? `0.5px solid rgba(245,166,35,0.3)` : `0.5px solid ${gmBorder}`,
+            borderRight: isActive ? `0.5px solid rgba(245,166,35,0.3)` : `0.5px solid ${gmBorder}`,
+          }}>
+            <input
+              type="text" inputMode="numeric" pattern="[0-9]*"
+              value={val ?? ''}
+              onChange={e => onChange(i, e.target.value)}
+              style={{
+                width: 30, height: 34, textAlign: 'center',
+                background: 'transparent',
+                border: isActive
+                  ? `1px solid ${isUs ? 'rgba(245,166,35,0.55)' : 'rgba(245,166,35,0.2)'}`
+                  : `0.5px solid rgba(238,244,255,0.12)`,
+                borderRadius: 5,
+                color: isUs ? gmAmber : gmFg,
+                fontSize: 17, fontWeight: 800, padding: 0,
+                outline: 'none',
+              }}
+            />
+          </div>
+        )
+      })}
+      <div style={{
+        width: 40, textAlign: 'center', flexShrink: 0,
+        fontSize: 22, fontWeight: 900, padding: '0 4px',
+        color: isUs ? gmAmber : gmFgDim,
+        borderLeft: `1px solid ${gmBorder}`,
+      }}>
+        {total}
+      </div>
     </div>
   )
 }
