@@ -62,30 +62,30 @@ function FieldSVG() {
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     >
       {/* Foul territory background */}
-      <rect width="400" height="440" fill="#162b16" />
+      <rect width="400" height="440" fill="#243d24" />
 
       {/* Fair territory — home → left foul corner → outfield arc → right foul corner → home */}
-      <path d="M 200 420 L 0 220 A 260 260 0 0 1 400 220 Z" fill="#1e4020" />
+      <path d="M 200 420 L 0 220 A 260 260 0 0 1 400 220 Z" fill="#2e5c32" />
 
       {/* Warning track */}
       <path d="M 0 220 A 260 260 0 0 1 400 220"
-        fill="none" stroke="rgba(155,105,45,0.65)" strokeWidth="22" />
+        fill="none" stroke="rgba(180,125,55,0.75)" strokeWidth="22" />
       {/* Outfield fence line */}
       <path d="M 0 220 A 260 260 0 0 1 400 220"
-        fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
+        fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
 
       {/* Foul lines at exactly 45° — pass through 3B (120,340) and 1B (280,340) */}
-      <line x1="200" y1="420" x2="0"   y2="220" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-      <line x1="200" y1="420" x2="400" y2="220" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+      <line x1="200" y1="420" x2="0"   y2="220" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
+      <line x1="200" y1="420" x2="400" y2="220" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
 
       {/* Infield dirt — the diamond */}
-      <polygon points="200,420 280,340 200,260 120,340" fill="#7a4f2a" opacity="0.75" />
+      <polygon points="200,420 280,340 200,260 120,340" fill="#9a6535" opacity="0.85" />
 
       {/* Base paths */}
-      <line x1="200" y1="420" x2="280" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
-      <line x1="280" y1="340" x2="200" y2="260" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
-      <line x1="200" y1="260" x2="120" y2="340" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
-      <line x1="120" y1="340" x2="200" y2="420" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+      <line x1="200" y1="420" x2="280" y2="340" stroke="rgba(255,255,255,0.7)" strokeWidth="2" />
+      <line x1="280" y1="340" x2="200" y2="260" stroke="rgba(255,255,255,0.7)" strokeWidth="2" />
+      <line x1="200" y1="260" x2="120" y2="340" stroke="rgba(255,255,255,0.7)" strokeWidth="2" />
+      <line x1="120" y1="340" x2="200" y2="420" stroke="rgba(255,255,255,0.7)" strokeWidth="2" />
 
       {/* 1B bag at (280, 340) */}
       <rect x="273" y="333" width="14" height="14" rx="1" fill="white" opacity="0.92"
@@ -689,7 +689,7 @@ export default function FieldView({
                   position: 'absolute',
                   top: `${coords.top}%`, left: `${coords.left}%`,
                   transform: 'translate(-50%, -50%)',
-                  width: 70, padding: '3px 5px', borderRadius: 7,
+                  width: 76, padding: '4px 5px', borderRadius: 7,
                   textAlign: 'center', zIndex: 10, overflow: 'hidden',
                   cursor: readOnly ? 'default' : 'pointer',
                   backdropFilter: 'blur(6px)',
@@ -732,41 +732,42 @@ export default function FieldView({
                       <span
                         onClick={e => handleBattingOrderClick(slot, e)}
                         style={{
-                          fontSize: 8, fontWeight: 700, minWidth: 8,
-                          color: isUp ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)',
+                          fontSize: 9, fontWeight: 700, minWidth: 9,
+                          color: isUp ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.6)',
                           cursor: 'pointer',
                         }}
                       >
                         {slot.batting_order ?? ''}
                       </span>
                       <span style={{
-                        fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
+                        fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
                         textTransform: 'uppercase',
-                        color: isUp ? '#fff' : (pc?.text ?? 'rgba(255,255,255,0.9)'),
+                        color: isUp ? '#fff' : (pc?.text ?? 'rgba(255,255,255,0.95)'),
                       }}>
                         {pos}
                       </span>
                     </div>
                     <div style={{
-                      fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                      fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                       overflow: 'hidden', textOverflow: 'ellipsis',
-                      color: isUp ? '#fff' : 'rgba(255,255,255,0.95)',
+                      color: '#fff',
                       lineHeight: 1.2, textAlign: 'center',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.6)',
                     }}>
                       {lastName(slot.player)}
                     </div>
                     {isUp && (
                       <div style={{
-                        fontSize: 7, fontWeight: 800, color: 'rgba(255,255,255,0.9)',
-                        letterSpacing: '0.12em', textAlign: 'center', marginTop: 2,
+                        fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.95)',
+                        letterSpacing: '0.1em', textAlign: 'center', marginTop: 2,
                       }}>
                         UP
                       </div>
                     )}
                     {isOnDeck && (
                       <div style={{
-                        fontSize: 7, color: 'rgba(75,156,211,0.85)',
-                        letterSpacing: '0.08em', textAlign: 'center', marginTop: 2,
+                        fontSize: 8, color: 'rgba(75,156,211,0.9)',
+                        letterSpacing: '0.06em', textAlign: 'center', marginTop: 2,
                       }}>
                         next
                       </div>
@@ -775,14 +776,14 @@ export default function FieldView({
                 ) : (
                   <>
                     <div style={{
-                      fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
-                      textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)',
+                      fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
+                      textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)',
                       lineHeight: 1.3, textAlign: 'center',
                     }}>
                       {pos}
                     </div>
                     <div style={{
-                      fontSize: 11, color: 'rgba(255,255,255,0.25)',
+                      fontSize: 13, color: 'rgba(255,255,255,0.35)',
                       lineHeight: 1.2, textAlign: 'center',
                     }}>
                       +
@@ -827,29 +828,29 @@ export default function FieldView({
                         <span
                           onClick={e => handleBattingOrderClick(s, e)}
                           style={{
-                            fontSize: 11, fontWeight: 700, minWidth: 18, textAlign: 'right',
-                            color: isUpR ? 'var(--accent)' : `rgba(var(--fg-rgb),0.3)`,
+                            fontSize: 12, fontWeight: 700, minWidth: 20, textAlign: 'right',
+                            color: isUpR ? 'var(--accent)' : `rgba(var(--fg-rgb),0.35)`,
                             cursor: 'pointer', flexShrink: 0,
                           }}
                         >
                           {s.batting_order}
                         </span>
                         <span style={{
-                          flex: 1, fontSize: 13, fontWeight: isUpR ? 700 : 400,
-                          color: isUpR ? 'var(--fg)' : `rgba(var(--fg-rgb),0.75)`,
+                          flex: 1, fontSize: 15, fontWeight: isUpR ? 700 : 500,
+                          color: isUpR ? 'var(--fg)' : `rgba(var(--fg-rgb),0.85)`,
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
                           {s.player?.first_name?.[0]}. {lastName(s.player)}
                         </span>
                         {isUpR && (
-                          <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', flexShrink: 0 }}>UP</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', flexShrink: 0 }}>UP</span>
                         )}
                         {isNextR && (
-                          <span style={{ fontSize: 9, color: 'rgba(75,156,211,0.6)', flexShrink: 0 }}>next</span>
+                          <span style={{ fontSize: 10, color: 'rgba(75,156,211,0.6)', flexShrink: 0 }}>next</span>
                         )}
                         {pos && (
                           <span style={{
-                            fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
+                            fontSize: 11, fontWeight: 700, padding: '2px 5px', borderRadius: 4, flexShrink: 0,
                             color: pc?.text ?? `rgba(var(--fg-rgb),0.4)`,
                             background: pc?.bg ?? 'transparent',
                           }}>

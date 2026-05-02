@@ -1662,8 +1662,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                           }}
                         >
                           <span style={{
-                            fontSize: 13, fontWeight: 800,
-                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.18)`),
+                            fontSize: 15, fontWeight: 900,
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.2)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
