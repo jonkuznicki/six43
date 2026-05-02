@@ -93,6 +93,25 @@ export default function InGameView({
   const [viewMode,    setViewMode]    = useState<'list' | 'field'>('field')
   const [localSlots,  setLocalSlots]  = useState<any[]>(slots)
 
+  // ── Game Mode (high-visibility dugout display) ────────────────────────────
+  const [gameMode, setGameMode] = useState(false)
+
+  function enterGameMode() {
+    setGameMode(true)
+    setLocked(true)
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => setIsCssFullscreen(true))
+    } else {
+      setIsCssFullscreen(true)
+    }
+  }
+
+  function exitGameMode() {
+    setGameMode(false)
+    if (isNativeFullscreen) document.exitFullscreen().catch(() => {})
+    setIsCssFullscreen(false)
+  }
+
   // ── Hide games-left-nav while in-game view is mounted ────────────────────
   useEffect(() => {
     document.body.classList.add('ingame-mode')
@@ -207,6 +226,358 @@ export default function InGameView({
     const filled = slots.filter(s => !!(s.inning_positions ?? [])[ii]).length
     return { filled, total: slots.length }
   })
+
+  // ── GAME MODE RENDER (early return) ──────────────────────────────────────
+  if (gameMode) {
+    // High-contrast constants — max readability at arm's length
+    const GM_BG      = '#060E1C'
+    const GM_BG2     = '#0B1628'
+    const GM_FG      = '#EEF4FF'
+    const GM_FG_DIM  = 'rgba(238,244,255,0.45)'
+    const GM_BORDER  = 'rgba(238,244,255,0.1)'
+    const GM_AMBER   = '#F5A623'
+
+    const GM_POS: Record<string, { bg: string; color: string }> = {
+      P:    { bg: 'rgba(75,156,211,0.25)',  color: '#6BB8FF' },
+      C:    { bg: 'rgba(220,100,150,0.25)', color: '#F0A0C8' },
+      '1B': { bg: 'rgba(128,176,232,0.18)', color: '#9EC8FF' },
+      '2B': { bg: 'rgba(128,176,232,0.18)', color: '#9EC8FF' },
+      SS:   { bg: 'rgba(128,176,232,0.18)', color: '#9EC8FF' },
+      '3B': { bg: 'rgba(128,176,232,0.18)', color: '#9EC8FF' },
+      LF:   { bg: 'rgba(109,184,117,0.22)', color: '#80D890' },
+      CF:   { bg: 'rgba(109,184,117,0.22)', color: '#80D890' },
+      LC:   { bg: 'rgba(109,184,117,0.22)', color: '#80D890' },
+      RC:   { bg: 'rgba(109,184,117,0.22)', color: '#80D890' },
+      RF:   { bg: 'rgba(109,184,117,0.22)', color: '#80D890' },
+    }
+
+    const gmContainer: React.CSSProperties = isCssFullscreen
+      ? { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column',
+          background: GM_BG, color: GM_FG, overflowY: 'auto' }
+      : { minHeight: '100vh', display: 'flex', flexDirection: 'column',
+          background: GM_BG, color: GM_FG }
+
+    return (
+      <div ref={containerRef} style={gmContainer}>
+
+        {/* ── GM HEADER ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '0 16px', height: 56, flexShrink: 0,
+          background: GM_BG2,
+          borderBottom: `1px solid ${GM_BORDER}`,
+          position: 'sticky', top: 0, zIndex: 100,
+        }}>
+          {/* Exit */}
+          <button
+            onClick={exitGameMode}
+            style={{
+              padding: '7px 14px', borderRadius: 7, fontSize: 13, fontWeight: 700,
+              border: `1px solid ${GM_BORDER}`,
+              background: 'rgba(238,244,255,0.06)',
+              color: GM_FG_DIM, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+          >
+            ✕ Exit Game Mode
+          </button>
+
+          <div style={{ width: 1, height: 22, background: GM_BORDER, flexShrink: 0 }} />
+
+          {/* Inning selector — inline ‹ N › */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => setInning(i => Math.max(0, i - 1))}
+              disabled={inning === 0}
+              style={{
+                width: 32, height: 32, borderRadius: 6, border: `1px solid ${GM_BORDER}`,
+                background: 'transparent', color: inning > 0 ? GM_FG : GM_FG_DIM,
+                fontSize: 16, cursor: inning > 0 ? 'pointer' : 'default',
+              }}
+            >‹</button>
+            <div style={{ textAlign: 'center', minWidth: 72 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: GM_FG_DIM }}>Inning</div>
+              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, color: GM_FG }}>{inning + 1}</div>
+            </div>
+            <button
+              onClick={() => setInning(i => Math.min(inningCount - 1, i + 1))}
+              disabled={inning === inningCount - 1}
+              style={{
+                width: 32, height: 32, borderRadius: 6, border: `1px solid ${GM_BORDER}`,
+                background: 'transparent',
+                color: inning < inningCount - 1 ? GM_FG : GM_FG_DIM,
+                fontSize: 16, cursor: inning < inningCount - 1 ? 'pointer' : 'default',
+              }}
+            >›</button>
+          </div>
+
+          <div style={{ width: 1, height: 22, background: GM_BORDER, flexShrink: 0 }} />
+
+          {/* Score */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+            padding: '4px 14px', borderRadius: 8,
+            background: 'rgba(238,244,255,0.05)',
+            border: `1px solid ${GM_BORDER}`,
+          }}>
+            <span style={{
+              fontSize: 24, fontWeight: 800, lineHeight: 1,
+              color: usTotal > themTotal ? '#6DD880' : usTotal < themTotal ? '#FF7060' : GM_FG,
+            }}>{usTotal}</span>
+            <span style={{ fontSize: 14, color: GM_FG_DIM, fontWeight: 300 }}>–</span>
+            <span style={{
+              fontSize: 24, fontWeight: 800, lineHeight: 1,
+              color: usTotal < themTotal ? '#6DD880' : usTotal > themTotal ? '#FF7060' : GM_FG,
+            }}>{themTotal}</span>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* View toggle */}
+          <div style={{
+            display: 'flex', flexShrink: 0,
+            border: `1px solid ${GM_BORDER}`, borderRadius: 7, overflow: 'hidden',
+          }}>
+            {(['field', 'list'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '6px 14px', border: 'none', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer',
+                  background: viewMode === mode ? 'rgba(75,156,211,0.25)' : 'transparent',
+                  color: viewMode === mode ? '#6BB8FF' : GM_FG_DIM,
+                }}
+              >
+                {mode === 'field' ? '◈ Field' : '≡ List'}
+              </button>
+            ))}
+          </div>
+
+          {/* Unlock — subtle, always accessible */}
+          <button
+            onClick={() => locked ? setShowUnlockModal(true) : setLocked(true)}
+            style={{
+              flexShrink: 0, padding: '6px 11px', borderRadius: 6, fontSize: 13,
+              border: locked ? `1px solid rgba(245,166,35,0.4)` : `1px solid ${GM_BORDER}`,
+              background: locked ? 'rgba(245,166,35,0.1)' : 'transparent',
+              color: locked ? GM_AMBER : GM_FG_DIM,
+              cursor: 'pointer',
+            }}
+          >
+            {locked ? '🔒' : '🔓'}
+          </button>
+        </div>
+
+        {/* ── GM UP-TO-BAT BANNER ── */}
+        {upSlot && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            padding: '10px 20px', flexShrink: 0,
+            background: 'rgba(245,166,35,0.12)',
+            borderBottom: `1px solid rgba(245,166,35,0.25)`,
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 900, color: GM_AMBER, letterSpacing: '0.12em' }}>UP</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: GM_FG }}>
+              #{highlightedOrder} {upSlot.player?.first_name} {upSlot.player?.last_name}
+            </span>
+            {onDeckSlot && (
+              <span style={{ fontSize: 14, color: GM_FG_DIM }}>
+                on deck: #{onDeckOrder} {onDeckSlot.player?.last_name}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={() => highlightedOrder != null && setHighlightedOrder(nextOrder(highlightedOrder))}
+              style={{
+                padding: '7px 18px', borderRadius: 7, fontSize: 14, fontWeight: 800,
+                background: 'rgba(245,166,35,0.2)', border: `1px solid rgba(245,166,35,0.45)`,
+                color: GM_AMBER, cursor: 'pointer',
+              }}
+            >
+              Next →
+            </button>
+            <button
+              onClick={() => setHighlightedOrder(null)}
+              style={{
+                padding: '7px 11px', borderRadius: 7, fontSize: 18,
+                background: 'transparent', border: `1px solid ${GM_BORDER}`,
+                color: GM_FG_DIM, cursor: 'pointer', lineHeight: 1,
+              }}
+            >×</button>
+          </div>
+        )}
+
+        {/* ── GM MAIN CONTENT ── */}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+
+          {/* BATTING LIST */}
+          {viewMode === 'list' && (
+            <div style={{ padding: '8px 0 40px' }}>
+              {sortedSlots.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '4rem 0', fontSize: 18, color: GM_FG_DIM }}>
+                  No lineup built yet.
+                </div>
+              ) : (
+                sortedSlots.map(s => {
+                  const pos     = (s.inning_positions ?? [])[inning] as string | null
+                  const isBench = pos === 'Bench' || pos === null
+                  const pc      = pos && !isBench ? (GM_POS[pos] ?? null) : null
+                  const isUp    = highlightedOrder != null && s.batting_order === highlightedOrder
+                  const isNext  = onDeckOrder != null && s.batting_order === onDeckOrder && !isUp
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => tapPlayer(s)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 16,
+                        padding: '14px 20px',
+                        borderBottom: `1px solid ${GM_BORDER}`,
+                        cursor: 'pointer',
+                        background: isUp
+                          ? 'rgba(245,166,35,0.13)'
+                          : isNext
+                          ? 'rgba(245,166,35,0.05)'
+                          : 'transparent',
+                        borderLeft: isUp
+                          ? `4px solid ${GM_AMBER}`
+                          : isNext
+                          ? `4px solid rgba(245,166,35,0.3)`
+                          : '4px solid transparent',
+                        opacity: isBench && !isUp ? 0.5 : 1,
+                      }}
+                    >
+                      {/* Batting # */}
+                      <div style={{
+                        width: 36, textAlign: 'center', flexShrink: 0,
+                        fontSize: 18, fontWeight: 800,
+                        color: isUp ? GM_AMBER : GM_FG_DIM,
+                      }}>
+                        {s.batting_order ?? '·'}
+                      </div>
+
+                      {/* Jersey */}
+                      <div style={{
+                        width: 42, flexShrink: 0, textAlign: 'center',
+                        fontSize: 13, fontWeight: 600, color: GM_FG_DIM,
+                      }}>
+                        #{s.player?.jersey_number ?? '—'}
+                      </div>
+
+                      {/* Name */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 28, fontWeight: 800, lineHeight: 1.1,
+                          color: GM_FG,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {s.player?.first_name} {s.player?.last_name}
+                        </div>
+                        {isUp && (
+                          <div style={{ fontSize: 11, fontWeight: 900, color: GM_AMBER, letterSpacing: '0.12em', marginTop: 2 }}>
+                            UP TO BAT — TAP NEXT WHEN DONE
+                          </div>
+                        )}
+                        {isNext && !isUp && (
+                          <div style={{ fontSize: 11, color: `rgba(245,166,35,0.6)`, letterSpacing: '0.07em', marginTop: 2 }}>
+                            on deck
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Position */}
+                      <div style={{ flexShrink: 0 }}>
+                        {isBench ? (
+                          <span style={{
+                            fontSize: 14, fontWeight: 700, padding: '6px 12px', borderRadius: 7,
+                            background: 'rgba(238,244,255,0.06)',
+                            color: 'rgba(238,244,255,0.3)',
+                          }}>
+                            {pos === 'Bench' ? 'BENCH' : '—'}
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: 22, fontWeight: 900, padding: '7px 16px', borderRadius: 8,
+                            background: pc ? pc.bg : 'rgba(238,244,255,0.08)',
+                            color: pc ? pc.color : GM_FG,
+                            minWidth: 60, display: 'inline-block', textAlign: 'center',
+                          }}>
+                            {pos}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
+
+          {/* FIELD VIEW */}
+          {viewMode === 'field' && (
+            <FieldView
+              slots={localSlots}
+              inningCount={inningCount}
+              teamPositions={teamPositions}
+              readOnly={locked}
+              onAssign={assignPosition}
+              activeInning={inning}
+            />
+          )}
+        </div>
+
+        {/* ── GM UNLOCK MODAL (reuse standard) ── */}
+        {showUnlockModal && (
+          <div
+            onClick={() => setShowUnlockModal(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 1000,
+              background: 'rgba(0,0,0,0.75)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: GM_BG2, border: `1px solid ${GM_BORDER}`,
+                borderRadius: 16, padding: '28px 24px', maxWidth: 360, width: '100%',
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, color: GM_FG, marginBottom: 8 }}>
+                Unlock positions?
+              </div>
+              <div style={{ fontSize: 14, color: GM_FG_DIM, marginBottom: 24, lineHeight: 1.55 }}>
+                This will allow field position changes. The score is always editable.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setShowUnlockModal(false)}
+                  style={{
+                    flex: 1, padding: '13px 0', borderRadius: 9, fontSize: 15,
+                    border: `1px solid ${GM_BORDER}`, background: 'transparent',
+                    color: GM_FG_DIM, cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setLocked(false); setShowUnlockModal(false) }}
+                  style={{
+                    flex: 2, padding: '13px 0', borderRadius: 9, fontSize: 15,
+                    fontWeight: 800, border: 'none',
+                    background: '#4B9CD3', color: '#060E1C', cursor: 'pointer',
+                  }}
+                >
+                  Unlock Positions
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+  // ── END GAME MODE ─────────────────────────────────────────────────────────
 
   // ── Container: CSS fullscreen fallback for iPad Safari ───────────────────
   const containerStyle: React.CSSProperties = isCssFullscreen
@@ -351,6 +722,21 @@ export default function InGameView({
           }}
         >
           {isFullscreen ? '⊡' : '⛶'}
+        </button>
+
+        {/* Game Mode */}
+        <button
+          onClick={enterGameMode}
+          title="Enter Game Mode — large fonts, locked, fullscreen"
+          style={{
+            flexShrink: 0, padding: '5px 12px', borderRadius: 6, fontSize: 12,
+            fontWeight: 700, whiteSpace: 'nowrap',
+            border: '0.5px solid rgba(75,156,211,0.5)',
+            background: 'rgba(75,156,211,0.1)',
+            color: 'var(--accent)', cursor: 'pointer',
+          }}
+        >
+          ◉ Game Mode
         </button>
 
         {/* End game */}

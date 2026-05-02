@@ -1433,15 +1433,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '100%' }}>
             <colgroup>
-              <col style={{ width: 24 }} />
-              <col style={{ width: 220 }} />
-              {innings.map(i => <col key={i} style={{ width: 54 }} />)}
-              <col style={{ width: 62 }} />
+              <col style={{ width: 28 }} />
+              <col style={{ width: 234 }} />
+              {innings.map(i => <col key={i} style={{ width: 56 }} />)}
+              <col style={{ width: 64 }} />
             </colgroup>
             <thead>
               <tr>
                 <th style={gHdr}>#</th>
-                <th style={{ ...gHdr, textAlign: 'left', paddingLeft: 8 }}>Player <span style={{ fontSize: 7, opacity: 0.4, fontWeight: 400 }}>drag to reorder</span></th>
+                <th style={{ ...gHdr, textAlign: 'left', paddingLeft: 8 }}>Player <span style={{ fontSize: 8, opacity: 0.4, fontWeight: 400 }}>drag to reorder</span></th>
                 {innings.map(ii => {
                   // Per-inning validation indicators
                   const counts: Record<string, number> = {}
@@ -1472,13 +1472,13 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, gap: 2 }}>
                         <span>{ii + 1}</span>
-                        {isComplete && <span style={{ fontSize: 9, color: '#6DB875', fontWeight: 700 }}>✓</span>}
+                        {isComplete && <span style={{ fontSize: 10, color: '#6DB875', fontWeight: 700 }}>✓</span>}
                       </div>
                     </th>
                   )
                 })}
                 <th
-                  style={{ ...gHdr, fontSize: 9, position: 'sticky', right: 0, zIndex: 2, borderLeft: '1px solid var(--border)' }}
+                  style={{ ...gHdr, fontSize: 10, position: 'sticky', right: 0, zIndex: 2, borderLeft: '1px solid var(--border)' }}
                   title={benchPerInning > 0
                     ? `${benchPerInning} player${benchPerInning !== 1 ? 's' : ''} bench each inning. Each player should bench ~${expectedBenchInnings.toFixed(1)} innings.`
                     : 'Everyone plays every inning'}
@@ -1486,7 +1486,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                   <div style={{ lineHeight: 1.3 }}>
                     <div>Bench</div>
                     {benchPerInning > 0 && (
-                      <div style={{ fontSize: 7, opacity: 0.5, fontWeight: 400 }}>
+                      <div style={{ fontSize: 8, opacity: 0.5, fontWeight: 400 }}>
                         ~{expectedBenchInnings.toFixed(1)} exp
                       </div>
                     )}
@@ -1530,11 +1530,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       transition: 'background 0.08s',
                     }}
                   >
-                    <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10, cursor: 'grab' }}>
+                    <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.3)`, fontSize: 12, cursor: 'grab' }}>
                       {si + 1}
                     </td>
                     <td style={{
-                      ...gCell, paddingLeft: 5, fontWeight: 600, fontSize: 12,
+                      ...gCell, paddingLeft: 5, fontWeight: 700, fontSize: 14,
                       position: 'sticky', left: 0, zIndex: 1,
                       background: 'var(--bg)',
                       borderRight: '1px solid var(--border)',
@@ -1546,33 +1546,33 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                           <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'up') }} style={nudge}>▴</button>
                           <button onClick={e => { e.stopPropagation(); nudgeBattingOrder(slot.id, 'down') }} style={nudge}>▾</button>
                         </div>
-                        <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 2, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.32)`, marginRight: 2, flexShrink: 0 }}>
                           #{slot.player?.jersey_number}
                         </span>
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', minWidth: 0 }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, minWidth: 30, fontSize: 12, fontWeight: 600 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, minWidth: 30, fontSize: 14, fontWeight: 700 }}>
                             {slot.player?.first_name?.[0]}. {slot.player?.last_name}
                           </span>
                           {(pIn > 0 || cIn > 0 || ifIn > 0 || ofIn > 0 || benchIn > 0) && (
                             <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                              {pIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.P?.color, fontWeight: 700 }}>P·{pIn}</span>}
-                              {cIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.C?.color, fontWeight: 700 }}>C·{cIn}</span>}
-                              {ifIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR['1B']?.color, fontWeight: 700 }}>IF·{ifIn}</span>}
-                              {ofIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.LF?.color, fontWeight: 700 }}>OF·{ofIn}</span>}
-                              {benchIn > 0 && <span style={{ fontSize: 10, color: POS_COLOR.Bench?.color, fontWeight: 700 }}>B·{benchIn}</span>}
+                              {pIn > 0 && <span style={{ fontSize: 11, color: POS_COLOR.P?.color, fontWeight: 700 }}>P·{pIn}</span>}
+                              {cIn > 0 && <span style={{ fontSize: 11, color: POS_COLOR.C?.color, fontWeight: 700 }}>C·{cIn}</span>}
+                              {ifIn > 0 && <span style={{ fontSize: 11, color: POS_COLOR['1B']?.color, fontWeight: 700 }}>IF·{ifIn}</span>}
+                              {ofIn > 0 && <span style={{ fontSize: 11, color: POS_COLOR.LF?.color, fontWeight: 700 }}>OF·{ofIn}</span>}
+                              {benchIn > 0 && <span style={{ fontSize: 11, color: POS_COLOR.Bench?.color, fontWeight: 700 }}>B·{benchIn}</span>}
                             </div>
                           )}
                         </div>
                         {allFilled && (
-                          <span style={{ fontSize: 9, color: '#6DB875', flexShrink: 0, marginRight: 2 }} title="All innings assigned">✓</span>
+                          <span style={{ fontSize: 10, color: '#6DB875', flexShrink: 0, marginRight: 2 }} title="All innings assigned">✓</span>
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); toggleAbsent(slot.id) }}
                           title="Mark absent"
                           style={{
-                            flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                            flexShrink: 0, width: 16, height: 16, borderRadius: 3,
                             border: '1px solid var(--border-md)', background: 'transparent',
-                            cursor: 'pointer', fontSize: 8, padding: 0,
+                            cursor: 'pointer', fontSize: 9, padding: 0,
                             color: `rgba(var(--fg-rgb),0.28)`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             marginRight: 3,
@@ -1662,8 +1662,8 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                           }}
                         >
                           <span style={{
-                            fontSize: 12, fontWeight: 800,
-                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.15)`),
+                            fontSize: 13, fontWeight: 800,
+                            color: isFoc ? '#fff' : isSel ? 'rgba(128,176,232,0.9)' : isDupe ? '#E87060' : (pc?.color ?? `rgba(var(--fg-rgb),0.18)`),
                           }}>
                             {pos === 'Bench' ? 'B' : (pos ?? '·')}
                           </span>
@@ -1683,12 +1683,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                         : ai > 0 ? 'No bench innings yet' : 'No innings assigned'}
                     >
                       {bi > 0 ? (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: bpColor }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: bpColor }}>
                           {bi}
-                          <span style={{ fontSize: 8, opacity: 0.6, fontWeight: 400 }}> inn</span>
+                          <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 400 }}> inn</span>
                         </span>
                       ) : (
-                        <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.18)` }}>—</span>
+                        <span style={{ fontSize: 12, color: `rgba(var(--fg-rgb),0.18)` }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -1697,27 +1697,27 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               {/* Absent rows */}
               {absentSlots.map(slot => (
                 <tr key={slot.id} style={{ opacity: 0.35 }}>
-                  <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 10 }}>—</td>
+                  <td style={{ ...gCell, textAlign: 'center', color: `rgba(var(--fg-rgb),0.22)`, fontSize: 12 }}>—</td>
                   <td style={{
-                    ...gCell, paddingLeft: 5, fontSize: 12,
+                    ...gCell, paddingLeft: 5, fontSize: 14,
                     position: 'sticky', left: 0, zIndex: 1,
                     background: 'var(--bg)', borderRight: '1px solid var(--border)',
                     maxWidth: 0, overflow: 'hidden',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
-                      <span style={{ fontSize: 10, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, color: `rgba(var(--fg-rgb),0.28)`, marginRight: 3, flexShrink: 0 }}>
                         #{slot.player?.jersey_number}
                       </span>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'line-through' }}>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'line-through', fontWeight: 700 }}>
                         {slot.player?.first_name?.[0]}. {slot.player?.last_name}
                       </span>
                       <button
                         onClick={() => toggleAbsent(slot.id)}
                         title="Mark present"
                         style={{
-                          flexShrink: 0, width: 14, height: 14, borderRadius: 3,
+                          flexShrink: 0, width: 16, height: 16, borderRadius: 3,
                           border: '1px solid rgba(109,184,117,0.45)', background: 'rgba(109,184,117,0.1)',
-                          cursor: 'pointer', fontSize: 8, padding: 0, color: '#6DB875',
+                          cursor: 'pointer', fontSize: 9, padding: 0, color: '#6DB875',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           marginRight: 3,
                         }}
@@ -2333,9 +2333,9 @@ const nudge: React.CSSProperties = {
 }
 
 const gHdr: React.CSSProperties = {
-  padding: '6px 3px', textAlign: 'center',
-  fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-  color: `rgba(var(--fg-rgb),0.32)`,
+  padding: '8px 4px', textAlign: 'center',
+  fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: `rgba(var(--fg-rgb),0.38)`,
   background: 'var(--bg-card)',
   borderBottom: '1px solid var(--border)',
   position: 'sticky', top: 0, zIndex: 10,
@@ -2343,8 +2343,8 @@ const gHdr: React.CSSProperties = {
 }
 
 const gCell: React.CSSProperties = {
-  padding: '0 3px', height: 34,
-  borderBottom: '0.5px solid var(--border-subtle)',
+  padding: '0 3px', height: 42,
+  borderBottom: '0.5px solid var(--border)',
   borderRight: '0.5px solid var(--border-subtle)',
   boxSizing: 'border-box',
 }
