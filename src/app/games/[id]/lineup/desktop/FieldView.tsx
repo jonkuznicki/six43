@@ -259,6 +259,11 @@ export default function FieldView({
       setSwapFirst(null)
       return
     }
+    // In read-only/locked mode tapping a chip sets the UP-to-bat marker
+    if (readOnly) {
+      if (slot) handleBattingOrderClick(slot, e)
+      return
+    }
     if (slot) openPlayerPopover(slot, e)
     else openPositionPopover(pos, e)
   }
@@ -813,10 +818,10 @@ export default function FieldView({
                     return (
                       <div
                         key={s.id}
-                        onClick={e => openPlayerPopover(s, e)}
+                        onClick={e => readOnly ? handleBattingOrderClick(s, e) : openPlayerPopover(s, e)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 7,
-                          padding: '5px 8px', borderRadius: 6, cursor: readOnly ? 'default' : 'pointer',
+                          padding: '5px 8px', borderRadius: 6, cursor: 'pointer',
                           background: isUpR
                             ? 'rgba(75,156,211,0.14)'
                             : 'transparent',
