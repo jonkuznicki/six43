@@ -318,8 +318,8 @@ export default function FieldView({
                     onClick={() => applyAssign(slot.id, pos)}
                     title={willSwap ? `Swaps with ${lastName(occupant.player)}` : undefined}
                     style={{
-                      padding: '4px 7px', borderRadius: 5, cursor: 'pointer',
-                      fontSize: 11, fontWeight: 700,
+                      width: 60, padding: '5px 4px', borderRadius: 5, cursor: 'pointer',
+                      fontSize: 11, fontWeight: 700, textAlign: 'center',
                       border: isCurrent
                         ? `1.5px solid ${pc?.text ?? 'var(--accent)'}`
                         : '1px solid var(--border)',
