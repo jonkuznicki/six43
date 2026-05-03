@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import { formatTime } from '../../../../../lib/formatTime'
 import FieldView from './FieldView'
+import GameEditButton from '../../GameEditButton'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1166,6 +1167,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <button onClick={() => setConfirmClear(true)} style={topBtn(true)}>Clear lineup</button>
           )}
           <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
+          {isOwner && game && <GameEditButton game={game} />}
           {isOwner && (
             <button
               onClick={toggleLock}
