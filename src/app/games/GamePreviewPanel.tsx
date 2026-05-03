@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
 import { parseScore, gameResult } from '../../lib/parseScore'
+import GameEditButton from './[id]/GameEditButton'
 
 const STATUS_LABEL: Record<string, { color: string; label: string }> = {
   scheduled:    { color: `rgba(var(--fg-rgb), 0.45)`, label: 'Scheduled' },
@@ -232,6 +233,7 @@ export default function GamePreviewPanel({
             🖨 Print
           </Link>
         )}
+        <GameEditButton game={game} />
         <div style={{ flex: 1 }} />
         {confirmDelete ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
