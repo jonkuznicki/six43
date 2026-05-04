@@ -6,6 +6,7 @@ import { createClient } from '../../../../../lib/supabase'
 import { formatTime } from '../../../../../lib/formatTime'
 import FieldView from './FieldView'
 import GameEditButton from '../../GameEditButton'
+import BoxScoreInput from '../../BoxScoreInput'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -105,10 +106,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const [restrictedSet, setRestrictedSet] = useState<Set<string>>(new Set())
   const [dcWarning, setDcWarning]       = useState<string | null>(null)
   const [benchWarning, setBenchWarning] = useState<string | null>(null)
-  const [gameScore, setGameScore]       = useState<{ us: number; them: number } | null>(null)
-  const [showScoreEdit, setShowScoreEdit] = useState(false)
-  const [scoreUs, setScoreUs]           = useState('')
-  const [scoreThem, setScoreThem]       = useState('')
   const benchWarnTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showBenchWarning = (msg: string) => {
     if (benchWarnTimer.current) clearTimeout(benchWarnTimer.current)
@@ -189,7 +186,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     try {
       const parsed = JSON.parse(rawNotes ?? '{}')
       setGameNotes(parsed._notes ?? '')
-      if (parsed._score) setGameScore({ us: parsed._score.us, them: parsed._score.them })
     } catch { setGameNotes('') }
 
     const team = (gameData as any)?.season?.team
@@ -792,19 +788,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     }
   }
 
-  async function saveScore() {
-    const us   = parseInt(scoreUs)   || 0
-    const them = parseInt(scoreThem) || 0
-    let parsed: any = {}
-    try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
-    parsed._score = { us, them }
-    const newRaw = JSON.stringify(parsed)
-    await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
-    notesRawRef.current = newRaw
-    setGameScore({ us, them })
-    setShowScoreEdit(false)
-  }
-
   async function savePlayerNotes() {
     const seasonId = game?.season_id
     if (!seasonId) return
@@ -1265,51 +1248,6 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
               {game?.status === 'in_progress' ? '▶ In Game' : '▶ Play Game'}
             </a>
           )}
-          {/* Score entry — only when Final */}
-          {game?.status === 'final' && (
-            showScoreEdit ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input
-                  type="text" inputMode="numeric" value={scoreUs}
-                  onChange={e => setScoreUs(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Us"
-                  style={{
-                    width: 36, padding: '4px 6px', borderRadius: 4, textAlign: 'center',
-                    border: '1px solid rgba(255,255,255,0.25)', background: '#0d2240',
-                    color: '#fff', fontSize: 13, fontWeight: 700,
-                  }}
-                />
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>–</span>
-                <input
-                  type="text" inputMode="numeric" value={scoreThem}
-                  onChange={e => setScoreThem(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Them"
-                  style={{
-                    width: 36, padding: '4px 6px', borderRadius: 4, textAlign: 'center',
-                    border: '1px solid rgba(255,255,255,0.25)', background: '#0d2240',
-                    color: '#fff', fontSize: 13, fontWeight: 700,
-                  }}
-                />
-                <button onClick={saveScore} style={{ ...topBtn(true), color: '#6DB875' }}>✓</button>
-                <button onClick={() => setShowScoreEdit(false)} style={topBtn(true)}>✕</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setScoreUs(gameScore ? String(gameScore.us) : '')
-                  setScoreThem(gameScore ? String(gameScore.them) : '')
-                  setShowScoreEdit(true)
-                }}
-                style={{
-                  ...topBtn(true),
-                  color: gameScore ? '#6DB875' : 'rgba(255,255,255,0.45)',
-                  fontWeight: gameScore ? 800 : 400,
-                }}
-              >
-                {gameScore ? `${gameScore.us}–${gameScore.them}` : '+ Score'}
-              </button>
-            )
-          )}
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           {confirmDelete ? (
             <>
@@ -1327,6 +1265,23 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </>)}
         </div>
       </div>
+
+      {/* ─── BOX SCORE (final games) ─── */}
+      {game?.status === 'final' && (
+        <div style={{
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          padding: '12px 20px',
+          background: 'rgba(0,0,0,0.15)',
+        }}>
+          <BoxScoreInput
+            gameId={params.id}
+            notes={game?.notes ?? null}
+            inningCount={game?.innings_played ?? game?.season?.innings_per_game ?? 6}
+            teamName={game?.season?.team?.name ?? 'Us'}
+            opponent={game?.opponent ?? 'Opponent'}
+          />
+        </div>
+      )}
 
       {/* ─── IN-GAME LIVE BANNER ─── */}
       {game?.status === 'in_progress' && (

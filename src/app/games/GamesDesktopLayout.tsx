@@ -294,6 +294,7 @@ export default function GamesDesktopLayout({
             <GamePreviewPanel
               game={selectedGame}
               inningsPerGame={inningsPerGame}
+              teamName={teamName}
               onDeleted={() => setSelectedGame(null)}
             />
           ) : (

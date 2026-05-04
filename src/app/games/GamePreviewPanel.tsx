@@ -7,6 +7,7 @@ import { createClient } from '../../lib/supabase'
 import { formatTime } from '../../lib/formatTime'
 import { parseScore, gameResult } from '../../lib/parseScore'
 import GameEditButton from './[id]/GameEditButton'
+import BoxScoreInput from './[id]/BoxScoreInput'
 
 const STATUS_LABEL: Record<string, { color: string; label: string }> = {
   scheduled:    { color: `rgba(var(--fg-rgb), 0.45)`, label: 'Scheduled' },
@@ -22,10 +23,12 @@ function lastName(player: any) {
 export default function GamePreviewPanel({
   game,
   inningsPerGame,
+  teamName,
   onDeleted,
 }: {
   game: any
   inningsPerGame: number
+  teamName?: string
   onDeleted?: () => void
 }) {
   const supabase  = createClient()
@@ -207,6 +210,17 @@ export default function GamePreviewPanel({
             </div>
           )}
         </>
+      )}
+
+      {/* ── Box score (final games) ── */}
+      {game.status === 'final' && (
+        <BoxScoreInput
+          gameId={game.id}
+          notes={game.notes}
+          inningCount={inningCount}
+          teamName={teamName ?? 'Us'}
+          opponent={game.opponent ?? 'Opponent'}
+        />
       )}
 
       {/* ── Actions ── */}
