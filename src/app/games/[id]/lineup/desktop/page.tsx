@@ -124,6 +124,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const slotsRef = useRef(slots)
   useEffect(() => { slotsRef.current = slots }, [slots])
   const selectedCellsRef = useRef(selectedCells)
+  // Clipboard ref: keeps keyboard handler in sync without re-registering the listener
+  const clipboardRef = useRef(clipboard)
+  useEffect(() => { clipboardRef.current = clipboard }, [clipboard])
   // Snapshot of inning_positions before a player is marked absent (for restore on un-absent)
   const savedPositionsRef = useRef<Record<string, (string|null)[]>>({})
   // Anchor for shift-selection: the cell where selection started (stays fixed while shift-arrowing)
@@ -873,7 +876,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
       // Ctrl+V — paste clipboard into selected cells (matched by row index within each inning)
       if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !e.shiftKey) {
-        const clip = clipboard
+        const clip = clipboardRef.current
         if (clip && selectedCellsRef.current.size > 0) {
           e.preventDefault()
           const active = slotsRef.current.filter(s => s.availability !== 'absent')
@@ -1279,6 +1282,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             inningCount={game?.innings_played ?? game?.season?.innings_per_game ?? 6}
             teamName={game?.season?.team?.name ?? 'Us'}
             opponent={game?.opponent ?? 'Opponent'}
+            onSaved={newNotes => { notesRawRef.current = newNotes }}
           />
         </div>
       )}

@@ -25,13 +25,14 @@ function writeScores(notes: string | null, us: (number|null)[], them: (number|nu
 }
 
 export default function BoxScoreInput({
-  gameId, notes, inningCount, teamName, opponent,
+  gameId, notes, inningCount, teamName, opponent, onSaved,
 }: {
   gameId: string
   notes: string | null
   inningCount: number
   teamName: string
   opponent: string
+  onSaved?: (newNotes: string) => void
 }) {
   const supabase = createClient()
   const innings = Array.from({ length: inningCount }, (_, i) => i)
@@ -39,10 +40,13 @@ export default function BoxScoreInput({
   const [us, setUs]     = useState<(number|null)[]>(() => readScores(notes, inningCount)[0])
   const [them, setThem] = useState<(number|null)[]>(() => readScores(notes, inningCount)[1])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Always hold the latest saved notes so concurrent writes (e.g. game notes textarea)
+  // don't clobber each other's keys when we merge before saving.
+  const notesRef = useRef<string | null>(notes)
 
   // Re-init if inningCount changes
   useEffect(() => {
-    const [initUs, initThem] = readScores(notes, inningCount)
+    const [initUs, initThem] = readScores(notesRef.current, inningCount)
     setUs(initUs)
     setThem(initThem)
   }, [inningCount])
@@ -50,8 +54,10 @@ export default function BoxScoreInput({
   function scheduleSave(newUs: (number|null)[], newThem: (number|null)[]) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      const newNotes = writeScores(notes, newUs, newThem)
+      const newNotes = writeScores(notesRef.current, newUs, newThem)
+      notesRef.current = newNotes
       await supabase.from('games').update({ notes: newNotes }).eq('id', gameId)
+      onSaved?.(newNotes)
     }, 800)
   }
 

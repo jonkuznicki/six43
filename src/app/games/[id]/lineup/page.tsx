@@ -61,6 +61,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [scoreUs, setScoreUs] = useState('')
   const [scoreThem, setScoreThem] = useState('')
   const notesRawRef = useRef<string | null>(null)
+  // Snapshot of inning_positions before marking absent so they can be restored
+  const savedPositionsRef = useRef<Record<string, (string|null)[]>>({})
 
   useEffect(() => { loadData() }, [])
 
@@ -175,7 +177,17 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) return
     const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
-    const newPositions = newAvail === 'absent' ? [null,null,null,null,null,null,null,null,null] : slot.inning_positions
+
+    let newPositions: (string|null)[]
+    if (newAvail === 'absent') {
+      const current = slot.inning_positions ?? [null,null,null,null,null,null,null,null,null]
+      if (current.some((p: string|null) => p !== null)) savedPositionsRef.current[slotId] = [...current]
+      newPositions = [null,null,null,null,null,null,null,null,null]
+    } else {
+      newPositions = savedPositionsRef.current[slotId] ?? slot.inning_positions ?? [null,null,null,null,null,null,null,null,null]
+      delete savedPositionsRef.current[slotId]
+    }
+
     setSlots(prev => prev.map(s =>
       s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPositions } : s
     ))
@@ -191,15 +203,25 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   }
 
   async function saveScore() {
-    const us   = parseInt(scoreUs)   || 0
-    const them = parseInt(scoreThem) || 0
+    const usVal   = parseInt(scoreUs)   || 0
+    const themVal = parseInt(scoreThem) || 0
     let parsed: any = {}
     try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
-    parsed._score = { us, them }
+    delete parsed._score  // remove legacy key so parseScore reads _box
+    const n = game?.innings_played ?? 6
+    // Only write _box if no per-inning data exists yet; otherwise preserve it
+    const hasPerInning = Array.isArray(parsed._box?.us) &&
+      parsed._box.us.some((v: number|null) => v !== null)
+    if (!hasPerInning) {
+      parsed._box = {
+        us:   [usVal,   ...Array(n - 1).fill(null)],
+        them: [themVal, ...Array(n - 1).fill(null)],
+      }
+    }
     const newRaw = JSON.stringify(parsed)
     await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
     notesRawRef.current = newRaw
-    setGameScore({ us, them })
+    setGameScore({ us: usVal, them: themVal })
     setShowScoreEdit(false)
   }
 
@@ -217,9 +239,9 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     setClearing(true)
     const blank = [null,null,null,null,null,null,null,null,null]
     setSlots(prev => prev.map(s => ({ ...s, inning_positions: blank })))
-    for (const slot of slots) {
-      await supabase.from('lineup_slots').update({ inning_positions: blank }).eq('id', slot.id)
-    }
+    await Promise.all(slots.map(slot =>
+      supabase.from('lineup_slots').update({ inning_positions: blank }).eq('id', slot.id)
+    ))
     setShowClearConfirm(false)
     setClearing(false)
   }
