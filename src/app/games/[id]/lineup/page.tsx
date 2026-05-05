@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
 import FieldView from './desktop/FieldView'
+import { buildCopyUpdates } from '../../../../lib/lineup'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
   P:     { bg: 'rgba(75,156,211,0.25)',    color: '#4B9CD3' },
@@ -61,6 +62,9 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [scoreUs, setScoreUs] = useState('')
   const [scoreThem, setScoreThem] = useState('')
   const notesRawRef = useRef<string | null>(null)
+  // Always-current reference so async callbacks see the latest slot state
+  const slotsRef = useRef(slots)
+  useEffect(() => { slotsRef.current = slots }, [slots])
   // Snapshot of inning_positions before marking absent so they can be restored
   const savedPositionsRef = useRef<Record<string, (string|null)[]>>({})
 
@@ -274,35 +278,23 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     if (!sourceSlots || sourceSlots.length === 0) { setCopying(false); return }
 
     const sourceByPlayer = new Map(sourceSlots.map((s: any) => [s.player_id, s]))
-    const blank = [null,null,null,null,null,null,null,null,null]
 
-    // Build updated slots — only touch players present in both games
-    const updates = slots
-      .filter(s => s.availability !== 'absent' && sourceByPlayer.has(s.player_id))
-      .map(s => {
-        const src = sourceByPlayer.get(s.player_id)
-        return {
-          id: s.id,
-          batting_order: src.batting_order,
-          inning_positions: copyMode === 'full' ? src.inning_positions : blank,
-        }
-      })
+    const updates = buildCopyUpdates(slotsRef.current, sourceByPlayer, copyMode)
 
     // Optimistic update
     setSlots(prev => {
       const updateMap = new Map(updates.map(u => [u.id, u]))
       const updated = prev.map(s => updateMap.has(s.id)
-        ? { ...s, ...updateMap.get(s.id) }
+        ? { ...s, ...updateMap.get(s.id)! }
         : s
       )
-      // Re-sort active slots by new batting_order
       const active = updated
         .filter(s => s.availability !== 'absent')
         .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
       return [...active, ...updated.filter(s => s.availability === 'absent')]
     })
 
-    // Persist
+    // Persist all active slots (matched + unmatched) with clean batting orders
     await Promise.all(updates.map(u =>
       supabase.from('lineup_slots').update({
         batting_order: u.batting_order,
@@ -316,7 +308,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
 
   // ── ASSIGN POSITION (shared by both modes) ─────────────────
   async function assignPosition(slotId: string, inningIndex: number, newPos: string | null) {
-    const slot = slots.find(s => s.id === slotId)
+    // Use slotsRef so rapid taps read the latest state rather than a potentially stale closure
+    const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
 
     if (newPos && newPos !== 'Bench' && restrictedSet.has(`${slot.player_id}::${newPos}`)) {
@@ -335,12 +328,15 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       return next
     })
 
-    const updatedPositions = [...slot.inning_positions]
+    // Build DB payload from slotsRef (latest state) to avoid saving stale positions
+    const latestSlot = slotsRef.current.find(s => s.id === slotId)
+    if (!latestSlot) return
+    const updatedPositions = [...latestSlot.inning_positions]
     updatedPositions[inningIndex] = newPos
     await supabase.from('lineup_slots').update({ inning_positions: updatedPositions }).eq('id', slotId)
 
     if (newPos && newPos !== 'Bench') {
-      const holder = slots.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
+      const holder = slotsRef.current.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
       if (holder) {
         const holderUpdated = [...holder.inning_positions]
         holderUpdated[inningIndex] = 'Bench'
@@ -350,8 +346,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   }
 
   async function swapPositions(slotId1: string, slotId2: string, ii: number) {
-    const s1 = slots.find(s => s.id === slotId1)
-    const s2 = slots.find(s => s.id === slotId2)
+    const s1 = slotsRef.current.find(s => s.id === slotId1)
+    const s2 = slotsRef.current.find(s => s.id === slotId2)
     if (!s1 || !s2) return
     const pos1 = (s1.inning_positions ?? [])[ii] as string | null
     const pos2 = (s2.inning_positions ?? [])[ii] as string | null
@@ -372,7 +368,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   }
 
   async function copyInningToAll(from: number, to: number[]) {
-    const activeS = slots.filter(s => s.availability !== 'absent')
+    const activeS = slotsRef.current.filter(s => s.availability !== 'absent')
     const updates = activeS.map(s => {
       const sourcePos = (s.inning_positions ?? [])[from] ?? null
       const newPositions = [...(s.inning_positions ?? [])]

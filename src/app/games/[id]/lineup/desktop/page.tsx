@@ -7,6 +7,7 @@ import { formatTime } from '../../../../../lib/formatTime'
 import FieldView from './FieldView'
 import GameEditButton from '../../GameEditButton'
 import BoxScoreInput from '../../BoxScoreInput'
+import { buildCopyUpdates } from '../../../../../lib/lineup'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -749,22 +750,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       .eq('game_id', copyGameId)
     if (!src?.length) { setCopying(false); return }
     const byPlayer = new Map(src.map((s: any) => [s.player_id, s]))
-    const current = slotsRef.current
-    const updates = current
-      .filter(s => s.availability !== 'absent' && byPlayer.has(s.player_id))
-      .map(s => {
-        const srcSlot: any = byPlayer.get(s.player_id)
-        return {
-          id: s.id,
-          batting_order: srcSlot.batting_order,
-          inning_positions: copyMode === 'full' ? srcSlot.inning_positions : [...BLANK],
-        }
-      })
+
+    const updates = buildCopyUpdates(slotsRef.current, byPlayer, copyMode)
+
     const updateMap = new Map(updates.map(u => [u.id, u]))
-    const merged = current.map(s => updateMap.has(s.id) ? { ...s, ...updateMap.get(s.id) } : s)
+    const merged = slotsRef.current.map(s => updateMap.has(s.id) ? { ...s, ...updateMap.get(s.id)! } : s)
     const active = merged.filter(s => s.availability !== 'absent').sort((a: any, b: any) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
     const next = [...active, ...merged.filter(s => s.availability === 'absent')]
     setSlots(next)
+    // Persist all active slots (matched + unmatched) with clean batting orders
     await Promise.all(updates.map(u =>
       supabase.from('lineup_slots').update({ batting_order: u.batting_order, inning_positions: u.inning_positions }).eq('id', u.id)
     ))
@@ -1282,7 +1276,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             inningCount={game?.innings_played ?? game?.season?.innings_per_game ?? 6}
             teamName={game?.season?.team?.name ?? 'Us'}
             opponent={game?.opponent ?? 'Opponent'}
-            onSaved={newNotes => { notesRawRef.current = newNotes }}
+            onSaved={newNotes => {
+                      notesRawRef.current = newNotes
+                      setGame((g: any) => g ? { ...g, notes: newNotes } : g)
+                    }}
           />
         </div>
       )}

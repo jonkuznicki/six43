@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { buildCopyUpdates } from '../lineup'
 
 // ── Pure helpers extracted from the lineup editor ─────────────────────────────
 // These are copied from lineup/desktop/page.tsx and lineup/page.tsx so they
@@ -305,6 +306,115 @@ describe('roster size edge cases', () => {
     const slot = { inning_positions: ['Bench','Bench','Bench',null,null,null,null,null,null] }
     expect(benchInnings(slot, 3)).toBe(3)
     expect(benchInnings(slot, 6)).toBe(3)
+  })
+})
+
+// ── buildCopyUpdates ──────────────────────────────────────────────────────────
+
+function slot(id: string, player_id: string, batting_order: number | null, availability = 'available', positions?: (string|null)[]) {
+  return { id, player_id, batting_order, availability, inning_positions: positions ?? [...BLANK] }
+}
+
+function src(batting_order: number | null, positions?: (string|null)[]) {
+  return { batting_order, inning_positions: positions ?? [...BLANK] }
+}
+
+describe('buildCopyUpdates', () => {
+  it('assigns clean 1..N batting orders to all matched active slots', () => {
+    const current = [slot('s1','p1',3), slot('s2','p2',1), slot('s3','p3',2)]
+    const source = new Map([['p1', src(1)], ['p2', src(2)], ['p3', src(3)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    const orders = updates.map(u => u.batting_order).sort((a,b) => a-b)
+    expect(orders).toEqual([1,2,3])
+  })
+
+  it('sorts matched players by source batting_order', () => {
+    const current = [slot('s1','p1',3), slot('s2','p2',1), slot('s3','p3',2)]
+    const source = new Map([['p1', src(3)], ['p2', src(1)], ['p3', src(2)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    // p2(src=1) → batting 1, p3(src=2) → batting 2, p1(src=3) → batting 3
+    expect(updates.find(u => u.id === 's2')!.batting_order).toBe(1)
+    expect(updates.find(u => u.id === 's3')!.batting_order).toBe(2)
+    expect(updates.find(u => u.id === 's1')!.batting_order).toBe(3)
+  })
+
+  it('appends unmatched players after matched, preserving their relative order', () => {
+    const current = [
+      slot('s1','p1',2),  // matched
+      slot('s2','p_new1',1),  // unmatched — currently batting 1st
+      slot('s3','p_new2',3),  // unmatched — currently batting 3rd
+    ]
+    const source = new Map([['p1', src(1)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    // p1 matched (src order 1) → position 1
+    // p_new1 (current 1) → position 2, p_new2 (current 3) → position 3
+    expect(updates.find(u => u.id === 's1')!.batting_order).toBe(1)
+    expect(updates.find(u => u.id === 's2')!.batting_order).toBe(2)
+    expect(updates.find(u => u.id === 's3')!.batting_order).toBe(3)
+  })
+
+  it('returns updates for ALL active players, not just matched', () => {
+    const current = [slot('s1','p1',1), slot('s2','p_new',2)]
+    const source = new Map([['p1', src(1)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    expect(updates).toHaveLength(2)
+    expect(updates.find(u => u.id === 's2')).toBeDefined()
+  })
+
+  it('skips absent players entirely', () => {
+    const current = [
+      slot('s1','p1',1,'available'),
+      slot('s2','p2',2,'absent'),
+    ]
+    const source = new Map([['p1', src(1)], ['p2', src(2)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    expect(updates).toHaveLength(1)
+    expect(updates[0].id).toBe('s1')
+    expect(updates[0].batting_order).toBe(1)
+  })
+
+  it('copies positions from source in full mode', () => {
+    const positions: (string|null)[] = ['P','C','1B',null,null,null,null,null,null]
+    const current = [slot('s1','p1',1)]
+    const source = new Map([['p1', src(1, positions)]])
+    const updates = buildCopyUpdates(current, source, 'full')
+    expect(updates[0].inning_positions).toEqual(positions)
+  })
+
+  it('clears positions in order mode for matched players', () => {
+    const positions: (string|null)[] = ['P','C','1B',null,null,null,null,null,null]
+    const current = [slot('s1','p1',1)]
+    const source = new Map([['p1', src(1, positions)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    expect(updates[0].inning_positions).toEqual([...BLANK])
+  })
+
+  it('preserves unmatched player positions regardless of copy mode', () => {
+    const existing: (string|null)[] = ['LF','LF',null,null,null,null,null,null,null]
+    const current = [slot('s1','p1',1), slot('s2','p_new',2,'available', existing)]
+    const source = new Map([['p1', src(1)]])
+    const fullUpdates = buildCopyUpdates(current, source, 'full')
+    const orderUpdates = buildCopyUpdates(current, source, 'order')
+    expect(fullUpdates.find(u => u.id === 's2')!.inning_positions).toEqual(existing)
+    expect(orderUpdates.find(u => u.id === 's2')!.inning_positions).toEqual(existing)
+  })
+
+  it('handles source with null batting_order (nulls sort last)', () => {
+    const current = [slot('s1','p1',1), slot('s2','p2',2)]
+    const source = new Map([['p1', src(null)], ['p2', src(1)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    // p2 has src order 1, p1 has src order null → p2 first
+    expect(updates[0].id).toBe('s2')
+    expect(updates[1].id).toBe('s1')
+  })
+
+  it('produces duplicate-free batting orders even when source had gaps', () => {
+    const current = [slot('s1','p1',1), slot('s2','p2',2), slot('s3','p3',3)]
+    // Source gaps: 1, 5, 10
+    const source = new Map([['p1', src(1)], ['p2', src(5)], ['p3', src(10)]])
+    const updates = buildCopyUpdates(current, source, 'order')
+    const orders = updates.map(u => u.batting_order).sort((a,b) => a-b)
+    expect(orders).toEqual([1,2,3])
   })
 })
 
