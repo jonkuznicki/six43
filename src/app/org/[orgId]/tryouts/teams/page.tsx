@@ -79,6 +79,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
       const { error } = await supabase.from('tryout_teams').insert({
         org_id: params.orgId, season_id: season.id,
         name: form.name.trim(), age_group: form.age_group, color: form.color,
+        is_active: true,
       })
       if (error) { setSaveError(error.message); setSaving(false); return }
     }
