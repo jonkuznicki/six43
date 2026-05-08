@@ -683,7 +683,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '1rem 1.5rem 6rem' }}>
+    <main className="page-wide" style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '1rem 1.5rem 0.5rem' }}>
 
       {/* ── Row 1: title + actions ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
@@ -806,11 +806,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
       {/* ── Table ── */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '14px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.dim, fontSize: '14px' }}>
           No players found. Import registration data to get started.
         </div>
       ) : (
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 290px)', borderRadius: '8px', border: '0.5px solid var(--border)' }}>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0, borderRadius: '8px', border: '0.5px solid var(--border)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               {/* ── Section header row ── */}
@@ -923,10 +923,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 const showWhiteLine = ageFilter !== 'all' && ageCutoff.white > 0 && idx === ageCutoff.blue + ageCutoff.white
                 const rowBg = idx % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.015)'
 
-                // Team color for the assignment cell
-                const teamColor = team?.name?.toLowerCase() === 'blue'  ? '#4090E0'
-                                : team?.name?.toLowerCase() === 'white' ? s.muted
-                                : team ? '#6DB875' : undefined
+                // Team color — use the color stored on the team record, fall back to a neutral accent
+                const teamColor = team?.color ?? '#6DB875'
 
                 return (
                   <>
