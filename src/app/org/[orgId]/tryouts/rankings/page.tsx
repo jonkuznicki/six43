@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import PlayerCard from './PlayerCard'
@@ -27,6 +27,7 @@ interface TryoutScoreRow {
 
 interface CoachEvalRow {
   player_id:        string
+  computed_score:   number | null
   coach_eval_score: number | null
   intangibles_score: number | null
   scores:           Record<string, number> | null
@@ -226,7 +227,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .eq('org_id', params.orgId),
 
       supabase.from('tryout_coach_evals')
-        .select('player_id, coach_eval_score, intangibles_score, scores, comments')
+        .select('player_id, computed_score, coach_eval_score, intangibles_score, scores, comments')
         .eq('org_id', params.orgId).eq('status', 'submitted'),
 
       supabase.from('tryout_coach_eval_config')
@@ -382,7 +383,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
     const base: Array<Omit<RankedPlayer, 'combinedRank' | 'tryoutRank' | 'coachRank' | 'intangiblesRank'>> =
       players.map(player => {
-        const ag = (player.tryout_age_group ?? player.age_group).toUpperCase()
+        const ag = ((player.tryout_age_group ?? player.age_group) ?? '?U').toUpperCase()
 
         // Tryout
         const tRows = tryoutByPlayer.get(player.id) ?? []
@@ -411,7 +412,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
         // Coach eval
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const coachEval     = evalRow?.coach_eval_score  ?? null
+        const coachEval     = evalRow ? (evalRow.computed_score ?? evalRow.coach_eval_score ?? null) : null
         const intangibles   = evalRow?.intangibles_score ?? null
         const teamPitching  = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting   = sectionAvg(evalRow?.scores ?? null, hittingKeys)
@@ -614,7 +615,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   const priorYear     = season ? season.year - 1 : null
   const assignedCount = filtered.filter(r => r.assignedTeamId).length
   const teamOptions   = (ag: string) => {
-    const matched = teams.filter(t => t.age_group.toLowerCase() === ag.toLowerCase() || t.age_group === 'all')
+    const matched = teams.filter(t => (t.age_group ?? '').toLowerCase() === ag.toLowerCase() || t.age_group === 'all')
     return matched.length > 0 ? matched : teams  // fallback: show all teams
   }
 
@@ -927,7 +928,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 const teamColor = team?.color ?? '#6DB875'
 
                 return (
-                  <>
+                  <React.Fragment key={row.player.id}>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
                         <td colSpan={21} style={{ padding: 0, border: 'none' }}>
@@ -1113,7 +1114,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                       </td>
 
                     </tr>
-                  </>
+                  </React.Fragment>
                 )
               })}
             </tbody>
