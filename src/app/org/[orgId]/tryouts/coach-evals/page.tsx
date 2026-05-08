@@ -42,6 +42,9 @@ interface EvalMeta {
   comments:     string | null
 }
 
+// Field keys that accept a raw decimal value (e.g. 60yd time in seconds) instead of 1-5
+const DECIMAL_EVAL_KEYS = new Set(['speed'])
+
 const SECTION_ORDER: Record<string, number> = {
   fielding_hitting:  0,
   athleticism:       1,
@@ -315,6 +318,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   }
 
   function fillColumn(fieldKey: string, value: number, visiblePlayerIds: string[]) {
+    if (DECIMAL_EVAL_KEYS.has(fieldKey)) return
     setGridScores(prev => {
       const next = { ...prev }
       for (const pid of visiblePlayerIds) {
@@ -338,6 +342,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       const cur = prev[playerId] ?? {}
       const patch: Record<string, number | null> = {}
       for (const f of fields) {
+        if (DECIMAL_EVAL_KEYS.has(f.key)) continue  // decimal fields are not 1-5
         if ((cur[f.key] ?? null) == null) patch[f.key] = value
       }
       const next = { ...prev, [playerId]: { ...cur, ...patch } }
@@ -356,6 +361,8 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return }
+
+    if (DECIMAL_EVAL_KEYS.has(field.key)) return  // decimal cell owns its own keyboard input
 
     if (e.key >= '1' && e.key <= '5') {
       e.preventDefault()
@@ -802,8 +809,8 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                         textAlign: 'left', paddingBottom: '4px',
                       }}>{field.label}</div>
 
-                      {/* Column fill control */}
-                      {colFill === field.key ? (
+                      {/* Column fill control — not shown for decimal fields */}
+                      {!DECIMAL_EVAL_KEYS.has(field.key) && (colFill === field.key ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', marginTop: '4px' }}>
                           {[1,2,3,4,5].map(v => (
                             <button key={v} onClick={() => fillColumn(field.key, v, filteredIds)}
@@ -815,7 +822,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                         <button onClick={() => { setColFill(field.key); setRowFill(null) }}
                           style={{ marginTop: '4px', fontSize: '9px', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer', whiteSpace: 'nowrap' }}
                           title={`Fill empty cells in "${field.label}"`}>fill ↓</button>
-                      )}
+                      ))}
                     </th>
                   )
                 })}
@@ -891,32 +898,83 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       const isFirstSec = fi === 0 || fields[fi - 1].section !== field.section
                       const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
+                      const isDecimal = DECIMAL_EVAL_KEYS.has(field.key)
+                      const numRows   = sortedFilteredPlayers.length
+                      const numCols   = fields.length
+
+                      // Commit helper for decimal input navigation
+                      const commitDecimal = (inputEl: HTMLInputElement) => {
+                        const v = inputEl.value.trim() === '' ? null : parseFloat(inputEl.value)
+                        commitScore(player.id, field.key, v === null || isNaN(v) ? null : v)
+                      }
+
                       return (
                         <td key={field.key}
                           onClick={() => {
                             setSelected({ rowIdx: pi, colIdx: fi })
                             setColFill(null)
                             setRowFill(null)
-                            gridRef.current?.focus()
+                            if (!isDecimal) gridRef.current?.focus()
                           }}
                           style={{
-                            padding: '5px 4px',
+                            padding: isDecimal ? '2px 4px' : '5px 4px',
                             borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)',
                             borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                             textAlign: 'center', cursor: 'pointer',
-                            background: isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
-                            outline: isSelected ? '2px solid rgba(80,160,232,0.7)' : 'none',
+                            background: isDecimal ? 'transparent' : isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
+                            outline: (!isDecimal && isSelected) ? '2px solid rgba(80,160,232,0.7)' : 'none',
                             outlineOffset: '-2px',
                             userSelect: 'none',
                             position: 'relative',
                           }}
                         >
-                          <span style={{
-                            fontSize: '13px', fontWeight: val != null ? 700 : 400,
-                            color: val != null ? scoreColor(val) : 'rgba(var(--fg-rgb),0.2)',
-                          }}>
-                            {val ?? '·'}
-                          </span>
+                          {isDecimal ? (
+                            isSelected ? (
+                              <input
+                                autoFocus
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                defaultValue={val !== null ? String(val) : ''}
+                                onBlur={e => commitDecimal(e.target)}
+                                onKeyDown={e => {
+                                  const el = e.currentTarget
+                                  const nav = (dr: number, dc: number) => {
+                                    e.preventDefault()
+                                    commitDecimal(el)
+                                    moveSelected(dr, dc, numRows, numCols)
+                                    gridRef.current?.focus()
+                                  }
+                                  if (e.key === 'Enter')                        nav(1, 0)
+                                  else if (e.key === 'Tab' && !e.shiftKey)      nav(0, 1)
+                                  else if (e.key === 'Tab' && e.shiftKey)       nav(0, -1)
+                                  else if (e.key === 'ArrowDown')               nav(1, 0)
+                                  else if (e.key === 'ArrowUp')                 nav(-1, 0)
+                                  else if (e.key === 'ArrowRight' && (e.currentTarget.selectionStart ?? 0) >= e.currentTarget.value.length) nav(0, 1)
+                                  else if (e.key === 'ArrowLeft'  && (e.currentTarget.selectionStart ?? 0) === 0)                           nav(0, -1)
+                                  else if (e.key === 'Escape') { e.preventDefault(); setSelected(null); gridRef.current?.focus() }
+                                }}
+                                style={{
+                                  width: '56px', textAlign: 'center', padding: '3px 4px',
+                                  background: 'rgba(80,160,232,0.12)',
+                                  border: '2px solid rgba(80,160,232,0.7)',
+                                  borderRadius: '4px', fontSize: '13px', fontWeight: 700,
+                                  color: 'var(--fg)', outline: 'none',
+                                }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '12px', fontWeight: val !== null ? 700 : 400, color: val !== null ? s.muted : 'rgba(var(--fg-rgb),0.2)' }}>
+                                {val !== null ? val : '·'}
+                              </span>
+                            )
+                          ) : (
+                            <span style={{
+                              fontSize: '13px', fontWeight: val != null ? 700 : 400,
+                              color: val != null ? scoreColor(val) : 'rgba(var(--fg-rgb),0.2)',
+                            }}>
+                              {val ?? '·'}
+                            </span>
+                          )}
                         </td>
                       )
                     })}
