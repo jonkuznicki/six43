@@ -6,6 +6,7 @@ import Link from 'next/link'
 import PlayerCard from './PlayerCard'
 import PlayerCompare from './PlayerCompare'
 import type { GcStatDef } from '../../../../../lib/tryouts/gcStatDefs'
+import { computeTryoutScore, type ScoringCategory } from '../../../../../lib/tryouts/computeScore'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -151,16 +152,17 @@ function sectionAvg(
 export default function TeamMakingPage({ params }: { params: { orgId: string } }) {
   const supabase = createClient()
 
-  const [season,      setSeason]      = useState<Season | null>(null)
-  const [players,     setPlayers]     = useState<Player[]>([])
-  const [tryoutRows,  setTryoutRows]  = useState<TryoutScoreRow[]>([])
-  const [evalRows,    setEvalRows]    = useState<CoachEvalRow[]>([])
-  const [evalConfig,  setEvalConfig]  = useState<EvalConfigRow[]>([])
-  const [gcRows,      setGcRows]      = useState<GcStatRow[]>([])
-  const [teams,       setTeams]       = useState<Team[]>([])
-  const [assignments, setAssignments] = useState<Record<string, string>>({})
-  const [notesMap,    setNotesMap]    = useState<Record<string, string>>({})
-  const [loading,     setLoading]     = useState(true)
+  const [season,        setSeason]        = useState<Season | null>(null)
+  const [players,       setPlayers]       = useState<Player[]>([])
+  const [tryoutRows,    setTryoutRows]    = useState<TryoutScoreRow[]>([])
+  const [evalRows,      setEvalRows]      = useState<CoachEvalRow[]>([])
+  const [evalConfig,    setEvalConfig]    = useState<EvalConfigRow[]>([])
+  const [scoringConfig, setScoringConfig] = useState<ScoringCategory[]>([])
+  const [gcRows,        setGcRows]        = useState<GcStatRow[]>([])
+  const [teams,         setTeams]         = useState<Team[]>([])
+  const [assignments,   setAssignments]   = useState<Record<string, string>>({})
+  const [notesMap,      setNotesMap]      = useState<Record<string, string>>({})
+  const [loading,       setLoading]       = useState(true)
 
   // Filters / sort
   const [ageFilter, setAgeFilter] = useState('all')
@@ -212,6 +214,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       { data: tryoutData },
       { data: evalData },
       { data: evalCfgData },
+      { data: scoringCfgData },
       { data: gcData },
       { data: teamData },
       { data: assignData },
@@ -235,6 +238,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .eq('org_id', params.orgId)
         .order('sort_order'),
 
+      supabase.from('tryout_scoring_config')
+        .select('category, label, weight, is_optional, is_tiebreaker, subcategories, sort_order')
+        .eq('season_id', seasonData.id)
+        .order('sort_order'),
+
       supabase.from('tryout_gc_stats')
         .select('player_id, gc_computed_score, gc_hitting_score, gc_pitching_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv')
         .eq('org_id', params.orgId),
@@ -256,6 +264,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     setTryoutRows(tryoutData ?? [])
     setEvalRows(evalData ?? [])
     setEvalConfig(evalCfgData ?? [])
+    setScoringConfig((scoringCfgData ?? []).map((c: any) => ({
+      category: c.category, label: c.label, weight: c.weight,
+      is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false,
+      subcategories: c.subcategories ?? [],
+    })))
     setGcRows(gcData ?? [])
     setTeams(teamData ?? [])
 
@@ -385,11 +398,16 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       players.map(player => {
         const ag = ((player.tryout_age_group ?? player.age_group) ?? '?U').toUpperCase()
 
-        // Tryout
+        // Tryout — use stored tryout_score; fall back to computing from scores JSONB
         const tRows = tryoutByPlayer.get(player.id) ?? []
-        const validT = tRows.filter(r => r.tryout_score != null)
+        const resolvedScores = tRows.map(r => {
+          if (r.tryout_score != null) return r.tryout_score
+          if (r.scores && scoringConfig.length > 0) return computeTryoutScore(r.scores, scoringConfig)
+          return null
+        })
+        const validT = resolvedScores.filter((v): v is number => v != null)
         const tryoutScore = validT.length > 0
-          ? validT.reduce((s, r) => s + r.tryout_score!, 0) / validT.length
+          ? validT.reduce((s, v) => s + v, 0) / validT.length
           : null
         const validTP = tRows.filter(r => r.tryout_pitching != null)
         const tryoutPitching = validTP.length > 0
@@ -480,7 +498,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, pitchingKeys, hittingKeys])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, pitchingKeys, hittingKeys, scoringConfig])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 
