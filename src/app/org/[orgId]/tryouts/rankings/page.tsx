@@ -209,6 +209,12 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     setShareToken(seasonData?.rankings_share_token ?? null)
     if (!seasonData) { setLoading(false); return }
 
+    const { data: sessionRows } = await supabase
+      .from('tryout_sessions')
+      .select('id')
+      .eq('season_id', seasonData.id)
+    const sessionIds = (sessionRows ?? []).map((s: any) => s.id as string)
+
     const [
       { data: playerData },
       { data: tryoutData },
@@ -225,9 +231,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .eq('org_id', params.orgId).eq('is_active', true)
         .order('last_name').order('first_name'),
 
-      supabase.from('tryout_scores')
-        .select('player_id, tryout_score, tryout_pitching, scores')
-        .eq('org_id', params.orgId),
+      sessionIds.length > 0
+        ? supabase.from('tryout_scores')
+            .select('player_id, tryout_score, tryout_pitching, scores')
+            .in('session_id', sessionIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
 
       supabase.from('tryout_coach_evals')
         .select('player_id, computed_score, coach_eval_score, intangibles_score, scores, comments')
@@ -907,13 +915,13 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
                 {/* Pitching & Hitting */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
-                  onClick={() => toggleSort('teamPitching')}>T.Pitch{sortArrow('teamPitching')}</th>
+                  onClick={() => toggleSort('teamPitching')}>Eval Pitch{sortArrow('teamPitching')}</th>
                 <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('tryoutPitching')}>Try.Pitch{sortArrow('tryoutPitching')}</th>
+                  onClick={() => toggleSort('tryoutPitching')}>TO Pitch{sortArrow('tryoutPitching')}</th>
                 <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('teamHitting')}>T.Hit{sortArrow('teamHitting')}</th>
+                  onClick={() => toggleSort('teamHitting')}>Eval Hit{sortArrow('teamHitting')}</th>
                 <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('tryoutHitting')}>Try.Hit{sortArrow('tryoutHitting')}</th>
+                  onClick={() => toggleSort('tryoutHitting')}>TO Hit{sortArrow('tryoutHitting')}</th>
                 <th style={{ ...th, color: '#C080E8' }}
                   onClick={() => toggleSort('speed')}>Speed{sortArrow('speed')}</th>
 
