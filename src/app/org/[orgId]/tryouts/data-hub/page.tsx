@@ -118,6 +118,13 @@ function scoreColor(v: number | null): string {
 
 function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
 
+const EVAL_SECTION_LABELS: Record<string, string> = {
+  fielding_hitting:  'Fielding & Hitting',
+  pitching_catching: 'Pitching & Catching',
+  intangibles:       'Intangibles',
+  athleticism:       'Athleticism',
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DataHubPage({ params }: { params: { orgId: string } }) {
@@ -223,8 +230,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       syear
         ? supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear))
         : Promise.resolve({ data: [] as any[] }),
-      sid
-        ? supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('season_id', sid).eq('status', 'submitted')
+      syear
+        ? supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear - 1)).eq('status', 'submitted')
         : Promise.resolve({ data: [] as any[] }),
       sessionIds.length > 0
         ? supabase.from('tryout_scores').select('player_id').in('session_id', sessionIds)
@@ -338,8 +345,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       const evalQ = supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('status', 'submitted')
       const cfgQ  = supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order')
       const [{ data: fields }, { data: evals }] = await Promise.all([
-        sid ? cfgQ.eq('season_id', sid) : cfgQ,
-        sid ? evalQ.eq('season_id', sid) : evalQ,
+        sid   ? cfgQ.eq('season_id', sid)                    : cfgQ,
+        syear ? evalQ.eq('season_year', String(syear - 1))   : evalQ,
       ])
       setEvalFields((fields ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
       setEvalFull(evals ?? [])
@@ -1109,7 +1116,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                           background: sec === 'pitching_catching' ? 'rgba(var(--fg-rgb),0.03)' : 'var(--bg)',
                           cursor: 'default',
                         }}>
-                          {sec === 'fielding_hitting' ? 'Fielding & Hitting' : sec === 'pitching_catching' ? 'Pitching & Catching' : 'Intangibles'}
+                          {EVAL_SECTION_LABELS[sec] ?? sec}
                         </th>
                       )
                     })}
