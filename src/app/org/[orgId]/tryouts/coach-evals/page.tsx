@@ -43,17 +43,17 @@ interface EvalMeta {
 }
 
 const SECTION_LABELS: Record<string, string> = {
-  fielding_hitting:  'Fielding & Hitting',
-  pitching_catching: 'Pitching & Catching',
-  intangibles:       'Intangibles',
+  fielding_hitting:  'Fielding / Hitting',
   athleticism:       'Athleticism',
+  pitching_catching: 'Pitching / Catching',
+  intangibles:       'Intangibles',
 }
 
 const SECTION_SHORT: Record<string, string> = {
-  fielding_hitting:  'F & H',
-  pitching_catching: 'P & C',
-  intangibles:       'Intang.',
+  fielding_hitting:  'F / H',
   athleticism:       'Ath.',
+  pitching_catching: 'P / C',
+  intangibles:       'Intang.',
 }
 
 function computeSectionScore(

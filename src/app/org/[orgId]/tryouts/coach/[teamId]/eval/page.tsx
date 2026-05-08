@@ -18,9 +18,10 @@ interface Season { id: string; label: string; year: number }
 interface OrgMember { id: string; name: string | null; email: string; role: string }
 
 const SECTION_LABELS: Record<string, string> = {
-  fielding_hitting:   'Fielding & Hitting',
-  pitching_catching:  'Pitching & Catching',
-  intangibles:        'Intangibles',
+  fielding_hitting:  'Fielding / Hitting',
+  athleticism:       'Athleticism',
+  pitching_catching: 'Pitching / Catching',
+  intangibles:       'Intangibles',
 }
 
 const SCALE = '5=Exceptional · 4=Above age · 3=Age appropriate · 2=Below age · 1=Needs work'
@@ -273,6 +274,24 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', fontSize: '12px', minWidth: '100%' }}>
             <thead>
+              {/* Section label row */}
+              <tr>
+                <th style={{ background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: 0 }} />
+                {sections.map(([sec, secFields]) => (
+                  <th key={sec} colSpan={secFields.length} style={{
+                    padding: '5px 6px', textAlign: 'center',
+                    borderBottom: '0.5px solid var(--border)',
+                    borderLeft: '0.5px solid var(--border-md)',
+                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
+                    textTransform: 'uppercase', color: s.muted,
+                    background: 'var(--bg)', whiteSpace: 'nowrap',
+                  }}>
+                    {SECTION_LABELS[sec] ?? sec}
+                  </th>
+                ))}
+                <th colSpan={2} style={{ background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: 0 }} />
+              </tr>
+              {/* Field abbreviation row */}
               <tr>
                 <th style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '2px solid var(--border)', position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 2, minWidth: '140px' }}>Player</th>
                 {sections.map(([sec, secFields]) => (
