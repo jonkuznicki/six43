@@ -42,6 +42,13 @@ interface EvalMeta {
   comments:     string | null
 }
 
+const SECTION_ORDER: Record<string, number> = {
+  fielding_hitting:  0,
+  athleticism:       1,
+  pitching_catching: 2,
+  intangibles:       3,
+}
+
 const SECTION_LABELS: Record<string, string> = {
   fielding_hitting:  'Fielding / Hitting',
   athleticism:       'Athleticism',
@@ -188,6 +195,10 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order,
       weight: f.weight ?? 1,
     }))
+    loadedFields.sort((a, b) => {
+      const sd = (SECTION_ORDER[a.section] ?? 99) - (SECTION_ORDER[b.section] ?? 99)
+      return sd !== 0 ? sd : a.sort_order - b.sort_order
+    })
     setFields(loadedFields)
 
     const isOrgCreator = !!(user && orgData?.admin_user_id === user.id)

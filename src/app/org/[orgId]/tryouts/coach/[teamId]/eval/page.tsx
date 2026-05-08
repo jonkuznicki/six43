@@ -10,12 +10,19 @@ interface Player {
 }
 
 interface EvalField {
-  key: string; label: string; section: string; is_optional: boolean
+  key: string; label: string; section: string; is_optional: boolean; sort_order: number
 }
 
 interface Team { id: string; name: string; age_group: string }
 interface Season { id: string; label: string; year: number }
 interface OrgMember { id: string; name: string | null; email: string; role: string }
+
+const SECTION_ORDER: Record<string, number> = {
+  fielding_hitting:  0,
+  athleticism:       1,
+  pitching_catching: 2,
+  intangibles:       3,
+}
 
 const SECTION_LABELS: Record<string, string> = {
   fielding_hitting:  'Fielding / Hitting',
@@ -83,9 +90,15 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
     ])
 
     setPlayers(playerData ?? [])
-    setFields((fieldData ?? []).map((f: any) => ({
+    const sortedFields = (fieldData ?? []).map((f: any) => ({
       key: f.field_key, label: f.label, section: f.section, is_optional: f.is_optional,
-    })))
+      sort_order: f.sort_order as number,
+    }))
+    sortedFields.sort((a, b) => {
+      const sd = (SECTION_ORDER[a.section] ?? 99) - (SECTION_ORDER[b.section] ?? 99)
+      return sd !== 0 ? sd : a.sort_order - b.sort_order
+    })
+    setFields(sortedFields)
 
     // Load existing eval data
     const scoreMap: typeof scores = {}
