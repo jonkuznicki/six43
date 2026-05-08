@@ -165,13 +165,21 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   }
 
   function handleCellChange(playerId: string, subKey: string, val: string) {
-    // Tiebreaker (speed): raw decimal seconds — no range clamping
-    // Regular scores: integer 1–5
-    const num = val === ''
-      ? ''
-      : TIEBREAKER_KEYS.has(subKey)
-        ? val  // allow any decimal, e.g. "7.82"
-        : String(Math.min(5, Math.max(1, parseInt(val) || 0)))
+    let num: string
+    if (val === '') {
+      num = ''
+    } else if (TIEBREAKER_KEYS.has(subKey)) {
+      num = val  // raw decimal seconds, no clamping
+    } else {
+      const parsed = parseFloat(val)
+      if (isNaN(parsed)) {
+        num = ''
+      } else if (val.endsWith('.')) {
+        num = val  // allow "4." while still typing "4.5"
+      } else {
+        num = String(Math.round(Math.min(5, Math.max(1, parsed)) * 10) / 10)
+      }
+    }
     setGrid(prev => ({ ...prev, [playerId]: { ...(prev[playerId] ?? {}), [subKey]: num } }))
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => autoSave(playerId), 1000)
@@ -455,14 +463,14 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                           ) : (
                             <input
                               ref={el => { inputRefs.current[rowIdx][colIdx] = el }}
-                              type="number" min={1} max={5}
+                              type="number" min={1} max={5} step={0.1}
                               value={val}
                               disabled={!playerId || isLocked}
                               onChange={e => playerId && handleCellChange(playerId, sub.key, e.target.value)}
                               onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
                               style={{
-                                width: '36px', textAlign: 'center', padding: '3px 2px',
-                                background: val ? (parseInt(val) >= 4 ? 'rgba(109,184,117,0.2)' : parseInt(val) <= 2 ? 'rgba(232,112,96,0.15)' : 'rgba(232,160,32,0.15)') : 'var(--bg-input)',
+                                width: '42px', textAlign: 'center', padding: '3px 2px',
+                                background: val ? (parseFloat(val) >= 4 ? 'rgba(109,184,117,0.2)' : parseFloat(val) <= 2 ? 'rgba(232,112,96,0.15)' : 'rgba(232,160,32,0.15)') : 'var(--bg-input)',
                                 border: `0.5px solid ${val ? 'transparent' : 'var(--border-md)'}`,
                                 borderRadius: '4px', fontSize: '13px', fontWeight: val ? 700 : 400,
                                 color: 'var(--fg)',
