@@ -177,12 +177,12 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
         team_label:    team?.name ?? '',
         coach_user_id: user?.id,
         coach_name:    member?.name ?? member?.email ?? 'Coach',
-        scores:        playerScores,
-        overall_score: avgScore,
-        comments:      comments[player.id] ?? null,
-        status:        'draft',
-        updated_at:    new Date().toISOString(),
-      }, { onConflict: 'player_id,season_id' })
+        scores:         playerScores,
+        computed_score: avgScore,
+        comments:       comments[player.id] ?? null,
+        status:         'draft',
+        updated_at:     new Date().toISOString(),
+      }, { onConflict: 'player_id,org_id,season_year' })
     }
 
     setSaving(false)

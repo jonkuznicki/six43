@@ -239,7 +239,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
       supabase.from('tryout_coach_evals')
         .select('player_id, computed_score, coach_eval_score, intangibles_score, scores, comments')
-        .eq('org_id', params.orgId).eq('status', 'submitted'),
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id).eq('status', 'submitted'),
 
       supabase.from('tryout_coach_eval_config')
         .select('field_key, section, weight')
