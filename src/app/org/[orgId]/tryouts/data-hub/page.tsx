@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 
@@ -102,7 +102,8 @@ const STATUS_TEXT: Record<AgeStatus, string> = {
   no_group:   'rgba(var(--fg-rgb),0.5)',
 }
 
-function nextAgeGroup(ag: string) {
+function nextAgeGroup(ag: string | null) {
+  if (!ag) return '?U'
   const m = ag.match(/^(\d+)u$/i)
   return m ? `${parseInt(m[1], 10) + 1}u` : ag
 }
@@ -452,7 +453,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       if (sortCol === 'name')      { va = `${a.last_name}${a.first_name}`; vb = `${b.last_name}${b.first_name}` }
       if (sortCol === 'team')      { va = pv(a, 'prior_team') ?? ''; vb = pv(b, 'prior_team') ?? '' }
       if (sortCol === 'tryout_ag') { va = pv(a, 'tryout_age_group') ?? ''; vb = pv(b, 'tryout_age_group') ?? '' }
-      if (sortCol === 'age')       { va = a.age_group; vb = b.age_group }
+      if (sortCol === 'age')       { va = a.age_group ?? ''; vb = b.age_group ?? '' }
       return va.localeCompare(vb) * sortDir
     })
   }, [players, ageFilter, search, sortCol, sortDir, localUpdates, regMap])
@@ -1343,8 +1344,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     const tagDisplay = p.tryout_age_group
 
                     return (
-                      <>
-                        <tr key={p.id} style={{ background: rowBg }}>
+                      <React.Fragment key={p.id}>
+                        <tr style={{ background: rowBg }}>
                           <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                           <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
                           <td style={{ ...td, color: s.muted, fontSize: '12px' }}>
@@ -1433,7 +1434,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
