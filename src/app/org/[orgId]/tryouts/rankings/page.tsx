@@ -319,15 +319,17 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     if (!season) return
     setAssigning(playerId)
     if (teamId) {
-      await supabase.from('tryout_team_assignments').upsert(
-        { player_id: playerId, team_id: teamId, season_id: season.id, org_id: params.orgId },
+      const { error } = await supabase.from('tryout_team_assignments').upsert(
+        { player_id: playerId, team_id: teamId, season_id: season.id, org_id: params.orgId, assigned_by: 'manual' },
         { onConflict: 'player_id,season_id' }
       )
-      setAssignments(prev => ({ ...prev, [playerId]: teamId }))
+      if (!error) setAssignments(prev => ({ ...prev, [playerId]: teamId }))
+      else console.error('assignTeam upsert failed:', error.message)
     } else {
-      await supabase.from('tryout_team_assignments').delete()
+      const { error } = await supabase.from('tryout_team_assignments').delete()
         .eq('player_id', playerId).eq('season_id', season.id)
-      setAssignments(prev => { const n = { ...prev }; delete n[playerId]; return n })
+      if (!error) setAssignments(prev => { const n = { ...prev }; delete n[playerId]; return n })
+      else console.error('assignTeam delete failed:', error.message)
     }
     setAssigning(null)
   }
