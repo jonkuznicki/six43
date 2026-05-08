@@ -240,7 +240,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
       supabase.from('tryout_teams')
         .select('id, name, age_group, color')
-        .eq('org_id', params.orgId).eq('season_id', seasonData.id).eq('is_active', true),
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id),
 
       supabase.from('tryout_team_assignments')
         .select('player_id, team_id')
