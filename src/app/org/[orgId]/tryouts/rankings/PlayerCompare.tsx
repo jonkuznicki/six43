@@ -86,8 +86,8 @@ export default function PlayerCompare({ players, gcRows, teams, ranked, onClose 
     { label: 'Tryout',      color: '#80B0E8',       getValue: p => p.tryoutScore,    getRank: p => p.tryoutRank,      higherBetter: true },
     { label: 'Coach Eval',  color: '#6DB875',       getValue: p => p.coachEval,      getRank: p => p.coachRank,       higherBetter: true },
     { label: 'Intangibles', color: '#6DB875',       getValue: p => p.intangibles,    getRank: p => p.intangiblesRank, higherBetter: true },
-    { label: 'T. Pitching', color: '#C080E8',       getValue: p => p.teamPitching,   getRank: _ => null,              higherBetter: true },
-    { label: 'T. Hitting',  color: '#C080E8',       getValue: p => p.teamHitting,    getRank: _ => null,              higherBetter: true },
+    { label: 'Tryout Pitching', color: '#C080E8',    getValue: p => p.teamPitching,   getRank: _ => null,              higherBetter: true },
+    { label: 'Tryout Catching', color: '#C080E8',   getValue: p => p.teamHitting,    getRank: _ => null,              higherBetter: true },
     { label: 'GC Hitting',  color: s.muted,         getValue: p => p.gcHittingScore,  getRank: _ => null,              higherBetter: true },
     { label: 'GC Pitching', color: s.muted,         getValue: p => p.gcPitchingScore, getRank: _ => null,              higherBetter: true },
   ]
@@ -138,11 +138,11 @@ export default function PlayerCompare({ players, gcRows, teams, ranked, onClose 
 
         {/* Table */}
         <div style={{ padding: '1rem 1.25rem' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 {/* Label column */}
-                <th style={{ width: '140px', padding: '8px 0', textAlign: 'left', fontSize: '10px', color: s.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '0.5px solid var(--border)' }} />
+                <th style={{ width: '150px', padding: '8px 0', textAlign: 'left', fontSize: '10px', color: s.dim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '0.5px solid var(--border)' }} />
                 {players.map(p => {
                   const team = teams.find(t => t.id === p.assignedTeamId)
                   const teamColor = team?.name?.toLowerCase() === 'blue' ? '#4090E0' : team?.name?.toLowerCase() === 'white' ? s.muted : team ? '#6DB875' : undefined
