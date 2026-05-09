@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import PrintLineupCard from '../PrintLineupCard'
 import ExchangeCardLayout from '../ExchangeCardLayout'
 import PrintControls from './PrintControls'
+import { makeLineupFilename } from '../../../../lib/shareLineup'
 
 export default async function PrintPage({ params }: { params: { id: string } }) {
   const supabase = await createServerClient()
@@ -22,6 +23,7 @@ export default async function PrintPage({ params }: { params: { id: string } }) 
   const inningCount = game.innings_played ?? 6
   const innings = Array.from({ length: inningCount }, (_, i) => i)
   const activeSlots = (slots ?? []).filter((s: any) => s.availability !== 'absent')
+  const shareFilename = makeLineupFilename(teamName, game.opponent ?? 'opponent', game.game_date ?? null)
 
   return (
     <html>
@@ -62,8 +64,8 @@ export default async function PrintPage({ params }: { params: { id: string } }) 
             </a>
           </div>
 
-          {/* Print controls — two separate buttons */}
-          <PrintControls />
+          {/* Print controls */}
+          <PrintControls filename={shareFilename} />
 
           {/* Page 1: Lineup sheet */}
           <div className="section-lineup">

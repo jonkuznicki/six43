@@ -7,6 +7,7 @@ import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
 import FieldView from './desktop/FieldView'
 import { buildCopyUpdates } from '../../../../lib/lineup'
+import { shareLineupPdf, makeLineupFilename } from '../../../../lib/shareLineup'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
   P:     { bg: 'rgba(75,156,211,0.25)',    color: '#4B9CD3' },
@@ -61,6 +62,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const [showScoreEdit, setShowScoreEdit] = useState(false)
   const [scoreUs, setScoreUs] = useState('')
   const [scoreThem, setScoreThem] = useState('')
+  const [sharing, setSharing] = useState(false)
   const notesRawRef = useRef<string | null>(null)
   // Always-current reference so async callbacks see the latest slot state
   const slotsRef = useRef(slots)
@@ -435,6 +437,25 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   const COL_STATUS = 24
   const reorderWidth = reorderMode ? 56 : 0
 
+  async function handleShare() {
+    const el = document.getElementById('lineup-print-sheet')
+    if (!el) return
+    setSharing(true)
+    try {
+      const filename = makeLineupFilename(
+        teamName ?? 'team',
+        game?.opponent ?? 'opponent',
+        game?.game_date ?? null,
+      )
+      await shareLineupPdf(el, filename)
+    } catch (err: any) {
+      // User cancelled the share sheet — not an error worth surfacing
+      if (err?.name !== 'AbortError') console.error('Share failed:', err)
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <>
       <style>{`
@@ -447,8 +468,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
         }
       `}</style>
 
-      {/* Print sheet */}
-      <div className="print-sheet">
+      {/* Print sheet — also captured by Share Lineup */}
+      <div id="lineup-print-sheet" className="print-sheet">
         <PrintLineupCard
           game={game}
           activeSlots={activeSlots}
@@ -692,6 +713,17 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                 color: `rgba(var(--fg-rgb), 0.5)`, cursor: 'pointer',
               }}>
               🖨 Print
+            </button>
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              style={{
+                fontSize: '11px', padding: '5px 10px', borderRadius: '4px',
+                border: '0.5px solid var(--border-strong)', background: 'transparent',
+                color: sharing ? `rgba(var(--fg-rgb), 0.3)` : `rgba(var(--fg-rgb), 0.5)`,
+                cursor: sharing ? 'default' : 'pointer',
+              }}>
+              {sharing ? '…' : '⬆ Share'}
             </button>
             <div style={{ display: 'flex', borderRadius: '4px', border: '0.5px solid var(--border-strong)', overflow: 'hidden', marginLeft: 'auto' }}>
               {(['grid', 'field'] as const).map(mode => (
