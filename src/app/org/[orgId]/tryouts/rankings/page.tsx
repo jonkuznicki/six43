@@ -17,6 +17,7 @@ interface Player {
   age_group:        string
   tryout_age_group: string | null
   prior_team:       string | null
+  grade:            string | null
 }
 
 interface TryoutScoreRow {
@@ -227,7 +228,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       { data: combinedData },
     ] = await Promise.all([
       supabase.from('tryout_players')
-        .select('id, first_name, last_name, age_group, tryout_age_group, prior_team')
+        .select('id, first_name, last_name, age_group, tryout_age_group, prior_team, grade')
         .eq('org_id', params.orgId).eq('is_active', true)
         .order('last_name').order('first_name'),
 
@@ -589,7 +590,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     const priorYear = season.year - 1
     const rows = [
       [
-        'Next Season Team', 'Notes', 'Combined Rank', 'Player', 'Age Group', `${priorYear} Team`,
+        'Next Season Team', 'Notes', 'Combined Rank', 'Player', 'Age Group', 'Grade', `${priorYear} Team`,
         'Combined Score', 'Tryout Score', 'Tryout Rank', 'Coach Eval', 'Coach Rank',
         'Intangibles', 'Intangibles Rank', 'Team Pitching', 'Tryout Pitching',
         'Team Hitting', 'Tryout Hitting', 'Speed (60yd)', 'GC Score', 'Comments',
@@ -602,6 +603,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           String(r.combinedRank ?? ''),
           `${r.player.last_name}, ${r.player.first_name}`,
           r.ageGroup,
+          r.player.grade ?? '',
           r.player.prior_team ?? '',
           r.combinedScore?.toFixed(2)    ?? '',
           r.tryoutScore?.toFixed(2)      ?? '',
@@ -852,7 +854,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   color: 'var(--accent)', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Combined</th>
                 {/* Identity */}
-                <th colSpan={2} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
+                <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
                 {/* Tryout */}
                 <th colSpan={2} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
@@ -893,8 +895,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 <th style={{ ...th, color: 'var(--accent)' }}
                   onClick={() => toggleSort('combinedScore')}>Score{sortArrow('combinedScore')}</th>
 
-                {/* Age + Prior Team */}
+                {/* Age + Grade + Prior Team */}
                 <th style={{ ...th }} onClick={() => toggleSort('ageGroup')}>Age</th>
+                <th style={{ ...th }}>Grade</th>
                 <th style={{ ...th, minWidth: '80px' }}>
                   {priorYear ? `${priorYear} Team` : 'Prior Team'}
                 </th>
@@ -1034,11 +1037,14 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                         {fmt(row.combinedScore)}
                       </td>
 
-                      {/* ── Age + Prior Team ── */}
+                      {/* ── Age + Grade + Prior Team ── */}
                       <td style={{ ...td, textAlign: 'center' }}>
                         <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', fontSize: '11px', fontWeight: 600 }}>
                           {row.ageGroup}
                         </span>
+                      </td>
+                      <td style={{ ...td, textAlign: 'center', fontSize: '11px', color: row.player.grade ? s.muted : s.dim }}>
+                        {row.player.grade ?? '—'}
                       </td>
                       <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? '#40A0E8' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {row.player.prior_team ?? '—'}
