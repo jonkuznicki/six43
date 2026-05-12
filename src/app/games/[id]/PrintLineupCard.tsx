@@ -202,11 +202,11 @@ export default function PrintLineupCard({ game, activeSlots, innings, teamName }
         </thead>
         <tbody>
           {(() => {
-            // Away team always listed first in a box score
-            const isHome = game?.location === 'Home'
-            const rows = isHome
-              ? [{ label: displayOpponent, bg: '#fff' }, { label: displayTeam, bg: '#eef3ff' }]
-              : [{ label: displayTeam, bg: '#fff' }, { label: displayOpponent, bg: '#eef3ff' }]
+            // Away team on top, home team on bottom
+            const isAway = game?.location === 'Away'
+            const rows = isAway
+              ? [{ label: displayTeam, bg: '#fff' }, { label: displayOpponent, bg: '#eef3ff' }]
+              : [{ label: displayOpponent, bg: '#fff' }, { label: displayTeam, bg: '#eef3ff' }]
             return rows.map((row, ti) => (
               <tr key={ti}>
                 <td style={{ ...scoreCell, paddingLeft: '8px', fontWeight: 700, fontSize: '13px',
