@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCopyUpdates } from '../lineup'
+import { buildCopyUpdates, isBeforeGame, selectPrevGame } from '../lineup'
 
 // ── Pure helpers extracted from the lineup editor ─────────────────────────────
 // These are copied from lineup/desktop/page.tsx and lineup/page.tsx so they
@@ -503,5 +503,107 @@ describe('box score notes helpers', () => {
     // _notes should still be present from the original base
     expect(result._notes).toBe('pre-existing note')
     expect(result._box.us).toEqual([3, 2])
+  })
+})
+
+// ── isBeforeGame ──────────────────────────────────────────────────────────────
+
+describe('isBeforeGame', () => {
+  it('returns true when candidate date is earlier', () => {
+    expect(isBeforeGame({ game_date: '2026-05-12', game_time: null }, '2026-05-14', null)).toBe(true)
+  })
+
+  it('returns false when candidate date is later', () => {
+    expect(isBeforeGame({ game_date: '2026-05-15', game_time: null }, '2026-05-14', null)).toBe(false)
+  })
+
+  it('returns false for same date when current game has no time', () => {
+    expect(isBeforeGame({ game_date: '2026-05-14', game_time: '10:00:00' }, '2026-05-14', null)).toBe(false)
+  })
+
+  it('returns false for same date when candidate has no time', () => {
+    expect(isBeforeGame({ game_date: '2026-05-14', game_time: null }, '2026-05-14', '12:00:00')).toBe(false)
+  })
+
+  it('returns true for same date when candidate time is earlier', () => {
+    expect(isBeforeGame({ game_date: '2026-05-14', game_time: '09:00:00' }, '2026-05-14', '12:00:00')).toBe(true)
+  })
+
+  it('returns false for same date when candidate time equals current time', () => {
+    expect(isBeforeGame({ game_date: '2026-05-14', game_time: '12:00:00' }, '2026-05-14', '12:00:00')).toBe(false)
+  })
+
+  it('returns false for same date when candidate time is later', () => {
+    expect(isBeforeGame({ game_date: '2026-05-14', game_time: '14:00:00' }, '2026-05-14', '12:00:00')).toBe(false)
+  })
+})
+
+// ── selectPrevGame ────────────────────────────────────────────────────────────
+
+function g(id: string, date: string, time: string | null = null) {
+  return { id, game_date: date, game_time: time }
+}
+
+describe('selectPrevGame', () => {
+  it('picks the most recent game before the current date', () => {
+    const games = [g('a', '2026-05-10'), g('b', '2026-05-12'), g('c', '2026-05-13')]
+    const result = selectPrevGame(games, '2026-05-14', null)
+    expect(result?.id).toBe('c')
+  })
+
+  it('returns null when no games predate the current game', () => {
+    const games = [g('a', '2026-05-15'), g('b', '2026-05-16')]
+    expect(selectPrevGame(games, '2026-05-14', null)).toBeNull()
+  })
+
+  it('excludes the same-day game when neither side has a time', () => {
+    const games = [g('a', '2026-05-14'), g('b', '2026-05-12')]
+    const result = selectPrevGame(games, '2026-05-14', null)
+    expect(result?.id).toBe('b')
+  })
+
+  it('selects a same-day game with an earlier time over a game two days prior', () => {
+    const games = [
+      g('earlier-today', '2026-05-14', '09:00:00'),
+      g('two-days-ago',  '2026-05-12', '12:00:00'),
+    ]
+    const result = selectPrevGame(games, '2026-05-14', '13:00:00')
+    expect(result?.id).toBe('earlier-today')
+  })
+
+  it('skips a same-day game with a later time', () => {
+    const games = [
+      g('later-today', '2026-05-14', '15:00:00'),
+      g('yesterday',   '2026-05-13', '12:00:00'),
+    ]
+    const result = selectPrevGame(games, '2026-05-14', '13:00:00')
+    expect(result?.id).toBe('yesterday')
+  })
+
+  it('never selects the current game (it is excluded by the caller)', () => {
+    // Simulates caller pre-filtering with .neq('id', currentId)
+    const games = [g('other', '2026-05-12')]
+    const result = selectPrevGame(games, '2026-05-14', null)
+    expect(result?.id).toBe('other')
+  })
+
+  it('falls back to most recent game when currentDate is null', () => {
+    const games = [g('a', '2026-05-10'), g('b', '2026-05-13'), g('c', '2026-05-12')]
+    const result = selectPrevGame(games, null, null)
+    expect(result?.id).toBe('b')
+  })
+
+  it('returns null for empty list', () => {
+    expect(selectPrevGame([], '2026-05-14', null)).toBeNull()
+  })
+
+  it('picks the latest among multiple same-day earlier games', () => {
+    const games = [
+      g('first',  '2026-05-14', '08:00:00'),
+      g('second', '2026-05-14', '11:00:00'),
+      g('third',  '2026-05-14', '13:00:00'),
+    ]
+    const result = selectPrevGame(games, '2026-05-14', '14:00:00')
+    expect(result?.id).toBe('third')
   })
 })

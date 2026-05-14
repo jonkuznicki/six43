@@ -7,7 +7,7 @@ import { formatTime } from '../../../../../lib/formatTime'
 import FieldView from './FieldView'
 import GameEditButton from '../../GameEditButton'
 import BoxScoreInput from '../../BoxScoreInput'
-import { buildCopyUpdates } from '../../../../../lib/lineup'
+import { buildCopyUpdates, selectPrevGame, isBeforeGame } from '../../../../../lib/lineup'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -174,10 +174,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     if ((gameData as any)?.season_id) {
       const { data: seasonGames } = await supabase
         .from('games')
-        .select('id, game_date')
+        .select('id, game_date, game_time')
         .eq('season_id', (gameData as any).season_id)
         .not('game_date', 'is', null)
         .order('game_date', { ascending: true })
+        .order('game_time', { ascending: true, nullsFirst: true })
       if (seasonGames?.length) {
         const idx = seasonGames.findIndex((g: any) => g.id === params.id)
         setPrevGameId(idx > 0 ? seasonGames[idx - 1].id : null)
@@ -220,6 +221,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     // Load position history (runs before slot check so it's available after batting order modal)
     if (gameData?.season_id) {
       const currentDate = (gameData as any)?.game_date ?? null
+      const currentTime = (gameData as any)?.game_time ?? null
       const defaultInn  = (gameData as any)?.season?.innings_per_game ?? 6
 
       const { data: statsData } = await supabase
@@ -240,14 +242,17 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
       let nonFinalQuery = supabase
         .from('games')
-        .select('id, innings_played, game_date')
+        .select('id, innings_played, game_date, game_time')
         .eq('season_id', (gameData as any).season_id)
         .neq('id', params.id)
         .neq('status', 'final')
-      if (currentDate) nonFinalQuery = (nonFinalQuery as any).lt('game_date', currentDate)
+      if (currentDate) nonFinalQuery = (nonFinalQuery as any).lte('game_date', currentDate)
 
-      const { data: nonFinalGames } = await nonFinalQuery
-      if (nonFinalGames?.length) {
+      const { data: nonFinalRaw } = await nonFinalQuery
+      const nonFinalGames = currentDate
+        ? (nonFinalRaw ?? []).filter((g: any) => isBeforeGame(g, currentDate, currentTime))
+        : (nonFinalRaw ?? [])
+      if (nonFinalGames.length) {
         const { data: nonFinalSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, availability, game_id')
@@ -280,18 +285,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       // Last game breakdown for right panel context
       const { data: otherGames } = await supabase
         .from('games')
-        .select('id, innings_played, game_date, status')
+        .select('id, innings_played, game_date, game_time, status')
         .eq('season_id', gameData.season_id)
         .neq('id', params.id)
-        .order('created_at', { ascending: false })
 
-      const sorted = (otherGames ?? [])
-        .filter(g => g.game_date)
-        .sort((a, b) => new Date(b.game_date).getTime() - new Date(a.game_date).getTime())
-      const prevGame =
-        sorted.find(g => !currentDate || g.game_date < currentDate) ??
-        sorted[0] ??
-        (otherGames ?? [])[0]
+      const prevGame = selectPrevGame(
+        (otherGames ?? []).filter((g: any) => g.game_date),
+        currentDate,
+        currentTime,
+      )
       if (prevGame) {
         const { data: prevSlots } = await supabase
           .from('lineup_slots')
@@ -318,16 +320,20 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
       // Pitching history for rest-days widget
       let prevGamesQuery = supabase
         .from('games')
-        .select('id, game_date, innings_played')
+        .select('id, game_date, game_time, innings_played')
         .eq('season_id', (gameData as any).season_id)
         .neq('id', params.id)
         .not('game_date', 'is', null)
         .order('game_date', { ascending: false })
+        .order('game_time', { ascending: false, nullsFirst: false })
         .limit(20)
-      if (currentDate) prevGamesQuery = (prevGamesQuery as any).lt('game_date', currentDate)
+      if (currentDate) prevGamesQuery = (prevGamesQuery as any).lte('game_date', currentDate)
 
-      const { data: prevGamesForPitching } = await prevGamesQuery
-      if (prevGamesForPitching?.length) {
+      const { data: prevGamesRaw } = await prevGamesQuery
+      const prevGamesForPitching = currentDate
+        ? (prevGamesRaw ?? []).filter((g: any) => isBeforeGame(g, currentDate, currentTime))
+        : (prevGamesRaw ?? [])
+      if (prevGamesForPitching.length) {
         const { data: pitchSlots } = await supabase
           .from('lineup_slots')
           .select('player_id, inning_positions, game_id')

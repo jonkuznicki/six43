@@ -1,5 +1,57 @@
 const BLANK: (string | null)[] = [null,null,null,null,null,null,null,null,null]
 
+// ── Previous-game selection helpers ───────────────────────────────────────────
+
+function gameMs(date: string, time: string | null): number {
+  return new Date(`${date}T${time ?? '00:00:00'}`).getTime()
+}
+
+/**
+ * Returns true when game `g` started strictly before (currentDate, currentTime).
+ *
+ * Rules:
+ * - An earlier date is always "before" regardless of time.
+ * - Same date: only "before" when both sides have a game_time and g.game_time
+ *   is strictly less (string compare works for HH:MM:SS ISO time).
+ * - Same date with either side missing a time: ambiguous, returns false.
+ */
+export function isBeforeGame(
+  g: { game_date: string; game_time?: string | null },
+  currentDate: string,
+  currentTime: string | null,
+): boolean {
+  if (g.game_date < currentDate) return true
+  if (g.game_date > currentDate) return false
+  if (!currentTime || !g.game_time) return false
+  return g.game_time < currentTime
+}
+
+/**
+ * From a list of candidate games, return the one that most recently preceded
+ * the current game (full datetime-aware: same-day earlier games are preferred
+ * over games from prior days when they exist).
+ *
+ * Falls back to the latest-dated candidate when currentDate is null (no
+ * current game date set yet).
+ */
+export function selectPrevGame<T extends { id: string; game_date: string; game_time?: string | null }>(
+  candidates: T[],
+  currentDate: string | null,
+  currentTime: string | null,
+): T | null {
+  const withDates = candidates.filter(g => g.game_date)
+  if (!withDates.length) return null
+
+  const eligible = currentDate
+    ? withDates.filter(g => isBeforeGame(g, currentDate, currentTime))
+    : withDates  // no current date — include all, pick most recent
+
+  if (!eligible.length) return null
+  return eligible.reduce((best, g) =>
+    gameMs(g.game_date, g.game_time ?? null) > gameMs(best.game_date, best.game_time ?? null) ? g : best
+  )
+}
+
 export interface CopySlotResult {
   id: string
   batting_order: number
