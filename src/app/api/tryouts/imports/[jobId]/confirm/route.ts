@@ -127,9 +127,19 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
     // Registration: update player record with registration data
     const payload = row.createPayload
     if (payload) {
+      // Fetch current record so we only overwrite blank name fields
+      const { data: current } = await supabase
+        .from('tryout_players')
+        .select('first_name, last_name')
+        .eq('id', playerId)
+        .single()
+
       await supabase
         .from('tryout_players')
         .update({
+          // Only fill name if blank on the canonical record (e.g. imported before BOM fix)
+          ...(!current?.first_name && payload.firstName ? { first_name: payload.firstName } : {}),
+          ...(!current?.last_name  && payload.lastName  ? { last_name:  payload.lastName }  : {}),
           ...(payload.ageGroup          ? { age_group:           payload.ageGroup }          : {}),
           ...(payload.dob               ? { dob:                 payload.dob }               : {}),
           ...(payload.parentEmail       ? { parent_email:        payload.parentEmail }       : {}),
@@ -357,10 +367,14 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       }
     } else if (job.type === 'registration' && job.season_id && row.createPayload) {
       const payload = row.createPayload
-      // Update player record age_group from this season's registration
-      if (payload.ageGroup) {
-        await supabase.from('tryout_players').update({ age_group: payload.ageGroup }).eq('id', topCandidate.id)
-      }
+      // Update player record — refresh age_group, fill blank names if needed
+      const { data: current } = await supabase
+        .from('tryout_players').select('first_name, last_name').eq('id', topCandidate.id).single()
+      await supabase.from('tryout_players').update({
+        ...(payload.ageGroup ? { age_group: payload.ageGroup } : {}),
+        ...(!current?.first_name && payload.firstName ? { first_name: payload.firstName } : {}),
+        ...(!current?.last_name  && payload.lastName  ? { last_name:  payload.lastName }  : {}),
+      }).eq('id', topCandidate.id)
       // Write registration staging
       await upsertRegStaging(supabase, {
         player_id:             topCandidate.id,

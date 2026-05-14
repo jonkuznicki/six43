@@ -277,14 +277,29 @@ export async function POST(req: NextRequest) {
       .eq('id', job.id)
   }
 
-  // Update age_group on player records for auto-matched returning players
+  // Update player records for auto-matched returning players.
+  // Always refresh age_group. Also fill in first/last name if blank (e.g. imported before BOM fix).
   const autoMatchedRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
   if (autoMatchedRows.length > 0) {
-    await Promise.all(autoMatchedRows.map(r =>
-      r.resolvedPlayerId && r.createPayload.ageGroup
-        ? supabase.from('tryout_players').update({ age_group: r.createPayload.ageGroup }).eq('id', r.resolvedPlayerId)
-        : Promise.resolve()
-    ))
+    // Fetch current player records so we only overwrite blank names
+    const ids = autoMatchedRows.map(r => r.resolvedPlayerId).filter(Boolean) as string[]
+    const { data: currentPlayers } = await supabase
+      .from('tryout_players')
+      .select('id, first_name, last_name')
+      .in('id', ids)
+    const currentMap = new Map((currentPlayers ?? []).map((p: any) => [p.id, p]))
+
+    await Promise.all(autoMatchedRows.map(r => {
+      if (!r.resolvedPlayerId) return Promise.resolve()
+      const cp = r.createPayload
+      const current = currentMap.get(r.resolvedPlayerId)
+      return supabase.from('tryout_players').update({
+        ...(cp.ageGroup ? { age_group: cp.ageGroup } : {}),
+        // Only fill name if the canonical record has a blank field
+        ...(!current?.first_name && cp.firstName ? { first_name: cp.firstName } : {}),
+        ...(!current?.last_name  && cp.lastName  ? { last_name:  cp.lastName }  : {}),
+      }).eq('id', r.resolvedPlayerId)
+    }))
   }
 
   // Write registration staging for auto-matched rows
