@@ -119,11 +119,18 @@ function scoreColor(v: number | null): string {
 
 function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
 
+const EVAL_SECTION_ORDER: Record<string, number> = {
+  fielding_hitting:  0,
+  athleticism:       1,
+  pitching_catching: 2,
+  intangibles:       3,
+}
+
 const EVAL_SECTION_LABELS: Record<string, string> = {
-  fielding_hitting:  'Fielding & Hitting',
-  pitching_catching: 'Pitching & Catching',
-  intangibles:       'Intangibles',
+  fielding_hitting:  'Fielding / Hitting',
   athleticism:       'Athleticism',
+  pitching_catching: 'Pitching / Catching',
+  intangibles:       'Intangibles',
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -349,7 +356,12 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         sid   ? cfgQ.eq('season_id', sid)                    : cfgQ,
         syear ? evalQ.eq('season_year', String(syear - 1))   : evalQ,
       ])
-      setEvalFields((fields ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
+      const mappedFields = (fields ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 }))
+      mappedFields.sort((a, b) => {
+        const sd = (EVAL_SECTION_ORDER[a.section] ?? 99) - (EVAL_SECTION_ORDER[b.section] ?? 99)
+        return sd !== 0 ? sd : a.sort_order - b.sort_order
+      })
+      setEvalFields(mappedFields)
       setEvalFull(evals ?? [])
     }
     if (target === 'scores') {
@@ -1113,7 +1125,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                       return (
                         <th key={sec} colSpan={secFields.length} style={{
                           ...th, textAlign: 'center', fontSize: '10px',
-                          borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)',
+                          borderLeft: '0.5px solid var(--border)',
                           background: sec === 'pitching_catching' ? 'rgba(var(--fg-rgb),0.03)' : 'var(--bg)',
                           cursor: 'default',
                         }}>
@@ -1126,11 +1138,18 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     </th>
                   </tr>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {evalFields.map(f => (
-                      <th key={f.field_key} title={f.label} style={{ ...th, textAlign: 'center', minWidth: '52px', maxWidth: '72px', fontSize: '10px', fontWeight: 500, cursor: 'default' }}>
-                        {f.label.length > 8 ? f.label.slice(0, 7) + '…' : f.label}
-                      </th>
-                    ))}
+                    {evalFields.map((f, fi) => {
+                      const isFirst = fi === 0 || evalFields[fi - 1].section !== f.section
+                      return (
+                        <th key={f.field_key} title={f.label} style={{
+                          ...th, textAlign: 'center', minWidth: '52px', maxWidth: '72px',
+                          fontSize: '10px', fontWeight: 500, cursor: 'default',
+                          borderLeft: isFirst ? '0.5px solid var(--border)' : undefined,
+                        }}>
+                          {f.label.split(' ').map((w: string) => w[0]).join('').slice(0, 4).toUpperCase()}
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -1142,10 +1161,15 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                           {p.last_name}, {p.first_name}
                           <span style={{ fontSize: '10px', color: s.dim, marginLeft: '6px' }}>{p.age_group}</span>
                         </td>
-                        {evalFields.map(f => {
+                        {evalFields.map((f, fi) => {
                           const v = ev.scores?.[f.field_key] ?? null
+                          const isFirst = fi === 0 || evalFields[fi - 1].section !== f.section
                           return (
-                            <td key={f.field_key} style={{ ...td, textAlign: 'center', background: v != null ? scoreColor(v) : 'transparent', padding: '5px 4px' }}>
+                            <td key={f.field_key} style={{
+                              ...td, textAlign: 'center', padding: '5px 4px',
+                              background: v != null ? scoreColor(v) : 'transparent',
+                              borderLeft: isFirst ? '0.5px solid var(--border)' : undefined,
+                            }}>
                               {v != null ? <span style={{ fontWeight: 700 }}>{v}</span> : <span style={{ opacity: 0.2 }}>—</span>}
                             </td>
                           )
