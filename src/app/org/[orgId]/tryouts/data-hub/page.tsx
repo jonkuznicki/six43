@@ -22,6 +22,7 @@ interface RegRow {
   guardian_first_name: string | null; guardian_last_name: string | null
   address: string | null; city: string | null; state: string | null; zip: string | null
   registration_date: string | null; current_team_division: string | null
+  player_first_name: string | null; player_last_name: string | null
 }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
@@ -254,7 +255,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (sid) {
       const { data } = await supabase
         .from('tryout_registration_staging')
-        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org,guardian_first_name,guardian_last_name,address,city,state,zip,registration_date,current_team_division')
+        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org,guardian_first_name,guardian_last_name,address,city,state,zip,registration_date,current_team_division,player_first_name,player_last_name')
         .eq('season_id', sid)
       regData = data ?? []
     }
@@ -295,6 +296,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           org_id:                params.orgId,
           season_id:             seasonId,
           import_job_id:         job.id,
+          player_first_name:     p.firstName ?? null,
+          player_last_name:      p.lastName ?? null,
           age_group:             p.ageGroup ?? row.ageGroup ?? null,
           preferred_tryout_date: p.preferredTryoutDate ?? null,
           prior_team:            p.priorTeam ?? null,
@@ -745,6 +748,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             case 'address':      return [reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ')
             case 'reg_date':     return reg?.registration_date ?? ''
             case 'cur_team_div': return reg?.current_team_division ?? ''
+            case 'reg_name':     return [reg?.player_first_name, reg?.player_last_name].filter(Boolean).join(' ')
             default:             return ''
           }
         }
@@ -766,6 +770,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
         const cols: { key: string; label: string; sticky?: boolean }[] = [
           { key: 'name',        label: 'Player',        sticky: true },
+          { key: 'reg_name',    label: 'Reg. Name' },
           { key: 'age',         label: 'Age Group' },
           { key: 'dob',         label: 'DOB' },
           { key: 'grade',       label: 'Grade' },
@@ -815,6 +820,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     return (
                       <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
                         <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {(reg?.player_first_name || reg?.player_last_name)
+                            ? `${reg?.player_first_name ?? ''} ${reg?.player_last_name ?? ''}`.trim()
+                            : <span style={{ opacity: 0.3 }}>—</span>}
+                        </td>
                         <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
                           {dob ? new Date(dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}

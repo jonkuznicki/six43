@@ -68,8 +68,8 @@ export interface ParseRegistrationResult {
 // Case-insensitive matching applied at parse time.
 
 const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowIndex'>, string[]> = {
-  firstName:   ['First Name', 'First'],
-  lastName:    ['Last Name', 'Last'],
+  firstName:   ['First Name', 'First', 'Player First Name', 'Athlete First Name', 'Child First Name', 'Player First', 'Athlete First'],
+  lastName:    ['Last Name', 'Last', 'Player Last Name', 'Athlete Last Name', 'Child Last Name', 'Player Last', 'Athlete Last'],
   // "Full Name" is used when there's no separate First/Last
   // (handled specially below)
   ageGroup:             ['Tryout Age Group', 'Age Group', 'Division', 'Age Division'],
