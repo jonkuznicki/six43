@@ -34,12 +34,24 @@ export interface ParsedRegistrationRow {
   parentEmail: string | null
   parentPhone: string | null
 
+  // Guardian
+  guardianFirstName: string | null
+  guardianLastName:  string | null
+
+  // Address
+  address: string | null
+  city:    string | null
+  state:   string | null
+  zip:     string | null
+
   // Background
-  dob:         string | null   // ISO: "YYYY-MM-DD" or null
-  grade:       string | null
-  school:      string | null
-  priorOrg:    string | null
-  priorTeam:   string | null
+  dob:                 string | null   // ISO: "YYYY-MM-DD" or null
+  grade:               string | null
+  school:              string | null
+  priorOrg:            string | null
+  priorTeam:           string | null
+  registrationDate:    string | null   // ISO: "YYYY-MM-DD" or null
+  currentTeamDivision: string | null   // current season team / division
 
   // Source row number for error reporting
   rowIndex:    number
@@ -64,11 +76,19 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   preferredTryoutDate:  ['Which tryout date will you attend?', 'Tryout Date', 'Preferred Tryout Date', 'Session Date', 'Preferred Session Date'],
   parentEmail:          ['Account Email', 'Email', 'Parent Email', 'Guardian Email'],
   parentPhone:          ['Guardian Phone', 'Parent Phone', 'Phone', 'Mobile'],
+  guardianFirstName:    ['Guardian First Name', 'Parent First Name', 'Primary Contact First Name'],
+  guardianLastName:     ['Guardian Last Name', 'Parent Last Name', 'Primary Contact Last Name'],
+  address:              ['Address', 'Street Address', 'Home Address'],
+  city:                 ['City', 'Home City'],
+  state:                ['State', 'Home State'],
+  zip:                  ['Zip', 'Zip Code', 'Postal Code', 'ZIP'],
   dob:                  ['Date of Birth', 'DOB', 'Birth Date', 'Birthday'],
   grade:                ['Grade', 'Grade Level', 'School Grade'],
-  school:               ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School', 'School Name'],
+  school:               ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School Attending in Fall 2027?', 'School', 'School Name'],
   priorOrg:             ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization'],
-  priorTeam:            ['2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
+  priorTeam:            ['2026 Season Team / League Name?', '2026 Season Team', 'Season Team Name', '2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
+  registrationDate:     ['Registration Date', 'Date Registered', 'Registered', 'Submitted'],
+  currentTeamDivision:  ['Current Season Team / Division', 'Current Team / Division', 'Current Team', 'Current Division', 'This Season Team'],
 }
 
 const FULL_NAME_COLS = ['Full Name', 'Player Name', 'Name', 'Athlete Name']
@@ -105,7 +125,7 @@ export function parseRegistrationFile(
     }
   }
 
-  const headerRow = (raw[headerRowIndex] as string[]).map(c => String(c).trim())
+  const headerRow = (raw[headerRowIndex] as string[]).map(c => String(c).trim().replace(/^﻿/, ''))
   const dataRows  = raw.slice(headerRowIndex + 1)
 
   // Build a column-name → index map (case-insensitive)
@@ -121,18 +141,26 @@ export function parseRegistrationFile(
   }
 
   // Resolve column indices for all fields
-  const firstNameIdx          = getCol(COL_MAP.firstName)
-  const lastNameIdx           = getCol(COL_MAP.lastName)
-  const fullNameIdx           = getCol(FULL_NAME_COLS)
-  const ageGroupIdx           = getCol(COL_MAP.ageGroup)
+  const firstNameIdx           = getCol(COL_MAP.firstName)
+  const lastNameIdx            = getCol(COL_MAP.lastName)
+  const fullNameIdx            = getCol(FULL_NAME_COLS)
+  const ageGroupIdx            = getCol(COL_MAP.ageGroup)
   const preferredTryoutDateIdx = getCol(COL_MAP.preferredTryoutDate)
-  const emailIdx              = getCol(COL_MAP.parentEmail)
-  const phoneIdx              = getCol(COL_MAP.parentPhone)
-  const dobIdx                = getCol(COL_MAP.dob)
-  const gradeIdx              = getCol(COL_MAP.grade)
-  const schoolIdx             = getCol(COL_MAP.school)
-  const priorOrgIdx           = getCol(COL_MAP.priorOrg)
-  const priorTeamIdx          = getCol(COL_MAP.priorTeam)
+  const emailIdx               = getCol(COL_MAP.parentEmail)
+  const phoneIdx               = getCol(COL_MAP.parentPhone)
+  const guardianFirstNameIdx   = getCol(COL_MAP.guardianFirstName)
+  const guardianLastNameIdx    = getCol(COL_MAP.guardianLastName)
+  const addressIdx             = getCol(COL_MAP.address)
+  const cityIdx                = getCol(COL_MAP.city)
+  const stateIdx               = getCol(COL_MAP.state)
+  const zipIdx                 = getCol(COL_MAP.zip)
+  const dobIdx                 = getCol(COL_MAP.dob)
+  const gradeIdx               = getCol(COL_MAP.grade)
+  const schoolIdx              = getCol(COL_MAP.school)
+  const priorOrgIdx            = getCol(COL_MAP.priorOrg)
+  const priorTeamIdx           = getCol(COL_MAP.priorTeam)
+  const registrationDateIdx    = getCol(COL_MAP.registrationDate)
+  const currentTeamDivisionIdx = getCol(COL_MAP.currentTeamDivision)
 
   const rows:   ParsedRegistrationRow[] = []
   const errors: Array<{ rowIndex: number; message: string }> = []
@@ -199,6 +227,20 @@ export function parseRegistrationFile(
       }
     }
 
+    // ── Registration date ────────────────────────────────────────────
+    let registrationDate: string | null = null
+    if (registrationDateIdx >= 0) {
+      const raw = row[registrationDateIdx]
+      if (raw != null && typeof raw === 'object' && raw instanceof Date) {
+        registrationDate = (raw as Date).toISOString().split('T')[0]
+      } else if (typeof raw === 'string' && raw.trim()) {
+        registrationDate = parseDateString(raw.trim())
+      } else if (typeof raw === 'number') {
+        const d = XLSX.SSF.parse_date_code(raw)
+        if (d) registrationDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
+      }
+    }
+
     rows.push({
       firstName:           capitalize(firstName),
       lastName:            capitalize(lastName),
@@ -207,11 +249,19 @@ export function parseRegistrationFile(
       preferredTryoutDate,
       parentEmail:         getString(emailIdx) || null,
       parentPhone:         getString(phoneIdx) || null,
+      guardianFirstName:   getString(guardianFirstNameIdx) || null,
+      guardianLastName:    getString(guardianLastNameIdx) || null,
+      address:             getString(addressIdx) || null,
+      city:                getString(cityIdx) || null,
+      state:               getString(stateIdx) || null,
+      zip:                 getString(zipIdx) || null,
       dob,
       grade:               getString(gradeIdx) || null,
       school:              getString(schoolIdx) || null,
       priorOrg:            getString(priorOrgIdx) || null,
       priorTeam:           getString(priorTeamIdx) || null,
+      registrationDate,
+      currentTeamDivision: getString(currentTeamDivisionIdx) || null,
       rowIndex,
     })
   })

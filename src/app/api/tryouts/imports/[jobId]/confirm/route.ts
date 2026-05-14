@@ -81,20 +81,10 @@ export async function POST(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Upsert into tryout_registration_staging, retrying without preferred_tryout_date
- * if the column doesn't exist yet (migration 051 pending).
- */
 async function upsertRegStaging(supabase: any, row: Record<string, any>) {
-  const { error } = await supabase
+  await supabase
     .from('tryout_registration_staging')
     .upsert(row, { onConflict: 'player_id,season_id' })
-  if (error) {
-    const { preferred_tryout_date: _drop, ...fallback } = row
-    await supabase
-      .from('tryout_registration_staging')
-      .upsert(fallback, { onConflict: 'player_id,season_id' })
-  }
 }
 
 // ── Action handlers ──────────────────────────────────────────────────────────
@@ -140,14 +130,16 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
       await supabase
         .from('tryout_players')
         .update({
-          ...(payload.ageGroup    ? { age_group:    payload.ageGroup }    : {}),
-          ...(payload.dob         ? { dob:          payload.dob }         : {}),
-          ...(payload.parentEmail ? { parent_email: payload.parentEmail } : {}),
-          ...(payload.parentPhone ? { parent_phone: payload.parentPhone } : {}),
-          ...(payload.grade       ? { grade:        payload.grade }       : {}),
-          ...(payload.school      ? { school:       payload.school }      : {}),
-          ...(payload.priorOrg    ? { prior_org:    payload.priorOrg }    : {}),
-          ...(payload.priorTeam   ? { prior_team:   payload.priorTeam }   : {}),
+          ...(payload.ageGroup          ? { age_group:           payload.ageGroup }          : {}),
+          ...(payload.dob               ? { dob:                 payload.dob }               : {}),
+          ...(payload.parentEmail       ? { parent_email:        payload.parentEmail }       : {}),
+          ...(payload.parentPhone       ? { parent_phone:        payload.parentPhone }       : {}),
+          ...(payload.guardianFirstName ? { guardian_first_name: payload.guardianFirstName } : {}),
+          ...(payload.guardianLastName  ? { guardian_last_name:  payload.guardianLastName }  : {}),
+          ...(payload.grade             ? { grade:               payload.grade }             : {}),
+          ...(payload.school            ? { school:              payload.school }            : {}),
+          ...(payload.priorOrg          ? { prior_org:           payload.priorOrg }          : {}),
+          ...(payload.priorTeam         ? { prior_team:          payload.priorTeam }         : {}),
         })
         .eq('id', playerId)
     }
@@ -167,19 +159,27 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
     // Write registration staging
     if (job.type === 'registration' && job.season_id && payload) {
       await upsertRegStaging(supabase, {
-        player_id:            playerId,
-        org_id:               job.org_id,
-        season_id:            job.season_id,
-        import_job_id:        job.id,
-        age_group:            payload.ageGroup,
+        player_id:             playerId,
+        org_id:                job.org_id,
+        season_id:             job.season_id,
+        import_job_id:         job.id,
+        age_group:             payload.ageGroup,
         preferred_tryout_date: payload.preferredTryoutDate ?? null,
-        prior_team:           payload.priorTeam,
-        parent_email:         payload.parentEmail,
-        parent_phone:         payload.parentPhone,
-        dob:                  payload.dob,
-        grade:                payload.grade,
-        school:               payload.school,
-        prior_org:            payload.priorOrg,
+        prior_team:            payload.priorTeam,
+        parent_email:          payload.parentEmail,
+        parent_phone:          payload.parentPhone,
+        guardian_first_name:   payload.guardianFirstName ?? null,
+        guardian_last_name:    payload.guardianLastName ?? null,
+        address:               payload.address ?? null,
+        city:                  payload.city ?? null,
+        state:                 payload.state ?? null,
+        zip:                   payload.zip ?? null,
+        dob:                   payload.dob,
+        grade:                 payload.grade,
+        school:                payload.school,
+        prior_org:             payload.priorOrg,
+        registration_date:     payload.registrationDate ?? null,
+        current_team_division: payload.currentTeamDivision ?? null,
       })
 
       await autoAssignToSession({
@@ -230,12 +230,14 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
         prior_team:    row.teamName ?? null,
         jersey_number: row.jerseyNumber ?? null,
       } : {
-        parent_email: payload?.parentEmail ?? null,
-        parent_phone: payload?.parentPhone ?? null,
-        grade:        payload?.grade ?? null,
-        school:       payload?.school ?? null,
-        prior_org:    payload?.priorOrg ?? null,
-        prior_team:   payload?.priorTeam ?? null,
+        parent_email:        payload?.parentEmail ?? null,
+        parent_phone:        payload?.parentPhone ?? null,
+        guardian_first_name: payload?.guardianFirstName ?? null,
+        guardian_last_name:  payload?.guardianLastName ?? null,
+        grade:               payload?.grade ?? null,
+        school:              payload?.school ?? null,
+        prior_org:           payload?.priorOrg ?? null,
+        prior_team:          payload?.priorTeam ?? null,
       }),
     })
     .select('id')
@@ -276,19 +278,27 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
 
   if (!isRoster && job.season_id && payload) {
     await upsertRegStaging(supabase, {
-      player_id:            newPlayer.id,
-      org_id:               job.org_id,
-      season_id:            job.season_id,
-      import_job_id:        job.id,
-      age_group:            payload.ageGroup,
+      player_id:             newPlayer.id,
+      org_id:                job.org_id,
+      season_id:             job.season_id,
+      import_job_id:         job.id,
+      age_group:             payload.ageGroup,
       preferred_tryout_date: payload.preferredTryoutDate ?? null,
-      prior_team:           payload.priorTeam,
-      parent_email:         payload.parentEmail,
-      parent_phone:         payload.parentPhone,
-      dob:                  payload.dob,
-      grade:                payload.grade,
-      school:               payload.school,
-      prior_org:            payload.priorOrg,
+      prior_team:            payload.priorTeam,
+      parent_email:          payload.parentEmail,
+      parent_phone:          payload.parentPhone,
+      guardian_first_name:   payload.guardianFirstName ?? null,
+      guardian_last_name:    payload.guardianLastName ?? null,
+      address:               payload.address ?? null,
+      city:                  payload.city ?? null,
+      state:                 payload.state ?? null,
+      zip:                   payload.zip ?? null,
+      dob:                   payload.dob,
+      grade:                 payload.grade,
+      school:                payload.school,
+      prior_org:             payload.priorOrg,
+      registration_date:     payload.registrationDate ?? null,
+      current_team_division: payload.currentTeamDivision ?? null,
     })
 
     await autoAssignToSession({
@@ -349,19 +359,27 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       }
       // Write registration staging
       await upsertRegStaging(supabase, {
-        player_id:            topCandidate.id,
-        org_id:               job.org_id,
-        season_id:            job.season_id,
-        import_job_id:        job.id,
-        age_group:            payload.ageGroup,
+        player_id:             topCandidate.id,
+        org_id:                job.org_id,
+        season_id:             job.season_id,
+        import_job_id:         job.id,
+        age_group:             payload.ageGroup,
         preferred_tryout_date: payload.preferredTryoutDate ?? null,
-        prior_team:           payload.priorTeam,
-        parent_email:         payload.parentEmail,
-        parent_phone:         payload.parentPhone,
-        dob:                  payload.dob,
-        grade:                payload.grade,
-        school:               payload.school,
-        prior_org:            payload.priorOrg,
+        prior_team:            payload.priorTeam,
+        parent_email:          payload.parentEmail,
+        parent_phone:          payload.parentPhone,
+        guardian_first_name:   payload.guardianFirstName ?? null,
+        guardian_last_name:    payload.guardianLastName ?? null,
+        address:               payload.address ?? null,
+        city:                  payload.city ?? null,
+        state:                 payload.state ?? null,
+        zip:                   payload.zip ?? null,
+        dob:                   payload.dob,
+        grade:                 payload.grade,
+        school:                payload.school,
+        prior_org:             payload.priorOrg,
+        registration_date:     payload.registrationDate ?? null,
+        current_team_division: payload.currentTeamDivision ?? null,
       })
 
       await autoAssignToSession({

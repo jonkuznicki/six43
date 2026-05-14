@@ -19,6 +19,9 @@ interface RegRow {
   parent_email: string | null; parent_phone: string | null
   imported_at: string; dob: string | null; preferred_tryout_date: string | null
   grade: string | null; school: string | null; prior_org: string | null
+  guardian_first_name: string | null; guardian_last_name: string | null
+  address: string | null; city: string | null; state: string | null; zip: string | null
+  registration_date: string | null; current_team_division: string | null
 }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
 interface GcRow  {
@@ -249,19 +252,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     // Registration staging — season-scoped
     let regData: any[] = []
     if (sid) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('tryout_registration_staging')
-        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org')
+        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org,guardian_first_name,guardian_last_name,address,city,state,zip,registration_date,current_team_division')
         .eq('season_id', sid)
-      if (!error) {
-        regData = data ?? []
-      } else {
-        const { data: fallback } = await supabase
-          .from('tryout_registration_staging')
-          .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,grade,school,prior_org')
-          .eq('season_id', sid)
-        regData = fallback ?? []
-      }
+      regData = data ?? []
     }
 
     setPlayers(playerData ?? [])
@@ -305,10 +300,18 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           prior_team:            p.priorTeam ?? null,
           parent_email:          p.parentEmail ?? null,
           parent_phone:          p.parentPhone ?? null,
+          guardian_first_name:   p.guardianFirstName ?? null,
+          guardian_last_name:    p.guardianLastName ?? null,
+          address:               p.address ?? null,
+          city:                  p.city ?? null,
+          state:                 p.state ?? null,
+          zip:                   p.zip ?? null,
           dob:                   p.dob ?? null,
           grade:                 p.grade ?? null,
           school:                p.school ?? null,
           prior_org:             p.priorOrg ?? null,
+          registration_date:     p.registrationDate ?? null,
+          current_team_division: p.currentTeamDivision ?? null,
           imported_at:           job.created_at,
         })
       }
@@ -325,14 +328,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       .from('tryout_registration_staging')
       .upsert(deduped, { onConflict: 'player_id,season_id' })
 
-    if (error) {
-      // Retry without preferred_tryout_date if column doesn't exist yet
-      const fallback = (deduped as any[]).map(({ preferred_tryout_date: _d, ...r }) => r)
-      const { error: e2 } = await supabase
-        .from('tryout_registration_staging')
-        .upsert(fallback, { onConflict: 'player_id,season_id' })
-      if (e2) { setBackfillError(e2.message); setBackfilling(false); return }
-    }
+    if (error) { setBackfillError(error.message); setBackfilling(false); return }
 
     setBackfilling(false)
     setBackfillDone(true)
@@ -734,18 +730,22 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
         function regVal(p: Player, reg: RegRow | null, col: string): string {
           switch (col) {
-            case 'name':     return `${p.last_name} ${p.first_name}`
-            case 'age':      return reg?.age_group ?? p.age_group ?? ''
-            case 'dob':      return reg?.dob ?? p.dob ?? ''
-            case 'grade':    return reg?.grade ?? p.grade ?? ''
-            case 'school':   return reg?.school ?? p.school ?? ''
-            case 'prior_org': return reg?.prior_org ?? p.prior_org ?? ''
-            case 'team':     return reg?.prior_team ?? p.prior_team ?? ''
-            case 'email':    return reg?.parent_email ?? p.parent_email ?? ''
-            case 'phone':    return reg?.parent_phone ?? p.parent_phone ?? ''
-            case 'pref_date': return reg?.preferred_tryout_date ?? ''
-            case 'imported': return reg?.imported_at ?? ''
-            default:         return ''
+            case 'name':         return `${p.last_name} ${p.first_name}`
+            case 'age':          return reg?.age_group ?? p.age_group ?? ''
+            case 'dob':          return reg?.dob ?? p.dob ?? ''
+            case 'grade':        return reg?.grade ?? p.grade ?? ''
+            case 'school':       return reg?.school ?? p.school ?? ''
+            case 'prior_org':    return reg?.prior_org ?? p.prior_org ?? ''
+            case 'team':         return reg?.prior_team ?? p.prior_team ?? ''
+            case 'email':        return reg?.parent_email ?? p.parent_email ?? ''
+            case 'phone':        return reg?.parent_phone ?? p.parent_phone ?? ''
+            case 'pref_date':    return reg?.preferred_tryout_date ?? ''
+            case 'imported':     return reg?.imported_at ?? ''
+            case 'guardian':     return [reg?.guardian_first_name, reg?.guardian_last_name].filter(Boolean).join(' ')
+            case 'address':      return [reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ')
+            case 'reg_date':     return reg?.registration_date ?? ''
+            case 'cur_team_div': return reg?.current_team_division ?? ''
+            default:             return ''
           }
         }
 
@@ -765,17 +765,21 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         }
 
         const cols: { key: string; label: string; sticky?: boolean }[] = [
-          { key: 'name',      label: 'Player',       sticky: true },
-          { key: 'age',       label: 'Age Group' },
-          { key: 'dob',       label: 'DOB' },
-          { key: 'grade',     label: 'Grade' },
-          { key: 'school',    label: 'School' },
-          { key: 'prior_org', label: 'Prior Org' },
-          { key: 'team',      label: 'Prior Team' },
-          { key: 'email',     label: 'Parent Email' },
-          { key: 'phone',     label: 'Parent Phone' },
-          { key: 'pref_date', label: 'Pref. Date' },
-          { key: 'imported',  label: 'Imported' },
+          { key: 'name',        label: 'Player',        sticky: true },
+          { key: 'age',         label: 'Age Group' },
+          { key: 'dob',         label: 'DOB' },
+          { key: 'grade',       label: 'Grade' },
+          { key: 'school',      label: 'School' },
+          { key: 'prior_org',   label: 'Prior Org' },
+          { key: 'team',        label: 'Prior Team' },
+          { key: 'cur_team_div', label: 'Cur. Team / Div' },
+          { key: 'guardian',    label: 'Guardian' },
+          { key: 'email',       label: 'Parent Email' },
+          { key: 'phone',       label: 'Parent Phone' },
+          { key: 'address',     label: 'Address' },
+          { key: 'pref_date',   label: 'Pref. Date' },
+          { key: 'reg_date',    label: 'Reg. Date' },
+          { key: 'imported',    label: 'Imported' },
         ]
 
         return (
@@ -819,9 +823,21 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reg?.school ?? p.school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.prior_org ?? p.prior_org ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: '#80B0E8', whiteSpace: 'nowrap' }}>{reg?.prior_team ?? p.prior_team ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.current_team_division ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {(reg?.guardian_first_name || reg?.guardian_last_name)
+                            ? `${reg?.guardian_first_name ?? ''} ${reg?.guardian_last_name ?? ''}`.trim()
+                            : <span style={{ opacity: 0.3 }}>—</span>}
+                        </td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? p.parent_email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.parent_phone ?? p.parent_phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {[reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ') || <span style={{ opacity: 0.3 }}>—</span>}
+                        </td>
                         <td style={{ ...td, color: '#40A0E8', fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.preferred_tryout_date ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {reg?.registration_date ? new Date(reg.registration_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}
+                        </td>
                         <td style={{ ...td, color: s.dim, fontSize: '12px', whiteSpace: 'nowrap' }}>{imported ? new Date(imported).toLocaleDateString() : <span style={{ opacity: 0.3 }}>—</span>}</td>
                       </tr>
                     )
