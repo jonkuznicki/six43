@@ -429,23 +429,26 @@ export default function InGameView({
             <div style={{ width: 40, textAlign: 'center', flexShrink: 0, fontSize: 12, color: 'rgba(238,244,255,0.35)', fontWeight: 700 }}>R</div>
           </div>
 
-          {/* Us row */}
-          <GmScoreRow
-            label={teamName} isUs
-            values={us} total={usTotal}
-            inningCount={inningCount} activeInning={inning}
-            onChange={setUsInning}
-            gmBg={GM_BG} gmBorder={GM_BORDER} gmAmber={GM_AMBER} gmFg={GM_FG} gmFgDim={GM_FG_DIM}
-          />
-
-          {/* Them row */}
-          <GmScoreRow
-            label={game.opponent}
-            values={them} total={themTotal}
-            inningCount={inningCount} activeInning={inning}
-            onChange={setThemInning}
-            gmBg={GM_BG} gmBorder={GM_BORDER} gmAmber={GM_AMBER} gmFg={GM_FG} gmFgDim={GM_FG_DIM}
-          />
+          {/* Away team on top, home team on bottom */}
+          {(game.location === 'Away'
+            ? [
+                { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
+                { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },
+              ]
+            : [
+                { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },
+                { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
+              ]
+          ).map(row => (
+            <GmScoreRow
+              key={row.label}
+              label={row.label} isUs={row.isUs}
+              values={row.values} total={row.total}
+              inningCount={inningCount} activeInning={inning}
+              onChange={row.onChange}
+              gmBg={GM_BG} gmBorder={GM_BORDER} gmAmber={GM_AMBER} gmFg={GM_FG} gmFgDim={GM_FG_DIM}
+            />
+          ))}
         </div>
 
         {/* ── GM MAIN CONTENT ── */}
@@ -1071,24 +1074,28 @@ export default function InGameView({
             }}>R</div>
           </div>
 
-          {/* Score rows */}
-          <ScoreRow
-            label={teamName}
-            isUs
-            values={us}
-            total={usTotal}
-            inningCount={inningCount}
-            activeInning={inning}
-            onChange={setUsInning}
-          />
-          <ScoreRow
-            label={game.opponent}
-            values={them}
-            total={themTotal}
-            inningCount={inningCount}
-            activeInning={inning}
-            onChange={setThemInning}
-          />
+          {/* Away team on top, home team on bottom */}
+          {(game.location === 'Away'
+            ? [
+                { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
+                { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },
+              ]
+            : [
+                { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },
+                { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
+              ]
+          ).map(row => (
+            <ScoreRow
+              key={row.label}
+              label={row.label}
+              isUs={row.isUs}
+              values={row.values}
+              total={row.total}
+              inningCount={inningCount}
+              activeInning={inning}
+              onChange={row.onChange}
+            />
+          ))}
 
           {locked && (
             <div style={{

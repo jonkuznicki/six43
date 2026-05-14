@@ -1282,6 +1282,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             inningCount={game?.innings_played ?? game?.season?.innings_per_game ?? 6}
             teamName={game?.season?.team?.name ?? 'Us'}
             opponent={game?.opponent ?? 'Opponent'}
+            location={game?.location ?? null}
             onSaved={newNotes => {
                       notesRawRef.current = newNotes
                       setGame((g: any) => g ? { ...g, notes: newNotes } : g)

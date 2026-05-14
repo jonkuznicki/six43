@@ -25,13 +25,14 @@ function writeScores(notes: string | null, us: (number|null)[], them: (number|nu
 }
 
 export default function BoxScoreInput({
-  gameId, notes, inningCount, teamName, opponent, onSaved,
+  gameId, notes, inningCount, teamName, opponent, location, onSaved,
 }: {
   gameId: string
   notes: string | null
   inningCount: number
   teamName: string
   opponent: string
+  location?: string | null
   onSaved?: (newNotes: string) => void
 }) {
   const supabase = createClient()
@@ -77,6 +78,15 @@ export default function BoxScoreInput({
   const cellW = 36
   const nameW = 100
 
+  // Away team on top, home team on bottom (matches baseball convention)
+  const isAway = location === 'Away'
+  const topRow    = isAway
+    ? { label: teamName, isUs: true,  values: us,   total: usTotal,   onChange: setUsInning }
+    : { label: opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning }
+  const bottomRow = isAway
+    ? { label: opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning }
+    : { label: teamName, isUs: true,  values: us,   total: usTotal,   onChange: setUsInning }
+
   return (
     <div style={{ marginTop: '1.25rem' }}>
       <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
@@ -95,18 +105,15 @@ export default function BoxScoreInput({
           fontSize: '10px', color: `rgba(var(--fg-rgb), 0.3)`, marginLeft: '4px' }}>R</div>
       </div>
 
-      {/* Our team */}
       <ScoreRow
-        label={teamName} us innings={innings} values={us} total={usTotal}
-        nameW={nameW} cellW={cellW}
-        onChange={setUsInning}
+        label={topRow.label} us={topRow.isUs} innings={innings}
+        values={topRow.values} total={topRow.total}
+        nameW={nameW} cellW={cellW} onChange={topRow.onChange}
       />
-
-      {/* Opponent */}
       <ScoreRow
-        label={opponent} innings={innings} values={them} total={themTotal}
-        nameW={nameW} cellW={cellW}
-        onChange={setThemInning}
+        label={bottomRow.label} us={bottomRow.isUs} innings={innings}
+        values={bottomRow.values} total={bottomRow.total}
+        nameW={nameW} cellW={cellW} onChange={bottomRow.onChange}
       />
     </div>
   )
