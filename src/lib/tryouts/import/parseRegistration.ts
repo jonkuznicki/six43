@@ -51,7 +51,6 @@ export interface ParsedRegistrationRow {
   priorOrg:            string | null
   priorTeam:           string | null
   registrationDate:    string | null   // ISO: "YYYY-MM-DD" or null
-  currentTeamDivision: string | null   // current season team / division
 
   // Source row number for error reporting
   rowIndex:    number
@@ -76,8 +75,8 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   preferredTryoutDate:  ['Which tryout date will you attend?', 'Tryout Date', 'Preferred Tryout Date', 'Session Date', 'Preferred Session Date'],
   parentEmail:          ['Account Email', 'Email', 'Parent Email', 'Guardian Email'],
   parentPhone:          ['Guardian Phone', 'Parent Phone', 'Phone', 'Mobile'],
-  guardianFirstName:    ['Guardian First Name', 'Parent First Name', 'Primary Contact First Name'],
-  guardianLastName:     ['Guardian Last Name', 'Parent Last Name', 'Primary Contact Last Name'],
+  guardianFirstName:    ['Guardian First Name', 'Parent First Name', 'Primary Contact First Name', 'Account Holder First Name', 'Parent/Guardian First Name'],
+  guardianLastName:     ['Guardian Last Name', 'Parent Last Name', 'Primary Contact Last Name', 'Account Holder Last Name', 'Parent/Guardian Last Name'],
   address:              ['Address', 'Street Address', 'Home Address'],
   city:                 ['City', 'Home City'],
   state:                ['State', 'Home State'],
@@ -87,11 +86,11 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   school:               ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School Attending in Fall 2027?', 'School', 'School Name'],
   priorOrg:             ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization'],
   priorTeam:            ['2026 Season Team / League Name?', '2026 Season Team', 'Season Team Name', '2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
-  registrationDate:     ['Registration Date', 'Date Registered', 'Registered', 'Submitted'],
-  currentTeamDivision:  ['Current Season Team / Division', 'Current Team / Division', 'Current Team', 'Current Division', 'This Season Team'],
+  registrationDate:     ['Registration Date', 'Date Registered', 'Registered', 'Submitted', 'Order Date', 'Date Submitted', 'Created', 'Created At', 'Entry Date', 'Transaction Date', 'Paid Date'],
 }
 
 const FULL_NAME_COLS = ['Full Name', 'Player Name', 'Name', 'Athlete Name']
+const GUARDIAN_FULL_NAME_COLS = ['Guardian Name', 'Parent Name', 'Primary Contact Name', 'Account Holder Name', 'Parent/Guardian Name']
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +151,7 @@ export function parseRegistrationFile(
   const phoneIdx               = getCol(COL_MAP.parentPhone)
   const guardianFirstNameIdx   = getCol(COL_MAP.guardianFirstName)
   const guardianLastNameIdx    = getCol(COL_MAP.guardianLastName)
+  const guardianFullNameIdx    = getCol(GUARDIAN_FULL_NAME_COLS)
   const addressIdx             = getCol(COL_MAP.address)
   const cityIdx                = getCol(COL_MAP.city)
   const stateIdx               = getCol(COL_MAP.state)
@@ -162,7 +162,6 @@ export function parseRegistrationFile(
   const priorOrgIdx            = getCol(COL_MAP.priorOrg)
   const priorTeamIdx           = getCol(COL_MAP.priorTeam)
   const registrationDateIdx    = getCol(COL_MAP.registrationDate)
-  const currentTeamDivisionIdx = getCol(COL_MAP.currentTeamDivision)
 
   const rows:   ParsedRegistrationRow[] = []
   const errors: Array<{ rowIndex: number; message: string }> = []
@@ -229,6 +228,18 @@ export function parseRegistrationFile(
       }
     }
 
+    // ── Guardian name resolution ─────────────────────────────────────────────
+    let guardianFirstName = getString(guardianFirstNameIdx)
+    let guardianLastName  = getString(guardianLastNameIdx)
+    if (!guardianFirstName && !guardianLastName && guardianFullNameIdx >= 0) {
+      const fullGuardian = getString(guardianFullNameIdx)
+      if (fullGuardian) {
+        const split = splitName(fullGuardian)
+        guardianFirstName = split.firstName
+        guardianLastName  = split.lastName
+      }
+    }
+
     // ── Registration date ────────────────────────────────────────────
     let registrationDate: string | null = null
     if (registrationDateIdx >= 0) {
@@ -251,8 +262,8 @@ export function parseRegistrationFile(
       preferredTryoutDate,
       parentEmail:         getString(emailIdx) || null,
       parentPhone:         getString(phoneIdx) || null,
-      guardianFirstName:   getString(guardianFirstNameIdx) || null,
-      guardianLastName:    getString(guardianLastNameIdx) || null,
+      guardianFirstName:   guardianFirstName || null,
+      guardianLastName:    guardianLastName || null,
       address:             getString(addressIdx) || null,
       city:                getString(cityIdx) || null,
       state:               getString(stateIdx) || null,
@@ -263,7 +274,6 @@ export function parseRegistrationFile(
       priorOrg:            getString(priorOrgIdx) || null,
       priorTeam:           getString(priorTeamIdx) || null,
       registrationDate,
-      currentTeamDivision: getString(currentTeamDivisionIdx) || null,
       rowIndex,
     })
   })
@@ -288,24 +298,33 @@ function normalizeAgeGroup(raw: string): string {
   return raw.trim()
 }
 
-/**
- * Parse common date string formats to ISO YYYY-MM-DD.
- * Handles: "4/14/2015", "April 14, 2015", "2015-04-14"
- */
 function parseDateString(s: string): string | null {
+  // Strip leading/trailing whitespace
+  s = s.trim()
+  // Strip time portion if present (e.g. "4/25/2026 10:30 AM" → "4/25/2026")
+  s = s.replace(/\s+\d{1,2}:\d{2}(:\d{2})?(\s*[AP]M)?$/i, '').trim()
+
   // Already ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
 
-  // M/D/YYYY or MM/DD/YYYY
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (mdy) {
-    return `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`
+  // M/D/YYYY or MM/DD/YYYY (4-digit year)
+  const mdy4 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (mdy4) {
+    return `${mdy4[3]}-${mdy4[1].padStart(2,'0')}-${mdy4[2].padStart(2,'0')}`
   }
 
-  // Try native Date parse as fallback
-  const d = new Date(s)
+  // M/D/YY (2-digit year: < 70 → 2000s, ≥ 70 → 1900s)
+  const mdy2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (mdy2) {
+    const yy   = parseInt(mdy2[3])
+    const year = yy < 70 ? 2000 + yy : 1900 + yy
+    return `${year}-${mdy2[1].padStart(2,'0')}-${mdy2[2].padStart(2,'0')}`
+  }
+
+  // Try native Date parse as fallback — parse as local noon to avoid UTC day offset
+  const d = new Date(s + ' 12:00:00')
   if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0]
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   }
 
   return null

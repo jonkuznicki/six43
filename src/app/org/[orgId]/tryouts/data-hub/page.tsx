@@ -21,7 +21,7 @@ interface RegRow {
   grade: string | null; school: string | null; prior_org: string | null
   guardian_first_name: string | null; guardian_last_name: string | null
   address: string | null; city: string | null; state: string | null; zip: string | null
-  registration_date: string | null; current_team_division: string | null
+  registration_date: string | null
   player_first_name: string | null; player_last_name: string | null
 }
 interface RosterRow { player_id: string; team_name: string | null; jersey_number: string | null; imported_at: string }
@@ -255,7 +255,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (sid) {
       const { data } = await supabase
         .from('tryout_registration_staging')
-        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org,guardian_first_name,guardian_last_name,address,city,state,zip,registration_date,current_team_division,player_first_name,player_last_name')
+        .select('player_id,prior_team,age_group,parent_email,parent_phone,imported_at,dob,preferred_tryout_date,grade,school,prior_org,guardian_first_name,guardian_last_name,address,city,state,zip,registration_date,player_first_name,player_last_name')
         .eq('season_id', sid)
       regData = data ?? []
     }
@@ -314,7 +314,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           school:                p.school ?? null,
           prior_org:             p.priorOrg ?? null,
           registration_date:     p.registrationDate ?? null,
-          current_team_division: p.currentTeamDivision ?? null,
           imported_at:           job.created_at,
         })
       }
@@ -646,7 +645,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                           onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, 'tryout_ag'); if (e.key==='Escape') setEditingCell(null) }}
                           style={{ ...editInput, width: '64px' }} />
                       ) : (
-                        <span onClick={() => startEdit(p.id, 'tryout_ag', tag ?? nextAgeGroup(p.age_group))}
+                        <span onClick={() => startEdit(p.id, 'tryout_ag', tag ?? p.age_group)}
                           style={{ cursor: 'text', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid transparent', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                           onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
@@ -747,7 +746,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             case 'guardian':     return [reg?.guardian_first_name, reg?.guardian_last_name].filter(Boolean).join(' ')
             case 'address':      return [reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ')
             case 'reg_date':     return reg?.registration_date ?? ''
-            case 'cur_team_div': return reg?.current_team_division ?? ''
             case 'reg_name':     return [reg?.player_first_name, reg?.player_last_name].filter(Boolean).join(' ')
             default:             return ''
           }
@@ -777,7 +775,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           { key: 'school',      label: 'School' },
           { key: 'prior_org',   label: 'Prior Org' },
           { key: 'team',        label: 'Prior Team' },
-          { key: 'cur_team_div', label: 'Cur. Team / Div' },
           { key: 'guardian',    label: 'Guardian' },
           { key: 'email',       label: 'Parent Email' },
           { key: 'phone',       label: 'Parent Phone' },
@@ -833,7 +830,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reg?.school ?? p.school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.prior_org ?? p.prior_org ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: '#80B0E8', whiteSpace: 'nowrap' }}>{reg?.prior_team ?? p.prior_team ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.current_team_division ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
                           {(reg?.guardian_first_name || reg?.guardian_last_name)
                             ? `${reg?.guardian_first_name ?? ''} ${reg?.guardian_last_name ?? ''}`.trim()
@@ -1339,8 +1335,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           <div>
             {/* Explanation */}
             <div style={{ fontSize: '12px', color: s.muted, marginBottom: '14px', lineHeight: 1.6 }}>
-              <strong>Baseball Age</strong> = age as of May 1, {seasonYear}.
-              Overage players must be moved to the correct group. Playing Up is allowed but flagged for review.
+              <strong>Baseball Age</strong> = age as of May 1, {seasonYear}. This should be the year of the season you are preparing for (e.g. 2027 for 2027 tryouts). If the numbers look off by one year, update the season year in <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--accent)' }}>Seasons</Link>.
+              {' '}Overage players must be moved to the correct group. Playing Up is allowed but flagged for review.
             </div>
 
             {/* Status filter chips + counts */}

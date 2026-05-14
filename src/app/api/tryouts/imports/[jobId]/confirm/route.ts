@@ -140,7 +140,7 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
           // Only fill name if blank on the canonical record (e.g. imported before BOM fix)
           ...(!current?.first_name && payload.firstName ? { first_name: payload.firstName } : {}),
           ...(!current?.last_name  && payload.lastName  ? { last_name:  payload.lastName }  : {}),
-          ...(payload.ageGroup          ? { age_group:           payload.ageGroup }          : {}),
+          ...(payload.ageGroup          ? { age_group: payload.ageGroup, tryout_age_group: payload.ageGroup } : {}),
           ...(payload.dob               ? { dob:                 payload.dob }               : {}),
           ...(payload.parentEmail       ? { parent_email:        payload.parentEmail }       : {}),
           ...(payload.parentPhone       ? { parent_phone:        payload.parentPhone }       : {}),
@@ -191,7 +191,6 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
         school:                payload.school,
         prior_org:             payload.priorOrg,
         registration_date:     payload.registrationDate ?? null,
-        current_team_division: payload.currentTeamDivision ?? null,
       })
 
       await autoAssignToSession({
@@ -250,6 +249,7 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
         school:              payload?.school ?? null,
         prior_org:           payload?.priorOrg ?? null,
         prior_team:          payload?.priorTeam ?? null,
+        tryout_age_group:    payload?.ageGroup ?? null,
       }),
     })
     .select('id')
@@ -312,7 +312,6 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
       school:                payload.school,
       prior_org:             payload.priorOrg,
       registration_date:     payload.registrationDate ?? null,
-      current_team_division: payload.currentTeamDivision ?? null,
     })
 
     await autoAssignToSession({
@@ -371,7 +370,7 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       const { data: current } = await supabase
         .from('tryout_players').select('first_name, last_name').eq('id', topCandidate.id).single()
       await supabase.from('tryout_players').update({
-        ...(payload.ageGroup ? { age_group: payload.ageGroup } : {}),
+        ...(payload.ageGroup ? { age_group: payload.ageGroup, tryout_age_group: payload.ageGroup } : {}),
         ...(!current?.first_name && payload.firstName ? { first_name: payload.firstName } : {}),
         ...(!current?.last_name  && payload.lastName  ? { last_name:  payload.lastName }  : {}),
       }).eq('id', topCandidate.id)
@@ -399,7 +398,6 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
         school:                payload.school,
         prior_org:             payload.priorOrg,
         registration_date:     payload.registrationDate ?? null,
-        current_team_division: payload.currentTeamDivision ?? null,
       })
 
       await autoAssignToSession({

@@ -201,6 +201,7 @@ export async function POST(req: NextRequest) {
       last_name:            r.createPayload.lastName,
       dob:                  r.createPayload.dob,
       age_group:            r.createPayload.ageGroup,
+      tryout_age_group:     r.createPayload.ageGroup ?? null,
       parent_email:         r.createPayload.parentEmail,
       parent_phone:         r.createPayload.parentPhone,
       guardian_first_name:  r.createPayload.guardianFirstName,
@@ -258,7 +259,6 @@ export async function POST(req: NextRequest) {
             school:                cp.school,
             prior_org:             cp.priorOrg,
             registration_date:     cp.registrationDate ?? null,
-            current_team_division: cp.currentTeamDivision ?? null,
           }
         })
         await supabase.from('tryout_registration_staging')
@@ -294,8 +294,7 @@ export async function POST(req: NextRequest) {
       const cp = r.createPayload
       const current = currentMap.get(r.resolvedPlayerId)
       return supabase.from('tryout_players').update({
-        ...(cp.ageGroup ? { age_group: cp.ageGroup } : {}),
-        // Only fill name if the canonical record has a blank field
+        ...(cp.ageGroup ? { age_group: cp.ageGroup, tryout_age_group: cp.ageGroup } : {}),
         ...(!current?.first_name && cp.firstName ? { first_name: cp.firstName } : {}),
         ...(!current?.last_name  && cp.lastName  ? { last_name:  cp.lastName }  : {}),
       }).eq('id', r.resolvedPlayerId)
@@ -329,7 +328,6 @@ export async function POST(req: NextRequest) {
         school:                cp.school,
         prior_org:             cp.priorOrg,
         registration_date:     cp.registrationDate ?? null,
-        current_team_division: cp.currentTeamDivision ?? null,
       }
     })
     await supabase.from('tryout_registration_staging')
