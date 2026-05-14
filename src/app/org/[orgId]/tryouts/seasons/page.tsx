@@ -31,6 +31,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
   const [saving,        setSaving]        = useState(false)
   const [deleteId,      setDeleteId]      = useState<string | null>(null)
   const [deleting,      setDeleting]      = useState(false)
+  const [deleteError,   setDeleteError]   = useState<string | null>(null)
   const [copyFromId,    setCopyFromId]    = useState<string>('')
 
   // Form state — shared for create and edit
@@ -194,7 +195,13 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
   async function confirmDelete() {
     if (!deleteId) return
     setDeleting(true)
-    await supabase.from('tryout_seasons').delete().eq('id', deleteId)
+    setDeleteError(null)
+    const { error } = await supabase.from('tryout_seasons').delete().eq('id', deleteId)
+    if (error) {
+      setDeleteError(error.message)
+      setDeleting(false)
+      return
+    }
     setSeasons(prev => prev.filter(s => s.id !== deleteId))
     setCounts(prev => { const c = { ...prev }; delete c[deleteId]; return c })
     setDeleteId(null)
@@ -439,7 +446,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
       {deleteId && deleteTarget && (
         <>
           <div
-            onClick={() => !deleting && setDeleteId(null)}
+            onClick={() => { if (!deleting) { setDeleteId(null); setDeleteError(null) } }}
             style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
           />
           <div style={{
@@ -472,8 +479,14 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
               </div>
             )}
 
+            {deleteError && (
+              <div style={{ marginBottom: '12px', fontSize: '13px', color: '#DC3C3C', background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,60,60,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+                Error: {deleteError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDeleteId(null)} disabled={deleting} style={{
+              <button onClick={() => { setDeleteId(null); setDeleteError(null) }} disabled={deleting} style={{
                 padding: '9px 16px', borderRadius: '7px',
                 border: '0.5px solid var(--border-md)', background: 'transparent',
                 color: s.muted, fontSize: '14px', cursor: 'pointer',
