@@ -125,7 +125,9 @@ export function parseRegistrationFile(
     }
   }
 
-  const headerRow = (raw[headerRowIndex] as string[]).map(c => String(c).trim().replace(/^﻿/, ''))
+  // Strip BOM (U+FEFF) that some CSV exporters embed in the first cell.
+  const stripBom = (s: string) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s
+  const headerRow = (raw[headerRowIndex] as string[]).map(c => stripBom(String(c).trim()))
   const dataRows  = raw.slice(headerRowIndex + 1)
 
   // Build a column-name → index map (case-insensitive)
