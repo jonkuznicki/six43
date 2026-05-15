@@ -274,13 +274,14 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setBackfilling(true)
     setBackfillError('')
 
-    // Load all completed registration import jobs for this org
+    // Load all completed registration import jobs, oldest first so newest wins dedup
     const { data: jobs } = await supabase
       .from('tryout_import_jobs')
       .select('id,season_id,match_report,created_at')
       .eq('org_id', params.orgId)
       .eq('type', 'registration')
       .in('status', ['complete', 'needs_review'])
+      .order('created_at', { ascending: true })
 
     if (!jobs?.length) { setBackfillError('No registration import jobs found.'); setBackfilling(false); return }
 
@@ -296,8 +297,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           org_id:                params.orgId,
           season_id:             seasonId,
           import_job_id:         job.id,
-          player_first_name:     p.firstName ?? null,
-          player_last_name:      p.lastName ?? null,
+          player_first_name:     p.firstName || null,
+          player_last_name:      p.lastName || null,
           age_group:             p.ageGroup ?? row.ageGroup ?? null,
           preferred_tryout_date: p.preferredTryoutDate ?? null,
           prior_team:            p.priorTeam ?? null,
@@ -321,7 +322,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
     if (!stagingRows.length) { setBackfillError('No matched players found in import jobs.'); setBackfilling(false); return }
 
-    // Deduplicate by player_id — keep last entry (jobs are ordered by created_at desc)
+    // Deduplicate by player_id — oldest job first means newest job's entry wins in Map
     const deduped = Array.from(
       stagingRows.reduce((m, r) => { m.set(r.player_id, r); return m }, new Map<string, any>()).values()
     )
@@ -331,6 +332,19 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       .upsert(deduped, { onConflict: 'player_id,season_id' })
 
     if (error) { setBackfillError(error.message); setBackfilling(false); return }
+
+    // Also repair blank first_name on tryout_players using the same import data
+    const nameRepairs = deduped.filter(r => r.player_first_name)
+    await Promise.all(nameRepairs.map(async (r: any) => {
+      const { data: p } = await supabase
+        .from('tryout_players').select('first_name').eq('id', r.player_id).single()
+      if (p && !p.first_name) {
+        await supabase.from('tryout_players').update({
+          first_name: r.player_first_name,
+          ...(r.player_last_name ? { last_name: r.player_last_name } : {}),
+        }).eq('id', r.player_id)
+      }
+    }))
 
     setBackfilling(false)
     setBackfillDone(true)
