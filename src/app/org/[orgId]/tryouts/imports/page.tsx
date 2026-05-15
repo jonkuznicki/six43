@@ -65,8 +65,8 @@ const MODE_CONFIG: Record<string, {
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Grade</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>School</span>
           <br />
-          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian First Name</span>{' · '}
-          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian Last Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian 1 First Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian 1 Last Name</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Address</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>City</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>State</span>{' · '}
