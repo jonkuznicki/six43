@@ -319,6 +319,18 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     setWritingIn(false)
   }
 
+  async function renumberSequentially() {
+    const sorted = [...assigned].sort((a, b) => (a.tryout_number ?? 999) - (b.tryout_number ?? 999))
+    const startFrom = otherSessionsMax + 1
+    await Promise.all(sorted.map((c, i) =>
+      supabase.from('tryout_checkins').update({ tryout_number: startFrom + i }).eq('id', c.id)
+    ))
+    setCheckins(prev => {
+      const byId = new Map(sorted.map((c, i) => [c.id, { ...c, tryout_number: startFrom + i }]))
+      return prev.map(c => byId.get(c.id) ?? c)
+    })
+  }
+
   function toggleSelect(playerId: string) {
     setSelected(prev => {
       const n = new Set(prev)
@@ -375,6 +387,12 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
               fontSize: '12px', cursor: 'pointer',
             }}>{m === 'checkin_order' ? 'Sequential' : 'Alphabetical'}</button>
           ))}
+          {assigned.length > 0 && (
+            <button onClick={renumberSequentially} title="Reset numbers to start from 1 in current order" style={{
+              padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.dim, fontSize: '12px', cursor: 'pointer',
+            }}>↺ Reset #s</button>
+          )}
           <Link href={`/org/${params.orgId}/tryouts/sessions/${params.sessionId}/roster`} style={{
             padding: '5px 14px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px',
