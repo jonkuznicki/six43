@@ -48,11 +48,13 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   const inputRefs     = useRef<(HTMLInputElement | null)[][]>([])
   const gridRef       = useRef<GridValues>({})
   const commentsRef   = useRef<Record<string, string>>({})
+  const naFlagsRef    = useRef<Record<string, Set<string>>>({})
   const checkinsRef   = useRef<Checkin[]>([])
   const categoriesRef = useRef<ScoringCategory[]>([])
 
   useEffect(() => { gridRef.current = grid }, [grid])
   useEffect(() => { commentsRef.current = comments }, [comments])
+  useEffect(() => { naFlagsRef.current = naFlags }, [naFlags])
   useEffect(() => { checkinsRef.current = checkins }, [checkins])
   useEffect(() => { categoriesRef.current = categories }, [categories])
 
@@ -115,7 +117,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     if (!evaluator) return
 
     const { data: scoreData } = await supabase
-      .from('tryout_scores').select('player_id, checkin_id, scores, comments')
+      .from('tryout_scores').select('player_id, checkin_id, scores, comments, na_flags')
       .eq('session_id', params.sessionId).eq('evaluator_id', evalId)
 
     const newGrid: GridValues = {}
@@ -130,6 +132,9 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
         newGrid[key][k] = v == null ? '' : String(v)
       }
       newComments[key] = sc.comments ?? ''
+      if (Array.isArray(sc.na_flags) && sc.na_flags.length > 0) {
+        newNa[key] = new Set(sc.na_flags as string[])
+      }
     }
     setGrid(newGrid)
     setComments(newComments)
@@ -168,6 +173,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
       }
       return { ...prev, [playerId]: set }
     })
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => autoSave(playerId), 1000)
   }
 
   function handleCellChange(playerId: string, subKey: string, val: string) {
@@ -205,6 +212,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
       scores[k] = v === '' ? null : parseFloat(v)
     }
     const tryoutScore = computeTryoutScore(scores, categoriesRef.current)
+    const naFlags = Array.from(naFlagsRef.current[rowKey] ?? [])
 
     setSaving(rowKey)
     if (isWriteIn) {
@@ -212,7 +220,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
         checkin_id: rowKey, player_id: null,
         session_id: params.sessionId, org_id: params.orgId,
         evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-        scores, tryout_score: tryoutScore,
+        scores, tryout_score: tryoutScore, na_flags: naFlags,
         comments: commentsRef.current[rowKey] ?? null,
         submitted_at: new Date().toISOString(),
       }, { onConflict: 'checkin_id,session_id,evaluator_id' })
@@ -220,7 +228,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
       await supabase.from('tryout_scores').upsert({
         player_id: rowKey, session_id: params.sessionId, org_id: params.orgId,
         evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-        scores, tryout_score: tryoutScore,
+        scores, tryout_score: tryoutScore, na_flags: naFlags,
         comments: commentsRef.current[rowKey] ?? null,
         submitted_at: new Date().toISOString(),
       }, { onConflict: 'player_id,session_id,evaluator_id' })
