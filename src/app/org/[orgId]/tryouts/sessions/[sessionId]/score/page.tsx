@@ -24,7 +24,8 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
   const [checkins,      setCheckins]      = useState<Checkin[]>([])
   const [currentIdx,    setCurrentIdx]    = useState(0)
   const [scores,        setScores]        = useState<Record<string, Record<string, number | null>>>({})
-  const [naFlags,       setNaFlags]       = useState<Record<string, Set<string>>>({}) // checkinId → Set of optional category keys
+  const [decimalInputs, setDecimalInputs] = useState<Record<string, string>>({}) // subKey → raw string for tiebreaker fields
+  const [naFlags,       setNaFlags]       = useState<Record<string, Set<string>>>({})
   const [comments,      setComments]      = useState<Record<string, string>>({})
   const [evaluatorName, setEvaluatorName] = useState('')
   const [evaluatorId,   setEvaluatorId]   = useState<string | null>(null)
@@ -37,7 +38,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
   const [showComment,   setShowComment]   = useState<Record<string, boolean>>({})
   const [done,          setDone]          = useState(false)
 
-  // Write-in modal
   const [showWriteIn,   setShowWriteIn]   = useState(false)
   const [wiName,        setWiName]        = useState('')
   const [wiAge,         setWiAge]         = useState('')
@@ -67,7 +67,7 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
 
     const [{ data: catData }, { data: checkinRaw }, memberResult] = await Promise.all([
       supabase.from('tryout_scoring_config')
-        .select('category, label, weight, is_optional, subcategories, sort_order')
+        .select('category, label, weight, is_optional, is_tiebreaker, subcategories, sort_order')
         .eq('season_id', sess.season_id).order('sort_order'),
       supabase.from('tryout_checkins')
         .select('id, tryout_number, player_id, is_write_in, write_in_name')
@@ -75,7 +75,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
       user ? supabase.from('tryout_org_members').select('name, email').eq('org_id', params.orgId).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
 
-    // Load player data separately to avoid FK join failures
     const checkinRows = checkinRaw ?? []
     const playerIds = Array.from(new Set(checkinRows.filter((c: any) => c.player_id).map((c: any) => c.player_id as string)))
     const playerMap = new Map<string, { first_name: string; last_name: string; prior_team: string | null }>()
@@ -97,7 +96,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     }))
     setCheckins(enrichedCheckins)
 
-    // Load existing scores for this evaluator
     if (user) {
       const { data: existingScores } = await supabase
         .from('tryout_scores').select('player_id, scores, comments')
@@ -113,7 +111,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
       setComments(commentMap)
     }
 
-    // Evaluator name
     const member = memberResult.data
     const saved  = localStorage.getItem(`tryout_eval_name_${params.orgId}`)
     if (member?.name) setEvaluatorName(member.name)
@@ -155,12 +152,29 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     })
   }
 
-  function setScore(playerId: string, subKey: string, val: number) {
+  function setScore(playerId: string, subKey: string, val: number | null) {
     setScores(prev => ({
       ...prev,
       [playerId]: { ...(prev[playerId] ?? {}), [subKey]: val },
     }))
   }
+
+  // When navigating to a new player, seed decimal inputs from existing scores
+  useEffect(() => {
+    if (!current) return
+    const pid = current.player_id
+    if (!pid) return
+    const playerScores = scores[pid] ?? {}
+    const newDecimal: Record<string, string> = {}
+    for (const cat of categories) {
+      if (!cat.is_tiebreaker) continue
+      for (const sub of cat.subcategories) {
+        const v = playerScores[sub.key]
+        if (v != null) newDecimal[sub.key] = String(v)
+      }
+    }
+    setDecimalInputs(newDecimal)
+  }, [currentIdx, categories])
 
   async function saveCurrentAndAdvance() {
     if (!current || !evaluatorId) return
@@ -192,7 +206,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     }
     setSaving(false)
 
-    // Find next unsaved player
     const nextUnsaved = checkins.findIndex((c, i) =>
       i > currentIdx && c.player_id && !scores[c.player_id]
     )
@@ -226,7 +239,7 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     const { data } = await supabase.from('tryout_checkins').insert({
       session_id: params.sessionId, tryout_number: maxNum + 1,
       is_write_in: true, write_in_name: wiName.trim(),
-      write_in_age_group: wiAge.trim() || session?.age_group,
+      write_in_age_group: (wiAge.trim() || session?.age_group || '').replace(/u$/i, 'U'),
     }).select('id, tryout_number, player_id, is_write_in, write_in_name').single()
     if (data) setCheckins(prev => [...prev, { ...data, player: undefined }])
     setWiName(''); setWiAge(''); setShowWriteIn(false)
@@ -244,7 +257,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Session not found.</main>
   )
 
-  // Name prompt
   if (namePrompt) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={{ maxWidth: '320px', width: '100%' }}>
@@ -263,7 +275,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     </main>
   )
 
-  // No checkins
   if (checkins.length === 0) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', padding: '2rem', textAlign: 'center' }}>
       <div style={{ fontSize: '32px' }}>📋</div>
@@ -272,7 +283,6 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
     </main>
   )
 
-  // Done screen
   if (done) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', padding: '2rem', textAlign: 'center' }}>
       <div style={{ fontSize: '48px' }}>✓</div>
@@ -291,67 +301,65 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
   const playerScore = playerId ? (scores[playerId] ?? {}) : {}
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto', paddingBottom: '120px' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', maxWidth: '480px', margin: '0 auto', paddingBottom: '140px' }}>
 
-      {/* Offline banner */}
-      {offline && (
-        <div style={{ background: '#E8A020', color: 'white', textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: 600 }}>
-          Offline — scores will sync when reconnected
-        </div>
-      )}
+      {/* ── Sticky header — stays visible while scrolling scoring fields ── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)' }}>
 
-      {/* Session header */}
-      <div style={{ padding: '14px 16px 10px', borderBottom: '0.5px solid var(--border)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: s.muted, fontWeight: 600 }}>{session.age_group} · {session.label}</div>
-            <div style={{ fontSize: '13px', color: s.dim }}>Evaluator: {evaluatorName}</div>
+        {/* Offline banner */}
+        {offline && (
+          <div style={{ background: '#E8A020', color: 'white', textAlign: 'center', padding: '7px', fontSize: '13px', fontWeight: 600 }}>
+            Offline — scores will sync when reconnected
           </div>
-          <div style={{ fontSize: '13px', color: s.dim, fontWeight: 700 }}>
-            {scoredCount}/{checkins.length}
+        )}
+
+        {/* Session info + progress */}
+        <div style={{ padding: '10px 16px 8px', borderBottom: '0.5px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '11px', color: s.muted, fontWeight: 600 }}>
+              {session.age_group} · {session.label}
+              <span style={{ fontWeight: 400, marginLeft: '6px' }}>{evaluatorName}</span>
+            </div>
+            <div style={{ fontSize: '13px', color: s.muted, fontWeight: 700 }}>{scoredCount}/{checkins.length}</div>
+          </div>
+          <div style={{ marginTop: '6px', height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: `${checkins.length > 0 ? (scoredCount / checkins.length) * 100 : 0}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
           </div>
         </div>
-        {/* Progress bar */}
-        <div style={{ marginTop: '8px', height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-          <div style={{ width: `${checkins.length > 0 ? (scoredCount / checkins.length) * 100 : 0}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+
+        {/* Player name — the anchor that stays on screen */}
+        <div style={{ padding: '10px 16px 10px', background: 'rgba(var(--fg-rgb),0.03)', borderBottom: '0.5px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+            <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>#{current.tryout_number}</span>
+            <span style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1.2 }}>{playerName(current)}</span>
+          </div>
+          {current.player?.prior_team && (
+            <div style={{ fontSize: '12px', color: '#40A0E8', marginTop: '3px' }}>↩ {current.player.prior_team}</div>
+          )}
+          {current.is_write_in && (
+            <div style={{ fontSize: '12px', color: 'var(--accent)' }}>Walk-up / Write-in</div>
+          )}
+        </div>
+
+        {/* Scale reminder */}
+        <div style={{ padding: '5px 16px', background: 'rgba(var(--fg-rgb),0.015)', borderBottom: '0.5px solid var(--border)', fontSize: '10px', color: s.dim, lineHeight: 1.4 }}>
+          {SCALE_LABEL}
         </div>
       </div>
 
-      {/* Player header */}
-      <div style={{ padding: '14px 16px 12px', background: 'rgba(var(--fg-rgb),0.03)', borderBottom: '0.5px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-          <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent)' }}>#{current.tryout_number}</span>
-          <span style={{ fontSize: '18px', fontWeight: 700 }}>{playerName(current)}</span>
-        </div>
-        {current.player?.prior_team && (
-          <div style={{ fontSize: '12px', color: '#40A0E8', marginTop: '2px' }}>↩ {current.player.prior_team}</div>
-        )}
-        {current.is_write_in && (
-          <div style={{ fontSize: '12px', color: 'var(--accent)' }}>Write-in player</div>
-        )}
-      </div>
-
-      {/* Rating scale reminder */}
-      <div style={{ padding: '8px 16px', background: 'rgba(var(--fg-rgb),0.02)', borderBottom: '0.5px solid var(--border)', fontSize: '11px', color: s.dim }}>
-        {SCALE_LABEL}
-      </div>
-
-      {/* Scoring */}
+      {/* ── Scoring fields ── */}
       <div style={{ padding: '16px' }}>
         {categories.map(cat => {
           const na = playerId ? isNa(current.id, cat.category) : false
           return (
-            <div key={cat.category} style={{ marginBottom: '20px' }}>
-              {/* Category header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div key={cat.category} style={{ marginBottom: '22px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: s.muted }}>
                   {cat.label}
                 </div>
                 {cat.is_optional && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: na ? 'var(--accent)' : s.dim, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={na}
-                      onChange={() => playerId && toggleNa(current.id, cat.category)}
-                    />
+                    <input type="checkbox" checked={na} onChange={() => playerId && toggleNa(current.id, cat.category)} />
                     N/A
                   </label>
                 )}
@@ -359,6 +367,49 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
 
               {!na && cat.subcategories.map(sub => {
                 const val = playerId ? (playerScore[sub.key] ?? null) : null
+
+                if (cat.is_tiebreaker) {
+                  // Decimal time input (e.g. 60yd dash in seconds)
+                  const rawStr = decimalInputs[sub.key] ?? (val != null ? String(val) : '')
+                  return (
+                    <div key={sub.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 600, minWidth: '90px', color: 'var(--fg)' }}>{sub.label}</div>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={rawStr}
+                        placeholder="0.00"
+                        onChange={e => {
+                          const raw = e.target.value
+                          setDecimalInputs(prev => ({ ...prev, [sub.key]: raw }))
+                          const n = parseFloat(raw)
+                          if (!isNaN(n) && playerId) setScore(playerId, sub.key, n)
+                          else if (raw === '' && playerId) setScore(playerId, sub.key, null)
+                        }}
+                        onBlur={e => {
+                          // Clean up trailing dot on blur
+                          const n = parseFloat(e.target.value)
+                          if (!isNaN(n)) {
+                            const clean = String(Math.round(n * 100) / 100)
+                            setDecimalInputs(prev => ({ ...prev, [sub.key]: clean }))
+                          } else {
+                            setDecimalInputs(prev => ({ ...prev, [sub.key]: '' }))
+                          }
+                        }}
+                        style={{
+                          flex: 1, height: '54px', borderRadius: '10px',
+                          border: `1.5px solid ${val != null ? 'var(--accent)' : 'var(--border-md)'}`,
+                          background: val != null ? 'rgba(var(--accent-rgb, 232,160,32),0.07)' : 'var(--bg-input)',
+                          color: 'var(--fg)', fontSize: '22px', fontWeight: 700,
+                          textAlign: 'center', outline: 'none', boxSizing: 'border-box',
+                        }}
+                      />
+                      <div style={{ fontSize: '14px', color: s.dim, minWidth: '16px' }}>s</div>
+                    </div>
+                  )
+                }
+
+                // Standard 1–5 button row
                 return (
                   <div key={sub.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                     <div style={{ fontSize: '14px', minWidth: '90px', color: 'var(--fg)' }}>{sub.label}</div>
@@ -367,12 +418,12 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
                         <button key={n} onClick={() => playerId && setScore(playerId, sub.key, n)}
                           disabled={!playerId}
                           style={{
-                            flex: 1, minHeight: '48px', borderRadius: '8px',
+                            flex: 1, minHeight: '52px', borderRadius: '8px',
                             border: '0.5px solid',
                             borderColor: val === n ? 'var(--accent)' : 'var(--border-md)',
                             background: val === n ? 'var(--accent)' : 'var(--bg-input)',
                             color: val === n ? 'var(--accent-text)' : 'var(--fg)',
-                            fontSize: '16px', fontWeight: val === n ? 800 : 400,
+                            fontSize: '17px', fontWeight: val === n ? 800 : 400,
                             cursor: playerId ? 'pointer' : 'default',
                           }}>
                           {n}
@@ -408,34 +459,34 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
         )}
       </div>
 
-      {/* Bottom navigation — sticky */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--bg)', borderTop: '0.5px solid var(--border)', padding: '12px 16px', maxWidth: '480px', margin: '0 auto' }}>
-        {/* Jump to number */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+      {/* ── Fixed bottom navigation ── */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--bg)', borderTop: '0.5px solid var(--border)', padding: '10px 16px 12px', maxWidth: '480px', margin: '0 auto' }}>
+        {/* Jump + saved indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
           <span style={{ fontSize: '12px', color: s.dim, flexShrink: 0 }}>Jump to #</span>
           <input
             value={jumpInput} onChange={e => setJumpInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && jumpTo(jumpInput)}
             type="number" min={1} placeholder="—"
-            style={{ width: '64px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '5px 8px', fontSize: '14px', color: 'var(--fg)', textAlign: 'center' }}
+            style={{ width: '60px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px', padding: '5px 8px', fontSize: '14px', color: 'var(--fg)', textAlign: 'center' }}
           />
           <button onClick={() => jumpTo(jumpInput)} style={{
-            padding: '5px 12px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
+            padding: '5px 10px', borderRadius: '5px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
           }}>Go</button>
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: s.dim }}>
+          <span style={{ marginLeft: 'auto', fontSize: '11px', color: s.dim }}>
             {savedAt ? `Saved ${savedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : saving ? 'Saving…' : ''}
           </span>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0} style={{
-            padding: '12px 20px', borderRadius: '8px', border: '0.5px solid var(--border-md)',
+            padding: '13px 18px', borderRadius: '8px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '14px', fontWeight: 600,
             cursor: currentIdx === 0 ? 'not-allowed' : 'pointer', opacity: currentIdx === 0 ? 0.4 : 1,
           }}>← Prev</button>
           <button onClick={saveCurrentAndAdvance} disabled={saving} style={{
-            flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+            flex: 1, padding: '13px', borderRadius: '8px', border: 'none',
             background: 'var(--accent)', color: 'var(--accent-text)',
             fontSize: '15px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
           }}>
@@ -443,9 +494,8 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
           </button>
         </div>
 
-        {/* Add write-in */}
         <button onClick={() => setShowWriteIn(true)} style={{
-          marginTop: '8px', width: '100%', padding: '7px', borderRadius: '6px',
+          marginTop: '7px', width: '100%', padding: '7px', borderRadius: '6px',
           border: '0.5px dashed var(--border-md)', background: 'none',
           color: s.dim, fontSize: '12px', cursor: 'pointer',
         }}>+ Add Write-In Player</button>
