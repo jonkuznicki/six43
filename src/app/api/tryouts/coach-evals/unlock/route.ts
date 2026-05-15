@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
   })
   if (!isMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Reset per-player eval rows
   const { error } = await supabase
     .from('tryout_coach_evals')
     .update({ status: 'draft', submitted_at: null })
@@ -27,6 +28,16 @@ export async function POST(req: NextRequest) {
     .eq('status', 'submitted')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Also reset the token-based draft row so the coach-facing form unlocks.
+  // tryout_eval_drafts.status drives the "already submitted" locked view.
+  await supabase
+    .from('tryout_eval_drafts')
+    .update({ status: 'in_progress', submitted_at: null })
+    .eq('org_id', orgId)
+    .eq('season_id', seasonId)
+    .eq('team_label', teamLabel)
+    .eq('status', 'submitted')
 
   await supabase.from('tryout_audit_log').insert({
     org_id:      orgId,
