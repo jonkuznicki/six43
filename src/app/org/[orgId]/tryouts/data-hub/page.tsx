@@ -854,7 +854,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {[reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ') || <span style={{ opacity: 0.3 }}>—</span>}
                         </td>
-                        <td style={{ ...td, color: '#40A0E8', fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.preferred_tryout_date ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td style={{ ...td, color: '#40A0E8', fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.preferred_tryout_date ? new Date(reg.preferred_tryout_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}</td>
                         <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
                           {reg?.registration_date ? new Date(reg.registration_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}
                         </td>

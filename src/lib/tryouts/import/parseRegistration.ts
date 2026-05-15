@@ -336,6 +336,25 @@ function parseDateString(s: string): string | null {
     return `${year}-${mdy2[1].padStart(2,'0')}-${mdy2[2].padStart(2,'0')}`
   }
 
+  // D-Mon or D-Mon-YY (e.g. "7-Jul", "14-Jul", "7-Jul-26")
+  // Year-less form uses current year — these are always upcoming tryout dates
+  const MONTHS: Record<string, string> = {
+    jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+    jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',
+  }
+  const dmon = s.match(/^(\d{1,2})-([A-Za-z]{3})(?:-(\d{2,4}))?$/)
+  if (dmon) {
+    const mm = MONTHS[dmon[2].toLowerCase()]
+    if (mm) {
+      let year = new Date().getFullYear()
+      if (dmon[3]) {
+        const yy = parseInt(dmon[3])
+        year = yy < 100 ? (yy < 70 ? 2000 + yy : 1900 + yy) : yy
+      }
+      return `${year}-${mm}-${dmon[1].padStart(2,'0')}`
+    }
+  }
+
   // Try native Date parse as fallback — parse as local noon to avoid UTC day offset
   const d = new Date(s + ' 12:00:00')
   if (!isNaN(d.getTime())) {
