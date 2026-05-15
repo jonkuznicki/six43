@@ -149,6 +149,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [gcIds,         setGcIds]         = useState<Set<string>>(new Set())
   const [evalIds,       setEvalIds]       = useState<Set<string>>(new Set())
   const [scoreIds,      setScoreIds]      = useState<Set<string>>(new Set())
+  const [assignedTeamMap, setAssignedTeamMap] = useState<Map<string, string>>(new Map()) // player_id → team name
   const [seasonId,      setSeasonId]      = useState<string | null>(null)
   const [seasonYear,    setSeasonYear]    = useState<number | null>(null)
   const [seasonAgeGroups, setSeasonAgeGroups] = useState<string[]>([])
@@ -260,12 +261,25 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       regData = data ?? []
     }
 
+    // Team assignments — fetch teams for season, then assignments for those teams
+    let assignMap = new Map<string, string>()
+    if (sid) {
+      const { data: teamsData } = await supabase.from('tryout_teams').select('id,name').eq('season_id', sid)
+      const teamIds = (teamsData ?? []).map((t: any) => t.id as string)
+      if (teamIds.length > 0) {
+        const { data: assignData } = await supabase.from('tryout_team_assignments').select('player_id,team_id').in('team_id', teamIds)
+        const nameById = new Map((teamsData ?? []).map((t: any) => [t.id, t.name as string]))
+        for (const a of (assignData ?? [])) assignMap.set(a.player_id, nameById.get(a.team_id) ?? '')
+      }
+    }
+
     setPlayers(playerData ?? [])
     setRegMap(new Map(regData.map((r: any) => [r.player_id, r])))
     setRosterMap(new Map((rosterData ?? []).map((r: any) => [r.player_id, r])))
     setGcIds(new Set((gcData ?? []).map((r: any) => r.player_id)))
     setEvalIds(new Set((evalData ?? []).map((r: any) => r.player_id)))
     setScoreIds(new Set((scoreData ?? []).map((r: any) => r.player_id)))
+    setAssignedTeamMap(assignMap)
     setLoading(false)
   }
 
@@ -468,7 +482,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           (reg?.prior_org ?? '').toLowerCase().includes(q) ||
           (reg?.parent_email ?? '').toLowerCase().includes(q) ||
           (reg?.parent_phone ?? '').toLowerCase().includes(q) ||
-          (reg?.grade ?? '').toLowerCase().includes(q)
+          (reg?.grade ?? '').toLowerCase().includes(q) ||
+          (assignedTeamMap.get(p.id) ?? '').toLowerCase().includes(q)
         )
       })
     }
@@ -482,6 +497,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         const db2 = b.dob ?? regMap.get(b.id)?.dob ?? null
         return ((da && seasonYear ? calcBaseballAge(da, seasonYear) : 0) - (db2 && seasonYear ? calcBaseballAge(db2, seasonYear) : 0)) * sortDir
       }
+      if (sortCol === 'assigned')   { va = assignedTeamMap.get(a.id) ?? ''; vb = assignedTeamMap.get(b.id) ?? '' }
       if (sortCol === 'grade')     { va = regMap.get(a.id)?.grade ?? a.grade ?? ''; vb = regMap.get(b.id)?.grade ?? b.grade ?? '' }
       if (sortCol === 'email')     { va = regMap.get(a.id)?.parent_email ?? a.parent_email ?? ''; vb = regMap.get(b.id)?.parent_email ?? b.parent_email ?? '' }
       if (sortCol === 'phone')     { va = regMap.get(a.id)?.parent_phone ?? a.parent_phone ?? ''; vb = regMap.get(b.id)?.parent_phone ?? b.parent_phone ?? '' }
@@ -630,12 +646,13 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             <thead>
               <tr>
                 {[
-                  { key: 'name',      label: 'Player' },
-                  { key: 'age',       label: 'Bsbl Age' },
-                  { key: 'tryout_ag', label: 'Tryout AG' },
-                  { key: 'team',      label: 'Current Team' },
-                  { key: null,        label: 'Reg Team' },
-                  { key: null,        label: 'Roster Team' },
+                  { key: 'name',        label: 'Player' },
+                  { key: 'age',         label: 'Bsbl Age' },
+                  { key: 'tryout_ag',   label: 'Tryout AG' },
+                  { key: 'team',        label: 'Current Team' },
+                  { key: null,          label: 'Reg Team' },
+                  { key: null,          label: 'Roster Team' },
+                  { key: 'assigned',    label: 'Assigned Team' },
                   { key: 'grade',     label: 'Grade' },
                   { key: 'school',    label: 'School' },
                   { key: null,        label: 'Parent' },
@@ -658,6 +675,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
                 const dob = p.dob ?? reg?.dob ?? null
                 const bbAge = dob && seasonYear ? calcBaseballAge(dob, seasonYear) : null
+                const assignedTeam = assignedTeamMap.get(p.id) ?? null
                 const grade = reg?.grade ?? p.grade ?? null
                 const school = reg?.school ?? p.school ?? null
                 const parentName = reg ? [reg.guardian_first_name, reg.guardian_last_name].filter(Boolean).join(' ') || null : null
@@ -714,6 +732,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     </td>
                     <td style={{ ...td, color: ros?.team_name ? '#6DB875' : s.dim, fontSize: '12px' }}>
                       {ros?.team_name ?? <span style={{ opacity: 0.3 }}>—</span>}
+                    </td>
+
+                    <td style={{ ...td, fontSize: '12px', fontWeight: assignedTeam ? 600 : 400, color: assignedTeam ? 'var(--accent)' : s.dim }}>
+                      {assignedTeam ?? <span style={{ opacity: 0.3 }}>—</span>}
                     </td>
 
                     <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
