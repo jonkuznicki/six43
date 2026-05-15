@@ -36,6 +36,7 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
   const [players,   setPlayers]   = useState<{ id: string; age_group: string; prior_team: string | null }[]>([])
   const [loading,   setLoading]   = useState(true)
   const [drill,     setDrill]     = useState<string | null>(null)  // expanded age group
+  const [unlocking, setUnlocking] = useState<string | null>(null)  // team label being unlocked
 
   useEffect(() => { loadData() }, [])
 
@@ -77,6 +78,25 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
     setScores(scoreData ?? [])
     setPlayers(playerData ?? [])
     setLoading(false)
+  }
+
+  async function unlockEvals(teamLabel: string) {
+    if (!season) return
+    if (!window.confirm(`Unlock evaluations for ${teamLabel}? The coach will be able to edit and re-submit.`)) return
+    setUnlocking(teamLabel)
+    const res = await fetch('/api/tryouts/coach-evals/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId: params.orgId, seasonId: season.id, teamLabel }),
+    })
+    if (res.ok) {
+      setCoachEvals(prev => prev.map(e =>
+        e.team_label === teamLabel && e.status === 'submitted'
+          ? { ...e, status: 'draft' }
+          : e
+      ))
+    }
+    setUnlocking(null)
   }
 
   const readiness = useMemo((): AgeGroupReadiness[] => {
@@ -234,7 +254,18 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
                 ) : ag.coachEvals.map(r => (
                   <div key={r.team.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
                     <span><StatusDot status={r.status} /> {r.team.name}</span>
-                    <span style={{ color: s.dim }}>{r.submittedCount}/{r.totalPlayers}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: s.dim }}>{r.submittedCount}/{r.totalPlayers}</span>
+                      {r.status === 'ready' && (
+                        <button
+                          onClick={() => unlockEvals(r.team.name)}
+                          disabled={unlocking === r.team.name}
+                          style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', border: '0.5px solid var(--border)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
+                        >
+                          {unlocking === r.team.name ? '…' : 'Unlock'}
+                        </button>
+                      )}
+                    </span>
                   </div>
                 ))}
               </div>
