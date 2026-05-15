@@ -25,15 +25,15 @@ const NAV = [
   {
     label: 'Tryouts',
     items: [
-      { href: 'sessions',    label: 'Sessions' },
-      { href: 'coach-evals', label: 'Evaluations' },
+      { href: 'sessions',    label: 'Tryout Sessions' },
+      { href: 'coach-evals', label: 'Coach Eval' },
     ],
   },
   {
     label: 'Team Making',
     items: [
-      { href: 'rankings', label: 'Rankings' },
-      { href: 'teams',    label: 'Teams' },
+      { href: 'rankings', label: 'Team Making' },
+      { href: 'teams',    label: 'Final Rosters' },
     ],
   },
 ]
