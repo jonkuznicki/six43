@@ -405,7 +405,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     const key = `${pid}_${field}`
     if (savingCell === key) return
     setSavingCell(key); setEditingCell(null)
-    const col: Record<string, string> = { team: 'prior_team', tryout_ag: 'tryout_age_group', jersey: 'jersey_number' }
+    const col: Record<string, string> = { team: 'prior_team', tryout_ag: 'tryout_age_group' }
     const dbCol = col[field]
     if (!dbCol) { setSavingCell(null); return }
     await supabase.from('tryout_players').update({ [dbCol]: editVal.trim() || null }).eq('id', pid)
@@ -477,7 +477,14 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       if (sortCol === 'name')      { va = `${a.last_name}${a.first_name}`; vb = `${b.last_name}${b.first_name}` }
       if (sortCol === 'team')      { va = pv(a, 'prior_team') ?? ''; vb = pv(b, 'prior_team') ?? '' }
       if (sortCol === 'tryout_ag') { va = pv(a, 'tryout_age_group') ?? ''; vb = pv(b, 'tryout_age_group') ?? '' }
-      if (sortCol === 'age')       { va = a.age_group ?? ''; vb = b.age_group ?? '' }
+      if (sortCol === 'age')       {
+        const da = a.dob ?? regMap.get(a.id)?.dob ?? null
+        const db2 = b.dob ?? regMap.get(b.id)?.dob ?? null
+        return ((da && seasonYear ? calcBaseballAge(da, seasonYear) : 0) - (db2 && seasonYear ? calcBaseballAge(db2, seasonYear) : 0)) * sortDir
+      }
+      if (sortCol === 'grade')     { va = regMap.get(a.id)?.grade ?? a.grade ?? ''; vb = regMap.get(b.id)?.grade ?? b.grade ?? '' }
+      if (sortCol === 'email')     { va = regMap.get(a.id)?.parent_email ?? a.parent_email ?? ''; vb = regMap.get(b.id)?.parent_email ?? b.parent_email ?? '' }
+      if (sortCol === 'phone')     { va = regMap.get(a.id)?.parent_phone ?? a.parent_phone ?? ''; vb = regMap.get(b.id)?.parent_phone ?? b.parent_phone ?? '' }
       return va.localeCompare(vb) * sortDir
     })
   }, [players, ageFilter, search, sortCol, sortDir, localUpdates, regMap])
@@ -624,12 +631,16 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               <tr>
                 {[
                   { key: 'name',      label: 'Player' },
-                  { key: 'age',       label: 'Age' },
+                  { key: 'age',       label: 'Bsbl Age' },
                   { key: 'tryout_ag', label: 'Tryout AG' },
                   { key: 'team',      label: 'Current Team' },
                   { key: null,        label: 'Reg Team' },
                   { key: null,        label: 'Roster Team' },
-                  { key: 'jersey',    label: 'Jersey' },
+                  { key: 'grade',     label: 'Grade' },
+                  { key: 'school',    label: 'School' },
+                  { key: null,        label: 'Parent' },
+                  { key: 'email',     label: 'Email' },
+                  { key: 'phone',     label: 'Phone' },
                   { key: null,        label: 'Data' },
                 ].map((col, i) => (
                   <th key={i} style={{ ...th, cursor: col.key ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}
@@ -642,14 +653,21 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             <tbody>
               {filtered.map((p, i) => {
                 const reg = regMap.get(p.id); const ros = rosterMap.get(p.id)
-                const team = pv(p, 'prior_team'); const tag = pv(p, 'tryout_age_group'); const jer = pv(p, 'jersey_number')
+                const team = pv(p, 'prior_team'); const tag = pv(p, 'tryout_age_group')
                 const conflict = !!(reg?.prior_team && ros?.team_name && reg.prior_team.toLowerCase() !== ros.team_name.toLowerCase())
                 const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
+                const dob = p.dob ?? reg?.dob ?? null
+                const bbAge = dob && seasonYear ? calcBaseballAge(dob, seasonYear) : null
+                const grade = reg?.grade ?? p.grade ?? null
+                const school = reg?.school ?? p.school ?? null
+                const parentName = reg ? [reg.guardian_first_name, reg.guardian_last_name].filter(Boolean).join(' ') || null : null
+                const email = reg?.parent_email ?? p.parent_email ?? null
+                const phone = reg?.parent_phone ?? p.parent_phone ?? null
 
                 return (
                   <tr key={p.id} style={{ background: rowBg }}>
                     <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                    <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
+                    <td style={{ ...td, color: s.muted, textAlign: 'center' }}>{bbAge ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
 
                     {/* Tryout AG — editable */}
                     <td style={td}>
@@ -698,23 +716,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                       {ros?.team_name ?? <span style={{ opacity: 0.3 }}>—</span>}
                     </td>
 
-                    {/* Jersey — editable */}
-                    <td style={td}>
-                      {editingCell === `${p.id}_jersey` ? (
-                        <input ref={inputRef} value={editVal} onChange={e => setEditVal(e.target.value)}
-                          onBlur={() => commitEdit(p.id, 'jersey')}
-                          onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, 'jersey'); if (e.key==='Escape') setEditingCell(null) }}
-                          style={{ ...editInput, width: '52px' }} />
-                      ) : (
-                        <span onClick={() => startEdit(p.id, 'jersey', jer ?? '')}
-                          style={{ cursor: 'text', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid transparent', display: 'inline-flex', alignItems: 'center' }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
-                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
-                          {jer ?? <span style={{ opacity: 0.3 }}>—</span>}
-                          {savedCell === `${p.id}_jersey` && <span style={{ color: '#6DB875', fontSize: '11px', marginLeft: '4px' }}>✓</span>}
-                        </span>
-                      )}
-                    </td>
+                    <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{parentName ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
 
                     {/* Data dots */}
                     <td style={td}>
