@@ -70,6 +70,8 @@ export default function SessionDetailPage({ params }: { params: { orgId: string;
   const [saving,     setSaving]     = useState(false)
   const [statusChanging, setStatusChanging] = useState(false)
   const [copied,     setCopied]     = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -132,6 +134,14 @@ export default function SessionDetailPage({ params }: { params: { orgId: string;
   async function removeEvaluator(evalId: string) {
     await supabase.from('tryout_session_evaluators').delete().eq('id', evalId)
     setEvaluators(prev => prev.filter(e => e.id !== evalId))
+  }
+
+  async function deleteScore(scoreId: string) {
+    setDeletingId(scoreId)
+    await supabase.from('tryout_scores').delete().eq('id', scoreId)
+    setScores(prev => prev.filter(s => s.id !== scoreId))
+    setDeletingId(null)
+    setConfirmDeleteId(null)
   }
 
   async function setStatus(status: Session['status']) {
@@ -362,7 +372,7 @@ export default function SessionDetailPage({ params }: { params: { orgId: string;
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {scores.map(score => (
-              <div key={score.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}>
+              <div key={score.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', border: `0.5px solid ${confirmDeleteId === score.id ? 'rgba(220,60,60,0.4)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600 }}>{score.player_name}</div>
                   <div style={{ fontSize: '11px', color: s.dim, marginTop: '1px' }}>
@@ -383,6 +393,26 @@ export default function SessionDetailPage({ params }: { params: { orgId: string;
                       </span>
                     ))}
                   </div>
+                )}
+                {confirmDeleteId === score.id ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'rgba(220,60,60,0.8)' }}>Delete?</span>
+                    <button
+                      onClick={() => deleteScore(score.id)}
+                      disabled={deletingId === score.id}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', background: 'rgba(220,60,60,0.15)', color: 'rgba(220,60,60,0.9)', cursor: 'pointer', fontWeight: 700 }}
+                    >{deletingId === score.id ? '…' : 'Yes'}</button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer' }}
+                    >No</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(score.id)}
+                    style={{ fontSize: '13px', padding: '3px 6px', borderRadius: '4px', border: 'none', background: 'transparent', color: s.dim, cursor: 'pointer', lineHeight: 1 }}
+                    title="Delete score"
+                  >🗑</button>
                 )}
               </div>
             ))}
