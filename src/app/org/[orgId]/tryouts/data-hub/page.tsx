@@ -34,7 +34,6 @@ interface GcRow  {
   sb: number|null; hbp: number|null; sac: number|null; tb: number|null
   era: number|null; whip: number|null; ip: number|null
   w: number|null; sv: number|null; k_bb: number|null; strike_pct: number|null
-  gc_computed_score: number|null
   gc_hitting_score:  number|null
   gc_pitching_score: number|null
 }
