@@ -302,7 +302,8 @@ function parseDateString(s: string): string | null {
   // Strip leading/trailing whitespace
   s = s.trim()
   // Strip time portion if present (e.g. "4/25/2026 10:30 AM" → "4/25/2026")
-  s = s.replace(/\s+\d{1,2}:\d{2}(:\d{2})?(\s*[AP]M)?$/i, '').trim()
+  // Also handles "05/14/2026, 12:57pm EDT" — comma before time, timezone suffix
+  s = s.replace(/,?\s+\d{1,2}:\d{2}(:\d{2})?(\s*[AP]M)?(\s+[A-Z]{2,5})?$/i, '').trim()
 
   // Already ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
