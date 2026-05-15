@@ -604,9 +604,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     const rows = [
       [
         'Next Season Team', 'Notes', 'Combined Rank', 'Player', 'Age Group', 'Grade', `${priorYear} Team`,
-        'Combined Score', 'Tryout Score', 'Tryout Rank', 'Coach Eval', 'Coach Rank',
-        'Intangibles', 'Intangibles Rank', 'Team Pitching', 'Tryout Pitching',
-        'Team Hitting', 'Tryout Hitting', 'Speed (60yd)', 'GC Score', 'Comments',
+        'Combined Score',
+        'Tryout Score', 'Tryout Rank', 'TO Pitching', 'TO Hitting', 'Speed (60yd)',
+        'Coach Eval', 'Coach Rank', 'Intangibles', 'Intangibles Rank', 'Eval Pitching', 'Eval Hitting',
+        'GC Hitting', 'GC Pitching',
+        'Comments',
       ],
       ...filtered.map(r => {
         const team = teams.find(t => t.id === r.assignedTeamId)
@@ -621,15 +623,15 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           r.combinedScore?.toFixed(2)    ?? '',
           r.tryoutScore?.toFixed(2)      ?? '',
           String(r.tryoutRank             ?? ''),
+          r.tryoutPitching?.toFixed(2)   ?? '',
+          r.tryoutHitting?.toFixed(2)    ?? '',
+          r.speed?.toFixed(2)            ?? '',
           r.coachEval?.toFixed(2)        ?? '',
           String(r.coachRank              ?? ''),
           r.intangibles?.toFixed(2)      ?? '',
           String(r.intangiblesRank        ?? ''),
           r.teamPitching?.toFixed(2)     ?? '',
-          r.tryoutPitching?.toFixed(2)   ?? '',
           r.teamHitting?.toFixed(2)      ?? '',
-          r.tryoutHitting?.toFixed(2)    ?? '',
-          r.speed?.toFixed(2)            ?? '',
           r.gcHittingScore?.toFixed(2)   ?? '',
           r.gcPitchingScore?.toFixed(2)  ?? '',
           r.coachComments ?? '',
@@ -859,7 +861,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
             <thead>
               {/* ── Section header row ── */}
               <tr style={{ borderBottom: 'none' }}>
-                {/* Sticky columns - no section label (includes checkbox col) */}
+                {/* Sticky columns */}
                 <th colSpan={3} style={{ ...th, top: 0, zIndex: 4, borderBottom: 'none', padding: '4px 8px' }} />
                 {/* Combined */}
                 <th colSpan={2} style={{
@@ -868,23 +870,23 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 }}>Combined</th>
                 {/* Identity */}
                 <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
-                {/* Tryout */}
-                <th colSpan={2} style={{
+                {/* Tryout — Score, Rank, TO Pitch, TO Hit, Speed */}
+                <th colSpan={5} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#80B0E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Tryout</th>
-                {/* Coach Eval */}
-                <th colSpan={4} style={{
+                {/* Coach Eval — Score, Rank, Intangibles, Rank, Eval Pitch, Eval Hit */}
+                <th colSpan={6} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#6DB875', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Coach Eval</th>
-                {/* Pitching & Hitting */}
-                <th colSpan={5} style={{
+                {/* GC */}
+                <th colSpan={2} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#C080E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
-                }}>Pitching & Hitting</th>
-                {/* GC + Notes + Comments */}
-                <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
+                }}>GC Stats</th>
+                {/* Notes + Comments */}
+                <th colSpan={2} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
               </tr>
 
               {/* ── Column header row ── */}
@@ -915,13 +917,19 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   {priorYear ? `${priorYear} Team` : 'Prior Team'}
                 </th>
 
-                {/* Tryout */}
+                {/* ── Tryout (Blue) ── */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#80B0E8' }}
                   onClick={() => toggleSort('tryoutScore')}>Score{sortArrow('tryoutScore')}</th>
                 <th style={{ ...th, color: '#80B0E8' }}
                   onClick={() => toggleSort('tryoutRank')}>#Rank{sortArrow('tryoutRank')}</th>
+                <th style={{ ...th, color: '#80B0E8' }}
+                  onClick={() => toggleSort('tryoutPitching')}>TO Pitch{sortArrow('tryoutPitching')}</th>
+                <th style={{ ...th, color: '#80B0E8' }}
+                  onClick={() => toggleSort('tryoutHitting')}>TO Hit{sortArrow('tryoutHitting')}</th>
+                <th style={{ ...th, color: '#80B0E8' }}
+                  onClick={() => toggleSort('speed')}>Speed{sortArrow('speed')}</th>
 
-                {/* Coach Eval */}
+                {/* ── Coach Eval (Green) ── */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#6DB875' }}
                   onClick={() => toggleSort('coachEval')}>Score{sortArrow('coachEval')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
@@ -930,23 +938,15 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   onClick={() => toggleSort('intangibles')}>Intangibles{sortArrow('intangibles')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('intangiblesRank')}>#Rank{sortArrow('intangiblesRank')}</th>
-
-                {/* Pitching & Hitting */}
-                <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
+                <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('teamPitching')}>Eval Pitch{sortArrow('teamPitching')}</th>
-                <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('tryoutPitching')}>TO Pitch{sortArrow('tryoutPitching')}</th>
-                <th style={{ ...th, color: '#C080E8' }}
+                <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('teamHitting')}>Eval Hit{sortArrow('teamHitting')}</th>
-                <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('tryoutHitting')}>TO Hit{sortArrow('tryoutHitting')}</th>
-                <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('speed')}>Speed{sortArrow('speed')}</th>
 
-                {/* GC */}
-                <th style={{ ...th }}
+                {/* ── GC (Purple) ── */}
+                <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
                   onClick={() => toggleSort('gcHittingScore')}>GC Hit{sortArrow('gcHittingScore')}</th>
-                <th style={{ ...th }}
+                <th style={{ ...th, color: '#C080E8' }}
                   onClick={() => toggleSort('gcPitchingScore')}>GC Pit{sortArrow('gcPitchingScore')}</th>
 
                 {/* Notes */}
@@ -1063,50 +1063,48 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                         {row.player.prior_team ?? '—'}
                       </td>
 
-                      {/* ── Tryout ── */}
+                      {/* ── Tryout (Blue) ── */}
                       <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400 }}>
                         {fmt(row.tryoutScore)}
                       </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.tryoutRank != null ? s.muted : s.dim, fontSize: '11px' }}>
+                      <td style={{ ...td, textAlign: 'center', color: row.tryoutRank != null ? '#80B0E8' : s.dim, fontSize: '11px' }}>
                         {fmtRank(row.tryoutRank)}
                       </td>
+                      <td style={{ ...td, color: row.tryoutPitching != null ? '#80B0E8' : s.dim }}>
+                        {fmt(row.tryoutPitching)}
+                      </td>
+                      <td style={{ ...td, color: row.tryoutHitting != null ? '#80B0E8' : s.dim }}>
+                        {fmt(row.tryoutHitting)}
+                      </td>
+                      <td style={{ ...td, color: row.speed != null ? '#80B0E8' : s.dim }}>
+                        {row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}
+                      </td>
 
-                      {/* ── Coach Eval ── */}
+                      {/* ── Coach Eval (Green) ── */}
                       <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400 }}>
                         {fmt(row.coachEval)}
                       </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.coachRank != null ? s.muted : s.dim, fontSize: '11px' }}>
+                      <td style={{ ...td, textAlign: 'center', color: row.coachRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>
                         {fmtRank(row.coachRank)}
                       </td>
                       <td style={{ ...td, color: row.intangibles != null ? '#6DB875' : s.dim, fontWeight: row.intangibles != null ? 600 : 400 }}>
                         {fmt(row.intangibles)}
                       </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.intangiblesRank != null ? s.muted : s.dim, fontSize: '11px' }}>
+                      <td style={{ ...td, textAlign: 'center', color: row.intangiblesRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>
                         {fmtRank(row.intangiblesRank)}
                       </td>
-
-                      {/* ── Pitching & Hitting ── */}
-                      <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.teamPitching != null ? '#C080E8' : s.dim }}>
+                      <td style={{ ...td, color: row.teamPitching != null ? '#6DB875' : s.dim }}>
                         {fmt(row.teamPitching)}
                       </td>
-                      <td style={{ ...td, color: row.tryoutPitching != null ? '#C080E8' : s.dim }}>
-                        {fmt(row.tryoutPitching)}
-                      </td>
-                      <td style={{ ...td, color: row.teamHitting != null ? '#C080E8' : s.dim }}>
+                      <td style={{ ...td, color: row.teamHitting != null ? '#6DB875' : s.dim }}>
                         {fmt(row.teamHitting)}
                       </td>
-                      <td style={{ ...td, color: row.tryoutHitting != null ? '#C080E8' : s.dim }}>
-                        {fmt(row.tryoutHitting)}
-                      </td>
-                      <td style={{ ...td, color: row.speed != null ? '#C080E8' : s.dim }}>
-                        {row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}
-                      </td>
 
-                      {/* ── GC ── */}
-                      <td style={{ ...td, color: row.gcHittingScore != null ? s.muted : s.dim, fontSize: '11px' }}>
+                      {/* ── GC (Purple) ── */}
+                      <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.gcHittingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>
                         {fmt(row.gcHittingScore)}
                       </td>
-                      <td style={{ ...td, color: row.gcPitchingScore != null ? s.muted : s.dim, fontSize: '11px' }}>
+                      <td style={{ ...td, color: row.gcPitchingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>
                         {fmt(row.gcPitchingScore)}
                       </td>
 
