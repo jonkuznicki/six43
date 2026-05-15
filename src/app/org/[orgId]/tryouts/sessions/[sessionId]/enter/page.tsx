@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '../../../../../../../lib/supabase'
 import Link from 'next/link'
-import { computeTryoutScore, ScoringCategory } from '../../../../../../../lib/tryouts/computeScore'
+import { computeTryoutScore, computePitchingScore, ScoringCategory } from '../../../../../../../lib/tryouts/computeScore'
 
 // Sub-keys that belong to tiebreaker categories (speed) — accept decimal seconds, not 1-5
 const TIEBREAKER_KEYS = new Set<string>()
@@ -211,7 +211,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     for (const [k, v] of Object.entries(row)) {
       scores[k] = v === '' ? null : parseFloat(v)
     }
-    const tryoutScore = computeTryoutScore(scores, categoriesRef.current)
+    const tryoutScore    = computeTryoutScore(scores, categoriesRef.current)
+    const tryoutPitching = computePitchingScore(scores, categoriesRef.current)
     const naFlags = Array.from(naFlagsRef.current[rowKey] ?? [])
 
     setSaving(rowKey)
@@ -220,7 +221,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
         checkin_id: rowKey, player_id: null,
         session_id: params.sessionId, org_id: params.orgId,
         evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-        scores, tryout_score: tryoutScore, na_flags: naFlags,
+        scores, tryout_score: tryoutScore, tryout_pitching: tryoutPitching, na_flags: naFlags,
         comments: commentsRef.current[rowKey] ?? null,
         submitted_at: new Date().toISOString(),
       }, { onConflict: 'checkin_id,session_id,evaluator_id' })
@@ -228,7 +229,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
       await supabase.from('tryout_scores').upsert({
         player_id: rowKey, session_id: params.sessionId, org_id: params.orgId,
         evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-        scores, tryout_score: tryoutScore, na_flags: naFlags,
+        scores, tryout_score: tryoutScore, tryout_pitching: tryoutPitching, na_flags: naFlags,
         comments: commentsRef.current[rowKey] ?? null,
         submitted_at: new Date().toISOString(),
       }, { onConflict: 'player_id,session_id,evaluator_id' })

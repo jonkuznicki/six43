@@ -23,6 +23,22 @@ export interface ScoringCategory {
   subcategories: ScoringSubcategory[]
 }
 
+/**
+ * Compute the pitching/catching score from categories with weight = 0 that are
+ * not tiebreakers. These categories are intentionally excluded from tryout_score
+ * but should still be stored and displayed as a reference column.
+ */
+export function computePitchingScore(
+  scores: Record<string, number | null | undefined>,
+  categories: ScoringCategory[],
+): number | null {
+  const pitchingCats = categories
+    .filter(c => c.weight === 0 && !c.is_tiebreaker)
+    .map(c => ({ ...c, weight: 1 }))   // treat each excluded cat as equal weight
+  if (pitchingCats.length === 0) return null
+  return computeTryoutScore(scores, pitchingCats)
+}
+
 export function computeTryoutScore(
   scores: Record<string, number | null | undefined>,
   categories: ScoringCategory[],

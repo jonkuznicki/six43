@@ -29,6 +29,7 @@ interface TryoutScoreRow {
 
 interface CoachEvalRow {
   player_id:        string
+  season_year:      string
   computed_score:   number | null
   coach_eval_score: number | null
   intangibles_score: number | null
@@ -239,8 +240,10 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         : Promise.resolve({ data: [] as any[], error: null }),
 
       supabase.from('tryout_coach_evals')
-        .select('player_id, computed_score, coach_eval_score, intangibles_score, scores, comments')
-        .eq('org_id', params.orgId).eq('season_id', seasonData.id).eq('status', 'submitted'),
+        .select('player_id, season_year, computed_score, coach_eval_score, intangibles_score, scores, comments')
+        .eq('org_id', params.orgId)
+        .in('season_year', [String(seasonData.year), String(seasonData.year - 1)])
+        .eq('status', 'submitted'),
 
       supabase.from('tryout_coach_eval_config')
         .select('field_key, section, weight')
@@ -397,9 +400,14 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       tryoutByPlayer.get(r.player_id)!.push(r)
     }
 
-    // Per-player eval (use first submitted eval — one per player per org/year)
+    // Per-player eval: prefer the higher season_year when evals exist for multiple years
     const evalByPlayer = new Map<string, CoachEvalRow>()
-    for (const r of evalRows) evalByPlayer.set(r.player_id, r)
+    for (const r of evalRows) {
+      const existing = evalByPlayer.get(r.player_id)
+      if (!existing || Number(r.season_year) > Number(existing.season_year)) {
+        evalByPlayer.set(r.player_id, r)
+      }
+    }
 
     // Per-player GC
     const gcByPlayer = new Map<string, GcStatRow>()
