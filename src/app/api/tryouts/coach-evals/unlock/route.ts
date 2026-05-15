@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '../../../../../lib/supabase-server'
+import { createServiceClient } from '../../../../../lib/supabase-service'
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient()
+  const supabaseService = createServiceClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,8 +32,9 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Also reset the token-based draft row so the coach-facing form unlocks.
-  // tryout_eval_drafts.status drives the "already submitted" locked view.
-  await supabase
+  // tryout_eval_drafts has RLS with no direct policies (security definer RPCs only),
+  // so use the service client to bypass RLS for this update.
+  await supabaseService
     .from('tryout_eval_drafts')
     .update({ status: 'in_progress', submitted_at: null })
     .eq('org_id', orgId)
