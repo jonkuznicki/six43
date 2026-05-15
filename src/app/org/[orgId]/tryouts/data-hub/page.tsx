@@ -334,7 +334,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (error) { setBackfillError(error.message); setBackfilling(false); return }
 
     // Also repair blank first_name on tryout_players using the same import data
-    const nameRepairs = deduped.filter(r => r.player_first_name)
+    const nameRepairs = deduped.filter((r: any) => r.player_first_name)
     await Promise.all(nameRepairs.map(async (r: any) => {
       const { data: p } = await supabase
         .from('tryout_players').select('first_name').eq('id', r.player_id).single()
