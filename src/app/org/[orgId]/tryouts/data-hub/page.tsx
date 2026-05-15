@@ -422,15 +422,18 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     const col: Record<string, string> = { team: 'prior_team', tryout_ag: 'tryout_age_group' }
     const dbCol = col[field]
     if (!dbCol) { setSavingCell(null); return }
-    await supabase.from('tryout_players').update({ [dbCol]: editVal.trim() || null }).eq('id', pid)
-    setLocalUpdates(prev => { const m = new Map(prev); m.set(pid, { ...(m.get(pid) ?? {}), [dbCol as keyof Player]: editVal.trim() || null }); return m })
+    let val = editVal.trim() || null
+    if (dbCol === 'tryout_age_group' && val) val = val.replace(/u$/i, 'U')
+    await supabase.from('tryout_players').update({ [dbCol]: val }).eq('id', pid)
+    setLocalUpdates(prev => { const m = new Map(prev); m.set(pid, { ...(m.get(pid) ?? {}), [dbCol as keyof Player]: val }); return m })
     setSavingCell(null); setSavedCell(key)
     setTimeout(() => setSavedCell(c => c === key ? null : c), 1500)
   }
 
   async function saveFix(pid: string) {
     setSavingFix(true)
-    const updates = { tryout_age_group: fixGroup || null, age_group_override_reason: fixReason.trim() || null }
+    const normalizedGroup = (fixGroup || '').replace(/u$/i, 'U') || null
+    const updates = { tryout_age_group: normalizedGroup, age_group_override_reason: fixReason.trim() || null }
     await supabase.from('tryout_players').update(updates).eq('id', pid)
     setPlayers(prev => prev.map(p => p.id === pid ? { ...p, ...updates } : p))
     setLocalUpdates(prev => { const m = new Map(prev); m.set(pid, { ...(m.get(pid) ?? {}), ...updates }); return m })

@@ -272,7 +272,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
     const guardianFirst = parentParts[0] ?? ''
     const guardianLast  = parentParts.slice(1).join(' ') || ''
 
-    const ageGroup = wiAgeGroup.trim() || session?.age_group || ''
+    const ageGroup = (wiAgeGroup.trim() || session?.age_group || '').replace(/u$/i, 'U')
 
     // Create the tryout_player record
     const { data: newPlayer } = await supabase.from('tryout_players').insert({
