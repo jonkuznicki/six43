@@ -124,12 +124,14 @@ export function parseRegistrationFile(
     }
   }
 
-  // Strip BOM from the first cell. Two forms:
-  //   U+FEFF  — Unicode BOM as a single character (charCode 65279)
-  //   ï»¿     — UTF-8 BOM bytes (EF BB BF) decoded as Latin-1 by some CSV readers
+  // Strip BOM from the first cell. Three forms seen in the wild:
+  //   U+FEFF        — actual Unicode BOM character (charCode 65279)
+  //   ï»¿           — UTF-8 BOM bytes (EF BB BF) decoded as Latin-1
+  //   ﻿        — literal 6-char text written by some export tools (\ u F E F F)
   const stripBom = (s: string) => {
     if (s.charCodeAt(0) === 0xFEFF) return s.slice(1)
     if (s.charCodeAt(0) === 0xEF && s.charCodeAt(1) === 0xBB && s.charCodeAt(2) === 0xBF) return s.slice(3)
+    if (s.startsWith('\\uFEFF')) return s.slice(6)
     return s
   }
   const headerRow = (raw[headerRowIndex] as string[]).map(c => stripBom(String(c).trim()))
