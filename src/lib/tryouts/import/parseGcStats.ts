@@ -135,8 +135,14 @@ function parseIp(val: unknown): number | undefined {
   return full + outs / 3
 }
 
+function stripBom(s: string): string {
+  if (s.charCodeAt(0) === 0xFEFF) return s.slice(1)
+  if (s.startsWith('\\uFEFF')) return s.slice(6)
+  return s
+}
+
 function normalizeHeader(h: string): string {
-  return h.toLowerCase().replace(/[^a-z0-9% /]/g, '').trim()
+  return stripBom(h).toLowerCase().replace(/[^a-z0-9% /]/g, '').trim()
 }
 
 function isNameCol(h: string): boolean {

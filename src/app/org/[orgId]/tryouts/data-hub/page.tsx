@@ -240,7 +240,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('season_id', sid)
         : Promise.resolve({ data: [] as any[] }),
       syear
-        ? supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear))
+        ? supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear - 1))
         : Promise.resolve({ data: [] as any[] }),
       syear
         ? supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear - 1)).eq('status', 'submitted')
@@ -358,7 +358,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         .from('tryout_gc_stats')
         .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score')
         .eq('org_id', params.orgId)
-      const { data } = syear ? await q.eq('season_year', String(syear)) : await q
+      const { data } = syear ? await q.eq('season_year', String(syear - 1)) : await q
       setGcFull(data ?? [])
     }
     if (target === 'evals') {
