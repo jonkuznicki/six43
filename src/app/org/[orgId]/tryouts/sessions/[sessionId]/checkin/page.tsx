@@ -54,9 +54,16 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
   // Walk-up modal
   const [showWriteIn,     setShowWriteIn]     = useState(false)
-  const [writeInName,     setWriteInName]     = useState('')
-  const [writeInAgeGroup, setWriteInAgeGroup] = useState('')
   const [writingIn,       setWritingIn]       = useState(false)
+  const [wiName,          setWiName]          = useState('')
+  const [wiAgeGroup,      setWiAgeGroup]      = useState('')
+  const [wiDob,           setWiDob]           = useState('')
+  const [wiGrade,         setWiGrade]         = useState('')
+  const [wiSchool,        setWiSchool]        = useState('')
+  const [wiPriorTeam,     setWiPriorTeam]     = useState('')
+  const [wiParentName,    setWiParentName]    = useState('')
+  const [wiEmail,         setWiEmail]         = useState('')
+  const [wiPhone,         setWiPhone]         = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -252,21 +259,62 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
   }
 
   async function addWriteIn() {
-    if (!writeInName.trim()) return
+    if (!wiName.trim()) return
     setWritingIn(true)
-    const { data } = await supabase.from('tryout_checkins').insert({
+
+    // Split full name into first/last
+    const parts = wiName.trim().split(/\s+/)
+    const firstName = parts[0] ?? ''
+    const lastName  = parts.slice(1).join(' ') || ''
+
+    // Split parent name into guardian first/last
+    const parentParts = wiParentName.trim().split(/\s+/)
+    const guardianFirst = parentParts[0] ?? ''
+    const guardianLast  = parentParts.slice(1).join(' ') || ''
+
+    const ageGroup = wiAgeGroup.trim() || session?.age_group || ''
+
+    // Create the tryout_player record
+    const { data: newPlayer } = await supabase.from('tryout_players').insert({
+      org_id:               params.orgId,
+      first_name:           firstName,
+      last_name:            lastName,
+      age_group:            ageGroup,
+      tryout_age_group:     ageGroup,
+      dob:                  wiDob.trim() || null,
+      grade:                wiGrade.trim() || null,
+      school:               wiSchool.trim() || null,
+      prior_team:           wiPriorTeam.trim() || null,
+      parent_email:         wiEmail.trim() || null,
+      parent_phone:         wiPhone.trim() || null,
+      guardian_first_name:  guardianFirst || null,
+      guardian_last_name:   guardianLast || null,
+      is_active:            true,
+    }).select('id, first_name, last_name, age_group, jersey_number, prior_team').single()
+
+    if (!newPlayer) { setWritingIn(false); return }
+
+    // Add to local players list so they appear in the data hub
+    setPlayers(prev => [...prev, newPlayer])
+
+    // Create checkin linked to the new player
+    const { data: checkin } = await supabase.from('tryout_checkins').insert({
       session_id:         params.sessionId,
       season_id:          session!.season_id,
-      age_group:          session!.age_group,
+      age_group:          ageGroup,
+      player_id:          newPlayer.id,
       tryout_number:      nextNumber(),
       arrived:            true,
       is_write_in:        true,
-      write_in_name:      writeInName.trim(),
-      write_in_age_group: writeInAgeGroup.trim() || session?.age_group,
+      write_in_name:      wiName.trim(),
+      write_in_age_group: ageGroup,
     }).select('*').single()
-    if (data) setCheckins(prev => [...prev, data])
-    setWriteInName('')
-    setWriteInAgeGroup('')
+
+    if (checkin) setCheckins(prev => [...prev, checkin])
+
+    // Reset form
+    setWiName(''); setWiAgeGroup(''); setWiDob(''); setWiGrade('')
+    setWiSchool(''); setWiPriorTeam(''); setWiParentName(''); setWiEmail(''); setWiPhone('')
     setShowWriteIn(false)
     setWritingIn(false)
   }
@@ -498,23 +546,46 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
 
       {/* Walk-up modal */}
       {showWriteIn && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.5rem', width: '320px' }}>
-            <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '1rem' }}>Add Walk-up Player</div>
-            <input value={writeInName} onChange={e => setWriteInName(e.target.value)}
-              placeholder="Full name" autoFocus
-              style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '10px' }}
-            />
-            <input value={writeInAgeGroup} onChange={e => setWriteInAgeGroup(e.target.value)}
-              placeholder={`Age group (default: ${session?.age_group})`}
-              style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '16px' }}
-            />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={addWriteIn} disabled={!writeInName.trim() || writingIn} style={{
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
+          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '1.25rem' }}>Add Walk-up Player</div>
+
+            {/* Player info */}
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, marginBottom: '8px' }}>Player</div>
+            {([
+              { val: wiName,      set: setWiName,      placeholder: 'Full name *', autoFocus: true },
+              { val: wiAgeGroup,  set: setWiAgeGroup,  placeholder: `Age group (default: ${session?.age_group})` },
+              { val: wiDob,       set: setWiDob,       placeholder: 'Date of birth (MM/DD/YYYY)' },
+              { val: wiGrade,     set: setWiGrade,     placeholder: 'Grade (e.g. 6th)' },
+              { val: wiSchool,    set: setWiSchool,    placeholder: 'School' },
+              { val: wiPriorTeam, set: setWiPriorTeam, placeholder: 'Prior team' },
+            ] as { val: string; set: (v: string) => void; placeholder: string; autoFocus?: boolean }[]).map(({ val, set, placeholder, autoFocus }) => (
+              <input key={placeholder} value={val} onChange={e => set(e.target.value)}
+                placeholder={placeholder} autoFocus={autoFocus}
+                style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '8px' }}
+              />
+            ))}
+
+            {/* Parent info */}
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, margin: '12px 0 8px' }}>Parent / Guardian</div>
+            {([
+              { val: wiParentName, set: setWiParentName, placeholder: 'Parent name' },
+              { val: wiEmail,      set: setWiEmail,      placeholder: 'Email', type: 'email' },
+              { val: wiPhone,      set: setWiPhone,      placeholder: 'Phone', type: 'tel' },
+            ] as { val: string; set: (v: string) => void; placeholder: string; type?: string }[]).map(({ val, set, placeholder, type }) => (
+              <input key={placeholder} value={val} onChange={e => set(e.target.value)}
+                placeholder={placeholder} type={type}
+                style={{ width: '100%', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', color: 'var(--fg)', boxSizing: 'border-box', marginBottom: '8px' }}
+              />
+            ))}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button onClick={addWriteIn} disabled={!wiName.trim() || writingIn} style={{
                 flex: 1, padding: '9px', borderRadius: '6px', border: 'none',
                 background: 'var(--accent)', color: 'var(--accent-text)',
                 fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-              }}>Add #{nextNumber()}</button>
+                opacity: !wiName.trim() || writingIn ? 0.5 : 1,
+              }}>{writingIn ? 'Adding…' : `Add #${nextNumber()}`}</button>
               <button onClick={() => setShowWriteIn(false)} style={{
                 padding: '9px 16px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
                 background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer',
