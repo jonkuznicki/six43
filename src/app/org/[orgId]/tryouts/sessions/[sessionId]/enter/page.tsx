@@ -44,13 +44,17 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
   const [addingEval,    setAddingEval]    = useState(false)
   const [newEvalName,   setNewEvalName]   = useState('')
 
-  const saveTimer  = useRef<ReturnType<typeof setTimeout>>()
-  const inputRefs  = useRef<(HTMLInputElement | null)[][]>([])
-  const gridRef    = useRef<GridValues>({})
-  const commentsRef = useRef<Record<string, string>>({})
+  const saveTimer     = useRef<ReturnType<typeof setTimeout>>()
+  const inputRefs     = useRef<(HTMLInputElement | null)[][]>([])
+  const gridRef       = useRef<GridValues>({})
+  const commentsRef   = useRef<Record<string, string>>({})
+  const checkinsRef   = useRef<Checkin[]>([])
+  const categoriesRef = useRef<ScoringCategory[]>([])
 
   useEffect(() => { gridRef.current = grid }, [grid])
   useEffect(() => { commentsRef.current = comments }, [comments])
+  useEffect(() => { checkinsRef.current = checkins }, [checkins])
+  useEffect(() => { categoriesRef.current = categories }, [categories])
 
   useEffect(() => { loadSession() }, [])
   useEffect(() => { if (selectedEval) loadScores(selectedEval) }, [selectedEval])
@@ -111,7 +115,7 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     if (!evaluator) return
 
     const { data: scoreData } = await supabase
-      .from('tryout_scores').select('player_id, scores, comments')
+      .from('tryout_scores').select('player_id, checkin_id, scores, comments')
       .eq('session_id', params.sessionId).eq('evaluator_id', evalId)
 
     const newGrid: GridValues = {}
@@ -119,11 +123,13 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     const newNa: Record<string, Set<string>> = {}
 
     for (const sc of (scoreData ?? [])) {
-      newGrid[sc.player_id] = {}
+      const key = sc.player_id ?? sc.checkin_id
+      if (!key) continue
+      newGrid[key] = {}
       for (const [k, v] of Object.entries(sc.scores ?? {})) {
-        newGrid[sc.player_id][k] = v == null ? '' : String(v)
+        newGrid[key][k] = v == null ? '' : String(v)
       }
-      newComments[sc.player_id] = sc.comments ?? ''
+      newComments[key] = sc.comments ?? ''
     }
     setGrid(newGrid)
     setComments(newComments)
@@ -185,29 +191,43 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
     saveTimer.current = setTimeout(() => autoSave(playerId), 1000)
   }
 
-  const autoSave = useCallback(async (playerId: string) => {
+  const autoSave = useCallback(async (rowKey: string) => {
     const evaluator = evaluators.find(e => e.id === selectedEval)
     if (!evaluator || evaluator.locked_at) return
 
-    // Read from refs so we always get the latest values, not the stale closure
-    const row = gridRef.current[playerId] ?? {}
+    // Determine if this is a write-in (rowKey = checkin.id, not a player UUID)
+    const checkin = checkinsRef.current.find(c => c.id === rowKey)
+    const isWriteIn = checkin?.is_write_in ?? false
+
+    const row = gridRef.current[rowKey] ?? {}
     const scores: Record<string, number | null> = {}
     for (const [k, v] of Object.entries(row)) {
       scores[k] = v === '' ? null : parseFloat(v)
     }
-    const tryoutScore = computeTryoutScore(scores, categories)
+    const tryoutScore = computeTryoutScore(scores, categoriesRef.current)
 
-    setSaving(playerId)
-    const { error } = await supabase.from('tryout_scores').upsert({
-      player_id: playerId, session_id: params.sessionId, org_id: params.orgId,
-      evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
-      scores, tryout_score: tryoutScore,
-      comments: commentsRef.current[playerId] ?? null,
-      submitted_at: new Date().toISOString(),
-    }, { onConflict: 'player_id,session_id,evaluator_id' })
+    setSaving(rowKey)
+    if (isWriteIn) {
+      await supabase.from('tryout_scores').upsert({
+        checkin_id: rowKey, player_id: null,
+        session_id: params.sessionId, org_id: params.orgId,
+        evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
+        scores, tryout_score: tryoutScore,
+        comments: commentsRef.current[rowKey] ?? null,
+        submitted_at: new Date().toISOString(),
+      }, { onConflict: 'checkin_id,session_id,evaluator_id' })
+    } else {
+      await supabase.from('tryout_scores').upsert({
+        player_id: rowKey, session_id: params.sessionId, org_id: params.orgId,
+        evaluator_id: selectedEval, evaluator_name: evaluator.name ?? evaluator.email,
+        scores, tryout_score: tryoutScore,
+        comments: commentsRef.current[rowKey] ?? null,
+        submitted_at: new Date().toISOString(),
+      }, { onConflict: 'player_id,session_id,evaluator_id' })
+    }
     setSaving(null)
-    if (!error) setSavedAt(new Date())
-  }, [categories, evaluators, selectedEval])
+    setSavedAt(new Date())
+  }, [evaluators, selectedEval])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number) {
     const refs = inputRefs.current
@@ -411,9 +431,9 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
             </thead>
             <tbody>
               {checkins.map((c, rowIdx) => {
-                const playerId = c.player_id
+                const rowKey = c.player_id ?? c.id  // write-ins use checkin ID as key
                 const name = c.is_write_in ? (c.write_in_name ?? 'Write-in') : c.player ? `${c.player.first_name} ${c.player.last_name}` : 'Unknown'
-                const completeness = playerId ? rowCompleteness(playerId) : 'empty'
+                const completeness = rowCompleteness(rowKey)
                 const rowBg = completeness === 'complete' ? 'rgba(109,184,117,0.07)' : completeness === 'partial' ? 'rgba(232,160,32,0.07)' : 'transparent'
 
                 inputRefs.current[rowIdx] = inputRefs.current[rowIdx] ?? []
@@ -432,8 +452,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
 
                     {/* Score cells */}
                     {allSubcategories.map((sub, colIdx) => {
-                      const na = playerId ? isNa(playerId, sub.catKey) : false
-                      const val = playerId ? (grid[playerId]?.[sub.key] ?? '') : ''
+                      const na = isNa(rowKey, sub.catKey)
+                      const val = grid[rowKey]?.[sub.key] ?? ''
 
                       return (
                         <td key={`${sub.catKey}-${sub.key}`} style={{
@@ -449,8 +469,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                               ref={el => { inputRefs.current[rowIdx][colIdx] = el }}
                               type="number" min={0} step={0.01}
                               value={val}
-                              disabled={!playerId || isLocked}
-                              onChange={e => playerId && handleCellChange(playerId, sub.key, e.target.value)}
+                              disabled={isLocked}
+                              onChange={e => handleCellChange(rowKey, sub.key, e.target.value)}
                               onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
                               style={{
                                 width: '54px', textAlign: 'center', padding: '3px 2px',
@@ -465,8 +485,8 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                               ref={el => { inputRefs.current[rowIdx][colIdx] = el }}
                               type="number" min={1} max={5} step={0.1}
                               value={val}
-                              disabled={!playerId || isLocked}
-                              onChange={e => playerId && handleCellChange(playerId, sub.key, e.target.value)}
+                              disabled={isLocked}
+                              onChange={e => handleCellChange(rowKey, sub.key, e.target.value)}
                               onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
                               style={{
                                 width: '42px', textAlign: 'center', padding: '3px 2px',
@@ -484,15 +504,13 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                     {/* N/A toggles per optional category — shown as a combined cell at end? No, inline */}
                     {/* Comment */}
                     <td style={{ padding: '2px 4px', borderBottom: '0.5px solid var(--border)', borderLeft: '0.5px solid var(--border-md)' }}>
-                      {playerId && (
-                        <input type="text"
-                          value={comments[playerId] ?? ''}
-                          disabled={isLocked}
-                          onChange={e => { setComments(prev => ({ ...prev, [playerId]: e.target.value })); clearTimeout(saveTimer.current); saveTimer.current = setTimeout(() => autoSave(playerId), 1000) }}
-                          style={{ width: '100%', minWidth: '70px', background: 'transparent', border: 'none', fontSize: '11px', color: s.muted, padding: '2px 4px' }}
-                          placeholder="—"
-                        />
-                      )}
+                      <input type="text"
+                        value={comments[rowKey] ?? ''}
+                        disabled={isLocked}
+                        onChange={e => { setComments(prev => ({ ...prev, [rowKey]: e.target.value })); clearTimeout(saveTimer.current); saveTimer.current = setTimeout(() => autoSave(rowKey), 1000) }}
+                        style={{ width: '100%', minWidth: '70px', background: 'transparent', border: 'none', fontSize: '11px', color: s.muted, padding: '2px 4px' }}
+                        placeholder="—"
+                      />
                     </td>
                   </tr>
                 )
@@ -508,17 +526,19 @@ export default function AdminEntryPage({ params }: { params: { orgId: string; se
                 {categories.filter(c => c.is_optional).map(cat => (
                   <div key={cat.category}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>{cat.label}</div>
-                    {checkins.map(c => c.player_id ? (
-                      <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px', cursor: 'pointer' }}>
-                        <input type="checkbox"
-                          checked={isNa(c.player_id, cat.category)}
-                          onChange={() => c.player_id && toggleNa(c.player_id, cat.category)}
-                        />
-                        <span style={{ fontSize: '11px' }}>
-                          #{c.tryout_number} {c.player ? `${c.player.first_name} ${c.player.last_name}` : ''}
-                        </span>
-                      </label>
-                    ) : null)}
+                    {checkins.map(c => {
+                      const rk = c.player_id ?? c.id
+                      const label = c.is_write_in ? (c.write_in_name ?? 'Write-in') : c.player ? `${c.player.first_name} ${c.player.last_name}` : ''
+                      return (
+                        <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px', cursor: 'pointer' }}>
+                          <input type="checkbox"
+                            checked={isNa(rk, cat.category)}
+                            onChange={() => toggleNa(rk, cat.category)}
+                          />
+                          <span style={{ fontSize: '11px' }}>#{c.tryout_number} {label}</span>
+                        </label>
+                      )
+                    })}
                   </div>
                 ))}
               </div>
