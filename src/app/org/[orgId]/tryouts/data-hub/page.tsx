@@ -872,7 +872,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
       {/* ── Roster tab ────────────────────────────────────────────────────── */}
       {!lazyLoading && tab === 'roster' && (() => {
-        const rows = filtered.map(p => ({ p, ros: rosterMap.get(p.id) })).filter(r => r.ros)
+        const rows = filtered.map(p => ({ p, ros: rosterMap.get(p.id), reg: regMap.get(p.id) }))
 
         function rosterToggleSort(col: string) {
           if (rosterSortCol === col) setRosterSortDir(d => d === 1 ? -1 : 1)
@@ -886,18 +886,18 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         const sorted = [...rows].sort((a, b) => {
           if (rosterSortCol === 'name')     return rosterSortDir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
           if (rosterSortCol === 'age')      return rosterSortDir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
-          if (rosterSortCol === 'team')     return rosterSortDir * (a.ros!.team_name ?? '').localeCompare(b.ros!.team_name ?? '')
-          if (rosterSortCol === 'jersey')   return rosterSortDir * (a.ros!.jersey_number ?? '').localeCompare(b.ros!.jersey_number ?? '')
-          if (rosterSortCol === 'imported') return rosterSortDir * (a.ros!.imported_at ?? '').localeCompare(b.ros!.imported_at ?? '')
+          if (rosterSortCol === 'team')     return rosterSortDir * (a.ros?.team_name ?? '').localeCompare(b.ros?.team_name ?? '')
+          if (rosterSortCol === 'jersey')   return rosterSortDir * (a.ros?.jersey_number ?? '').localeCompare(b.ros?.jersey_number ?? '')
+          if (rosterSortCol === 'registered') return rosterSortDir * (a.reg ? -1 : 1) - rosterSortDir * (b.reg ? -1 : 1)
           return 0
         })
 
         const cols = [
-          { key: 'name',     label: 'Player',    sticky: true },
-          { key: 'age',      label: 'Age Group' },
-          { key: 'team',     label: 'Team' },
-          { key: 'jersey',   label: 'Jersey #' },
-          { key: 'imported', label: 'Imported' },
+          { key: 'name',       label: 'Player',     sticky: true },
+          { key: 'age',        label: 'Age Group' },
+          { key: 'team',       label: 'Team' },
+          { key: 'jersey',     label: 'Jersey #' },
+          { key: 'registered', label: 'Registered' },
         ]
 
         return (
@@ -912,18 +912,22 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                 ))}
               </tr></thead>
               <tbody>
-                {sorted.map(({ p, ros }, i) => (
+                {sorted.map(({ p, ros, reg }, i) => (
                   <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
                     <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
                     <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
-                    <td style={{ ...td, color: '#6DB875' }}>{ros?.team_name ?? '—'}</td>
+                    <td style={{ ...td, color: ros ? '#6DB875' : s.dim }}>{ros?.team_name ?? '—'}</td>
                     <td style={{ ...td, color: s.muted }}>{ros?.jersey_number ?? '—'}</td>
-                    <td style={{ ...td, color: s.dim, fontSize: '12px' }}>{ros?.imported_at ? new Date(ros.imported_at).toLocaleDateString() : '—'}</td>
+                    <td style={{ ...td }}>
+                      {reg
+                        ? <span style={{ color: '#6DB875', fontSize: '11px', fontWeight: 600 }}>✓ Yes</span>
+                        : <span style={{ color: s.dim, fontSize: '11px' }}>—</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No roster data. Import a roster file first.</div>}
+            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a roster file and confirm matches first.</div>}
           </div>
         )
       })()}
