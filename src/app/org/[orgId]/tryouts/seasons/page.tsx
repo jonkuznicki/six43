@@ -83,8 +83,9 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
   }
 
   function openCreate() {
-    setLabel(`${new Date().getFullYear()} Season`)
-    setYear(new Date().getFullYear())
+    const nextYear = new Date().getFullYear() + 1
+    setLabel(`${nextYear} Season`)
+    setYear(nextYear)
     setAgeGroups([])
     setAgInput('')
     setCopyFromId('')

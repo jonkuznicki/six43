@@ -1333,6 +1333,15 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
         return (
           <div>
+            {/* Stale year warning */}
+            {seasonYear !== null && seasonYear <= new Date().getFullYear() && (
+              <div style={{ background: 'rgba(232,160,32,0.13)', border: '1px solid rgba(232,160,32,0.4)', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px', fontSize: '12px', color: '#E8A020', lineHeight: 1.6 }}>
+                <strong>Season year is {seasonYear}</strong> — today is {new Date().getFullYear()}. If you&apos;re running {new Date().getFullYear() + 1} tryouts, go to{' '}
+                <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: '#E8A020', textDecoration: 'underline' }}>Seasons</Link>{' '}
+                and update the year to {new Date().getFullYear() + 1}. Age calculations will be off by one year until you do.
+              </div>
+            )}
+
             {/* Explanation */}
             <div style={{ fontSize: '12px', color: s.muted, marginBottom: '14px', lineHeight: 1.6 }}>
               <strong>Baseball Age</strong> = age as of May 1, {seasonYear}. This should be the year of the season you are preparing for (e.g. 2027 for 2027 tryouts). If the numbers look off by one year, update the season year in <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--accent)' }}>Seasons</Link>.

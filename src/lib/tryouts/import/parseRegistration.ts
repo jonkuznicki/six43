@@ -75,8 +75,8 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   preferredTryoutDate:  ['Which tryout date will you attend?', 'Tryout Date', 'Preferred Tryout Date', 'Session Date', 'Preferred Session Date'],
   parentEmail:          ['Account Email', 'Email', 'Parent Email', 'Guardian Email'],
   parentPhone:          ['Guardian Phone', 'Parent Phone', 'Phone', 'Mobile'],
-  guardianFirstName:    ['Guardian First Name', 'Parent First Name', 'Primary Contact First Name', 'Account Holder First Name', 'Parent/Guardian First Name'],
-  guardianLastName:     ['Guardian Last Name', 'Parent Last Name', 'Primary Contact Last Name', 'Account Holder Last Name', 'Parent/Guardian Last Name'],
+  guardianFirstName:    ['Guardian First Name', 'Parent First Name', 'Primary Contact First Name', 'Account Holder First Name', 'Parent/Guardian First Name', 'Guardian/Parent First Name', 'Account First Name', 'Parent 1 First Name', 'Contact First Name'],
+  guardianLastName:     ['Guardian Last Name', 'Parent Last Name', 'Primary Contact Last Name', 'Account Holder Last Name', 'Parent/Guardian Last Name', 'Guardian/Parent Last Name', 'Account Last Name', 'Parent 1 Last Name', 'Contact Last Name'],
   address:              ['Address', 'Street Address', 'Home Address'],
   city:                 ['City', 'Home City'],
   state:                ['State', 'Home State'],
@@ -90,7 +90,7 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
 }
 
 const FULL_NAME_COLS = ['Full Name', 'Player Name', 'Name', 'Athlete Name']
-const GUARDIAN_FULL_NAME_COLS = ['Guardian Name', 'Parent Name', 'Primary Contact Name', 'Account Holder Name', 'Parent/Guardian Name']
+const GUARDIAN_FULL_NAME_COLS = ['Guardian Name', 'Parent Name', 'Primary Contact Name', 'Account Holder Name', 'Parent/Guardian Name', 'Guardian Full Name', 'Parent Full Name', 'Parent/Guardian Full Name', 'Guardian/Parent Name', 'Account Name', 'Contact Name']
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
