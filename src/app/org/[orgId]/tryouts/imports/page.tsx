@@ -65,11 +65,19 @@ const MODE_CONFIG: Record<string, {
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Grade</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>School</span>
           <br />
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian First Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Guardian Last Name</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Address</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>City</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>State</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Zip</span>
+          <br />
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Prior Organization</span>{' · '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Prior Team</span>{' · '}
-          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Preferred Tryout Date</span>
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Preferred Tryout Date</span>{' · '}
+          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>Registration Date</span>
         </div>
-        <div style={{ marginTop: '8px', opacity: 0.7 }}>Accepts .xlsx or .csv · Column names are flexible (case-insensitive)</div>
+        <div style={{ marginTop: '8px', opacity: 0.7 }}>Accepts .xlsx or .csv · Column names are flexible (case-insensitive) · Guardian name can be a single combined column</div>
       </div>
     ),
   },
