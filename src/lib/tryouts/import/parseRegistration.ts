@@ -135,6 +135,12 @@ export function parseRegistrationFile(
   const headerRow = (raw[headerRowIndex] as string[]).map(c => stripBom(String(c).trim()))
   const dataRows  = raw.slice(headerRowIndex + 1)
 
+  // Diagnostic: log the raw first cell and first few header values
+  const rawFirst = String((raw[headerRowIndex] as string[])[0] ?? '')
+  console.log('[parseRegistration] raw first cell charCodes:', Array.from(rawFirst.slice(0, 15)).map(c => c.charCodeAt(0)))
+  console.log('[parseRegistration] headerRow[0..2]:', headerRow.slice(0, 3))
+  console.log('[parseRegistration] dataRows[0][0..2]:', (dataRows[0] as unknown[])?.slice(0, 3))
+
   // Build a column-name → index map (case-insensitive)
   const colIndex: Record<string, number> = {}
   headerRow.forEach((h, i) => { colIndex[h.toLowerCase()] = i })
