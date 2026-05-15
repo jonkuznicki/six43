@@ -62,6 +62,7 @@ export default function ImportReviewPage({
   const [saving,   setSaving]   = useState<number | null>(null)  // rowIndex being saved
   const [filter,   setFilter]   = useState<'all' | 'needs_action' | 'done'>('needs_action')
   const [bulkConfirming, setBulkConfirming] = useState(false)
+  const [bulkCreating,   setBulkCreating]   = useState(false)
   // Track locally-resolved rows so UI updates without re-fetching
   const [localResolutions, setLocalResolutions] = useState<Map<number, { playerId: string | null; status: 'auto' | 'skipped' }>>(new Map())
 
@@ -130,11 +131,24 @@ export default function ImportReviewPage({
       body: JSON.stringify({ action: 'confirm_all_suggested' }),
     })
     if (res.ok) {
-      // Reload to get the updated report
       await loadJob()
       setLocalResolutions(new Map())
     }
     setBulkConfirming(false)
+  }
+
+  async function bulkCreateAllNew() {
+    setBulkCreating(true)
+    const res = await fetch(`/api/tryouts/imports/${params.jobId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_all_new' }),
+    })
+    if (res.ok) {
+      await loadJob()
+      setLocalResolutions(new Map())
+    }
+    setBulkCreating(false)
   }
 
   if (loading) return (
@@ -236,16 +250,27 @@ export default function ImportReviewPage({
           ))}
         </div>
 
-        {/* Bulk confirm */}
-        {suggestedRows.length > 0 && (
-          <button onClick={bulkConfirmSuggested} disabled={bulkConfirming} style={{
-            fontSize: '13px', fontWeight: 700, padding: '8px 18px', borderRadius: '6px',
-            border: 'none', background: 'rgba(232,160,32,0.15)', color: '#E8A020',
-            cursor: bulkConfirming ? 'default' : 'pointer', opacity: bulkConfirming ? 0.6 : 1,
-          }}>
-            {bulkConfirming ? 'Confirming…' : `Confirm all ${suggestedRows.length} suggested`}
-          </button>
-        )}
+        {/* Bulk actions */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {suggestedRows.length > 0 && (
+            <button onClick={bulkConfirmSuggested} disabled={bulkConfirming || bulkCreating} style={{
+              fontSize: '13px', fontWeight: 700, padding: '8px 18px', borderRadius: '6px',
+              border: 'none', background: 'rgba(232,160,32,0.15)', color: '#E8A020',
+              cursor: bulkConfirming ? 'default' : 'pointer', opacity: bulkConfirming ? 0.6 : 1,
+            }}>
+              {bulkConfirming ? 'Confirming…' : `Confirm all ${suggestedRows.length} suggested`}
+            </button>
+          )}
+          {unresolvedRows.length > 0 && (
+            <button onClick={bulkCreateAllNew} disabled={bulkCreating || bulkConfirming} style={{
+              fontSize: '13px', fontWeight: 700, padding: '8px 18px', borderRadius: '6px',
+              border: 'none', background: 'rgba(80,160,232,0.15)', color: '#80B0E8',
+              cursor: bulkCreating ? 'default' : 'pointer', opacity: bulkCreating ? 0.6 : 1,
+            }}>
+              {bulkCreating ? 'Creating…' : `Create all ${unresolvedRows.length} as new players`}
+            </button>
+          )}
+        </div>
 
         {allDone && (
           <div style={{ fontSize: '13px', color: '#6DB875', fontWeight: 600 }}>

@@ -49,12 +49,16 @@ export async function POST(
   if (!isMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json() as {
-    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested' | 'skip'
+    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested' | 'create_all_new' | 'skip'
     rowIndex?: number
     playerId?: string
   }
 
   const report = (job.match_report ?? []) as any[]
+
+  if (body.action === 'create_all_new') {
+    return createAllNew({ supabase, job, report, userId: user.id })
+  }
 
   if (body.action === 'confirm_all_suggested') {
     return confirmAllSuggested({ supabase, job, report, userId: user.id })
@@ -476,6 +480,89 @@ async function autoAssignToSession({
     arrived:       false,
     is_write_in:   false,
   }, { onConflict: 'session_id,player_id' })
+}
+
+async function createAllNew({ supabase, job, report, userId }: any) {
+  const pending = (report as any[]).filter((r: any) =>
+    r.status === 'unresolved' || r.status === 'suggested' || r.status === 'new'
+  )
+
+  const results: Array<{ rowIndex: number; playerId: string }> = []
+
+  for (const row of pending) {
+    const payload = row.createPayload
+    let firstName: string, lastName: string
+    if (payload?.firstName) {
+      firstName = payload.firstName
+      lastName  = payload.lastName ?? ''
+    } else {
+      const parts = (row.rawName ?? '').trim().split(/\s+/)
+      firstName = parts[0] ?? ''
+      lastName  = parts.slice(1).join(' ')
+    }
+
+    const { data: newPlayer, error } = await supabase
+      .from('tryout_players')
+      .insert({
+        org_id:              job.org_id,
+        first_name:          firstName,
+        last_name:           lastName,
+        dob:                 payload?.dob ?? row.dob ?? null,
+        age_group:           payload?.ageGroup ?? row.ageGroup ?? null,
+        tryout_age_group:    payload?.ageGroup ?? row.ageGroup ?? null,
+        prior_team:          row.teamName ?? payload?.priorTeam ?? null,
+        jersey_number:       row.jerseyNumber ?? null,
+        parent_email:        payload?.parentEmail ?? null,
+        parent_phone:        payload?.parentPhone ?? null,
+        guardian_first_name: payload?.guardianFirstName ?? null,
+        guardian_last_name:  payload?.guardianLastName ?? null,
+        grade:               payload?.grade ?? null,
+        school:              payload?.school ?? null,
+        prior_org:           payload?.priorOrg ?? null,
+      })
+      .select('id')
+      .single()
+
+    if (error || !newPlayer) continue
+
+    await supabase.from('tryout_player_aliases').insert({
+      player_id:     newPlayer.id,
+      raw_name:      row.rawName,
+      source:        job.type === 'roster' ? 'roster' : 'registration',
+      confidence:    1.0,
+      confirmed:     true,
+      confirmed_by:  userId,
+      confirmed_at:  new Date().toISOString(),
+      import_job_id: job.id,
+    })
+
+    if (job.type === 'roster' && job.season_id) {
+      await supabase.from('tryout_roster_staging').upsert({
+        player_id:     newPlayer.id,
+        org_id:        job.org_id,
+        season_id:     job.season_id,
+        import_job_id: job.id,
+        team_name:     row.teamName ?? null,
+        jersey_number: row.jerseyNumber ?? null,
+      }, { onConflict: 'player_id,season_id' })
+    }
+
+    results.push({ rowIndex: row.rowIndex, playerId: newPlayer.id })
+  }
+
+  const resolvedIndexes = new Set(results.map(r => r.rowIndex))
+  const updatedReport = (report as any[]).map((r: any) => {
+    if (!resolvedIndexes.has(r.rowIndex)) return r
+    const match = results.find(res => res.rowIndex === r.rowIndex)!
+    return { ...r, status: 'auto', resolvedPlayerId: match.playerId, matchReason: 'bulk created as new player' }
+  })
+
+  await updateJobReport({
+    supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id,
+    action: `Bulk created ${results.length} new players`,
+  })
+
+  return NextResponse.json({ ok: true, created: results.length })
 }
 
 async function updateJobReport({ supabase, jobId, report, userId, orgId, action }: any) {
