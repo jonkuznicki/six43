@@ -4,6 +4,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../../../../../lib/supabase'
 import Link from 'next/link'
 
+function fmtPrefDate(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso + 'T12:00:00')
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+}
+
 interface Player {
   id: string; first_name: string; last_name: string
   age_group: string; jersey_number: string | null; prior_team: string | null
@@ -370,7 +377,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: 600 }}>{name}</div>
                       <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
-                        {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
+                        {fmtPrefDate(prefDate) && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{fmtPrefDate(prefDate)}</span>}
                         {player?.prior_team && <span>↩ {player.prior_team}</span>}
                         {c.is_write_in && <span>Walk-up · {c.write_in_age_group ?? '—'}</span>}
                       </div>
@@ -465,7 +472,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
                     onClick={() => busy == null && assignNumber(p.id)}>
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.first_name} {p.last_name}</div>
                     <div style={{ fontSize: '11px', color: s.dim, display: 'flex', gap: '8px' }}>
-                      {prefDate && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{prefDate}</span>}
+                      {fmtPrefDate(prefDate) && <span style={{ color: '#40A0E8', fontWeight: 600 }}>{fmtPrefDate(prefDate)}</span>}
                       {(regAgeMap.get(p.id) ?? p.age_group) && <span style={{ padding: '1px 5px', borderRadius: '3px', background: 'rgba(var(--fg-rgb),0.07)', fontWeight: 600 }}>{regAgeMap.get(p.id) ?? p.age_group}</span>}
                       <span>{p.prior_team ?? 'No prior team'}</span>
                     </div>
