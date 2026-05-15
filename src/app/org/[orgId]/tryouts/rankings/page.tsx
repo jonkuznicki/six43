@@ -6,7 +6,7 @@ import Link from 'next/link'
 import PlayerCard from './PlayerCard'
 import PlayerCompare from './PlayerCompare'
 import type { GcStatDef } from '../../../../../lib/tryouts/gcStatDefs'
-import { computeTryoutScore, type ScoringCategory } from '../../../../../lib/tryouts/computeScore'
+import { computeTryoutScore, computePitchingScore, type ScoringCategory } from '../../../../../lib/tryouts/computeScore'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -257,7 +257,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
       supabase.from('tryout_gc_stats')
         .select('player_id, gc_computed_score, gc_hitting_score, gc_pitching_score, avg, obp, slg, ops, rbi, r, hr, sb, bb, so, era, whip, ip, k, bb_allowed, bf, baa, bb_per_inn, k_bb, strike_pct, w, sv')
-        .eq('org_id', params.orgId),
+        .eq('org_id', params.orgId).eq('season_year', String(seasonData.year - 1)),
 
       supabase.from('tryout_teams')
         .select('id, name, age_group, color')
@@ -428,9 +428,14 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         const tryoutScore = validT.length > 0
           ? validT.reduce((s, v) => s + v, 0) / validT.length
           : null
-        const validTP = tRows.filter(r => r.tryout_pitching != null)
+        const resolvedPitching = tRows.map(r => {
+          if (r.tryout_pitching != null) return r.tryout_pitching
+          if (r.scores && scoringConfig.length > 0) return computePitchingScore(r.scores, scoringConfig)
+          return null
+        })
+        const validTP = resolvedPitching.filter((v): v is number => v != null)
         const tryoutPitching = validTP.length > 0
-          ? validTP.reduce((s, r) => s + r.tryout_pitching!, 0) / validTP.length
+          ? validTP.reduce((s, v) => s + v, 0) / validTP.length
           : null
         // Tryout hitting — look for 'hitting' category in scores JSON
         let tryoutHitting: number | null = null

@@ -164,24 +164,40 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
       const playerScores = scores[player.id]
       if (!playerScores || Object.keys(playerScores).length === 0) continue
 
-      const avgScore = (() => {
-        const vals = Object.values(playerScores).filter((v): v is number => v != null)
+      const sectionAvg = (section: string) => {
+        const vals = fields
+          .filter(f => f.section === section)
+          .map(f => playerScores[f.key])
+          .filter((v): v is number => v != null)
         return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null
-      })()
+      }
+
+      const intangiblesScore = sectionAvg('intangibles')
+      const nonIntangiblesVals = fields
+        .filter(f => f.section !== 'intangibles')
+        .map(f => playerScores[f.key])
+        .filter((v): v is number => v != null)
+      const evalScore = nonIntangiblesVals.length > 0
+        ? nonIntangiblesVals.reduce((a, b) => a + b, 0) / nonIntangiblesVals.length
+        : null
+      const allVals = Object.values(playerScores).filter((v): v is number => v != null)
+      const avgScore = allVals.length > 0 ? allVals.reduce((a, b) => a + b, 0) / allVals.length : null
 
       await supabase.from('tryout_coach_evals').upsert({
-        player_id:     player.id,
-        org_id:        params.orgId,
-        season_year:   String(season.year),
-        season_id:     season.id,
-        team_label:    team?.name ?? '',
-        coach_user_id: user?.id,
-        coach_name:    member?.name ?? member?.email ?? 'Coach',
-        scores:         playerScores,
-        computed_score: avgScore,
-        comments:       comments[player.id] ?? null,
-        status:         'draft',
-        updated_at:     new Date().toISOString(),
+        player_id:        player.id,
+        org_id:           params.orgId,
+        season_year:      String(season.year),
+        season_id:        season.id,
+        team_label:       team?.name ?? '',
+        coach_user_id:    user?.id,
+        coach_name:       member?.name ?? member?.email ?? 'Coach',
+        scores:           playerScores,
+        computed_score:   avgScore,
+        coach_eval_score: evalScore,
+        intangibles_score: intangiblesScore,
+        comments:         comments[player.id] ?? null,
+        status:           'draft',
+        updated_at:       new Date().toISOString(),
       }, { onConflict: 'player_id,org_id,season_year' })
     }
 
