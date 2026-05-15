@@ -14,14 +14,15 @@ interface Subcategory {
 }
 
 interface ScoringCategory {
-  id:            string | null  // null = unsaved new row
-  category:      string         // slug key
-  label:         string
-  weight:        number         // 0–1 fraction of total tryout score
-  subcategories: Subcategory[]
-  is_optional:   boolean
-  sort_order:    number
-  expanded:      boolean
+  id:             string | null  // null = unsaved new row
+  category:       string         // slug key
+  label:          string
+  weight:         number         // 0–1 fraction of total tryout score
+  subcategories:  Subcategory[]
+  is_optional:    boolean
+  is_tiebreaker:  boolean        // true = raw decimal input (e.g. 60yd dash times), not 1-5 scale
+  sort_order:     number
+  expanded:       boolean
 }
 
 interface EvalField {
@@ -95,7 +96,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
     const [{ data: scoreCfg }, { data: evalCfg }, { data: gcCfgRows }, { data: playerRows }] = await Promise.all([
       supabase.from('tryout_scoring_config')
-        .select('id, category, label, weight, subcategories, is_optional, sort_order')
+        .select('id, category, label, weight, subcategories, is_optional, is_tiebreaker, sort_order')
         .eq('season_id', seasonData.id)
         .order('sort_order'),
       supabase.from('tryout_coach_eval_config')
@@ -146,6 +147,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         weight:        c.weight,
         subcategories: c.subcategories ?? [],
         is_optional:   c.is_optional,
+        is_tiebreaker: c.is_tiebreaker ?? false,
         sort_order:    c.sort_order,
         expanded:      false,
       }))
@@ -181,7 +183,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
     setCategories(prev => [...prev, {
       id: null, category: '', label: '', weight: 0.1,
       subcategories: [{ key: '', label: '', weight: 1.0 }],
-      is_optional: false, sort_order: prev.length + 1, expanded: true,
+      is_optional: false, is_tiebreaker: false, sort_order: prev.length + 1, expanded: true,
     }])
   }
 
@@ -247,6 +249,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
       weight:        c.weight,
       subcategories: c.subcategories,
       is_optional:   c.is_optional,
+      is_tiebreaker: c.is_tiebreaker,
       sort_order:    c.sort_order,
     }))
 
@@ -618,6 +621,12 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: s.muted, cursor: 'pointer', flexShrink: 0 }}>
                     <input type="checkbox" checked={cat.is_optional} onChange={e => updateCat(catIdx, { is_optional: e.target.checked })} />
                     opt.
+                  </label>
+
+                  {/* Tiebreaker toggle — enables raw decimal input (e.g. 60yd times) instead of 1-5 scale */}
+                  <label title="Raw decimal input (e.g. 7.85 seconds) instead of 1–5 scale" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: cat.is_tiebreaker ? 'var(--accent)' : s.muted, cursor: 'pointer', flexShrink: 0 }}>
+                    <input type="checkbox" checked={cat.is_tiebreaker} onChange={e => updateCat(catIdx, { is_tiebreaker: e.target.checked })} />
+                    time
                   </label>
 
                   {/* Move / delete */}
