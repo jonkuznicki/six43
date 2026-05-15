@@ -35,6 +35,8 @@ interface GcRow  {
   era: number|null; whip: number|null; ip: number|null
   w: number|null; sv: number|null; k_bb: number|null; strike_pct: number|null
   gc_computed_score: number|null
+  gc_hitting_score:  number|null
+  gc_pitching_score: number|null
 }
 interface EvalField { field_key: string; label: string; section: string; sort_order: number; weight: number }
 interface EvalRow   { player_id: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
@@ -370,7 +372,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (target === 'gc') {
       const q = supabase
         .from('tryout_gc_stats')
-        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score')
+        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_hitting_score,gc_pitching_score')
         .eq('org_id', params.orgId)
       const { data } = syear ? await q.eq('season_year', String(syear - 1)) : await q
       setGcFull(data ?? [])
@@ -977,7 +979,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           H: 'h', '2B': 'doubles', '3B': 'triples', HR: 'hr', RBI: 'rbi',
           R: 'r', BB: 'bb', SO: 'so', SB: 'sb', HBP: 'hbp', SAC: 'sac', TB: 'tb',
           ERA: 'era', WHIP: 'whip', IP: 'ip', W: 'w', SV: 'sv', 'K/BB': 'k_bb', 'STR%': 'strike_pct',
-          Score: 'gc_computed_score',
+          'Hit Score': 'gc_hitting_score',
+          'Pit Score': 'gc_pitching_score',
         }
 
         function gcToggleSort(col: string) {
@@ -1083,7 +1086,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                     <th style={thGc('year', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Year{gcArrow('year')}</th>
                     <th colSpan={batting.length} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Batting</th>
                     <th colSpan={pitching.length} style={{ ...th, textAlign: 'center', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Pitching</th>
-                    <th style={thGc('Score', { textAlign: 'right', color: 'var(--accent)' })} rowSpan={2}>Score{gcArrow('Score')}</th>
+                    <th style={thGc('Hit Score', { textAlign: 'right', color: '#6DB875' })} rowSpan={2}>Hit{gcArrow('Hit Score')}</th>
+                    <th style={thGc('Pit Score', { textAlign: 'right', color: '#6DB875' })} rowSpan={2}>Pit{gcArrow('Pit Score')}</th>
                   </tr>
                   <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
                     {batting.map(l => (
@@ -1136,9 +1140,12 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, textAlign: 'right' }}>{gc?.sv ?? '—'}</td>
                         <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.k_bb ?? null, 2)}</td>
                         <td style={{ ...td, textAlign: 'right', borderRight: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.strike_pct != null ? `${(gc.strike_pct * 100).toFixed(0)}%` : '—'}</td>
-                        {/* Score */}
-                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, background: scoreColor(gc?.gc_computed_score ?? null) }}>
-                          {gc?.gc_computed_score != null ? gc.gc_computed_score.toFixed(2) : '—'}
+                        {/* Scores */}
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: gc?.gc_hitting_score != null ? '#6DB875' : s.dim }}>
+                          {gc?.gc_hitting_score != null ? gc.gc_hitting_score.toFixed(2) : '—'}
+                        </td>
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: gc?.gc_pitching_score != null ? '#6DB875' : s.dim }}>
+                          {gc?.gc_pitching_score != null ? gc.gc_pitching_score.toFixed(2) : '—'}
                         </td>
                       </tr>
                     )
