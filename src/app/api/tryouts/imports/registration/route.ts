@@ -334,6 +334,27 @@ export async function POST(req: NextRequest) {
       .upsert(stagingRows, { onConflict: 'player_id,season_id' })
   }
 
+  // ── Repair blank first_names via DOB matching ───────────────────────────
+  // Runs unconditionally — catches players that didn't auto-match (suggested/new)
+  // and ensures first_name is always populated after any registration import.
+  const rowsWithName = parseResult.rows.filter(r => r.firstName && r.dob)
+  console.log('[import/registration] parsed rows sample:', parseResult.rows.slice(0, 3).map(r => ({
+    firstName: r.firstName, lastName: r.lastName, dob: r.dob, ageGroup: r.ageGroup,
+  })))
+  console.log('[import/registration] match summary:', { auto: autoCount, suggested: suggestedCount, unresolved: unresolvedCount, new: newCount })
+  if (rowsWithName.length > 0) {
+    const repairResults = await Promise.all(rowsWithName.map(r =>
+      supabase.from('tryout_players')
+        .update({ first_name: r.firstName })
+        .eq('org_id', orgId)
+        .eq('dob', r.dob!)
+        .or('first_name.is.null,first_name.eq.')
+        .select('id, first_name')
+    ))
+    const repaired = repairResults.flatMap(res => res.data ?? [])
+    console.log('[import/registration] DOB-repair updated', repaired.length, 'players:', repaired.map(p => p.first_name))
+  }
+
   // ── Audit log ────────────────────────────────────────────────────────────
   await supabase.from('tryout_audit_log').insert({
     org_id:      orgId,
