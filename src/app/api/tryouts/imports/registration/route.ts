@@ -341,7 +341,7 @@ export async function POST(req: NextRequest) {
   console.log('[import/registration] parsed rows sample:', parseResult.rows.slice(0, 3).map(r => ({
     firstName: r.firstName, lastName: r.lastName, dob: r.dob, ageGroup: r.ageGroup,
   })))
-  console.log('[import/registration] match summary:', { auto: autoCount, suggested: suggestedCount, unresolved: unresolvedCount, new: newCount })
+  console.log('[import/registration] match summary:', { auto: autoCount, suggested: suggestedCount, unresolved: unresolvedCount, new: newCount, poolSize: candidatePool.length })
   if (rowsWithName.length > 0) {
     const repairResults = await Promise.all(rowsWithName.map(r =>
       supabase.from('tryout_players')
