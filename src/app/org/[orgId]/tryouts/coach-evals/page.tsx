@@ -158,6 +158,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [teamTokens,   setTeamTokens]   = useState<Record<string, string>>({}) // team_label → token uuid
   const [tokenBusy,    setTokenBusy]    = useState<string | null>(null)         // team_label currently generating
   const [copiedTeam,   setCopiedTeam]   = useState<string | null>(null)
+  const [unlocking,    setUnlocking]    = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -427,6 +428,30 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     setSavingTeamNote(false)
   }
 
+  async function unlockEvals(teamLabel: string) {
+    if (!season) return
+    if (!window.confirm(`Unlock evaluations for ${teamLabel}? The coach will be able to edit and re-submit.`)) return
+    setUnlocking(teamLabel)
+    const res = await fetch('/api/tryouts/coach-evals/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId: params.orgId, seasonId: season.id, teamLabel }),
+    })
+    if (res.ok) {
+      setSubmissions(prev => prev.filter(s => s.team_label !== teamLabel))
+      setEvalMeta(prev => {
+        const updated = { ...prev }
+        for (const pid of Object.keys(updated)) {
+          if (updated[pid].status === 'submitted') {
+            updated[pid] = { ...updated[pid], status: 'draft' }
+          }
+        }
+        return updated
+      })
+    }
+    setUnlocking(null)
+  }
+
   async function savePlayerNote(player: Player) {
     if (!season) return
     setSavingPlayerNote(true)
@@ -657,15 +682,24 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     )}
                     <span style={{ fontSize: '11px', color: '#6DB875', fontWeight: 700 }}>✓</span>
                     {isAdmin && (
-                      <button
-                        onClick={() => {
-                          if (isEditing) { setEditingTeam(null) }
-                          else { setEditingTeam(sub.team_label); setEditingTeamText(sub.overall_notes ?? '') }
-                        }}
-                        style={{ padding: '3px 10px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
-                      >
-                        {isEditing ? 'Cancel' : '✎ Edit notes'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            if (isEditing) { setEditingTeam(null) }
+                            else { setEditingTeam(sub.team_label); setEditingTeamText(sub.overall_notes ?? '') }
+                          }}
+                          style={{ padding: '3px 10px', borderRadius: '5px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          {isEditing ? 'Cancel' : '✎ Edit notes'}
+                        </button>
+                        <button
+                          onClick={() => unlockEvals(sub.team_label)}
+                          disabled={unlocking === sub.team_label}
+                          style={{ padding: '3px 10px', borderRadius: '5px', border: '0.5px solid rgba(232,112,96,0.4)', background: 'transparent', color: '#E87060', fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          {unlocking === sub.team_label ? '…' : '↺ Unlock'}
+                        </button>
+                      </>
                     )}
                   </div>
 
