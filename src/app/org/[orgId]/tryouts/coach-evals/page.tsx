@@ -42,8 +42,8 @@ interface EvalMeta {
   comments:     string | null
 }
 
-// Field keys that accept a raw decimal value (e.g. 60yd time in seconds) instead of 1-5
-const DECIMAL_EVAL_KEYS = new Set(['speed'])
+// All coach eval fields use 1-5 scale — no decimal fields
+const DECIMAL_EVAL_KEYS = new Set<string>()
 
 const SECTION_ORDER: Record<string, number> = {
   fielding_hitting:  0,
@@ -394,17 +394,21 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     await Promise.all(toSave.map(pid => {
       const p = playerMap.get(pid)!
       const scores = gridScores[pid] ?? {}
-      const computed = computeScore(scores, fields)
+      const computed      = computeScore(scores, fields)
+      const evalScore     = computeScore(scores, fields.filter(f => f.section !== 'intangibles'))
+      const intangibles   = computeSectionScore(scores, fields, 'intangibles')
       return supabase.from('tryout_coach_evals').upsert({
-        player_id:    pid,
-        org_id:       params.orgId,
-        season_id:    season.id,
-        season_year:  String(evalYear),
-        team_label:   p.prior_team ?? '',
-        coach_name:   myName || 'Admin',
-        status:       evalMeta[pid]?.status ?? 'draft',
+        player_id:         pid,
+        org_id:            params.orgId,
+        season_id:         season.id,
+        season_year:       String(evalYear),
+        team_label:        p.prior_team ?? '',
+        coach_name:        myName || 'Admin',
+        status:            evalMeta[pid]?.status ?? 'draft',
         scores,
-        computed_score: computed,
+        computed_score:    computed,
+        coach_eval_score:  evalScore,
+        intangibles_score: intangibles,
       }, { onConflict: 'player_id,org_id,season_year' })
     }))
 
