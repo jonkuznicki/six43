@@ -14,8 +14,10 @@ const TABS = [
 export default function BottomNav() {
   const pathname = usePathname()
 
-  // Hide on login and root pages
+  // Hide on login, root, and standalone tryout pages (mobile scoring/checkin)
   if (pathname === '/login' || pathname === '/') return null
+  const STANDALONE = ['/checkin', '/evalform', '/score', '/enter']
+  if (STANDALONE.some(s => pathname.includes(s))) return null
 
   return (
     <nav className="bottom-nav" style={{

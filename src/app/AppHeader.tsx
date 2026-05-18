@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from './ThemeProvider'
 
 const HIDDEN_PATHS = ['/', '/login']
+const HIDDEN_SEGMENTS = ['/checkin', '/evalform', '/score', '/enter']
 
 export default function AppHeader() {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
 
   if (HIDDEN_PATHS.includes(pathname)) return null
+  if (HIDDEN_SEGMENTS.some(s => pathname.includes(s))) return null
 
   return (
     <header className="app-header" style={{

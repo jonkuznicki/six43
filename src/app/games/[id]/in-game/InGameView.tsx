@@ -286,12 +286,12 @@ export default function InGameView({
           {/* Inning selector — inline ‹ N › */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
-              onClick={() => setInning(i => Math.max(0, i - 1))}
-              disabled={inning === 0}
+              onClick={() => { if (!locked) setInning(i => Math.max(0, i - 1)) }}
+              disabled={inning === 0 || locked}
               style={{
                 width: 32, height: 32, borderRadius: 6, border: `1px solid ${GM_BORDER}`,
-                background: 'transparent', color: inning > 0 ? GM_FG : GM_FG_DIM,
-                fontSize: 16, cursor: inning > 0 ? 'pointer' : 'default',
+                background: 'transparent', color: inning > 0 && !locked ? GM_FG : GM_FG_DIM,
+                fontSize: 16, cursor: inning > 0 && !locked ? 'pointer' : 'default',
               }}
             >‹</button>
             <div style={{ textAlign: 'center', minWidth: 72 }}>
@@ -299,13 +299,13 @@ export default function InGameView({
               <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, color: GM_FG }}>{inning + 1}</div>
             </div>
             <button
-              onClick={() => setInning(i => Math.min(inningCount - 1, i + 1))}
-              disabled={inning === inningCount - 1}
+              onClick={() => { if (!locked) setInning(i => Math.min(inningCount - 1, i + 1)) }}
+              disabled={inning === inningCount - 1 || locked}
               style={{
                 width: 32, height: 32, borderRadius: 6, border: `1px solid ${GM_BORDER}`,
                 background: 'transparent',
-                color: inning < inningCount - 1 ? GM_FG : GM_FG_DIM,
-                fontSize: 16, cursor: inning < inningCount - 1 ? 'pointer' : 'default',
+                color: inning < inningCount - 1 && !locked ? GM_FG : GM_FG_DIM,
+                fontSize: 16, cursor: inning < inningCount - 1 && !locked ? 'pointer' : 'default',
               }}
             >›</button>
           </div>
@@ -580,7 +580,7 @@ export default function InGameView({
                 Unlock positions?
               </div>
               <div style={{ fontSize: 14, color: GM_FG_DIM, marginBottom: 24, lineHeight: 1.55 }}>
-                This will allow field position changes. The score is always editable.
+                This will allow field position and inning changes. The score is always editable.
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
@@ -799,7 +799,7 @@ export default function InGameView({
           flexShrink: 0,
         }}>
           <span style={{ fontSize: 11, color: '#E8A020', fontWeight: 600 }}>
-            🔒 Positions locked — score is still editable · tap 🔒 to unlock
+            🔒 Positions and inning locked — score is still editable · tap 🔒 to unlock
           </span>
         </div>
       )}
@@ -824,7 +824,7 @@ export default function InGameView({
           return (
             <button
               key={i}
-              onClick={() => setInning(i)}
+              onClick={() => { if (!locked) setInning(i) }}
               style={{
                 position: 'relative',
                 minWidth: 38, height: 38, borderRadius: 7,
@@ -832,7 +832,8 @@ export default function InGameView({
                 background: inning === i ? 'rgba(75,156,211,0.15)' : 'var(--bg-card)',
                 color: inning === i ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.55)',
                 fontSize: 14, fontWeight: inning === i ? 700 : 400,
-                cursor: 'pointer', flexShrink: 0,
+                cursor: locked ? 'default' : 'pointer', flexShrink: 0,
+                opacity: locked && inning !== i ? 0.4 : 1,
               }}
             >
               {i + 1}
@@ -1216,7 +1217,7 @@ export default function InGameView({
               Unlock positions?
             </div>
             <div style={{ fontSize: 13, color: 'rgba(var(--fg-rgb),0.45)', marginBottom: 20, lineHeight: 1.55 }}>
-              This will allow field position changes. The score is always editable.
+              This will allow field position and inning changes. The score is always editable.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button

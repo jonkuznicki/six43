@@ -284,14 +284,26 @@ export default function EvaluatorScorePage({ params }: { params: { orgId: string
   )
 
   if (done) return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', padding: '2rem', textAlign: 'center' }}>
-      <div style={{ fontSize: '48px' }}>✓</div>
-      <div style={{ fontSize: '22px', fontWeight: 800 }}>All done!</div>
-      <div style={{ fontSize: '14px', color: s.muted }}>{scoredCount} of {checkins.length} players scored.</div>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: '2rem', textAlign: 'center' }}>
+      <div style={{ fontSize: '64px', marginBottom: '12px' }}>✅</div>
+      <div style={{ fontSize: '26px', fontWeight: 800, marginBottom: '6px' }}>Scores Submitted!</div>
+      <div style={{ fontSize: '15px', color: s.muted, marginBottom: '6px' }}>
+        {scoredCount} of {checkins.length} players scored
+      </div>
+      <div style={{ fontSize: '13px', color: s.dim, marginBottom: '32px' }}>
+        {evaluatorName && `Submitted by ${evaluatorName}`}
+      </div>
+      <div style={{
+        background: 'rgba(109,184,117,0.1)', border: '0.5px solid rgba(109,184,117,0.4)',
+        borderRadius: '10px', padding: '14px 20px', fontSize: '13px', color: '#6DB875',
+        marginBottom: '28px', maxWidth: '280px',
+      }}>
+        Your scores have been saved. You can close this window.
+      </div>
       <button onClick={() => { setDone(false); setCurrentIdx(0) }} style={{
         padding: '10px 24px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
-        background: 'var(--bg-input)', color: s.muted, fontSize: '14px', cursor: 'pointer',
-      }}>Review scores</button>
+        background: 'transparent', color: s.dim, fontSize: '13px', cursor: 'pointer',
+      }}>Review / edit scores</button>
     </main>
   )
 

@@ -26,11 +26,15 @@ export default function AddSlotButtons({
   const supabase = createClient()
   const router   = useRouter()
   const [adding, setAdding] = useState<GameType | null>(null)
+  const [localPoolCount,    setLocalPoolCount]    = useState(poolCount)
+  const [localBracketCount, setLocalBracketCount] = useState(bracketCount)
 
   async function addSlot(type: GameType) {
     setAdding(type)
-    const count    = type === 'pool_play' ? poolCount + 1 : bracketCount + 1
+    const count    = type === 'pool_play' ? localPoolCount + 1 : localBracketCount + 1
     const opponent = type === 'pool_play' ? `Pool Play ${count}` : `Bracket Game ${count}`
+    if (type === 'pool_play') setLocalPoolCount(c => c + 1)
+    else setLocalBracketCount(c => c + 1)
 
     await supabase.from('games').insert({
       season_id:      seasonId,
