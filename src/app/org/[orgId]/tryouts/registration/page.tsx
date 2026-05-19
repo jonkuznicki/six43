@@ -201,9 +201,11 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   // Players with prior_team (returning HBA) who haven't registered yet.
   // Exclude 14U — they age out with no 15U team to return to.
+  // Check both age_group and prior_team since age_group may reflect last season's value.
+  const is14U = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(p.prior_team ?? '')
   const missingPlayers = useMemo(() => {
     return activePlayers
-      .filter(p => p.prior_team != null && !registeredIds.has(p.id) && !walkupIds.has(p.id) && p.age_group !== '14U')
+      .filter(p => p.prior_team != null && !registeredIds.has(p.id) && !walkupIds.has(p.id) && !is14U(p))
       .filter(p => ageFilter === 'all' || p.age_group === ageFilter)
       .sort((a, b) => (a.prior_team ?? '').localeCompare(b.prior_team ?? '') || a.last_name.localeCompare(b.last_name))
   }, [activePlayers, registeredIds, walkupIds, ageFilter])
