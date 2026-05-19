@@ -17,9 +17,10 @@ const NAV = [
   {
     label: 'Player Data',
     items: [
-      { href: 'imports',   label: 'Imports' },
-      { href: 'data-hub',  label: 'Data Hub' },
-      { href: 'readiness', label: 'Readiness' },
+      { href: 'imports',      label: 'Imports' },
+      { href: 'registration', label: 'Registration' },
+      { href: 'data-hub',    label: 'Data Hub' },
+      { href: 'readiness',   label: 'Readiness' },
     ],
   },
   {
