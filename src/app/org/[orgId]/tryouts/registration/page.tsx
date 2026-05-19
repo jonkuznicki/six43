@@ -28,6 +28,7 @@ interface Player {
   prior_team: string | null
   prior_org:  string | null
   is_active:  boolean
+  is_walkup:  boolean
 }
 
 const s = {
@@ -80,11 +81,10 @@ function SectionHead({ title, count }: { title: string; count?: number }) {
 export default function RegistrationPage({ params }: { params: { orgId: string } }) {
   const supabase = createClient()
 
-  const [season,     setSeason]     = useState<Season | null>(null)
-  const [regs,       setRegs]       = useState<RegRow[]>([])
-  const [players,    setPlayers]    = useState<Player[]>([])
-  const [walkupIds,  setWalkupIds]  = useState<Set<string>>(new Set())
-  const [loading,    setLoading]    = useState(true)
+  const [season,  setSeason]  = useState<Season | null>(null)
+  const [regs,    setRegs]    = useState<RegRow[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
 
   const [ageFilter,  setAgeFilter]  = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('all')
@@ -101,26 +101,19 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     setSeason(seasonData)
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: regData }, { data: playerData }, { data: walkupData }] = await Promise.all([
+    const [{ data: regData }, { data: playerData }] = await Promise.all([
       supabase
         .from('tryout_registration_staging')
         .select('player_id, player_first_name, player_last_name, age_group, preferred_tryout_date, prior_team, prior_org, dob, parent_email, parent_phone, school, registration_date, imported_at')
         .eq('season_id', seasonData.id),
       supabase
         .from('tryout_players')
-        .select('id, first_name, last_name, age_group, prior_team, prior_org, is_active')
+        .select('id, first_name, last_name, age_group, prior_team, prior_org, is_active, is_walkup')
         .eq('org_id', params.orgId),
-      supabase
-        .from('tryout_checkins')
-        .select('player_id')
-        .eq('season_id', seasonData.id)
-        .eq('is_write_in', true)
-        .not('player_id', 'is', null),
     ])
 
     setRegs(regData ?? [])
     setPlayers(playerData ?? [])
-    setWalkupIds(new Set((walkupData ?? []).map((c: { player_id: string }) => c.player_id)))
     setLoading(false)
   }
 
@@ -205,10 +198,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   const is14U = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(p.prior_team ?? '')
   const missingPlayers = useMemo(() => {
     return activePlayers
-      .filter(p => p.prior_team != null && !registeredIds.has(p.id) && !walkupIds.has(p.id) && !is14U(p))
+      .filter(p => p.prior_team != null && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p))
       .filter(p => ageFilter === 'all' || p.age_group === ageFilter)
       .sort((a, b) => (a.prior_team ?? '').localeCompare(b.prior_team ?? '') || a.last_name.localeCompare(b.last_name))
-  }, [activePlayers, registeredIds, walkupIds, ageFilter])
+  }, [activePlayers, registeredIds, ageFilter])
 
   // Section 5: new / non-HBA players (includes those who selected "Other" for team)
   const newPlayers = useMemo(() =>

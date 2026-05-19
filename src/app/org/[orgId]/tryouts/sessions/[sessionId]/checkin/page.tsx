@@ -290,6 +290,7 @@ export default function CheckinPage({ params }: { params: { orgId: string; sessi
       guardian_first_name:  guardianFirst || null,
       guardian_last_name:   guardianLast || null,
       is_active:            true,
+      is_walkup:            true,
     }).select('id, first_name, last_name, age_group, jersey_number, prior_team').single()
 
     if (!newPlayer) { setWritingIn(false); return }
