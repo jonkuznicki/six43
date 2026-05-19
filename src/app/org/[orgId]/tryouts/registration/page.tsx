@@ -214,7 +214,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   // "If 2026 Team is 'Other', please provide team name". Use that as the label.
   const orgLabel = (r: RegRow) => {
     if (isOther(r.prior_team)) return r.prior_org?.trim() || 'Other (not specified)'
-    return r.prior_org?.trim() || 'Unknown / First year'
+    return r.prior_org?.trim() || r.prior_team?.trim() || 'Unknown / First year'
   }
 
   const byOrg = useMemo(() => {
