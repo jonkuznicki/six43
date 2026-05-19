@@ -167,8 +167,12 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   // Section 3 & 4: returning vs missing HBA players
   const activePlayers = useMemo(() => players.filter(p => p.is_active), [players])
 
+  // "Other" in the team/league field means they self-identified as non-HBA
+  const isOther = (val: string | null) => val?.trim().toLowerCase() === 'other'
+
   const returning = useMemo(() =>
     filtered.filter(r => {
+      if (isOther(r.prior_team) || isOther(r.prior_org)) return false
       const p = players.find(pl => pl.id === r.player_id)
       return p && p.prior_team != null
     }),
@@ -187,17 +191,19 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => b.rows.length - a.rows.length)
   }, [returning, players])
 
-  // Players with prior_team (returning HBA) who haven't registered yet
+  // Players with prior_team (returning HBA) who haven't registered yet.
+  // Exclude 14U — they age out with no 15U team to return to.
   const missingPlayers = useMemo(() => {
     return activePlayers
-      .filter(p => p.prior_team != null && !registeredIds.has(p.id))
+      .filter(p => p.prior_team != null && !registeredIds.has(p.id) && p.age_group !== '14U')
       .filter(p => ageFilter === 'all' || p.age_group === ageFilter)
       .sort((a, b) => (a.prior_team ?? '').localeCompare(b.prior_team ?? '') || a.last_name.localeCompare(b.last_name))
   }, [activePlayers, registeredIds, ageFilter])
 
-  // Section 5: new / non-HBA players
+  // Section 5: new / non-HBA players (includes those who selected "Other" for team)
   const newPlayers = useMemo(() =>
     filtered.filter(r => {
+      if (isOther(r.prior_team) || isOther(r.prior_org)) return true
       const p = players.find(pl => pl.id === r.player_id)
       return !p || p.prior_team == null
     }),
