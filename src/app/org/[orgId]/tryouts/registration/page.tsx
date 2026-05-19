@@ -210,10 +210,17 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   [filtered, players])
 
   // Section 6: by prior org
+  // When prior_team is "Other", prior_org holds the custom team name from
+  // "If 2026 Team is 'Other', please provide team name". Use that as the label.
+  const orgLabel = (r: RegRow) => {
+    if (isOther(r.prior_team)) return r.prior_org?.trim() || 'Other (not specified)'
+    return r.prior_org?.trim() || 'Unknown / First year'
+  }
+
   const byOrg = useMemo(() => {
     const map = new Map<string, number>()
     filtered.forEach(r => {
-      const key = r.prior_org ?? 'Unknown / First year'
+      const key = orgLabel(r)
       map.set(key, (map.get(key) ?? 0) + 1)
     })
     return Array.from(map.entries())
