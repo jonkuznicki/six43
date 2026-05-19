@@ -284,7 +284,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   const maxByAge  = Math.max(...byAgeGroup.map(x => x.count), 1)
   const maxByDate = Math.max(...byDate.map(x => x.count), 1)
-  const maxByOrg  = Math.max(...byOrg.map(x => x.count), 1)
 
   return (
     <div className="page-wide" style={{ padding: '2rem 1.5rem 6rem' }}>
@@ -528,7 +527,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                   <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{r.player_first_name} {r.player_last_name}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{r.age_group ?? '—'}</td>
-                    <td style={{ padding: '8px 18px', color: s.muted }}>{r.prior_org ?? '—'}</td>
+                    <td style={{ padding: '8px 18px', color: s.muted }}>{isOther(r.prior_team) ? (r.prior_org?.trim() || '—') : (r.prior_org?.trim() || r.prior_team?.trim() || '—')}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{r.school ?? '—'}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>
                       {r.preferred_tryout_date
@@ -553,7 +552,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{org}</span>
                 <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
               </div>
-              <MiniBar pct={(count / maxByOrg) * 100} color="rgba(232,160,32,0.6)" />
+              <MiniBar pct={total > 0 ? (count / total) * 100 : 0} color="rgba(232,160,32,0.6)" />
             </div>
           ))}
         </div>
