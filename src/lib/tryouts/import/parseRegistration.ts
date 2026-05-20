@@ -84,13 +84,22 @@ const COL_MAP: Record<keyof Omit<ParsedRegistrationRow, 'rawFullName' | 'rowInde
   dob:                  ['Date of Birth', 'DOB', 'Birth Date', 'Birthday'],
   grade:                ['Grade', 'Grade Level', 'School Grade'],
   school:               ['School Attending in Fall 2025?', 'School Attending in Fall 2026?', 'School Attending in Fall 2027?', 'School', 'School Name'],
-  priorOrg:             ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization', 'If 2026 Team is \'Other\', please provide team name', 'If 2025 Team is \'Other\', please provide team name'],
-  priorTeam:            ['2026 Season Team / League Name?', '2026 Season Team', 'Season Team Name', '2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
+  priorOrg:             ['2025 Organization', '2024 Organization', 'Prior Organization', 'Previous Organization', 'Organization'],
+  priorTeam:            ['2026 Season Team / League Name?', '2026 Season Team', '2025 Team', '2024 Team', 'Prior Team', 'Previous Team'],
   registrationDate:     ['Registration Date', 'Date Registered', 'Registered', 'Submitted', 'Order Date', 'Date Submitted', 'Created', 'Created At', 'Entry Date', 'Transaction Date', 'Paid Date'],
 }
 
 const FULL_NAME_COLS = ['Full Name', 'Player Name', 'Name', 'Athlete Name']
 const GUARDIAN_FULL_NAME_COLS = ['Guardian Name', 'Parent Name', 'Primary Contact Name', 'Account Holder Name', 'Parent/Guardian Name', 'Guardian Full Name', 'Parent Full Name', 'Parent/Guardian Full Name', 'Guardian/Parent Name', 'Account Name', 'Contact Name']
+
+// When the team column contains "Other", the actual team name is in a separate write-in column.
+// Both single- and double-quote variants appear in real exports.
+const PRIOR_OTHER_TEAM_COLS = [
+  "If 2026 Team is 'Other', please provide team name",
+  'If 2026 Team is "Other", please provide team name',
+  "If 2025 Team is 'Other', please provide team name",
+  'If 2025 Team is "Other", please provide team name',
+]
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
@@ -175,6 +184,7 @@ export function parseRegistrationFile(
   const schoolIdx              = getCol(COL_MAP.school)
   const priorOrgIdx            = getCol(COL_MAP.priorOrg)
   const priorTeamIdx           = getCol(COL_MAP.priorTeam)
+  const priorOtherTeamIdx      = getCol(PRIOR_OTHER_TEAM_COLS)
   const registrationDateIdx    = getCol(COL_MAP.registrationDate)
 
   const rows:   ParsedRegistrationRow[] = []
@@ -286,7 +296,11 @@ export function parseRegistrationFile(
       grade:               getString(gradeIdx) || null,
       school:              getString(schoolIdx) || null,
       priorOrg:            getString(priorOrgIdx) || null,
-      priorTeam:           getString(priorTeamIdx) || null,
+      priorTeam:           (() => {
+        const raw = getString(priorTeamIdx)
+        if (raw.toLowerCase() === 'other') return getString(priorOtherTeamIdx) || null
+        return raw || null
+      })(),
       registrationDate,
       rowIndex,
     })
