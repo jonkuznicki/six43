@@ -244,14 +244,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   const byOrg = useMemo(() => {
     const map = new Map<string, number>()
-    filtered.forEach(r => {
+    newPlayers.forEach(r => {
       const key = orgLabel(r)
       map.set(key, (map.get(key) ?? 0) + 1)
     })
     return Array.from(map.entries())
       .map(([org, count]) => ({ org, count }))
       .sort((a, b) => b.count - a.count)
-  }, [filtered])
+  }, [newPlayers])
 
   const issues = useMemo(() => {
     return filtered.filter(r =>
@@ -575,18 +575,20 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
       {/* ── Section 6: by prior org ── */}
       <Card style={{ marginBottom: 16 }}>
-        <SectionHead title="Player Source / Prior Org" />
+        <SectionHead title="Player Source / Prior Org" count={newPlayers.length} />
         <div style={{ padding: '12px 18px' }}>
-          {byOrg.map(({ org, count }) => (
+          {byOrg.length === 0 ? (
+            <div style={{ fontSize: 13, color: s.dim }}>No new/non-HBA players.</div>
+          ) : byOrg.map(({ org, count }) => (
             <div key={org} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{org}</span>
                 <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
               </div>
-              <MiniBar value={count} total={total} color="rgba(232,160,32,0.7)" />
+              <MiniBar value={count} total={newPlayers.length} color="rgba(232,160,32,0.7)" />
             </div>
           ))}
-          <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
+          <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of new / non-HBA players</div>
         </div>
       </Card>
 
