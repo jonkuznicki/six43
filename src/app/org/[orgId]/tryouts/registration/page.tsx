@@ -242,10 +242,15 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     return r.prior_org?.trim() || r.prior_team?.trim() || 'Unknown / First year'
   }
 
+  const normalizeOrg = (label: string) => {
+    if (/kiwanis/i.test(label)) return 'Kiwanis'
+    return label
+  }
+
   const byOrg = useMemo(() => {
     const map = new Map<string, number>()
     newPlayers.forEach(r => {
-      const key = orgLabel(r)
+      const key = normalizeOrg(orgLabel(r))
       map.set(key, (map.get(key) ?? 0) + 1)
     })
     return Array.from(map.entries())
