@@ -32,17 +32,22 @@ interface Player {
 }
 
 const s = {
-  muted: 'rgba(var(--fg-rgb),0.55)',
-  dim:   'rgba(var(--fg-rgb),0.35)',
+  muted:  'rgba(var(--fg-rgb),0.50)',
+  dim:    'rgba(var(--fg-rgb),0.32)',
 } as const
 
-function MiniBar({ pct, color }: { pct: number; color: string }) {
+function pct(n: number, total: number) {
+  return total > 0 ? Math.round((n / total) * 100) : 0
+}
+
+function MiniBar({ value, total, color }: { value: number; total: number; color: string }) {
+  const p = pct(value, total)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(var(--fg-rgb),0.08)', overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: color, borderRadius: 3 }} />
+      <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(var(--fg-rgb),0.07)', overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(100, p)}%`, height: '100%', background: color, borderRadius: 3 }} />
       </div>
-      <span style={{ fontSize: 11, color: s.muted, minWidth: 32, textAlign: 'right' }}>{Math.round(pct)}%</span>
+      <span style={{ fontSize: 11, color: s.muted, minWidth: 36, textAlign: 'right' }}>{p}%</span>
     </div>
   )
 }
@@ -50,10 +55,11 @@ function MiniBar({ pct, color }: { pct: number; color: string }) {
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      border: '0.5px solid var(--border)',
+      background: 'white',
+      border: '1px solid #e8eaed',
       borderRadius: 12,
       overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
       ...style,
     }}>
       {children}
@@ -64,17 +70,33 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 function SectionHead({ title, count }: { title: string; count?: number }) {
   return (
     <div style={{
-      padding: '14px 18px',
-      borderBottom: '0.5px solid var(--border)',
+      padding: '13px 18px',
+      borderBottom: '1px solid #f0f1f3',
       display: 'flex', alignItems: 'center', gap: 10,
     }}>
-      <span style={{ fontWeight: 700, fontSize: 14 }}>{title}</span>
+      <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>{title}</span>
       {count !== undefined && (
-        <span style={{ fontSize: 12, color: s.muted, background: 'rgba(var(--fg-rgb),0.07)', borderRadius: 10, padding: '1px 8px' }}>
+        <span style={{ fontSize: 12, color: s.muted, background: 'rgba(var(--fg-rgb),0.06)', borderRadius: 10, padding: '1px 8px' }}>
           {count}
         </span>
       )}
     </div>
+  )
+}
+
+type SortDir = 'asc' | 'desc'
+type NewPlayerSortCol = 'name' | 'age' | 'org' | 'school' | 'date'
+
+function SortTh({
+  label, col, active, dir, onSort,
+}: { label: string; col: NewPlayerSortCol; active: boolean; dir: SortDir; onSort: (col: NewPlayerSortCol) => void }) {
+  return (
+    <th
+      onClick={() => onSort(col)}
+      style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: active ? '#1a1a1a' : s.dim, textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+    >
+      {label}{active ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
+    </th>
   )
 }
 
@@ -88,9 +110,11 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   const [ageFilter,  setAgeFilter]  = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('all')
-  const [showMissing,  setShowMissing]  = useState(false)
-  const [showIssues,   setShowIssues]   = useState(false)
+  const [showMissing,    setShowMissing]    = useState(false)
+  const [showIssues,     setShowIssues]     = useState(false)
   const [showNewPlayers, setShowNewPlayers] = useState(false)
+
+  const [newSort, setNewSort] = useState<{ col: NewPlayerSortCol; dir: SortDir }>({ col: 'name', dir: 'asc' })
 
   useEffect(() => { loadData() }, [])
 
@@ -117,6 +141,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     setLoading(false)
   }
 
+  function toggleNewSort(col: NewPlayerSortCol) {
+    setNewSort(prev => prev.col === col ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
+  }
+
   // ── Computed data ──────────────────────────────────────────────────────────
 
   const ageGroups = useMemo(() => {
@@ -141,7 +169,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   const registeredIds = useMemo(() => new Set(regs.map(r => r.player_id)), [regs])
 
-  // Section 1: by age group
   const byAgeGroup = useMemo(() => {
     const map = new Map<string, number>()
     filtered.forEach(r => {
@@ -153,7 +180,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => a.ag.localeCompare(b.ag))
   }, [filtered])
 
-  // Section 2: by preferred tryout date
   const byDate = useMemo(() => {
     const map = new Map<string, number>()
     filtered.forEach(r => {
@@ -165,11 +191,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [filtered])
 
-  // Section 3 & 4: returning vs missing HBA players
   const activePlayers = useMemo(() => players.filter(p => p.is_active), [players])
 
-  // "Other" in the team/league field means they self-identified as non-HBA
   const isOther = (val: string | null) => val?.trim().toLowerCase() === 'other'
+  const is14U   = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(p.prior_team ?? '')
 
   const returning = useMemo(() =>
     filtered.filter(r => {
@@ -192,10 +217,11 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => b.rows.length - a.rows.length)
   }, [returning, players])
 
-  // Players with prior_team (returning HBA) who haven't registered yet.
-  // Exclude 14U — they age out with no 15U team to return to.
-  // Check both age_group and prior_team since age_group may reflect last season's value.
-  const is14U = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(p.prior_team ?? '')
+  // All eligible prior HBA players (used to show coverage: X of Y have registered)
+  const eligibleHbaPlayers = useMemo(() =>
+    activePlayers.filter(p => p.prior_team != null && !p.is_walkup && !is14U(p)),
+  [activePlayers])
+
   const missingPlayers = useMemo(() => {
     return activePlayers
       .filter(p => p.prior_team != null && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p))
@@ -203,7 +229,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => (a.prior_team ?? '').localeCompare(b.prior_team ?? '') || a.last_name.localeCompare(b.last_name))
   }, [activePlayers, registeredIds, ageFilter])
 
-  // Section 5: new / non-HBA players (includes those who selected "Other" for team)
   const newPlayers = useMemo(() =>
     filtered.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return true
@@ -212,9 +237,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     }),
   [filtered, players])
 
-  // Section 6: by prior org
-  // When prior_team is "Other", prior_org holds the custom team name from
-  // "If 2026 Team is 'Other', please provide team name". Use that as the label.
   const orgLabel = (r: RegRow) => {
     if (isOther(r.prior_team)) return r.prior_org?.trim() || 'Other (not specified)'
     return r.prior_org?.trim() || r.prior_team?.trim() || 'Unknown / First year'
@@ -231,7 +253,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .sort((a, b) => b.count - a.count)
   }, [filtered])
 
-  // Section 7: data quality issues
   const issues = useMemo(() => {
     return filtered.filter(r =>
       !r.dob ||
@@ -243,7 +264,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     )
   }, [filtered])
 
-  // Duplicate registrations (same player_id more than once in full regs)
   const duplicates = useMemo(() => {
     const counts = new Map<string, RegRow[]>()
     regs.forEach(r => {
@@ -255,10 +275,21 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .map(([id, rows]) => ({ id, rows }))
   }, [regs])
 
-  const total        = filtered.length
-  const returningPct = total > 0 ? (returning.length / total) * 100 : 0
-  const newPct       = total > 0 ? (newPlayers.length / total) * 100 : 0
-  const issuesPct    = total > 0 ? (issues.length / total) * 100 : 0
+  const total = filtered.length
+
+  const sortedNewPlayers = useMemo(() => {
+    const { col, dir } = newSort
+    const sign = dir === 'asc' ? 1 : -1
+    return [...newPlayers].sort((a, b) => {
+      let va = '', vb = ''
+      if (col === 'name')   { va = `${a.player_last_name ?? ''} ${a.player_first_name ?? ''}`; vb = `${b.player_last_name ?? ''} ${b.player_first_name ?? ''}` }
+      if (col === 'age')    { va = a.age_group ?? ''; vb = b.age_group ?? '' }
+      if (col === 'org')    { va = orgLabel(a); vb = orgLabel(b) }
+      if (col === 'school') { va = a.school ?? ''; vb = b.school ?? '' }
+      if (col === 'date')   { va = a.preferred_tryout_date ?? ''; vb = b.preferred_tryout_date ?? '' }
+      return va.localeCompare(vb) * sign
+    })
+  }, [newPlayers, newSort])
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -282,29 +313,25 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     </div>
   )
 
-  const maxByAge  = Math.max(...byAgeGroup.map(x => x.count), 1)
-  const maxByDate = Math.max(...byDate.map(x => x.count), 1)
-
   return (
-    <div className="page-wide" style={{ padding: '2rem 1.5rem 6rem' }}>
+    <div className="page-wide" style={{ padding: '2rem 1.5rem 6rem', background: '#f5f6f8', minHeight: '100vh' }}>
 
       {/* ── Header ── */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Registration Dashboard</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#111' }}>Registration Dashboard</h1>
         <div style={{ fontSize: 13, color: s.muted, marginTop: 4 }}>{season.label}</div>
       </div>
 
       {/* ── Filters ── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {/* Age group filter */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: s.dim, marginRight: 2 }}>Age:</span>
           {['all', ...ageGroups].map(ag => (
             <button key={ag} onClick={() => setAgeFilter(ag)} style={{
               padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-              border: '0.5px solid var(--border)',
-              background: ageFilter === ag ? 'rgba(232,160,32,0.15)' : 'transparent',
-              color: ageFilter === ag ? 'var(--accent)' : s.muted,
+              border: '1px solid #dde0e5',
+              background: ageFilter === ag ? 'rgba(232,160,32,0.12)' : 'white',
+              color: ageFilter === ag ? '#b87a00' : '#666',
               cursor: 'pointer',
             }}>
               {ag === 'all' ? 'All' : ag}
@@ -312,16 +339,15 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
           ))}
         </div>
 
-        {/* Date filter */}
         {tryoutDates.length > 0 && (
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: s.dim, marginRight: 2 }}>Date:</span>
             {['all', ...tryoutDates].map(d => (
               <button key={d} onClick={() => setDateFilter(d)} style={{
                 padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                border: '0.5px solid var(--border)',
-                background: dateFilter === d ? 'rgba(128,176,232,0.15)' : 'transparent',
-                color: dateFilter === d ? '#80B0E8' : s.muted,
+                border: '1px solid #dde0e5',
+                background: dateFilter === d ? 'rgba(128,176,232,0.12)' : 'white',
+                color: dateFilter === d ? '#4a7fb5' : '#666',
                 cursor: 'pointer',
               }}>
                 {d === 'all' ? 'All dates' : new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -334,21 +360,22 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       {/* ── Summary cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: '1.5rem' }}>
         {[
-          { label: 'Total Registered', value: total, color: 'var(--fg)' },
-          { label: 'Returning HBA', value: returning.length, color: '#6DB875' },
-          { label: 'New Players', value: newPlayers.length, color: '#80B0E8' },
-          { label: 'Missing (not yet reg)', value: missingPlayers.length, color: '#E8A020' },
-          { label: 'Data Issues', value: issues.length, color: issues.length > 0 ? '#e05252' : s.muted },
-          { label: 'Duplicates', value: duplicates.length, color: duplicates.length > 0 ? '#e05252' : s.muted },
+          { label: 'Total Registered',           value: total,                sub: 'this season',               color: '#111' },
+          { label: 'Returning HBA',               value: returning.length,    sub: `of ${total} registered`,    color: '#3a9e4a' },
+          { label: 'New Players',                 value: newPlayers.length,   sub: `${pct(newPlayers.length, total)}% of registrations`, color: '#4a7fb5' },
+          { label: 'Not Yet Registered',          value: missingPlayers.length, sub: 'prior HBA players',       color: missingPlayers.length > 0 ? '#c47a00' : '#999' },
+          { label: 'Data Issues',                 value: issues.length,       sub: 'missing required fields',   color: issues.length > 0 ? '#c93a3a' : '#999' },
+          { label: 'Duplicates',                  value: duplicates.length,   sub: 'registered more than once', color: duplicates.length > 0 ? '#c93a3a' : '#999' },
         ].map(card => (
           <Card key={card.label}>
             <div style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, color: s.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                 {card.label}
               </div>
               <div style={{ fontSize: 28, fontWeight: 800, color: card.color, lineHeight: 1 }}>
                 {card.value}
               </div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 5 }}>{card.sub}</div>
             </div>
           </Card>
         ))}
@@ -368,9 +395,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{ag}</span>
                   <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
                 </div>
-                <MiniBar pct={(count / maxByAge) * 100} color="var(--accent)" />
+                <MiniBar value={count} total={total} color="var(--accent)" />
               </div>
             ))}
+            <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
           </div>
         </Card>
 
@@ -389,10 +417,11 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
                     <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
                   </div>
-                  <MiniBar pct={(count / maxByDate) * 100} color="#80B0E8" />
+                  <MiniBar value={count} total={total} color="#80B0E8" />
                 </div>
               )
             })}
+            <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
           </div>
         </Card>
       </div>
@@ -401,27 +430,31 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       <Card style={{ marginBottom: 16 }}>
         <SectionHead title="Returning HBA Players" count={returning.length} />
         <div style={{ padding: '12px 18px' }}>
-          <div style={{ marginBottom: 10 }}>
-            <MiniBar pct={returningPct} color="#6DB875" />
-            <div style={{ fontSize: 11, color: s.dim, marginTop: 4 }}>
-              {returning.length} of {total} registered players are returning HBA players
+          <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#3a9e4a' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {total} registered</span></div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>share of this season's registrations</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#3a9e4a' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {eligibleHbaPlayers.length} prior HBA</span></div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>prior HBA players who have registered</div>
             </div>
           </div>
           {returningByTeam.length === 0 ? (
             <div style={{ color: s.dim, fontSize: 13 }}>None matched</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {returningByTeam.map(({ team, rows }) => (
                 <div key={team} style={{
                   padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(109,184,117,0.07)',
-                  border: '0.5px solid rgba(109,184,117,0.2)',
+                  background: '#f4fbf5',
+                  border: '1px solid #d0ecd4',
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{team}</div>
-                  <div style={{ fontSize: 11, color: s.muted }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, color: '#1a1a1a' }}>{team}</div>
+                  <div style={{ fontSize: 11, color: '#777' }}>
                     {rows.map(r => `${r.player_first_name ?? ''} ${r.player_last_name ?? ''}`.trim()).join(', ')}
                   </div>
-                  <div style={{ fontSize: 11, color: '#6DB875', marginTop: 4, fontWeight: 600 }}>
+                  <div style={{ fontSize: 11, color: '#3a9e4a', marginTop: 4, fontWeight: 600 }}>
                     {rows.length} registered
                   </div>
                 </div>
@@ -431,39 +464,37 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
         </div>
       </Card>
 
-      {/* ── Section 4: missing prior season players ── */}
+      {/* ── Section 4: prior HBA players not yet registered ── */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{
-          padding: '14px 18px',
-          borderBottom: showMissing ? '0.5px solid var(--border)' : undefined,
+          padding: '13px 18px',
+          borderBottom: showMissing && missingPlayers.length > 0 ? '1px solid #f0f1f3' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>Not Yet Registered</span>
-            <span style={{ fontSize: 12, color: missingPlayers.length > 0 ? '#E8A020' : s.muted, background: 'rgba(232,160,32,0.1)', borderRadius: 10, padding: '1px 8px' }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Returning Players Not Yet Registered</span>
+            <span style={{ fontSize: 12, color: missingPlayers.length > 0 ? '#c47a00' : '#aaa', background: missingPlayers.length > 0 ? 'rgba(232,160,32,0.1)' : '#f4f4f4', borderRadius: 10, padding: '1px 8px' }}>
               {missingPlayers.length}
             </span>
           </div>
           {missingPlayers.length > 0 && (
             <button onClick={() => setShowMissing(x => !x)} style={{
-              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showMissing ? 'Hide' : 'Show'}
             </button>
           )}
         </div>
-        {!showMissing && (
-          <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
-            {missingPlayers.length === 0
-              ? 'All returning HBA players have registered.'
-              : `${missingPlayers.length} returning player${missingPlayers.length === 1 ? '' : 's'} haven't registered yet.`}
-          </div>
-        )}
+        <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
+          {missingPlayers.length === 0
+            ? <span style={{ color: '#3a9e4a' }}>All returning HBA players have registered.</span>
+            : `${missingPlayers.length} of ${eligibleHbaPlayers.length} prior HBA players haven't registered yet.`}
+        </div>
         {showMissing && missingPlayers.length > 0 && (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', borderTop: '1px solid #f0f1f3' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
                   {['Name', 'Prior Team', 'Age Group'].map(h => (
                     <th key={h} style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: s.dim, textTransform: 'uppercase' }}>{h}</th>
                   ))}
@@ -471,7 +502,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
               </thead>
               <tbody>
                 {missingPlayers.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>
+                  <tr key={p.id} style={{ borderBottom: '1px solid #f7f8f9' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{p.first_name} {p.last_name}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{p.prior_team}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{p.age_group}</td>
@@ -486,45 +517,45 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       {/* ── Section 5: new / non-HBA players ── */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{
-          padding: '14px 18px',
-          borderBottom: showNewPlayers ? '0.5px solid var(--border)' : undefined,
+          padding: '13px 18px',
+          borderBottom: showNewPlayers && newPlayers.length > 0 ? '1px solid #f0f1f3' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>New / Non-HBA Players</span>
-            <span style={{ fontSize: 12, color: '#80B0E8', background: 'rgba(128,176,232,0.1)', borderRadius: 10, padding: '1px 8px' }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>New / Non-HBA Players</span>
+            <span style={{ fontSize: 12, color: '#4a7fb5', background: 'rgba(128,176,232,0.1)', borderRadius: 10, padding: '1px 8px' }}>
               {newPlayers.length}
             </span>
           </div>
           {newPlayers.length > 0 && (
             <button onClick={() => setShowNewPlayers(x => !x)} style={{
-              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showNewPlayers ? 'Hide' : 'Show'}
             </button>
           )}
         </div>
-        {!showNewPlayers && (
-          <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
-            <MiniBar pct={newPct} color="#80B0E8" />
-            <div style={{ marginTop: 4 }}>
-              {newPlayers.length} player{newPlayers.length === 1 ? '' : 's'} with no prior HBA record ({Math.round(newPct)}% of registrations)
-            </div>
+        <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
+          <MiniBar value={newPlayers.length} total={total} color="#80B0E8" />
+          <div style={{ marginTop: 4 }}>
+            {newPlayers.length} player{newPlayers.length === 1 ? '' : 's'} with no prior HBA record ({pct(newPlayers.length, total)}% of registrations)
           </div>
-        )}
+        </div>
         {showNewPlayers && newPlayers.length > 0 && (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', borderTop: '1px solid #f0f1f3' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                  {['Name', 'Age Group', 'Prior Org', 'School', 'Tryout Date'].map(h => (
-                    <th key={h} style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: s.dim, textTransform: 'uppercase' }}>{h}</th>
-                  ))}
+                <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
+                  <SortTh label="Name"       col="name"   active={newSort.col === 'name'}   dir={newSort.dir} onSort={toggleNewSort} />
+                  <SortTh label="Age Group"  col="age"    active={newSort.col === 'age'}    dir={newSort.dir} onSort={toggleNewSort} />
+                  <SortTh label="Prior Org"  col="org"    active={newSort.col === 'org'}    dir={newSort.dir} onSort={toggleNewSort} />
+                  <SortTh label="School"     col="school" active={newSort.col === 'school'} dir={newSort.dir} onSort={toggleNewSort} />
+                  <SortTh label="Tryout Date" col="date"  active={newSort.col === 'date'}   dir={newSort.dir} onSort={toggleNewSort} />
                 </tr>
               </thead>
               <tbody>
-                {newPlayers.map((r, i) => (
-                  <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>
+                {sortedNewPlayers.map((r, i) => (
+                  <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '1px solid #f7f8f9' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{r.player_first_name} {r.player_last_name}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{r.age_group ?? '—'}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{isOther(r.prior_team) ? (r.prior_org?.trim() || '—') : (r.prior_org?.trim() || r.prior_team?.trim() || '—')}</td>
@@ -552,68 +583,67 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{org}</span>
                 <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
               </div>
-              <MiniBar pct={total > 0 ? (count / total) * 100 : 0} color="rgba(232,160,32,0.6)" />
+              <MiniBar value={count} total={total} color="rgba(232,160,32,0.7)" />
             </div>
           ))}
+          <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
         </div>
       </Card>
 
-      {/* ── Section 7: data quality issues ── */}
+      {/* ── Section 7: data quality ── */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{
-          padding: '14px 18px',
-          borderBottom: showIssues && issues.length > 0 ? '0.5px solid var(--border)' : undefined,
+          padding: '13px 18px',
+          borderBottom: showIssues && (issues.length > 0 || duplicates.length > 0) ? '1px solid #f0f1f3' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>Data Quality</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Data Quality</span>
             {issues.length > 0 && (
-              <span style={{ fontSize: 12, color: '#e05252', background: 'rgba(224,82,82,0.1)', borderRadius: 10, padding: '1px 8px' }}>
+              <span style={{ fontSize: 12, color: '#c93a3a', background: 'rgba(224,82,82,0.08)', borderRadius: 10, padding: '1px 8px' }}>
                 {issues.length} issue{issues.length === 1 ? '' : 's'}
               </span>
             )}
             {duplicates.length > 0 && (
-              <span style={{ fontSize: 12, color: '#e05252', background: 'rgba(224,82,82,0.1)', borderRadius: 10, padding: '1px 8px' }}>
+              <span style={{ fontSize: 12, color: '#c93a3a', background: 'rgba(224,82,82,0.08)', borderRadius: 10, padding: '1px 8px' }}>
                 {duplicates.length} duplicate{duplicates.length === 1 ? '' : 's'}
               </span>
             )}
           </div>
           {(issues.length > 0 || duplicates.length > 0) && (
             <button onClick={() => setShowIssues(x => !x)} style={{
-              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showIssues ? 'Hide' : 'Show'}
             </button>
           )}
         </div>
 
-        {!showIssues && (
-          <div style={{ padding: '10px 18px' }}>
-            {issues.length === 0 && duplicates.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#6DB875' }}>No data issues found.</div>
-            ) : (
-              <div style={{ fontSize: 13, color: s.dim }}>
-                {issues.length > 0 && <div><MiniBar pct={issuesPct} color="#e05252" /></div>}
-                <div style={{ marginTop: 4 }}>
-                  {[
-                    issues.length > 0 && `${issues.length} registration${issues.length === 1 ? '' : 's'} missing required fields`,
-                    duplicates.length > 0 && `${duplicates.length} player${duplicates.length === 1 ? '' : 's'} registered more than once`,
-                  ].filter(Boolean).join(' · ')}
-                </div>
+        <div style={{ padding: '10px 18px' }}>
+          {issues.length === 0 && duplicates.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#3a9e4a' }}>No data issues found.</div>
+          ) : !showIssues && (
+            <div style={{ fontSize: 13, color: s.dim }}>
+              {issues.length > 0 && <div style={{ marginBottom: 4 }}><MiniBar value={issues.length} total={total} color="#e05252" /></div>}
+              <div style={{ marginTop: 4 }}>
+                {[
+                  issues.length > 0 && `${issues.length} registration${issues.length === 1 ? '' : 's'} missing required fields`,
+                  duplicates.length > 0 && `${duplicates.length} player${duplicates.length === 1 ? '' : 's'} registered more than once`,
+                ].filter(Boolean).join(' · ')}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         {showIssues && (issues.length > 0 || duplicates.length > 0) && (
-          <div style={{ padding: '12px 18px' }}>
+          <div style={{ padding: '0 18px 12px' }}>
             {issues.length > 0 && (
               <>
                 <div style={{ fontSize: 12, fontWeight: 700, color: s.dim, textTransform: 'uppercase', marginBottom: 8 }}>Missing required fields</div>
                 <div style={{ overflowX: 'auto', marginBottom: 16 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                      <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
                         {['Name', 'Age Group', 'Missing'].map(h => (
                           <th key={h} style={{ padding: '6px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: s.dim, textTransform: 'uppercase' }}>{h}</th>
                         ))}
@@ -630,10 +660,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                           !r.parent_phone      && 'Phone',
                         ].filter(Boolean).join(', ')
                         return (
-                          <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>
+                          <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '1px solid #f7f8f9' }}>
                             <td style={{ padding: '6px 12px', fontWeight: 500 }}>{r.player_first_name} {r.player_last_name}</td>
                             <td style={{ padding: '6px 12px', color: s.muted }}>{r.age_group ?? '—'}</td>
-                            <td style={{ padding: '6px 12px', color: '#e05252', fontSize: 12 }}>{missing}</td>
+                            <td style={{ padding: '6px 12px', color: '#c93a3a', fontSize: 12 }}>{missing}</td>
                           </tr>
                         )
                       })}
@@ -648,7 +678,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 {duplicates.map(({ id, rows }) => (
                   <div key={id} style={{
                     padding: '8px 12px', marginBottom: 6, borderRadius: 6,
-                    background: 'rgba(224,82,82,0.06)', border: '0.5px solid rgba(224,82,82,0.2)',
+                    background: 'rgba(224,82,82,0.04)', border: '1px solid rgba(224,82,82,0.15)',
                     fontSize: 13,
                   }}>
                     <span style={{ fontWeight: 600 }}>{rows[0].player_first_name} {rows[0].player_last_name}</span>
