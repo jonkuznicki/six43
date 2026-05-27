@@ -76,13 +76,10 @@ export function resolvePlayer(
   const normalizedRaw  = normalizeName(rawName)
   const expandedRaw    = expandName(rawName)
 
-  // Pre-filter: if ageGroup is provided, only match within that age group
-  // (unless that filter leaves no candidates — fall back to all)
-  let pool = candidates
-  if (ageGroup) {
-    const filtered = candidates.filter(c => c.ageGroup === ageGroup)
-    if (filtered.length > 0) pool = filtered
-  }
+  // Score all candidates. Age group mismatch is applied as a confidence
+  // penalty below — never as a hard filter — so a player whose stored
+  // age_group is stale or null is still found by name.
+  const pool = candidates
 
   const scored: MatchCandidate[] = pool.map(player => {
     const canonicalNorm     = normalizeName(fullName(player.firstName, player.lastName))
