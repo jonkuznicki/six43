@@ -102,6 +102,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const [colFillKey,  setColFillKey]  = useState<string | null>(null)
   // Row fill (expanded comment row)
   const [expandedComment, setExpandedComment] = useState<string | null>(null)
+  // Scoring guide collapsible in score step
+  const [showScoringGuide, setShowScoringGuide] = useState(false)
 
   // Hide Six43 chrome — this is a standalone org-branded page
   useEffect(() => {
@@ -746,35 +748,23 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         </div>
       )}
 
-      {/* Instructions */}
+      {/* Scoring Philosophy */}
       <div style={{
         background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)',
-        borderRadius: '10px', padding: '1.25rem',
+        borderRadius: '12px', padding: '1.25rem 1.5rem',
       }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '12px' }}>
-          Before you start — please read
+        <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent)', marginBottom: '14px', letterSpacing: '0.02em' }}>
+          Scoring Philosophy — Please Read Before You Start
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: s.muted, lineHeight: 1.6 }}>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: 'var(--fg)' }}>Scores are based on your age group, not your specific team.</strong> For example, if a player has a strong arm on your team but is average across all players you faced in your age group this season, score them a <strong style={{ color: 'var(--fg)' }}>3 (Age appropriate)</strong> for throwing — not a 5.
-          </p>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: 'var(--fg)' }}>Most players will live in the 3s.</strong> That is completely expected — a 3 means "age appropriate" and is exactly where most players should be by end of season.
-          </p>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: 'var(--fg)' }}>Reserve a 5 for truly exceptional players</strong> — best-in-class out of everyone you've seen and played against in your age group this year.
-          </p>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: 'var(--fg)' }}>Be objective, thorough, and detailed in the comments.</strong> The board often finds your written commentary as valuable as the scores — please be thoughtful and intentional.
-          </p>
-        </div>
-        <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
+
+        {/* Visual scale */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', fontSize: '11px', marginBottom: '18px' }}>
           {[
-            { n: 1, label: 'Needs work' },
-            { n: 2, label: 'Below age' },
-            { n: 3, label: 'Age appropriate' },
-            { n: 4, label: 'Above age' },
-            { n: 5, label: 'Exceptional' },
+            { n: 1, label: 'Below Age Level' },
+            { n: 2, label: 'Developing' },
+            { n: 3, label: 'Age Appropriate' },
+            { n: 4, label: 'Above Average' },
+            { n: 5, label: 'Exceptional / Rare' },
           ].map(({ n, label }) => (
             <span key={n} style={{
               padding: '3px 10px', borderRadius: '20px', fontWeight: 600,
@@ -784,6 +774,46 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
               {n} — {label}
             </span>
           ))}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px', lineHeight: 1.65 }}>
+
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>
+              1. Score relative to the entire age group — not just your team
+            </div>
+            <p style={{ margin: 0, color: s.muted }}>
+              The 1–5 scale is based on the overall age group, not your specific team roster. A player may have the strongest arm on your team, but when compared to the full age group across all teams and opponents you faced this season, that same player may simply be above-average. In that case the correct throwing score is a <strong style={{ color: 'var(--fg)' }}>4 (Above Average)</strong> — not a 5.
+            </p>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>
+              2. Most players should fall in the "3" range — and that's completely expected
+            </div>
+            <p style={{ margin: 0, color: s.muted }}>
+              A score of 3 means <strong style={{ color: 'var(--fg)' }}>age-appropriate</strong> — solid, capable performance at the expected level for this age group. Most players will land here across many categories. Please do not feel pressure to inflate scores. A roster full of 3s is an accurate, honest, and helpful evaluation.
+            </p>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>
+              3. Reserve a "5 / Exceptional" for truly rare ability
+            </div>
+            <p style={{ margin: 0, color: s.muted }}>
+              A 5 is for players who demonstrate genuinely best-in-class skill compared to the entire age group. For example: at 14U, there were many strong pitchers who threw hard and consistently threw strikes — but one player consistently threw strikes at nearly 80 mph, harder and more accurately than anyone else seen all season. <em>That</em> is a true 5.
+            </p>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>
+              4. Be objective, thorough, and detailed in your comments
+            </div>
+            <p style={{ margin: 0, color: s.muted }}>
+              The board often finds written commentary as valuable as the scores. Please be specific — mention strengths, areas to develop, coachability, attitude, and any notable improvement this season.
+            </p>
+          </div>
+
         </div>
       </div>
     </main>
@@ -977,6 +1007,54 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
               ↑ XLS<input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleXlsUpload} />
             </label>
           </div>
+        </div>
+
+        {/* ── Scoring guide collapsible ── */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => setShowScoringGuide(x => !x)}
+            style={{
+              padding: '5px 12px', borderRadius: '6px',
+              border: '0.5px solid rgba(232,160,32,0.35)',
+              background: showScoringGuide ? 'rgba(232,160,32,0.1)' : 'transparent',
+              color: showScoringGuide ? 'var(--fg)' : s.muted,
+              fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+            }}
+          >
+            Scoring Guide {showScoringGuide ? '▲' : '▼'}
+          </button>
+          {showScoringGuide && (
+            <div style={{
+              marginTop: '8px', padding: '14px 16px', borderRadius: '8px',
+              background: 'rgba(232,160,32,0.06)', border: '0.5px solid rgba(232,160,32,0.22)',
+              fontSize: '12px', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '10px',
+            }}>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '2px' }}>
+                {[
+                  { n: 1, label: 'Below Age Level' }, { n: 2, label: 'Developing' },
+                  { n: 3, label: 'Age Appropriate' }, { n: 4, label: 'Above Average' },
+                  { n: 5, label: 'Exceptional / Rare' },
+                ].map(({ n, label }) => (
+                  <span key={n} style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 600, fontSize: '11px', background: scoreColor(n), border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
+                    {n} — {label}
+                  </span>
+                ))}
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Score vs. the full age group, not just your team.</strong>{' '}
+                <span style={{ opacity: 0.75 }}>The strongest arm on your team may only be above-average across the full age group — score a 4, not a 5.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Most players will be 3s — that's correct.</strong>{' '}
+                <span style={{ opacity: 0.75 }}>A 3 = age-appropriate, solid, capable. Don't inflate scores.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Reserve a 5 for truly exceptional, rare ability</strong>{' '}
+                <span style={{ opacity: 0.75 }}>— best-in-class compared to every player you've seen at this age level all season.</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Score grid ── */}
