@@ -77,6 +77,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [selected,        setSelected]        = useState<{ rowIdx: number; colIdx: number } | null>(null)
   const [colFillKey,      setColFillKey]      = useState<string | null>(null)
   const [expandedComment, setExpandedComment] = useState<string | null>(null)
+  const [showScoringGuide, setShowScoringGuide] = useState(false)
 
   const gridRef    = useRef<HTMLDivElement>(null)
   const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
@@ -305,7 +306,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoScore(); return }
 
     const sectionKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
-    const cellNa = naFlags[player.id]?.has(sectionKey) ?? false
+    const cellNa = isNa(player.id, fieldNaKey(field.field_key, sectionKey))
 
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
@@ -325,13 +326,13 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     if (e.key === 'Escape')     { setSelected(null); return }
   }
 
-  function toggleNa(playerId: string, sectionKey: string, fields: EvalField[]) {
+  function toggleNa(playerId: string, naKey: string, fields: EvalField[]) {
     setNaFlags(prev => {
       const cur = new Set(prev[playerId] ?? [])
-      if (cur.has(sectionKey)) {
-        cur.delete(sectionKey)
+      if (cur.has(naKey)) {
+        cur.delete(naKey)
       } else {
-        cur.add(sectionKey)
+        cur.add(naKey)
         setScores(ps => {
           const ps2 = { ...(ps[playerId] ?? {}) }
           for (const f of fields) delete ps2[f.field_key]
@@ -342,8 +343,12 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     })
   }
 
-  function isNa(playerId: string, sectionKey: string) {
-    return naFlags[playerId]?.has(sectionKey) ?? false
+  function isNa(playerId: string, naKey: string) {
+    return naFlags[playerId]?.has(naKey) ?? false
+  }
+
+  function fieldNaKey(fieldKey: string, sectionKey: string): string {
+    return sectionKey === 'pitching_catching' ? fieldKey : sectionKey
   }
 
   async function handleSubmit() {
@@ -569,25 +574,49 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
           {hasDraft ? 'Continue evaluations →' : 'Start evaluations →'}
         </button>
 
-        {/* Instructions */}
-        <div style={{ background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)', borderRadius: '10px', padding: '1.25rem' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '12px' }}>Before you start — please read</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: s.muted, lineHeight: 1.6 }}>
-            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Scores are based on your age group, not your specific team.</strong> A player with a strong arm on your team but average across the age group should be scored a <strong style={{ color: 'var(--fg)' }}>3</strong>.</p>
-            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Most players will live in the 3s.</strong> A 3 means "age appropriate" and is exactly where most players should be.</p>
-            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Reserve a 5 for truly exceptional players</strong> — best-in-class out of everyone in your age group this year.</p>
-            <p style={{ margin: 0 }}><strong style={{ color: 'var(--fg)' }}>Be objective and thorough in comments.</strong> Written commentary is often as valuable as the scores.</p>
+        {/* Scoring Philosophy */}
+        <div style={{ background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+          <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent)', marginBottom: '14px', letterSpacing: '0.02em' }}>
+            Scoring Philosophy — Please Read Before You Start
           </div>
-          <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', fontSize: '11px', marginBottom: '18px' }}>
             {[
-              { n: 1, label: 'Needs work' }, { n: 2, label: 'Below age' },
-              { n: 3, label: 'Age appropriate' }, { n: 4, label: 'Above age' },
-              { n: 5, label: 'Exceptional' },
+              { n: 1, label: 'Below Age Level' }, { n: 2, label: 'Developing' },
+              { n: 3, label: 'Age Appropriate' }, { n: 4, label: 'Above Average' },
+              { n: 5, label: 'Exceptional / Rare' },
             ].map(({ n, label }) => (
               <span key={n} style={{ padding: '3px 10px', borderRadius: '20px', fontWeight: 600, background: scoreColor(n), color: 'var(--fg)', border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
                 {n} — {label}
               </span>
             ))}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px', lineHeight: 1.65 }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>1. Score relative to the entire age group — not just your team</div>
+              <p style={{ margin: 0, color: s.muted }}>
+                The 1–5 scale is based on the overall age group, not your specific team roster. A player may have the strongest arm on your team, but when compared to the full age group across all teams and opponents you faced this season, that same player may simply be above-average. In that case the correct throwing score is a <strong style={{ color: 'var(--fg)' }}>4 (Above Average)</strong> — not a 5.
+              </p>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>2. Most players should fall in the "3" range — and that's completely expected</div>
+              <p style={{ margin: 0, color: s.muted }}>
+                A score of 3 means <strong style={{ color: 'var(--fg)' }}>age-appropriate</strong> — solid, capable performance at the expected level for this age group. Most players will land here across many categories. Please do not feel pressure to inflate scores. A roster full of 3s is an accurate, honest, and helpful evaluation.
+              </p>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>3. Reserve a "5 / Exceptional" for truly rare ability</div>
+              <p style={{ margin: 0, color: s.muted }}>
+                A 5 is for players who demonstrate genuinely best-in-class skill compared to the entire age group. For example: at 14U, there were many strong pitchers who threw hard and consistently threw strikes — but one player consistently threw strikes at nearly 80 mph, harder and more accurately than anyone else seen all season. <em>That</em> is a true 5.
+              </p>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--fg)', marginBottom: '5px' }}>4. Be objective, thorough, and detailed in your comments</div>
+              <p style={{ margin: 0, color: s.muted }}>
+                The board often finds written commentary as valuable as the scores. Please be specific — mention strengths, areas to develop, coachability, attitude, and any notable improvement this season.
+              </p>
+            </div>
           </div>
         </div>
       </main>
@@ -643,7 +672,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       </td>
                       {allFields.map(f => {
                         const v = ps[f.field_key] ?? null
-                        const na = isNa(p.id, sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? '')
+                        const fSecKey = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
+                        const na = isNa(p.id, fieldNaKey(f.field_key, fSecKey))
                         return (
                           <td key={f.field_key} style={{ padding: '4px 2px', textAlign: 'center' }}>
                             <span style={{ display: 'inline-block', width: '30px', height: '26px', lineHeight: '26px', borderRadius: '5px', fontWeight: 700, fontSize: '13px', background: na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(v), color: v != null && !na ? 'var(--fg)' : s.dim }}>
@@ -714,14 +744,62 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         {/* Scale legend */}
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', fontSize: '11px', marginBottom: '1rem' }}>
           {[
-            { n: 1, label: 'Needs work' }, { n: 2, label: 'Below age' },
-            { n: 3, label: 'Age appropriate' }, { n: 4, label: 'Above age' },
-            { n: 5, label: 'Exceptional' },
+            { n: 1, label: 'Below Age Level' }, { n: 2, label: 'Developing' },
+            { n: 3, label: 'Age Appropriate' }, { n: 4, label: 'Above Average' },
+            { n: 5, label: 'Exceptional / Rare' },
           ].map(({ n, label }) => (
             <span key={n} style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 600, background: scoreColor(n), border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
               {n} — {label}
             </span>
           ))}
+        </div>
+
+        {/* ── Scoring guide collapsible ── */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => setShowScoringGuide(x => !x)}
+            style={{
+              padding: '5px 12px', borderRadius: '6px',
+              border: '0.5px solid rgba(232,160,32,0.35)',
+              background: showScoringGuide ? 'rgba(232,160,32,0.1)' : 'transparent',
+              color: showScoringGuide ? 'var(--fg)' : s.muted,
+              fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+            }}
+          >
+            Scoring Guide {showScoringGuide ? '▲' : '▼'}
+          </button>
+          {showScoringGuide && (
+            <div style={{
+              marginTop: '8px', padding: '14px 16px', borderRadius: '8px',
+              background: 'rgba(232,160,32,0.06)', border: '0.5px solid rgba(232,160,32,0.22)',
+              fontSize: '12px', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '10px',
+            }}>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '2px' }}>
+                {[
+                  { n: 1, label: 'Below Age Level' }, { n: 2, label: 'Developing' },
+                  { n: 3, label: 'Age Appropriate' }, { n: 4, label: 'Above Average' },
+                  { n: 5, label: 'Exceptional / Rare' },
+                ].map(({ n, label }) => (
+                  <span key={n} style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 600, fontSize: '11px', background: scoreColor(n), border: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
+                    {n} — {label}
+                  </span>
+                ))}
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Score vs. the full age group, not just your team.</strong>{' '}
+                <span style={{ opacity: 0.75 }}>The strongest arm on your team may only be above-average across the full age group — score a 4, not a 5.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Most players will be 3s — that's correct.</strong>{' '}
+                <span style={{ opacity: 0.75 }}>A 3 = age-appropriate, solid, capable. Don't inflate scores.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Reserve a 5 for truly exceptional, rare ability</strong>{' '}
+                <span style={{ opacity: 0.75 }}>— best-in-class compared to every player you've seen at this age level all season.</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Score grid ── */}
@@ -787,7 +865,10 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
               {players.map((player, pi) => {
                 const ps = scores[player.id] ?? {}
                 const required = sections.filter(sec => !sec.is_optional).flatMap(sec => sec.fields)
-                const complete = required.every(f => ps[f.field_key] != null || isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''))
+                const complete = required.every(f => {
+                  const sk = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
+                  return ps[f.field_key] != null || isNa(player.id, fieldNaKey(f.field_key, sk))
+                })
                 const rowBg = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
                 const hasComment = !!(playerComments[player.id]?.trim())
                 const commentOpen = expandedComment === player.id
@@ -803,7 +884,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       {allFields.map((field, fi) => {
                         const val = ps[field.field_key] ?? null
                         const sectionKey = sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? ''
-                        const na = isNa(player.id, sectionKey)
+                        const na = isNa(player.id, fieldNaKey(field.field_key, sectionKey))
                         const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
                         const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
@@ -826,12 +907,32 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       </td>
 
                       <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim, width: '50px' }}>
-                        {sections.filter(sec => sec.is_optional).map(sec => (
-                          <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
-                            <span style={{ fontSize: '9px' }}>N/A</span>
-                          </label>
-                        ))}
+                        {sections.filter(sec => sec.is_optional).flatMap(sec => {
+                          if (sec.key === 'pitching_catching') {
+                            const pitchFields = sec.fields.filter(f => f.field_key === 'pitching')
+                            const catchFields = sec.fields.filter(f => f.field_key === 'catching')
+                            return [
+                              pitchFields.length > 0 && (
+                                <label key="pitching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={isNa(player.id, 'pitching')} onChange={() => toggleNa(player.id, 'pitching', pitchFields)} style={{ width: '11px', height: '11px' }} />
+                                  <span style={{ fontSize: '9px' }}>P N/A</span>
+                                </label>
+                              ),
+                              catchFields.length > 0 && (
+                                <label key="catching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={isNa(player.id, 'catching')} onChange={() => toggleNa(player.id, 'catching', catchFields)} style={{ width: '11px', height: '11px' }} />
+                                  <span style={{ fontSize: '9px' }}>C N/A</span>
+                                </label>
+                              ),
+                            ].filter(Boolean)
+                          }
+                          return [(
+                            <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
+                              <span style={{ fontSize: '9px' }}>N/A</span>
+                            </label>
+                          )]
+                        })}
                       </td>
                     </tr>
 
@@ -892,7 +993,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         const field  = allFields[selected.colIdx]
         if (!player || !field) return null
         const val = scores[player.id]?.[field.field_key] ?? null
-        const na  = isNa(player.id, sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? '')
+        const barSecKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
+        const na  = isNa(player.id, fieldNaKey(field.field_key, barSecKey))
         return (
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: '#1a365d', borderTop: '2px solid #2a4a7d', padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
