@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '../../../../../lib/supabase-server'
 import { parseRegistrationFile, ParsedRegistrationRow } from '../../../../../lib/tryouts/import/parseRegistration'
 import { resolvePlayer, CandidatePlayer, MatchStatus } from '../../../../../lib/tryouts/identityResolver'
+import { normalizeName } from '../../../../../lib/tryouts/nameNormalization'
 
 interface MatchReportRow {
   rowIndex:         number
@@ -30,12 +31,13 @@ interface MatchReportRow {
   matchReason:      string | null
   resolvedPlayerId: string | null          // set for auto-matched rows
   candidates:       Array<{
-    id:         string
-    name:       string
-    ageGroup:   string | null
-    dob:        string | null
-    confidence: number
-    reason:     string
+    id:             string
+    name:           string
+    normalizedName: string   // what this candidate normalized to, for debug
+    ageGroup:       string | null
+    dob:            string | null
+    confidence:     number
+    reason:         string
   }>
   // Payload to create if this row becomes a new player
   createPayload:    Omit<ParsedRegistrationRow, 'rowIndex'>
@@ -116,7 +118,7 @@ export async function POST(req: NextRequest) {
       return {
         rowIndex:         row.rowIndex,
         rawName:          row.rawFullName,
-        normalized:       rawName,
+        normalized:       normalizeName(rawName),
         ageGroup:         row.ageGroup,
         dob:              row.dob,
         parentEmail:      row.parentEmail,
@@ -140,7 +142,7 @@ export async function POST(req: NextRequest) {
     return {
       rowIndex:         row.rowIndex,
       rawName:          row.rawFullName,
-      normalized:       rawName,
+      normalized:       result.normalizedInput,
       ageGroup:         row.ageGroup,
       dob:              row.dob,
       parentEmail:      row.parentEmail,
@@ -149,12 +151,13 @@ export async function POST(req: NextRequest) {
       matchReason:      result.topMatch?.matchReason ?? null,
       resolvedPlayerId: result.status === 'auto' ? (result.topMatch?.player.id ?? null) : null,
       candidates:       result.candidates.map(c => ({
-        id:         c.player.id,
-        name:       `${c.player.firstName} ${c.player.lastName}`,
-        ageGroup:   c.player.ageGroup,
-        dob:        c.player.dob,
-        confidence: c.confidence,
-        reason:     c.matchReason,
+        id:             c.player.id,
+        name:           `${c.player.firstName} ${c.player.lastName}`,
+        normalizedName: c.normalizedCandidateName,
+        ageGroup:       c.player.ageGroup,
+        dob:            c.player.dob,
+        confidence:     c.confidence,
+        reason:         c.matchReason,
       })),
       createPayload: row,
     }

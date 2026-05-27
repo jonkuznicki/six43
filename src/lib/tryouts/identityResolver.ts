@@ -29,7 +29,8 @@ export interface CandidatePlayer {
 export interface MatchCandidate {
   player: CandidatePlayer
   confidence: number
-  matchReason: string   // human-readable explanation for the review UI
+  matchReason: string         // human-readable explanation for the review UI
+  normalizedCandidateName: string  // what the candidate normalized to, for debug
 }
 
 export type MatchStatus = 'auto' | 'suggested' | 'unresolved'
@@ -38,6 +39,7 @@ export interface ResolveResult {
   status: MatchStatus
   topMatch: MatchCandidate | null
   candidates: MatchCandidate[]  // top 3, sorted by confidence desc
+  normalizedInput: string       // what the resolver actually compared (for debug)
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ export function resolvePlayer(
   maxResults = 3,
 ): ResolveResult {
   if (!rawName.trim()) {
-    return { status: 'unresolved', topMatch: null, candidates: [] }
+    return { status: 'unresolved', topMatch: null, candidates: [], normalizedInput: '' }
   }
 
   const normalizedRaw  = normalizeName(rawName)
@@ -93,6 +95,19 @@ export function resolvePlayer(
     if (normalizedRaw === canonicalNorm) {
       confidence  = 1.0
       matchReason = 'exact name match'
+    }
+
+    // ── Tier 1.5: First+last match with middle name difference ───────
+    // "James M Smith" vs "James Smith" — one side has exactly 3 words (first +
+    // middle + last). Require exactly 3 to avoid matching compound last names
+    // like "James Van Der Berg" (4 words) against an unrelated "James Berg".
+    else if (
+      (wordCount(normalizedRaw) === 3 || wordCount(canonicalNorm) === 3) &&
+      firstLastOnly(normalizedRaw) === firstLastOnly(canonicalNorm) &&
+      firstLastOnly(normalizedRaw).length >= 5  // guard against very short names
+    ) {
+      confidence  = 0.95
+      matchReason = 'first+last match (middle name ignored)'
     }
 
     // ── Tier 2: DOB match + any name similarity ──────────────────────
@@ -145,7 +160,7 @@ export function resolvePlayer(
       matchReason += ', different age group'
     }
 
-    return { player, confidence, matchReason }
+    return { player, confidence, matchReason, normalizedCandidateName: canonicalNorm }
   })
 
   // Sort by confidence descending, take top N
@@ -155,7 +170,8 @@ export function resolvePlayer(
     .filter(c => c.confidence >= 0.30)   // discard obvious non-matches
 
   if (topCandidates.length === 0) {
-    return { status: 'unresolved', topMatch: null, candidates: [] }
+    console.log(`[identityResolver] UNRESOLVED "${rawName}" → normalized="${normalizedRaw}" — no candidates above 0.30`)
+    return { status: 'unresolved', topMatch: null, candidates: [], normalizedInput: normalizedRaw }
   }
 
   const top = topCandidates[0]
@@ -165,10 +181,18 @@ export function resolvePlayer(
     top.confidence >= CONFIDENCE.SUGGEST ? 'suggested' :
                                            'unresolved'
 
+  // Debug log every resolution so we can see what's happening with real data
+  console.log(
+    `[identityResolver] "${rawName}" → norm="${normalizedRaw}" | status=${status} conf=${top.confidence.toFixed(3)}` +
+    ` | top="${top.normalizedCandidateName}" reason="${top.matchReason}"` +
+    (status !== 'auto' ? ` | pool=${pool.length} candidates=${topCandidates.map(c => `"${c.normalizedCandidateName}"(${c.confidence.toFixed(2)})`).join(', ')}` : '')
+  )
+
   return {
     status,
-    topMatch:   top,
-    candidates: topCandidates,
+    topMatch:        top,
+    candidates:      topCandidates,
+    normalizedInput: normalizedRaw,
   }
 }
 
@@ -199,4 +223,15 @@ function firstNameOnly(fullNormalized: string): string {
 function lastNameOnly(fullNormalized: string): string {
   const parts = fullNormalized.split(' ')
   return parts[parts.length - 1] ?? ''
+}
+
+function wordCount(s: string): number {
+  return s.trim().split(/\s+/).length
+}
+
+/** Returns "firstname lastname" — drops middle names/initials when 3+ words. */
+function firstLastOnly(normalized: string): string {
+  const parts = normalized.trim().split(/\s+/)
+  if (parts.length <= 2) return normalized
+  return `${parts[0]} ${parts[parts.length - 1]}`
 }

@@ -11,6 +11,17 @@
  *   4. After expansion, fuzzy-match against the canonical player list
  */
 
+// ── Punctuation normalization helpers ────────────────────────────────────────
+
+// Various Unicode apostrophe/quote variants that appear in names (O'Brien, D'Angelo)
+const APOSTROPHE_RE = /[‘’‚‛′ʼʹ]/g
+
+// Unicode dashes that appear in hyphenated names (Jean-Paul, Mary-Beth)
+const UNICODE_DASH_RE = /[‐‑‒–—―−﹘﹣－]/g
+
+// Non-printing / non-standard whitespace that trim() misses
+const HIDDEN_WS_RE = /[ ​‌‍­﻿   　]/g
+
 // ── Nickname → canonical first name map ─────────────────────────────────────
 // Keep this in a single place so the resolver and any UI can share it.
 export const NICKNAME_MAP: Record<string, string> = {
@@ -90,20 +101,39 @@ export const NICKNAME_MAP: Record<string, string> = {
   'toby': 'tobias',
 }
 
-// Regex for generational suffixes — strip these before any matching
-const SUFFIX_RE = /\s*(jr\.?|sr\.?|ii|iii|iv)\s*$/i
+// Generational suffixes — also handles ", Jr." (comma before suffix)
+const SUFFIX_RE = /\s*,?\s*(jr\.?|sr\.?|ii|iii|iv)\s*$/i
 
 /**
  * Normalize a raw name string to a consistent lowercase form.
  * Does NOT expand nicknames — do that separately so you can use
  * the normalized (but unexpanded) form for exact matching first.
+ *
+ * Normalization pipeline:
+ *   1. Replace hidden/non-breaking whitespace with a regular space
+ *   2. Collapse multiple spaces
+ *   3. Strip generational suffixes (Jr., Sr., II, III, IV — with or without comma)
+ *   4. Remove apostrophes (all Unicode variants): O'Brien → OBrien, D'Angelo → DAngelo
+ *   5. Normalize hyphens/dashes → space: Jean-Paul → Jean Paul
+ *   6. Remove periods: middle initials (J.), titles (Dr.), abbreviations
+ *   7. Lowercase
+ *   8. Strip anything remaining that's non-alpha, non-space
+ *   9. Re-collapse spaces (dashes/removed chars may have left doubles)
  */
 export function normalizeName(raw: string): string {
   return raw
+    .replace(HIDDEN_WS_RE, ' ')              // hidden whitespace → regular space
     .trim()
-    .replace(/\s+/g, ' ')          // collapse multiple spaces (real data has these)
-    .replace(SUFFIX_RE, '')         // strip Jr., Sr., II, etc.
+    .replace(/\s+/g, ' ')                    // collapse spaces
+    .replace(SUFFIX_RE, '')                  // strip Jr., Sr., II, etc.
+    .replace(APOSTROPHE_RE, '')              // remove all apostrophe variants
+    .replace(UNICODE_DASH_RE, ' ')           // Unicode dashes → space
+    .replace(/-/g, ' ')                      // ASCII hyphen → space
+    .replace(/\./g, '')                      // remove periods (initials, titles)
     .toLowerCase()
+    .replace(/[^a-z\s]/g, '')               // strip non-alpha-space characters
+    .replace(/\s+/g, ' ')                   // collapse spaces again
+    .trim()
 }
 
 /**
