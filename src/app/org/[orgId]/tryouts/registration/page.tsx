@@ -215,7 +215,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     })
     return Array.from(map.entries())
       .map(([team, rows]) => ({ team, rows }))
-      .sort((a, b) => b.rows.length - a.rows.length)
+      .sort((a, b) => (parseInt(a.team.match(/\d+/)?.[0] ?? '999') || 999) - (parseInt(b.team.match(/\d+/)?.[0] ?? '999') || 999))
   }, [returning, players])
 
   // All eligible prior HBA players (used to show coverage: X of Y have registered)
