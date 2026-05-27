@@ -21,9 +21,10 @@ interface ImportJob {
 }
 
 interface Season {
-  id:    string
-  label: string
-  year:  number
+  id:        string
+  label:     string
+  year:      number
+  is_active: boolean
 }
 
 const STATUS_STYLES: Record<string, { color: string; label: string }> = {
@@ -158,17 +159,20 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
         .limit(50),
       supabase
         .from('tryout_seasons')
-        .select('id, label, year')
+        .select('id, label, year, is_active')
         .eq('org_id', params.orgId)
         .order('year', { ascending: false }),
     ])
 
     setJobs(jobData ?? [])
-    const s = seasonData ?? []
+    const s = (seasonData ?? []) as Season[]
     setSeasons(s)
     if (s.length > 0) {
-      setSeasonId(s[0].id)
-      setSeasonYear(String(s[0].year - 1))
+      // Default to the active season so imports land in the same bucket the dashboard reads.
+      // Fall back to most-recent by year if none is marked active.
+      const preferred = s.find(x => x.is_active) ?? s[0]
+      setSeasonId(preferred.id)
+      setSeasonYear(String(preferred.year - 1))
     }
 
     const { data: teamRows } = await supabase
@@ -299,7 +303,9 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
               color: 'var(--fg)', cursor: 'pointer',
             }}>
               {seasons.map(season => (
-                <option key={season.id} value={season.id}>{season.label}</option>
+                <option key={season.id} value={season.id}>
+                  {season.label}{season.is_active ? ' ✓ active' : ''}
+                </option>
               ))}
             </select>
           </div>

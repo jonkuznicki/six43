@@ -305,6 +305,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Write registration staging for auto-matched rows
+  console.log(`[import/registration] staging write: ${autoMatchedRows.length} auto rows, seasonId=${seasonId}`)
   if (autoMatchedRows.length > 0 && seasonId) {
     const stagingRows = autoMatchedRows.map(r => {
       const cp = r.createPayload
@@ -333,8 +334,13 @@ export async function POST(req: NextRequest) {
         registration_date:     cp.registrationDate ?? null,
       }
     })
-    await supabase.from('tryout_registration_staging')
+    const { error: stagingErr } = await supabase.from('tryout_registration_staging')
       .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+    if (stagingErr) {
+      console.error('[import/registration] staging upsert error:', stagingErr.message, stagingErr.details)
+    } else {
+      console.log(`[import/registration] staging upsert OK: ${stagingRows.length} rows → season ${seasonId}`)
+    }
   }
 
   // ── Repair blank first_names via DOB matching ───────────────────────────
