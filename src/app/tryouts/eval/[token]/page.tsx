@@ -1141,7 +1141,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                 {/* Notes header */}
                 <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap', width: '60px' }}>Notes</th>
                 {/* N/A header */}
-                <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 4px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', width: '50px' }} />
+                <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 4px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', width: '80px' }} />
               </tr>
             </thead>
             <tbody>
@@ -1219,7 +1219,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                       </td>
 
                       {/* N/A checkboxes for optional sections */}
-                      <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim, width: '50px' }}>
+                      <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', fontSize: '10px', color: s.dim, width: '80px' }}>
                         {sections.filter(sec => sec.is_optional).flatMap(sec => {
                           if (sec.key === 'pitching_catching') {
                             const pitchFields = sec.fields.filter(f => f.field_key === 'pitching')
