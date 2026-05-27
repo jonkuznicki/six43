@@ -369,7 +369,8 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       if (team) teamRegistered.set(team, (teamRegistered.get(team) ?? 0) + 1)
     })
     const teamLines = Array.from(teamTotals.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .filter(([team]) => !isOther(team))
+      .sort((a, b) => (parseInt(a[0].match(/\d+/)?.[0] ?? '999') || 999) - (parseInt(b[0].match(/\d+/)?.[0] ?? '999') || 999))
       .map(([team, total]) => {
         const reg = teamRegistered.get(team) ?? 0
         return `  • ${team} — ${reg} of ${total} registered`
