@@ -334,12 +334,23 @@ export async function POST(req: NextRequest) {
         registration_date:     cp.registrationDate ?? null,
       }
     })
+    // Deduplicate by player_id: if the same player registered twice in the file,
+    // keep the last row. Sending duplicate player_id+season_id pairs in one batch
+    // causes Postgres to throw "ON CONFLICT DO UPDATE command cannot affect row a
+    // second time" and the entire upsert fails.
+    const dedupedRows = Array.from(
+      stagingRows.reduce((map, row) => map.set(row.player_id, row), new Map<string | null, typeof stagingRows[0]>()).values()
+    )
+    if (dedupedRows.length < stagingRows.length) {
+      console.warn(`[import/registration] deduped ${stagingRows.length - dedupedRows.length} duplicate player(s) from staging batch`)
+    }
+
     const { error: stagingErr } = await supabase.from('tryout_registration_staging')
-      .upsert(stagingRows, { onConflict: 'player_id,season_id' })
+      .upsert(dedupedRows, { onConflict: 'player_id,season_id' })
     if (stagingErr) {
       console.error('[import/registration] staging upsert error:', stagingErr.message, stagingErr.details)
     } else {
-      console.log(`[import/registration] staging upsert OK: ${stagingRows.length} rows → season ${seasonId}`)
+      console.log(`[import/registration] staging upsert OK: ${dedupedRows.length} rows → season ${seasonId}`)
     }
   }
 
