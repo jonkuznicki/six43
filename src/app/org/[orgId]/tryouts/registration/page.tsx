@@ -178,7 +178,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     })
     return Array.from(map.entries())
       .map(([ag, count]) => ({ ag, count }))
-      .sort((a, b) => a.ag.localeCompare(b.ag))
+      .sort((a, b) => (parseInt(a.ag) || 999) - (parseInt(b.ag) || 999))
   }, [filtered])
 
   const byDate = useMemo(() => {
