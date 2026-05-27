@@ -321,7 +321,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     const ageCounts = new Map<string, number>()
     regs.forEach(r => { const k = r.age_group ?? 'Unknown'; ageCounts.set(k, (ageCounts.get(k) ?? 0) + 1) })
     const ageLines = Array.from(ageCounts.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => (parseInt(a[0]) || 999) - (parseInt(b[0]) || 999))
       .map(([ag, n]) => `  • ${ag}: ${n}`)
       .join('\n')
 
@@ -355,6 +355,31 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       lines.push(`${allMissing.length} prior HBA player${allMissing.length === 1 ? '' : 's'} ${allMissing.length === 1 ? 'has' : 'have'} not yet signed up.`)
     } else if (eligibleHbaPlayers.length > 0) {
       lines.push('All prior HBA players have registered — great turnout!')
+    }
+
+    // Returning players by team
+    const teamTotals = new Map<string, number>()
+    eligibleHbaPlayers.forEach(p => {
+      if (p.prior_team) teamTotals.set(p.prior_team, (teamTotals.get(p.prior_team) ?? 0) + 1)
+    })
+    const teamRegistered = new Map<string, number>()
+    allReturning.forEach(r => {
+      const p = players.find(pl => pl.id === r.player_id)
+      const team = p?.prior_team
+      if (team) teamRegistered.set(team, (teamRegistered.get(team) ?? 0) + 1)
+    })
+    const teamLines = Array.from(teamTotals.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([team, total]) => {
+        const reg = teamRegistered.get(team) ?? 0
+        return `  • ${team} — ${reg} of ${total} registered`
+      })
+      .join('\n')
+
+    if (teamLines) {
+      lines.push('')
+      lines.push('Returning players by team:')
+      lines.push(teamLines)
     }
 
     lines.push('')
