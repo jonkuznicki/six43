@@ -52,9 +52,9 @@ function MiniBar({ value, total, color }: { value: number; total: number; color:
   )
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Card({ children, style, className }: { children: React.ReactNode; style?: React.CSSProperties; className?: string }) {
   return (
-    <div style={{
+    <div className={className} style={{
       background: 'white',
       border: '1px solid #e8eaed',
       borderRadius: 12,
@@ -444,13 +444,26 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     <div className="page-wide" style={{ padding: '2rem 1.5rem 6rem', background: '#f5f6f8', minHeight: '100vh' }}>
 
       {/* ── Header ── */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#111' }}>Registration Dashboard</h1>
-        <div style={{ fontSize: 13, color: s.muted, marginTop: 4 }}>{season.label}</div>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#111' }}>Registration Dashboard</h1>
+          <div style={{ fontSize: 13, color: s.muted, marginTop: 4 }}>{season.label}</div>
+        </div>
+        <button
+          className="no-print"
+          onClick={() => window.print()}
+          style={{
+            padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+            border: '1px solid #dde0e5', background: 'white', color: '#555',
+            cursor: 'pointer', marginTop: 4,
+          }}
+        >
+          Export PDF
+        </button>
       </div>
 
       {/* ── Filters ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: s.dim, marginRight: 2 }}>Age:</span>
           {['all', ...ageGroups].map(ag => (
@@ -605,7 +618,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
             </span>
           </div>
           {missingPlayers.length > 0 && (
-            <button onClick={() => setShowMissing(x => !x)} style={{
+            <button className="no-print" onClick={() => setShowMissing(x => !x)} style={{
               fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showMissing ? 'Hide' : 'Show'}
@@ -655,7 +668,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
             </span>
           </div>
           {newPlayers.length > 0 && (
-            <button onClick={() => setShowNewPlayers(x => !x)} style={{
+            <button className="no-print" onClick={() => setShowNewPlayers(x => !x)} style={{
               fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showNewPlayers ? 'Hide' : 'Show'}
@@ -720,7 +733,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </Card>
 
       {/* ── Board Update ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card className="no-print" style={{ marginBottom: 16 }}>
         <div style={{
           padding: '13px 18px', borderBottom: '1px solid #f0f1f3',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -778,7 +791,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
             )}
           </div>
           {(issues.length > 0 || duplicates.length > 0) && (
-            <button onClick={() => setShowIssues(x => !x)} style={{
+            <button className="no-print" onClick={() => setShowIssues(x => !x)} style={{
               fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showIssues ? 'Hide' : 'Show'}

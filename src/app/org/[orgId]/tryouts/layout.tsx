@@ -80,7 +80,7 @@ export default function TryoutsLayout({
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
 
       {/* ── Sidebar ── */}
-      <nav style={{
+      <nav className="tryout-sidebar" style={{
         width: '188px', flexShrink: 0,
         position: 'fixed', top: 0, left: 0, bottom: 0,
         overflowY: 'auto',
@@ -139,7 +139,7 @@ export default function TryoutsLayout({
       </nav>
 
       {/* ── Content ── */}
-      <div style={{ marginLeft: '188px', flex: 1, minWidth: 0 }}>
+      <div className="tryout-content" style={{ marginLeft: '188px', flex: 1, minWidth: 0 }}>
         {children}
       </div>
     </div>
