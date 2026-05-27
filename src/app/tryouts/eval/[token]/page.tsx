@@ -293,7 +293,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoScore(); return }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoScore(); return }
 
-    const cellNa = isNa(player.id, sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? '')
+    const secKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
+    const cellNa = isNa(player.id, fieldNaKey(field.field_key, secKey))
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
       commitScore(player.id, field.field_key, parseInt(e.key))
@@ -314,13 +315,13 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     if (e.key === 'Escape')     { setSelected(null); return }
   }
 
-  function toggleNa(playerId: string, sectionKey: string, fields: EvalField[]) {
+  function toggleNa(playerId: string, naKey: string, fields: EvalField[]) {
     setNaFlags(prev => {
       const cur = new Set(prev[playerId] ?? [])
-      if (cur.has(sectionKey)) {
-        cur.delete(sectionKey)
+      if (cur.has(naKey)) {
+        cur.delete(naKey)
       } else {
-        cur.add(sectionKey)
+        cur.add(naKey)
         setScores(ps => {
           const ps2 = { ...(ps[playerId] ?? {}) }
           for (const f of fields) delete ps2[f.field_key]
@@ -331,8 +332,14 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     })
   }
 
-  function isNa(playerId: string, sectionKey: string) {
-    return naFlags[playerId]?.has(sectionKey) ?? false
+  function isNa(playerId: string, naKey: string) {
+    return naFlags[playerId]?.has(naKey) ?? false
+  }
+
+  // For pitching_catching fields, N/A is tracked per field_key (pitching vs catching)
+  // rather than per section, so coaches can mark them independently.
+  function fieldNaKey(fieldKey: string, sectionKey: string): string {
+    return sectionKey === 'pitching_catching' ? fieldKey : sectionKey
   }
 
   // Progress: required fields filled for each player
@@ -859,7 +866,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                       </td>
                       {allFields.map(f => {
                         const v = ps[f.field_key] ?? null
-                        const na = isNa(p.id, sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? '')
+                        const fSecKey = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
+                        const na = isNa(p.id, fieldNaKey(f.field_key, fSecKey))
                         return (
                           <td key={f.field_key} style={{ padding: '4px 2px', textAlign: 'center' }}>
                             <span style={{
@@ -1086,7 +1094,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                       {/* Score cells */}
                       {allFields.map((field, fi) => {
                         const val = ps[field.field_key] ?? null
-                        const na = isNa(player.id, sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? '')
+                        const cellSecKey = sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? ''
+                        const na = isNa(player.id, fieldNaKey(field.field_key, cellSecKey))
                         const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
                         const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
@@ -1133,12 +1142,32 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
                       {/* N/A checkboxes for optional sections */}
                       <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: '10px', color: s.dim, width: '50px' }}>
-                        {sections.filter(sec => sec.is_optional).map(sec => (
-                          <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
-                            <span style={{ fontSize: '9px' }}>N/A</span>
-                          </label>
-                        ))}
+                        {sections.filter(sec => sec.is_optional).flatMap(sec => {
+                          if (sec.key === 'pitching_catching') {
+                            const pitchFields = sec.fields.filter(f => f.field_key === 'pitching')
+                            const catchFields = sec.fields.filter(f => f.field_key === 'catching')
+                            return [
+                              pitchFields.length > 0 && (
+                                <label key="pitching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={isNa(player.id, 'pitching')} onChange={() => toggleNa(player.id, 'pitching', pitchFields)} style={{ width: '11px', height: '11px' }} />
+                                  <span style={{ fontSize: '9px' }}>P N/A</span>
+                                </label>
+                              ),
+                              catchFields.length > 0 && (
+                                <label key="catching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={isNa(player.id, 'catching')} onChange={() => toggleNa(player.id, 'catching', catchFields)} style={{ width: '11px', height: '11px' }} />
+                                  <span style={{ fontSize: '9px' }}>C N/A</span>
+                                </label>
+                              ),
+                            ].filter(Boolean)
+                          }
+                          return [(
+                            <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
+                              <span style={{ fontSize: '9px' }}>N/A</span>
+                            </label>
+                          )]
+                        })}
                       </td>
                     </tr>
 
@@ -1207,7 +1236,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         const field  = allFields[selected.colIdx]
         if (!player || !field) return null
         const val = scores[player.id]?.[field.field_key] ?? null
-        const na  = isNa(player.id, sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? '')
+        const barSecKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
+        const na  = isNa(player.id, fieldNaKey(field.field_key, barSecKey))
         return (
           <div style={{
             position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
