@@ -115,6 +115,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   const [showNewPlayers, setShowNewPlayers] = useState(false)
 
   const [newSort, setNewSort] = useState<{ col: NewPlayerSortCol; dir: SortDir }>({ col: 'name', dir: 'asc' })
+  const [copied,  setCopied]  = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -295,6 +296,101 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       return va.localeCompare(vb) * sign
     })
   }, [newPlayers, newSort])
+
+  // ── Board update email text ────────────────────────────────────────────────
+
+  const emailSummary = useMemo(() => {
+    if (!season || regs.length === 0) return ''
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+    // Always use all regs (not filtered) so the board update is complete
+    const allReturning = regs.filter(r => {
+      if (isOther(r.prior_team) || isOther(r.prior_org)) return false
+      const p = players.find(pl => pl.id === r.player_id)
+      return p && p.prior_team != null
+    })
+    const allNew = regs.filter(r => {
+      if (isOther(r.prior_team) || isOther(r.prior_org)) return true
+      const p = players.find(pl => pl.id === r.player_id)
+      return !p || p.prior_team == null
+    })
+    const allMissing = activePlayers.filter(p =>
+      p.prior_team != null && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p)
+    )
+
+    const ageCounts = new Map<string, number>()
+    regs.forEach(r => { const k = r.age_group ?? 'Unknown'; ageCounts.set(k, (ageCounts.get(k) ?? 0) + 1) })
+    const ageLines = Array.from(ageCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([ag, n]) => `  • ${ag}: ${n}`)
+      .join('\n')
+
+    const dateCounts = new Map<string, number>()
+    regs.forEach(r => { if (r.preferred_tryout_date) dateCounts.set(r.preferred_tryout_date, (dateCounts.get(r.preferred_tryout_date) ?? 0) + 1) })
+    const dateLines = Array.from(dateCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, n]) => {
+        const label = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        return `  • ${label}: ${n} player${n === 1 ? '' : 's'}`
+      }).join('\n')
+
+    const orgMap = new Map<string, number>()
+    allNew.forEach(r => { const k = normalizeOrg(orgLabel(r)); orgMap.set(k, (orgMap.get(k) ?? 0) + 1) })
+    const orgList = Array.from(orgMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([org, n]) => `${org} (${n})`).join(', ')
+
+    const returningPct = pct(allReturning.length, eligibleHbaPlayers.length)
+
+    const lines: string[] = [
+      `HBA Tryout Registration Update — ${season.label}`,
+      `As of ${today}`,
+      '',
+      `We currently have ${regs.length} player${regs.length === 1 ? '' : 's'} registered for ${season.label} tryouts.`,
+      '',
+      `Returning HBA players: ${allReturning.length} of ${eligibleHbaPlayers.length} eligible players have registered (${returningPct}%).`,
+    ]
+
+    if (allMissing.length > 0) {
+      lines.push(`${allMissing.length} prior HBA player${allMissing.length === 1 ? '' : 's'} ${allMissing.length === 1 ? 'has' : 'have'} not yet signed up.`)
+    } else if (eligibleHbaPlayers.length > 0) {
+      lines.push('All prior HBA players have registered — great turnout!')
+    }
+
+    lines.push('')
+    lines.push(`New / non-HBA players: ${allNew.length} (${pct(allNew.length, regs.length)}% of registrations).`)
+    if (orgList) lines.push(`Sources: ${orgList}.`)
+
+    if (ageLines) {
+      lines.push('')
+      lines.push('Registrations by age group:')
+      lines.push(ageLines)
+    }
+
+    if (dateLines) {
+      lines.push('')
+      lines.push('Preferred tryout dates:')
+      lines.push(dateLines)
+    }
+
+    const noteItems = [
+      issues.length    > 0 && `${issues.length} registration${issues.length === 1 ? '' : 's'} with incomplete data`,
+      duplicates.length > 0 && `${duplicates.length} duplicate registration${duplicates.length === 1 ? '' : 's'}`,
+    ].filter(Boolean)
+    if (noteItems.length > 0) {
+      lines.push('')
+      lines.push(`Note: ${noteItems.join('; ')}.`)
+    }
+
+    return lines.join('\n')
+  }, [regs, players, activePlayers, registeredIds, eligibleHbaPlayers, issues, duplicates, season])
+
+  function copyToClipboard() {
+    navigator.clipboard.writeText(emailSummary).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    })
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -594,6 +690,44 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
             </div>
           ))}
           <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of new / non-HBA players</div>
+        </div>
+      </Card>
+
+      {/* ── Board Update ── */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{
+          padding: '13px 18px', borderBottom: '1px solid #f0f1f3',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Board Update</span>
+            <span style={{ fontSize: 12, color: s.dim, marginLeft: 10 }}>ready to copy into an email</span>
+          </div>
+          <button
+            onClick={copyToClipboard}
+            style={{
+              padding: '5px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+              border: `1px solid ${copied ? '#b2dfbb' : '#dde0e5'}`,
+              background: copied ? '#f0fff4' : 'white',
+              color: copied ? '#3a9e4a' : '#555',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+        <div style={{ padding: '14px 18px' }}>
+          <textarea
+            readOnly
+            value={emailSummary}
+            style={{
+              width: '100%', border: '1px solid #e8eaed', outline: 'none',
+              background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
+              fontSize: 13, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7,
+              color: '#333', resize: 'vertical', minHeight: 260,
+              boxSizing: 'border-box',
+            }}
+          />
         </div>
       </Card>
 
