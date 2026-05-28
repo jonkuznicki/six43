@@ -158,6 +158,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   const [teamTokens,   setTeamTokens]   = useState<Record<string, string>>({}) // team_label → token uuid
   const [tokenBusy,    setTokenBusy]    = useState<string | null>(null)         // team_label currently generating
   const [copiedTeam,   setCopiedTeam]   = useState<string | null>(null)
+  const [copiedPortal, setCopiedPortal] = useState(false)
   const [unlocking,    setUnlocking]    = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
@@ -603,7 +604,20 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
           })
         return (
           <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Team eval links</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700 }}>Team eval links</div>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/tryouts/eval/org/${params.orgId}`
+                  navigator.clipboard.writeText(url)
+                  setCopiedPortal(true)
+                  setTimeout(() => setCopiedPortal(false), 2500)
+                }}
+                style={{ padding: '5px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: copiedPortal ? 'rgba(109,184,117,0.12)' : 'var(--bg-input)', color: copiedPortal ? '#6DB875' : s.muted, fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+              >
+                {copiedPortal ? '✓ Portal link copied' : '⎘ Copy Coach Portal Link'}
+              </button>
+            </div>
             <div style={{ fontSize: '12px', color: s.muted, marginBottom: '12px' }}>
               Each link locks the form to that team's roster. Copy and send to the coach — no account required.
             </div>
