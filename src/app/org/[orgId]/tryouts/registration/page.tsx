@@ -357,11 +357,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       lines.push('All prior HBA players have registered — great turnout!')
     }
 
-    // Returning players by team
+    // Returning players by team — use all prior HBA players (not eligibleHbaPlayers) so
+    // the denominator stays stable even as age_group gets updated for 14U-aging players
     const teamTotals = new Map<string, number>()
-    eligibleHbaPlayers.forEach(p => {
-      if (p.prior_team) teamTotals.set(p.prior_team, (teamTotals.get(p.prior_team) ?? 0) + 1)
-    })
+    activePlayers
+      .filter(p => p.prior_team != null && !p.is_walkup)
+      .forEach(p => {
+        if (p.prior_team) teamTotals.set(p.prior_team, (teamTotals.get(p.prior_team) ?? 0) + 1)
+      })
     const teamRegistered = new Map<string, number>()
     allReturning.forEach(r => {
       const p = players.find(pl => pl.id === r.player_id)
