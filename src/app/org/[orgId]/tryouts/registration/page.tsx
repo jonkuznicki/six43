@@ -114,7 +114,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   const [showIssues,     setShowIssues]     = useState(false)
   const [showNewPlayers, setShowNewPlayers] = useState(false)
 
-  const [newSort, setNewSort] = useState<{ col: NewPlayerSortCol; dir: SortDir }>({ col: 'name', dir: 'asc' })
+  const [newSort, setNewSort] = useState<{ col: NewPlayerSortCol; dir: SortDir }>({ col: 'age', dir: 'asc' })
   const [copied,  setCopied]  = useState(false)
 
   useEffect(() => { loadData() }, [])
@@ -287,9 +287,16 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     const { col, dir } = newSort
     const sign = dir === 'asc' ? 1 : -1
     return [...newPlayers].sort((a, b) => {
+      if (col === 'age') {
+        const na = parseInt(a.age_group ?? '999') || 999
+        const nb = parseInt(b.age_group ?? '999') || 999
+        if (na !== nb) return (na - nb) * sign
+        const nameA = `${a.player_last_name ?? ''} ${a.player_first_name ?? ''}`
+        const nameB = `${b.player_last_name ?? ''} ${b.player_first_name ?? ''}`
+        return nameA.localeCompare(nameB)
+      }
       let va = '', vb = ''
       if (col === 'name')   { va = `${a.player_last_name ?? ''} ${a.player_first_name ?? ''}`; vb = `${b.player_last_name ?? ''} ${b.player_first_name ?? ''}` }
-      if (col === 'age')    { va = a.age_group ?? ''; vb = b.age_group ?? '' }
       if (col === 'org')    { va = orgLabel(a); vb = orgLabel(b) }
       if (col === 'school') { va = a.school ?? ''; vb = b.school ?? '' }
       if (col === 'date')   { va = a.preferred_tryout_date ?? ''; vb = b.preferred_tryout_date ?? '' }
