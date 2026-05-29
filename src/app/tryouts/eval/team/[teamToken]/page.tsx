@@ -256,10 +256,12 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     let filled = 0
     for (const p of players) {
       const ps = scores[p.id] ?? {}
-      if (required.every(k => ps[k] != null)) filled++
+      const scoresOk  = required.every(k => ps[k] != null)
+      const commentOk = !!playerComments[p.id]?.trim()
+      if (scoresOk && commentOk) filled++
     }
     return { filled, total: players.length, pct: players.length > 0 ? Math.round(filled / players.length * 100) : 0 }
-  }, [scores, players, sections])
+  }, [scores, players, sections, playerComments])
 
   function commitScore(playerId: string, fieldKey: string, val: number | null) {
     setScores(prev => {
@@ -353,6 +355,20 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
   async function handleSubmit() {
     if (!coachName.trim()) { setSubmitError('Please enter your name.'); return }
+
+    const reqKeys = sections.filter(s => !s.is_optional).flatMap(s => s.fields).map(f => f.field_key)
+    const incomplete = players.filter(p => {
+      const ps = scores[p.id] ?? {}
+      return reqKeys.some(k => ps[k] == null) || !playerComments[p.id]?.trim()
+    })
+    if (incomplete.length > 0) {
+      setSubmitError(
+        `Please complete all player scores and comments before submitting — ` +
+        `${incomplete.length} player${incomplete.length !== 1 ? 's' : ''} still need${incomplete.length === 1 ? 's' : ''} attention.`
+      )
+      return
+    }
+
     setSubmitting(true); setSubmitError(null)
 
     const playerScores: Record<string, Record<string, number>> = {}
@@ -626,17 +642,44 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   // ── Step: review ──────────────────────────────────────────────────────────
   if (step === 'review') {
     const requiredFields = sections.filter(s => !s.is_optional).flatMap(s => s.fields)
+
+    const playerStatus = players.map(p => {
+      const ps = scores[p.id] ?? {}
+      const missingScores = requiredFields.filter(f => {
+        const sk = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
+        return ps[f.field_key] == null && !isNa(p.id, fieldNaKey(f.field_key, sk))
+      })
+      const hasComment = !!(playerComments[p.id]?.trim())
+      return { player: p, missingScores, hasComment, complete: missingScores.length === 0 && hasComment }
+    })
+    const allComplete    = playerStatus.every(st => st.complete)
+    const incompleteList = playerStatus.filter(st => !st.complete)
+
     return (
       <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
+        {/* Sticky header */}
         <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: '12px 1.5rem' }}>
           <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>Review — {formData.selected_team}</div>
               <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {allComplete ? (
+                <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(109,184,117,0.15)', color: '#2f855a', border: '0.5px solid rgba(109,184,117,0.3)' }}>
+                  ✓ Ready to submit
+                </span>
+              ) : (
+                <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', background: 'rgba(232,160,32,0.1)', color: '#B7791F', border: '0.5px solid rgba(232,160,32,0.3)' }}>
+                  ⚠ {incompleteList.length} player{incompleteList.length !== 1 ? 's' : ''} incomplete
+                </span>
+              )}
               <button onClick={() => setStep('score')} style={{ padding: '7px 16px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: 'var(--fg)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>← Back to edit</button>
-              <button onClick={handleSubmit} disabled={submitting} style={{ padding: '7px 18px', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || !allComplete}
+                style={{ padding: '7px 18px', borderRadius: '6px', border: 'none', background: allComplete ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.12)', color: allComplete ? 'var(--accent-text)' : s.dim, fontSize: '13px', fontWeight: 700, cursor: allComplete ? 'pointer' : 'not-allowed', opacity: submitting ? 0.6 : 1 }}
+              >
                 {submitting ? 'Submitting…' : 'Submit →'}
               </button>
             </div>
@@ -644,9 +687,34 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         </div>
 
         <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 1.5rem 6rem' }}>
+
+          {/* Validation banner */}
+          {!allComplete && (
+            <div style={{ padding: '12px 16px', background: 'rgba(232,160,32,0.07)', border: '0.5px solid rgba(232,160,32,0.25)', borderRadius: '10px', marginBottom: '1.25rem' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: '#B7791F', marginBottom: '8px' }}>
+                Please complete all player scores and comments before submitting.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {incompleteList.map(st => (
+                  <div key={st.player.id} style={{ fontSize: '12px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--fg)', minWidth: '140px' }}>{st.player.last_name}, {st.player.first_name}</span>
+                    <span style={{ color: s.muted }}>
+                      {[
+                        st.missingScores.length > 0 && `${st.missingScores.length} score${st.missingScores.length !== 1 ? 's' : ''} missing`,
+                        !st.hasComment && 'no comment',
+                      ].filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {submitError && (
             <div style={{ padding: '10px 14px', background: 'rgba(232,112,96,0.1)', border: '0.5px solid rgba(232,112,96,0.3)', borderRadius: '8px', fontSize: '13px', color: '#E87060', marginBottom: '1rem' }}>{submitError}</div>
           )}
+
+          {/* Scores table */}
           <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
@@ -657,18 +725,20 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       {f.label.length > 9 ? f.label.slice(0, 8) + '…' : f.label}
                     </th>
                   ))}
-                  <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', minWidth: '160px' }}>Comments</th>
+                  <th style={{ textAlign: 'center', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', minWidth: '80px' }}>Comment</th>
                 </tr>
               </thead>
               <tbody>
                 {players.map((p, i) => {
                   const ps = scores[p.id] ?? {}
-                  const complete = requiredFields.every(f => ps[f.field_key] != null)
+                  const st = playerStatus[i]
                   return (
                     <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
-                      <td style={{ padding: '7px 10px', fontWeight: 600, position: 'sticky', left: 0, background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg)', zIndex: 1 }}>
+                      <td style={{ padding: '7px 10px', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 1 }}>
+                        <span style={{ marginRight: '5px', fontSize: '11px', color: st.complete ? '#2f855a' : '#B7791F' }}>
+                          {st.complete ? '✓' : '⚠'}
+                        </span>
                         {p.last_name}, {p.first_name}
-                        {!complete && <span title="Missing required scores" style={{ fontSize: '10px', color: '#E8A020', marginLeft: '4px' }}>⚠</span>}
                       </td>
                       {allFields.map(f => {
                         const v = ps[f.field_key] ?? null
@@ -682,8 +752,11 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                           </td>
                         )
                       })}
-                      <td style={{ padding: '7px 10px', fontSize: '12px', color: s.muted, maxWidth: '200px' }}>
-                        {playerComments[p.id] ? <span>{playerComments[p.id].length > 60 ? playerComments[p.id].slice(0, 58) + '…' : playerComments[p.id]}</span> : <span style={{ opacity: 0.35, fontStyle: 'italic' }}>—</span>}
+                      <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                        {st.hasComment
+                          ? <span style={{ fontSize: '11px', fontWeight: 700, color: '#2f855a' }}>✓</span>
+                          : <span style={{ fontSize: '11px', fontWeight: 700, color: '#C05621' }}>⚠ Missing</span>
+                        }
                       </td>
                     </tr>
                   )
@@ -692,6 +765,32 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
             </table>
           </div>
 
+          {/* Player comments — full text */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px' }}>Player Comments</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {players.map(p => {
+                const comment    = playerComments[p.id]?.trim()
+                const hasComment = !!comment
+                return (
+                  <div key={p.id} style={{ background: 'var(--bg-card)', border: `0.5px solid ${hasComment ? 'var(--border)' : 'rgba(232,160,32,0.35)'}`, borderRadius: '8px', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasComment ? '6px' : 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px' }}>{p.first_name} {p.last_name}</span>
+                      {!hasComment && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#C05621', background: 'rgba(232,160,32,0.08)', padding: '2px 8px', borderRadius: '10px' }}>⚠ Required</span>
+                      )}
+                    </div>
+                    {hasComment
+                      ? <p style={{ margin: 0, fontSize: '13px', color: s.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{comment}</p>
+                      : <p style={{ margin: 0, fontSize: '12px', color: s.dim, fontStyle: 'italic' }}>No comment entered — go back and add one before submitting.</p>
+                    }
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Overall notes */}
           {overallNotes.trim() && (
             <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', padding: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: s.dim, marginBottom: '6px' }}>Overall season notes</div>
@@ -700,7 +799,11 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
           )}
 
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button onClick={handleSubmit} disabled={submitting} style={{ padding: '12px 28px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !allComplete}
+              style={{ padding: '12px 28px', borderRadius: '8px', border: 'none', background: allComplete ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.12)', color: allComplete ? 'var(--accent-text)' : s.dim, fontSize: '14px', fontWeight: 700, cursor: allComplete ? 'pointer' : 'not-allowed', opacity: submitting ? 0.6 : 1 }}
+            >
               {submitting ? 'Submitting…' : 'Submit evaluations'}
             </button>
             <button onClick={() => setStep('score')} style={{ padding: '12px 16px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer' }}>
@@ -868,7 +971,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                 const complete = required.every(f => {
                   const sk = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
                   return ps[f.field_key] != null || isNa(player.id, fieldNaKey(f.field_key, sk))
-                })
+                }) && !!playerComments[player.id]?.trim()
                 const rowBg = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
                 const hasComment = !!(playerComments[player.id]?.trim())
                 const commentOpen = expandedComment === player.id
