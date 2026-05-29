@@ -907,32 +907,34 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       </td>
 
                       <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', fontSize: '10px', color: s.dim, width: '80px' }}>
-                        {sections.filter(sec => sec.is_optional).flatMap(sec => {
-                          if (sec.key === 'pitching_catching') {
-                            const pitchFields = sec.fields.filter(f => f.field_key === 'pitching')
-                            const catchFields = sec.fields.filter(f => f.field_key === 'catching')
-                            return [
-                              pitchFields.length > 0 && (
-                                <label key="pitching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                                  <input type="checkbox" checked={isNa(player.id, 'pitching')} onChange={() => toggleNa(player.id, 'pitching', pitchFields)} style={{ width: '11px', height: '11px' }} />
-                                  <span style={{ fontSize: '9px' }}>P N/A</span>
-                                </label>
-                              ),
-                              catchFields.length > 0 && (
-                                <label key="catching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                                  <input type="checkbox" checked={isNa(player.id, 'catching')} onChange={() => toggleNa(player.id, 'catching', catchFields)} style={{ width: '11px', height: '11px' }} />
-                                  <span style={{ fontSize: '9px' }}>C N/A</span>
-                                </label>
-                              ),
-                            ].filter(Boolean)
-                          }
-                          return [(
-                            <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                              <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
-                              <span style={{ fontSize: '9px' }}>N/A</span>
-                            </label>
-                          )]
-                        })}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {sections.filter(sec => sec.is_optional).flatMap(sec => {
+                            if (sec.key === 'pitching_catching') {
+                              const pitchFields = sec.fields.filter(f => f.field_key === 'pitching')
+                              const catchFields = sec.fields.filter(f => f.field_key === 'catching')
+                              return [
+                                pitchFields.length > 0 && (
+                                  <label key="pitching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={isNa(player.id, 'pitching')} onChange={() => toggleNa(player.id, 'pitching', pitchFields)} style={{ width: '11px', height: '11px' }} />
+                                    <span style={{ fontSize: '9px' }}>P N/A</span>
+                                  </label>
+                                ),
+                                catchFields.length > 0 && (
+                                  <label key="catching" style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={isNa(player.id, 'catching')} onChange={() => toggleNa(player.id, 'catching', catchFields)} style={{ width: '11px', height: '11px' }} />
+                                    <span style={{ fontSize: '9px' }}>C N/A</span>
+                                  </label>
+                                ),
+                              ].filter(Boolean)
+                            }
+                            return [(
+                              <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
+                                <span style={{ fontSize: '9px' }}>N/A</span>
+                              </label>
+                            )]
+                          })}
+                        </div>
                       </td>
                     </tr>
 
