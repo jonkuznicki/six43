@@ -292,6 +292,7 @@ export default function GamesDesktopLayout({
         <div className="games-preview-panel">
           {selectedGame ? (
             <GamePreviewPanel
+              key={selectedGame.id}
               game={selectedGame}
               inningsPerGame={inningsPerGame}
               teamName={teamName}
