@@ -386,7 +386,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         .every((s: any) => (s.inning_positions ?? []).every((p: any) => !p))
     const alreadyChose = typeof window !== 'undefined' &&
       localStorage.getItem(`six43_batting_chose_${params.id}`) === '1'
-    const noSlots = noPositions && !alreadyChose
+    // If there are truly no DB slots, always show the modal — alreadyChose only suppresses
+    // the modal when slots exist but all positions are blank (user chose "start fresh")
+    const noSlots = !slotData?.length || (noPositions && !alreadyChose)
     if (noSlots && gameData?.season_id) {
       let recentGamesQuery = supabase
         .from('games')
