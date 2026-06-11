@@ -40,12 +40,14 @@ const SECTION_LABELS: Record<string, string> = {
   athleticism:       'Athleticism',
 }
 
+const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+
 function scoreColor(v: number | null): string {
   if (v == null) return 'transparent'
-  if (v === 5) return 'rgba(109,184,117,0.45)'
-  if (v === 4) return 'rgba(109,184,117,0.2)'
-  if (v === 3) return 'rgba(80,160,232,0.18)'
-  if (v === 2) return 'rgba(232,140,40,0.2)'
+  if (v >= 4.5) return 'rgba(109,184,117,0.45)'
+  if (v >= 3.5) return 'rgba(109,184,117,0.2)'
+  if (v >= 2.5) return 'rgba(80,160,232,0.18)'
+  if (v >= 1.5) return 'rgba(232,140,40,0.2)'
   return 'rgba(232,80,80,0.22)'
 }
 
@@ -314,6 +316,15 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       e.preventDefault()
       commitScore(player.id, field.field_key, parseInt(e.key))
       moveSelected(0, 1, numRows, numCols)
+      return
+    }
+    if (!cellNa && e.key === '.') {
+      e.preventDefault()
+      const cur = scores[player.id]?.[field.field_key] ?? null
+      if (cur != null) {
+        const next = Number.isInteger(cur) && cur < 5 ? cur + 0.5 : Math.floor(cur)
+        commitScore(player.id, field.field_key, next)
+      }
       return
     }
     if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
@@ -1101,15 +1112,15 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
             {na ? (
               <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: '6px 0' }}>N/A for this player</div>
             ) : (
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                {[1, 2, 3, 4, 5].map(v => (
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                {SCORE_OPTIONS.map(v => (
                   <button key={v} onClick={() => {
                     if (val === v) { commitScore(player.id, field.field_key, null) }
                     else { commitScore(player.id, field.field_key, v); moveSelected(0, 1, players.length, allFields.length) }
-                  }} style={{ flex: 1, height: '48px', borderRadius: '8px', border: 'none', background: val === v ? '#ffffff' : 'rgba(255,255,255,0.15)', color: val === v ? '#1a365d' : '#ffffff', fontSize: '20px', fontWeight: 800, cursor: 'pointer' }}>{v}</button>
+                  }} style={{ flex: 1, height: '44px', borderRadius: '6px', border: 'none', background: val === v ? '#ffffff' : 'rgba(255,255,255,0.15)', color: val === v ? '#1a365d' : '#ffffff', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{v}</button>
                 ))}
                 {val != null && (
-                  <button onClick={() => commitScore(player.id, field.field_key, null)} style={{ width: '44px', height: '48px', borderRadius: '8px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '18px', cursor: 'pointer', flexShrink: 0 }}>×</button>
+                  <button onClick={() => commitScore(player.id, field.field_key, null)} style={{ width: '36px', height: '44px', borderRadius: '6px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>×</button>
                 )}
               </div>
             )}

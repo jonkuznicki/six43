@@ -31,7 +31,9 @@ const SECTION_LABELS: Record<string, string> = {
   intangibles:       'Intangibles',
 }
 
-const SCALE = '5=Exceptional · 4=Above age · 3=Age appropriate · 2=Below age · 1=Needs work'
+const SCALE = '5=Exceptional · 4=Above age · 3=Age appropriate · 2=Below age · 1=Needs work · half-point values (1.5, 2.5…) allowed'
+
+const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
 
 export default function CoachEvalPage({ params }: { params: { orgId: string; teamId: string } }) {
   const supabase = createClient()
@@ -369,14 +371,10 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
                                   else if (e.target.value === '') { setScore(player.id, f.key, null) }
                                   else { if (naFlags[player.id]?.has(f.key)) toggleNa(player.id, f.key); setScore(player.id, f.key, Number(e.target.value)) }
                                 }}
-                                style={{ width: '48px', padding: '2px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '4px', fontSize: '12px', color: 'var(--fg)', textAlign: 'center' }}
+                                style={{ width: '58px', padding: '2px', background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '4px', fontSize: '12px', color: 'var(--fg)', textAlign: 'center' }}
                               >
                                 <option value="">—</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5</option>
+                                {SCORE_OPTIONS.map(v => <option key={v} value={String(v)}>{v}</option>)}
                                 {f.is_optional && <option value="na">N/A</option>}
                               </select>
                             )}
@@ -435,35 +433,28 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
                 return (
                   <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                     <div style={{ minWidth: '120px', fontSize: '13px' }}>{f.label}</div>
-                    <div style={{ display: 'flex', gap: '5px', flex: 1 }}>
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <button key={n}
-                          onClick={() => { if (na) toggleNa(playerId, f.key); setScore(playerId, f.key, val === n ? null : n) }}
-                          disabled={evalStatus === 'submitted'}
-                          style={{
-                            flex: 1, minHeight: '40px', borderRadius: '6px', border: '0.5px solid',
-                            borderColor: !na && val === n ? 'var(--accent)' : 'var(--border-md)',
-                            background: !na && val === n ? 'var(--accent)' : 'var(--bg-input)',
-                            color: !na && val === n ? 'var(--accent-text)' : 'var(--fg)',
-                            fontSize: '14px', fontWeight: !na && val === n ? 800 : 400,
-                            cursor: evalStatus === 'submitted' ? 'default' : 'pointer',
-                            opacity: na ? 0.3 : 1,
-                          }}>
-                          {n}
-                        </button>
-                      ))}
-                      {f.is_optional && (
-                        <button onClick={() => toggleNa(playerId, f.key)} disabled={evalStatus === 'submitted'}
-                          style={{
-                            minHeight: '40px', padding: '0 10px', borderRadius: '6px', border: '0.5px solid',
-                            borderColor: na ? 'var(--accent)' : 'var(--border-md)',
-                            background: na ? 'rgba(232,160,32,0.12)' : 'var(--bg-input)',
-                            color: na ? 'var(--accent)' : s.dim, fontSize: '12px',
-                            cursor: evalStatus === 'submitted' ? 'default' : 'pointer',
-                          }}>
-                          N/A
-                        </button>
-                      )}
+                    <div style={{ display: 'flex', gap: '8px', flex: 1, alignItems: 'center' }}>
+                      <select
+                        value={na ? 'na' : (val == null ? '' : String(val))}
+                        onChange={e => {
+                          if (e.target.value === 'na') { if (!na) toggleNa(playerId, f.key) }
+                          else if (e.target.value === '') { if (na) toggleNa(playerId, f.key); setScore(playerId, f.key, null) }
+                          else { if (na) toggleNa(playerId, f.key); setScore(playerId, f.key, Number(e.target.value)) }
+                        }}
+                        disabled={evalStatus === 'submitted'}
+                        style={{
+                          flex: 1, minHeight: '40px', borderRadius: '6px', padding: '0 8px',
+                          border: `0.5px solid ${!na && val != null ? 'var(--accent)' : 'var(--border-md)'}`,
+                          background: !na && val != null ? 'rgba(232,160,32,0.06)' : 'var(--bg-input)',
+                          color: 'var(--fg)', fontSize: '14px', fontWeight: !na && val != null ? 700 : 400,
+                          cursor: evalStatus === 'submitted' ? 'default' : 'pointer',
+                          opacity: na ? 0.4 : 1,
+                        }}
+                      >
+                        <option value="">—</option>
+                        {SCORE_OPTIONS.map(v => <option key={v} value={String(v)}>{v}</option>)}
+                        {f.is_optional && <option value="na">N/A</option>}
+                      </select>
                     </div>
                   </div>
                 )

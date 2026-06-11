@@ -42,8 +42,7 @@ interface EvalMeta {
   comments:     string | null
 }
 
-// All coach eval fields use 1-5 scale — no decimal fields
-const DECIMAL_EVAL_KEYS = new Set<string>()
+const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
 
 const SECTION_ORDER: Record<string, number> = {
   fielding_hitting:  0,
@@ -320,7 +319,6 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   }
 
   function fillColumn(fieldKey: string, value: number, visiblePlayerIds: string[]) {
-    if (DECIMAL_EVAL_KEYS.has(fieldKey)) return
     setGridScores(prev => {
       const next = { ...prev }
       for (const pid of visiblePlayerIds) {
@@ -344,7 +342,6 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
       const cur = prev[playerId] ?? {}
       const patch: Record<string, number | null> = {}
       for (const f of fields) {
-        if (DECIMAL_EVAL_KEYS.has(f.key)) continue  // decimal fields are not 1-5
         if ((cur[f.key] ?? null) == null) patch[f.key] = value
       }
       const next = { ...prev, [playerId]: { ...cur, ...patch } }
@@ -356,27 +353,13 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   }
 
   function handleGridKeyDown(e: React.KeyboardEvent, numRows: number, numCols: number, fp: Player[]) {
+    // Ignore events that bubbled up from an inner select/input (they handle their own keys)
+    if ((e.target as HTMLElement).tagName === 'SELECT' || (e.target as HTMLElement).tagName === 'INPUT') return
     if (!selected) return
-    const player = fp[selected.rowIdx]
-    const field  = fields[selected.colIdx]
-    if (!player || !field) return
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return }
 
-    if (DECIMAL_EVAL_KEYS.has(field.key)) return  // decimal cell owns its own keyboard input
-
-    if (e.key >= '1' && e.key <= '5') {
-      e.preventDefault()
-      commitScore(player.id, field.key, parseInt(e.key))
-      moveSelected(0, 1, numRows, numCols)
-      return
-    }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault()
-      commitScore(player.id, field.key, null)
-      return
-    }
     if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
     if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
     if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
@@ -797,7 +780,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
           style={{ outline: 'none', overflowX: 'auto', borderRadius: '10px', border: '0.5px solid var(--border)', position: 'relative' }}
         >
           <div style={{ fontSize: '11px', color: s.dim, padding: '6px 12px 4px', borderBottom: '0.5px solid var(--border)', background: 'var(--bg-card)', display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <span>Click a cell to select · type <strong>1–5</strong> · <strong>Tab</strong>/arrows to move · <strong>Del</strong> to clear · <strong>Ctrl+Z</strong>/<strong>Y</strong> undo/redo</span>
+            <span>Click a cell to select · choose from dropdown (supports 0.5 steps) · <strong>Tab</strong>/arrows to move · <strong>Ctrl+Z</strong>/<strong>Y</strong> undo/redo</span>
           </div>
           <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
             <thead>
@@ -861,20 +844,23 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                         textAlign: 'left', paddingBottom: '4px',
                       }}>{field.label}</div>
 
-                      {/* Column fill control — not shown for decimal fields */}
-                      {!DECIMAL_EVAL_KEYS.has(field.key) && (colFill === field.key ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', marginTop: '4px' }}>
-                          {[1,2,3,4,5].map(v => (
-                            <button key={v} onClick={() => fillColumn(field.key, v, filteredIds)}
-                              style={{ width: '28px', height: '20px', borderRadius: '3px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>{v}</button>
-                          ))}
-                          <button onClick={() => setColFill(null)} style={{ width: '28px', height: '16px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '10px', cursor: 'pointer', padding: 0 }}>×</button>
-                        </div>
+                      {/* Column fill control */}
+                      {colFill === field.key ? (
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onChange={e => { if (e.target.value !== '') fillColumn(field.key, Number(e.target.value), filteredIds) }}
+                          onBlur={() => setColFill(null)}
+                          style={{ marginTop: '4px', width: '52px', fontSize: '11px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', padding: '2px' }}
+                        >
+                          <option value="">pick…</option>
+                          {SCORE_OPTIONS.map(v => <option key={v} value={String(v)}>{v}</option>)}
+                        </select>
                       ) : (
                         <button onClick={() => { setColFill(field.key); setRowFill(null) }}
                           style={{ marginTop: '4px', fontSize: '9px', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer', whiteSpace: 'nowrap' }}
                           title={`Fill empty cells in "${field.label}"`}>fill ↓</button>
-                      ))}
+                      )}
                     </th>
                   )
                 })}
@@ -949,16 +935,8 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                       const val        = pScores[field.key] ?? null
                       const isFirstSec = fi === 0 || fields[fi - 1].section !== field.section
                       const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
-
-                      const isDecimal = DECIMAL_EVAL_KEYS.has(field.key)
-                      const numRows   = sortedFilteredPlayers.length
-                      const numCols   = fields.length
-
-                      // Commit helper for decimal input navigation
-                      const commitDecimal = (inputEl: HTMLInputElement) => {
-                        const v = inputEl.value.trim() === '' ? null : parseFloat(inputEl.value)
-                        commitScore(player.id, field.key, v === null || isNaN(v) ? null : v)
-                      }
+                      const numRows    = sortedFilteredPlayers.length
+                      const numCols    = fields.length
 
                       return (
                         <td key={field.key}
@@ -966,59 +944,50 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                             setSelected({ rowIdx: pi, colIdx: fi })
                             setColFill(null)
                             setRowFill(null)
-                            if (!isDecimal) gridRef.current?.focus()
                           }}
                           style={{
-                            padding: isDecimal ? '2px 4px' : '5px 4px',
+                            padding: isSelected ? '2px 4px' : '5px 4px',
                             borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)',
                             borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)',
                             textAlign: 'center', cursor: 'pointer',
-                            background: isDecimal ? 'transparent' : isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
-                            outline: (!isDecimal && isSelected) ? '2px solid rgba(80,160,232,0.7)' : 'none',
+                            background: isSelected ? 'rgba(80,160,232,0.12)' : cellBg(val),
+                            outline: isSelected ? '2px solid rgba(80,160,232,0.7)' : 'none',
                             outlineOffset: '-2px',
                             userSelect: 'none',
                             position: 'relative',
                           }}
                         >
-                          {isDecimal ? (
-                            isSelected ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                defaultValue={val !== null ? String(val) : ''}
-                                onBlur={e => commitDecimal(e.target)}
-                                onKeyDown={e => {
-                                  const el = e.currentTarget
-                                  const nav = (dr: number, dc: number) => {
-                                    e.preventDefault()
-                                    commitDecimal(el)
-                                    moveSelected(dr, dc, numRows, numCols)
-                                    gridRef.current?.focus()
-                                  }
-                                  if (e.key === 'Enter')                        nav(1, 0)
-                                  else if (e.key === 'Tab' && !e.shiftKey)      nav(0, 1)
-                                  else if (e.key === 'Tab' && e.shiftKey)       nav(0, -1)
-                                  else if (e.key === 'ArrowDown')               nav(1, 0)
-                                  else if (e.key === 'ArrowUp')                 nav(-1, 0)
-                                  else if (e.key === 'ArrowRight' && (e.currentTarget.selectionStart ?? 0) >= e.currentTarget.value.length) nav(0, 1)
-                                  else if (e.key === 'ArrowLeft'  && (e.currentTarget.selectionStart ?? 0) === 0)                           nav(0, -1)
-                                  else if (e.key === 'Escape') { e.preventDefault(); setSelected(null); gridRef.current?.focus() }
-                                }}
-                                style={{
-                                  width: '56px', textAlign: 'center', padding: '3px 4px',
-                                  background: 'rgba(80,160,232,0.12)',
-                                  border: '2px solid rgba(80,160,232,0.7)',
-                                  borderRadius: '4px', fontSize: '13px', fontWeight: 700,
-                                  color: 'var(--fg)', outline: 'none',
-                                }}
-                              />
-                            ) : (
-                              <span style={{ fontSize: '12px', fontWeight: val !== null ? 700 : 400, color: val !== null ? s.muted : 'rgba(var(--fg-rgb),0.2)' }}>
-                                {val !== null ? val : '·'}
-                              </span>
-                            )
+                          {isSelected ? (
+                            <select
+                              autoFocus
+                              value={val !== null ? String(val) : ''}
+                              onChange={e => {
+                                const v = e.target.value === '' ? null : Number(e.target.value)
+                                commitScore(player.id, field.key, v)
+                              }}
+                              onKeyDown={e => {
+                                e.stopPropagation()
+                                if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols) }
+                                else if (e.key === 'Enter') { e.preventDefault(); moveSelected(1, 0, numRows, numCols) }
+                                else if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols) }
+                                else if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols) }
+                                else if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols) }
+                                else if (e.key === 'ArrowLeft')  { e.preventDefault(); moveSelected(0, -1, numRows, numCols) }
+                                else if (e.key === 'Escape')     { e.preventDefault(); setSelected(null); gridRef.current?.focus() }
+                                else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); commitScore(player.id, field.key, null); moveSelected(0, 1, numRows, numCols) }
+                                else if (e.key >= '1' && e.key <= '5') { e.preventDefault(); commitScore(player.id, field.key, parseInt(e.key)); moveSelected(0, 1, numRows, numCols) }
+                              }}
+                              style={{
+                                width: '56px', textAlign: 'center', padding: '2px 2px',
+                                background: 'rgba(80,160,232,0.12)',
+                                border: '2px solid rgba(80,160,232,0.7)',
+                                borderRadius: '4px', fontSize: '12px', fontWeight: 700,
+                                color: 'var(--fg)', outline: 'none', cursor: 'pointer',
+                              }}
+                            >
+                              <option value="">—</option>
+                              {SCORE_OPTIONS.map(v => <option key={v} value={String(v)}>{v}</option>)}
+                            </select>
                           ) : (
                             <span style={{
                               fontSize: '13px', fontWeight: val != null ? 700 : 400,
@@ -1097,14 +1066,16 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                     {/* Row fill */}
                     <td style={{ padding: '4px 6px', borderBottom: noteOpen ? 'none' : '0.5px solid var(--border)', textAlign: 'center' }}>
                       {rowFill === player.id ? (
-                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
-                          {[1,2,3,4,5].map(v => (
-                            <button key={v} onClick={() => fillRow(player.id, v)}
-                              style={{ width: '22px', height: '22px', borderRadius: '4px', border: 'none', background: 'var(--accent)', color: 'var(--accent-text)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>{v}</button>
-                          ))}
-                          <button onClick={() => setRowFill(null)}
-                            style={{ width: '22px', height: '22px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, fontSize: '11px', cursor: 'pointer', padding: 0 }}>×</button>
-                        </div>
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onChange={e => { if (e.target.value !== '') fillRow(player.id, Number(e.target.value)) }}
+                          onBlur={() => setRowFill(null)}
+                          style={{ width: '52px', fontSize: '11px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)', padding: '2px' }}
+                        >
+                          <option value="">pick…</option>
+                          {SCORE_OPTIONS.map(v => <option key={v} value={String(v)}>{v}</option>)}
+                        </select>
                       ) : (
                         <button onClick={() => { setRowFill(player.id); setColFill(null) }}
                           style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '3px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.dim, cursor: 'pointer', whiteSpace: 'nowrap' }}
