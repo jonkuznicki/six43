@@ -96,9 +96,11 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
 
   // Keyboard-driven cell selection (replaces floating picker)
   const [selected, setSelected] = useState<{ rowIdx: number; colIdx: number } | null>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
-  const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
-  const histIdxRef = useRef(0)
+  const gridRef         = useRef<HTMLDivElement>(null)
+  const historyRef      = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
+  const histIdxRef      = useRef(0)
+  const pendingInputRef = useRef('')
+  const [pendingInput, setPendingInput] = useState('')
 
   // Column fill
   const [colFillKey,  setColFillKey]  = useState<string | null>(null)
@@ -112,6 +114,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     document.body.classList.add('eval-standalone')
     return () => document.body.classList.remove('eval-standalone')
   }, [])
+
+  useEffect(() => { pendingInputRef.current = ''; setPendingInput('') }, [selected])
 
   useEffect(() => {
     supabase.rpc('tryout_eval_form_data_by_token', { p_token: params.token })
@@ -301,20 +305,40 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     const cellNa = isNa(player.id, fieldNaKey(field.field_key, secKey))
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
-      commitScore(player.id, field.field_key, parseInt(e.key))
+      const buf = pendingInputRef.current
+      if (buf.includes('.')) {
+        // Completing a decimal, e.g. "3." + "5" → 3.5
+        const candidate = buf + e.key
+        const val = parseFloat(candidate)
+        if (SCORE_OPTIONS.includes(val)) {
+          commitScore(player.id, field.field_key, val)
+          pendingInputRef.current = candidate
+          setPendingInput(candidate)
+        }
+        // invalid completion (e.g. "3.2") — ignore keystroke
+      } else {
+        // New whole-number entry
+        const val = parseInt(e.key)
+        commitScore(player.id, field.field_key, val)
+        pendingInputRef.current = e.key
+        setPendingInput(e.key)
+      }
       return
     }
     if (!cellNa && e.key === '.') {
       e.preventDefault()
-      const cur = scores[player.id]?.[field.field_key] ?? null
-      if (cur != null) {
-        const next = Number.isInteger(cur) && cur < 5 ? cur + 0.5 : Math.floor(cur)
-        commitScore(player.id, field.field_key, next)
+      const buf = pendingInputRef.current
+      // Allow '.' only after a single digit 1–4 (5.5 is out of range)
+      if (buf.length === 1 && !buf.includes('.') && buf !== '5') {
+        pendingInputRef.current = buf + '.'
+        setPendingInput(buf + '.')
       }
       return
     }
     if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
       e.preventDefault()
+      pendingInputRef.current = ''
+      setPendingInput('')
       commitScore(player.id, field.field_key, null)
       return
     }
@@ -1212,8 +1236,8 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                               width: '52px', minWidth: '52px',
                             }}
                           >
-                            <span style={{ fontSize: '13px', fontWeight: val != null ? 700 : 400, color: na ? s.dim : val != null ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
-                              {na ? 'N/A' : val ?? '·'}
+                            <span style={{ fontSize: '13px', fontWeight: val != null || (isSelected && pendingInput) ? 700 : 400, color: na ? s.dim : val != null || (isSelected && pendingInput) ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
+                              {na ? 'N/A' : isSelected && pendingInput ? pendingInput : val ?? '·'}
                             </span>
                           </td>
                         )

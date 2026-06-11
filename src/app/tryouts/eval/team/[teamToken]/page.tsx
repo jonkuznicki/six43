@@ -81,9 +81,11 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [expandedComment, setExpandedComment] = useState<string | null>(null)
   const [showScoringGuide, setShowScoringGuide] = useState(false)
 
-  const gridRef      = useRef<HTMLDivElement>(null)
-  const historyRef   = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
-  const histIdxRef   = useRef(0)
+  const gridRef         = useRef<HTMLDivElement>(null)
+  const historyRef      = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
+  const histIdxRef      = useRef(0)
+  const pendingInputRef = useRef('')
+  const [pendingInput, setPendingInput] = useState('')
 
   // Refs for auto-save interval (avoid stale closures)
   const scoresRef    = useRef(scores)
@@ -95,6 +97,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   useEffect(() => { commentsRef.current  = playerComments }, [playerComments])
   useEffect(() => { notesRef.current     = overallNotes },   [overallNotes])
   useEffect(() => { coachNameRef.current = coachName },      [coachName])
+  useEffect(() => { pendingInputRef.current = ''; setPendingInput('') }, [selected])
 
   // Hide Six43 chrome — standalone org-branded page
   useEffect(() => {
@@ -314,20 +317,42 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
-      commitScore(player.id, field.field_key, parseInt(e.key))
+      const buf = pendingInputRef.current
+      if (buf.includes('.')) {
+        // Completing a decimal, e.g. "3." + "5" → 3.5
+        const candidate = buf + e.key
+        const val = parseFloat(candidate)
+        if (SCORE_OPTIONS.includes(val)) {
+          commitScore(player.id, field.field_key, val)
+          pendingInputRef.current = candidate
+          setPendingInput(candidate)
+        }
+        // invalid completion (e.g. "3.2") — ignore keystroke
+      } else {
+        // New whole-number entry
+        const val = parseInt(e.key)
+        commitScore(player.id, field.field_key, val)
+        pendingInputRef.current = e.key
+        setPendingInput(e.key)
+      }
       return
     }
     if (!cellNa && e.key === '.') {
       e.preventDefault()
-      const cur = scores[player.id]?.[field.field_key] ?? null
-      if (cur != null) {
-        const next = Number.isInteger(cur) && cur < 5 ? cur + 0.5 : Math.floor(cur)
-        commitScore(player.id, field.field_key, next)
+      const buf = pendingInputRef.current
+      // Allow '.' only after a single digit 1–4 (5.5 is out of range)
+      if (buf.length === 1 && !buf.includes('.') && buf !== '5') {
+        pendingInputRef.current = buf + '.'
+        setPendingInput(buf + '.')
       }
       return
     }
     if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
-      e.preventDefault(); commitScore(player.id, field.field_key, null); return
+      e.preventDefault()
+      pendingInputRef.current = ''
+      setPendingInput('')
+      commitScore(player.id, field.field_key, null)
+      return
     }
     if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
     if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
@@ -1006,8 +1031,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                             onClick={() => { if (na) return; setSelected({ rowIdx: pi, colIdx: fi }); setColFillKey(null); gridRef.current?.focus() }}
                             style={{ padding: '3px 2px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)', textAlign: 'center', cursor: na ? 'default' : 'pointer', background: isSelected ? 'rgba(26,54,93,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val), outline: isSelected ? '2px solid rgba(26,54,93,0.7)' : 'none', outlineOffset: '-2px', position: 'relative', userSelect: 'none', width: '52px', minWidth: '52px' }}
                           >
-                            <span style={{ fontSize: '13px', fontWeight: val != null ? 700 : 400, color: na ? s.dim : val != null ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
-                              {na ? 'N/A' : val ?? '·'}
+                            <span style={{ fontSize: '13px', fontWeight: val != null || (isSelected && pendingInput) ? 700 : 400, color: na ? s.dim : val != null || (isSelected && pendingInput) ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
+                              {na ? 'N/A' : isSelected && pendingInput ? pendingInput : val ?? '·'}
                             </span>
                           </td>
                         )
