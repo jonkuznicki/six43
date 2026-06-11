@@ -31,7 +31,13 @@ const SECTION_LABELS: Record<string, string> = {
   intangibles:       'Intangibles',
 }
 
-const SCALE = '5=Exceptional · 4=Above age · 3=Age appropriate · 2=Below age · 1=Needs work · half-point values (1.5, 2.5…) allowed'
+const SCORE_CHIPS = [
+  { n: 1,   bg: 'rgba(232,80,80,0.22)',    label: 'Well below age level' },
+  { n: 2,   bg: 'rgba(232,140,40,0.2)',   label: 'Below age level' },
+  { n: 3,   bg: 'rgba(80,160,232,0.18)',  label: 'Age-appropriate / solid' },
+  { n: 4,   bg: 'rgba(109,184,117,0.2)',  label: 'Above-average' },
+  { n: 5,   bg: 'rgba(109,184,117,0.45)', label: 'Rare / best-in-class' },
+]
 
 const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
 
@@ -51,9 +57,10 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
   const [loading,     setLoading]     = useState(true)
   const [saving,      setSaving]      = useState(false)
   const [savedAt,     setSavedAt]     = useState<Date | null>(null)
-  const [view,        setView]        = useState<'table' | 'card'>('table')
-  const [cardIdx,     setCardIdx]     = useState(0)
-  const [submitting,  setSubmitting]  = useState(false)
+  const [view,             setView]             = useState<'table' | 'card'>('table')
+  const [cardIdx,          setCardIdx]          = useState(0)
+  const [submitting,       setSubmitting]       = useState(false)
+  const [showScoringGuide, setShowScoringGuide] = useState(false)
 
   const autoSaveTimer = useRef<ReturnType<typeof setInterval>>()
 
@@ -298,7 +305,54 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
         )}
       </div>
 
-      <div style={{ fontSize: '11px', color: s.dim, marginBottom: '1rem' }}>{SCALE}</div>
+      {/* Scoring guide collapsible */}
+      <div style={{ marginBottom: '1rem' }}>
+        <button
+          onClick={() => setShowScoringGuide(x => !x)}
+          style={{
+            padding: '5px 12px', borderRadius: '6px',
+            border: '0.5px solid rgba(232,160,32,0.35)',
+            background: showScoringGuide ? 'rgba(232,160,32,0.1)' : 'transparent',
+            color: showScoringGuide ? 'var(--fg)' : s.dim,
+            fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+          }}
+        >
+          Scoring Guide {showScoringGuide ? '▲' : '▼'}
+        </button>
+        {showScoringGuide && (
+          <div style={{
+            marginTop: '8px', padding: '14px 16px', borderRadius: '8px',
+            background: 'rgba(232,160,32,0.06)', border: '0.5px solid rgba(232,160,32,0.22)',
+            fontSize: '12px', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '10px',
+          }}>
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {SCORE_CHIPS.map(({ n, bg, label }) => (
+                <span key={n} style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 600, fontSize: '11px', background: bg, border: '0.5px solid rgba(0,0,0,0.08)' }}>
+                  {n} — {label}
+                </span>
+              ))}
+            </div>
+            <div style={{ color: s.dim, fontSize: '11px' }}>Half-points (1.5, 2.5, 3.5, 4.5) fall between the levels above.</div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>Score vs. the full age group, not just your team.</strong>{' '}
+              <span style={{ opacity: 0.75 }}>The best player on your team may still be a 4 or 4.5 across the full age group.</span>
+            </div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>A 3 = age-appropriate, solid, capable.</strong>{' '}
+              <span style={{ opacity: 0.75 }}>Most players should be around a 3. Don't inflate scores.</span>
+            </div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>Use half-points</strong> (1.5, 2.5, 3.5, 4.5){' '}
+              <span style={{ opacity: 0.75 }}>to better separate players who fall between levels.</span>
+            </div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>Reserve a 5 for rare, best-in-class ability</strong>{' '}
+              <span style={{ opacity: 0.75 }}>compared to all players you've seen at this age level.</span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── TABLE VIEW ─────────────────────────────────────────────────────── */}
       {view === 'table' && (
