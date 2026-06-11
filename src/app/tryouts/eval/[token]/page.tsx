@@ -838,6 +838,17 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
             Reserve a <strong style={{ color: 'var(--fg)' }}>5</strong> for rare, best-in-class ability compared to
             all players you have seen at this age level.
           </p>
+          <p style={{ margin: 0 }}>
+            If a player <strong style={{ color: 'var(--fg)' }}>did not pitch</strong>, check <strong style={{ color: 'var(--fg)' }}>P N/A</strong>.
+            If they <strong style={{ color: 'var(--fg)' }}>did not catch</strong>, check <strong style={{ color: 'var(--fg)' }}>C N/A</strong>.
+            This marks those fields as not applicable rather than leaving them blank.
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong style={{ color: 'var(--fg)' }}>Player notes are very important.</strong>{' '}
+            Please leave a comment for every player — mention strengths, areas to develop,
+            coachability, attitude, and any notable improvement this season. The board often
+            finds written commentary as valuable as the scores.
+          </p>
         </div>
       </div>
     </main>
@@ -1081,6 +1092,14 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
               <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
                 <strong>Reserve a 5 for rare, best-in-class ability</strong>{' '}
                 <span style={{ opacity: 0.75 }}>compared to all players you've seen at this age level.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>P N/A / C N/A</strong>{' '}
+                <span style={{ opacity: 0.75 }}>— check these if a player did not pitch or did not catch. Do not leave those fields blank.</span>
+              </div>
+              <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+                <strong>Player notes are very important</strong>{' '}
+                <span style={{ opacity: 0.75 }}>— please leave a comment for every player. Use the Notes column or the comment button next to each player.</span>
               </div>
             </div>
           )}

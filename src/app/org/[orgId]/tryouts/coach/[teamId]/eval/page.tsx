@@ -350,6 +350,14 @@ export default function CoachEvalPage({ params }: { params: { orgId: string; tea
               <strong>Reserve a 5 for rare, best-in-class ability</strong>{' '}
               <span style={{ opacity: 0.75 }}>compared to all players you've seen at this age level.</span>
             </div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>P N/A / C N/A</strong>{' '}
+              <span style={{ opacity: 0.75 }}>— check these if a player did not pitch or did not catch. Do not leave those fields blank.</span>
+            </div>
+            <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
+              <strong>Player notes are very important</strong>{' '}
+              <span style={{ opacity: 0.75 }}>— please leave a comment for every player covering strengths, areas to develop, coachability, and attitude.</span>
+            </div>
           </div>
         )}
       </div>
