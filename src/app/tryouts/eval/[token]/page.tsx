@@ -99,7 +99,6 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const gridRef = useRef<HTMLDivElement>(null)
   const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
   const histIdxRef = useRef(0)
-  const advanceTimer = useRef<ReturnType<typeof setTimeout>>()
 
   // Column fill
   const [colFillKey,  setColFillKey]  = useState<string | null>(null)
@@ -113,8 +112,6 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     document.body.classList.add('eval-standalone')
     return () => document.body.classList.remove('eval-standalone')
   }, [])
-
-  useEffect(() => () => clearTimeout(advanceTimer.current), [])
 
   useEffect(() => {
     supabase.rpc('tryout_eval_form_data_by_token', { p_token: params.token })
@@ -305,35 +302,29 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
       commitScore(player.id, field.field_key, parseInt(e.key))
-      // Delay advance so the user can still type '.' to add a half-point
-      clearTimeout(advanceTimer.current)
-      advanceTimer.current = setTimeout(() => moveSelected(0, 1, numRows, numCols), 400)
       return
     }
     if (!cellNa && e.key === '.') {
       e.preventDefault()
-      clearTimeout(advanceTimer.current)
       const cur = scores[player.id]?.[field.field_key] ?? null
       if (cur != null) {
         const next = Number.isInteger(cur) && cur < 5 ? cur + 0.5 : Math.floor(cur)
         commitScore(player.id, field.field_key, next)
-        advanceTimer.current = setTimeout(() => moveSelected(0, 1, numRows, numCols), 300)
       }
       return
     }
     if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
       e.preventDefault()
-      clearTimeout(advanceTimer.current)
       commitScore(player.id, field.field_key, null)
       return
     }
-    if (e.key === 'Tab')        { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
-    if (e.key === 'Enter')      { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
-    if (e.key === 'ArrowRight') { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
-    if (e.key === 'ArrowLeft')  { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
-    if (e.key === 'ArrowDown')  { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
-    if (e.key === 'ArrowUp')    { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
-    if (e.key === 'Escape')     { clearTimeout(advanceTimer.current); setSelected(null); return }
+    if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
+    if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
+    if (e.key === 'Escape')     { setSelected(null); return }
   }
 
   function toggleNa(playerId: string, naKey: string, fields: EvalField[]) {
@@ -1203,7 +1194,6 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
                           <td key={field.field_key}
                             onClick={() => {
                               if (na) return
-                              clearTimeout(advanceTimer.current)
                               setSelected({ rowIdx: pi, colIdx: fi })
                               setColFillKey(null)
                               gridRef.current?.focus()
