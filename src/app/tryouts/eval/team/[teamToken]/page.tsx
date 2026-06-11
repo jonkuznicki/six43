@@ -81,9 +81,10 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [expandedComment, setExpandedComment] = useState<string | null>(null)
   const [showScoringGuide, setShowScoringGuide] = useState(false)
 
-  const gridRef    = useRef<HTMLDivElement>(null)
-  const historyRef = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
-  const histIdxRef = useRef(0)
+  const gridRef      = useRef<HTMLDivElement>(null)
+  const historyRef   = useRef<Array<Record<string, Record<string, number | null>>>>([{}])
+  const histIdxRef   = useRef(0)
+  const advanceTimer = useRef<ReturnType<typeof setTimeout>>()
 
   // Refs for auto-save interval (avoid stale closures)
   const scoresRef    = useRef(scores)
@@ -95,6 +96,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   useEffect(() => { commentsRef.current  = playerComments }, [playerComments])
   useEffect(() => { notesRef.current     = overallNotes },   [overallNotes])
   useEffect(() => { coachNameRef.current = coachName },      [coachName])
+  useEffect(() => () => clearTimeout(advanceTimer.current), [])
 
   // Hide Six43 chrome — standalone org-branded page
   useEffect(() => {
@@ -315,28 +317,32 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     if (!cellNa && e.key >= '1' && e.key <= '5') {
       e.preventDefault()
       commitScore(player.id, field.field_key, parseInt(e.key))
-      moveSelected(0, 1, numRows, numCols)
+      // Delay advance so the user can still type '.' to add a half-point
+      clearTimeout(advanceTimer.current)
+      advanceTimer.current = setTimeout(() => moveSelected(0, 1, numRows, numCols), 400)
       return
     }
     if (!cellNa && e.key === '.') {
       e.preventDefault()
+      clearTimeout(advanceTimer.current)
       const cur = scores[player.id]?.[field.field_key] ?? null
       if (cur != null) {
         const next = Number.isInteger(cur) && cur < 5 ? cur + 0.5 : Math.floor(cur)
         commitScore(player.id, field.field_key, next)
+        advanceTimer.current = setTimeout(() => moveSelected(0, 1, numRows, numCols), 300)
       }
       return
     }
     if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
-      e.preventDefault(); commitScore(player.id, field.field_key, null); return
+      e.preventDefault(); clearTimeout(advanceTimer.current); commitScore(player.id, field.field_key, null); return
     }
-    if (e.key === 'Tab')        { e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
-    if (e.key === 'Enter')      { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
-    if (e.key === 'ArrowRight') { e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
-    if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
-    if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
-    if (e.key === 'Escape')     { setSelected(null); return }
+    if (e.key === 'Tab')        { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, e.shiftKey ? -1 : 1, numRows, numCols); return }
+    if (e.key === 'Enter')      { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowRight') { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, 1, numRows, numCols); return }
+    if (e.key === 'ArrowLeft')  { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(0, -1, numRows, numCols); return }
+    if (e.key === 'ArrowDown')  { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
+    if (e.key === 'ArrowUp')    { clearTimeout(advanceTimer.current); e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
+    if (e.key === 'Escape')     { clearTimeout(advanceTimer.current); setSelected(null); return }
   }
 
   function toggleNa(playerId: string, naKey: string, fields: EvalField[]) {
@@ -1004,7 +1010,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
                         return (
                           <td key={field.field_key}
-                            onClick={() => { if (na) return; setSelected({ rowIdx: pi, colIdx: fi }); setColFillKey(null); gridRef.current?.focus() }}
+                            onClick={() => { if (na) return; clearTimeout(advanceTimer.current); setSelected({ rowIdx: pi, colIdx: fi }); setColFillKey(null); gridRef.current?.focus() }}
                             style={{ padding: '3px 2px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)', textAlign: 'center', cursor: na ? 'default' : 'pointer', background: isSelected ? 'rgba(26,54,93,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val), outline: isSelected ? '2px solid rgba(26,54,93,0.7)' : 'none', outlineOffset: '-2px', position: 'relative', userSelect: 'none', width: '52px', minWidth: '52px' }}
                           >
                             <span style={{ fontSize: '13px', fontWeight: val != null ? 700 : 400, color: na ? s.dim : val != null ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
