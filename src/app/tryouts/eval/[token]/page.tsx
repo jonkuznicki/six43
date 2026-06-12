@@ -67,6 +67,7 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
   const [step, setStep] = useState<'identify' | 'score' | 'review' | 'submitted'>('identify')
   const [selectedTeam, setSelectedTeam] = useState('')
   const [coachName,   setCoachName]   = useState('')
+  const [editingName, setEditingName] = useState(false)
 
   // scores[playerId][fieldKey] = 1-5 | null
   const [scores,          setScores]          = useState<Record<string, Record<string, number | null>>>({})
@@ -865,7 +866,23 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
           <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>Review — {selectedTeam}</div>
-              <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
+              <div style={{ fontSize: '11px', color: s.dim, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={coachName}
+                    onChange={e => setCoachName(e.target.value)}
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingName(false) }}
+                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--fg)', fontSize: '11px', padding: '0 2px', outline: 'none', width: '140px' }}
+                  />
+                ) : (
+                  <button onClick={() => setEditingName(true)} title="Edit your name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.dim, fontSize: '11px', padding: 0, textDecoration: 'underline dotted' }}>
+                    {coachName || 'Edit name'}
+                  </button>
+                )}
+                <span>· {formData.season.label}</span>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setStep('score')} style={{
@@ -997,7 +1014,23 @@ export default function PublicEvalPage({ params }: { params: { token: string } }
         <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700 }}>{selectedTeam}</div>
-            <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
+            <div style={{ fontSize: '11px', color: s.dim, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={coachName}
+                    onChange={e => setCoachName(e.target.value)}
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingName(false) }}
+                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--fg)', fontSize: '11px', padding: '0 2px', outline: 'none', width: '140px' }}
+                  />
+                ) : (
+                  <button onClick={() => setEditingName(true)} title="Edit your name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.dim, fontSize: '11px', padding: 0, textDecoration: 'underline dotted' }}>
+                    {coachName || 'Edit name'}
+                  </button>
+                )}
+                <span>· {formData.season.label}</span>
+              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <div style={{ fontSize: '12px', color: progress.pct === 100 ? '#6DB875' : s.muted, fontWeight: 600 }}>

@@ -58,8 +58,9 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading,   setLoading]   = useState(true)
 
-  const [step,      setStep]      = useState<'identify' | 'score' | 'review' | 'submitted'>('identify')
-  const [coachName, setCoachName] = useState('')
+  const [step,        setStep]        = useState<'identify' | 'score' | 'review' | 'submitted'>('identify')
+  const [coachName,   setCoachName]   = useState('')
+  const [editingName, setEditingName] = useState(false)
 
   const [scores,         setScores]         = useState<Record<string, Record<string, number | null>>>({})
   const [naFlags,        setNaFlags]        = useState<Record<string, Set<string>>>({})
@@ -708,7 +709,23 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
           <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>Review — {formData.selected_team}</div>
-              <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
+              <div style={{ fontSize: '11px', color: s.dim, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={coachName}
+                    onChange={e => setCoachName(e.target.value)}
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingName(false) }}
+                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--fg)', fontSize: '11px', padding: '0 2px', outline: 'none', width: '140px' }}
+                  />
+                ) : (
+                  <button onClick={() => setEditingName(true)} title="Edit your name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.dim, fontSize: '11px', padding: 0, textDecoration: 'underline dotted' }}>
+                    {coachName || 'Edit name'}
+                  </button>
+                )}
+                <span>· {formData.season.label}</span>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {allComplete ? (
@@ -869,7 +886,23 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700 }}>{formData.selected_team}</div>
-            <div style={{ fontSize: '11px', color: s.dim }}>{coachName} · {formData.season.label}</div>
+            <div style={{ fontSize: '11px', color: s.dim, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={coachName}
+                    onChange={e => setCoachName(e.target.value)}
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingName(false) }}
+                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--fg)', fontSize: '11px', padding: '0 2px', outline: 'none', width: '140px' }}
+                  />
+                ) : (
+                  <button onClick={() => setEditingName(true)} title="Edit your name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.dim, fontSize: '11px', padding: 0, textDecoration: 'underline dotted' }}>
+                    {coachName || 'Edit name'}
+                  </button>
+                )}
+                <span>· {formData.season.label}</span>
+              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <div style={{ fontSize: '12px', color: progress.pct === 100 ? '#6DB875' : s.muted, fontWeight: 600 }}>
