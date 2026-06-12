@@ -42,6 +42,24 @@ interface EvalMeta {
   comments:     string | null
 }
 
+interface DraftStatus {
+  team_label:    string
+  status:        'not_started' | 'in_progress' | 'submitted'
+  coach_name:    string | null
+  opened_at:     string | null
+  last_saved_at: string | null
+  submitted_at:  string | null
+}
+
+function fmtRelative(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 2)   return 'just now'
+  if (mins < 60)  return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24)   return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
 
 const SECTION_ORDER: Record<string, number> = {
@@ -156,9 +174,10 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
   // Team eval tokens (per-team unique links)
   const [teamTokens,   setTeamTokens]   = useState<Record<string, string>>({}) // team_label → token uuid
   const [tokenBusy,    setTokenBusy]    = useState<string | null>(null)         // team_label currently generating
-  const [copiedTeam,   setCopiedTeam]   = useState<string | null>(null)
-  const [copiedPortal, setCopiedPortal] = useState(false)
-  const [copiedAll,    setCopiedAll]    = useState(false)
+  const [copiedTeam,    setCopiedTeam]    = useState<string | null>(null)
+  const [copiedPortal,  setCopiedPortal]  = useState(false)
+  const [copiedAll,     setCopiedAll]     = useState(false)
+  const [draftStatuses, setDraftStatuses] = useState<Record<string, DraftStatus>>({})
   const [unlocking,    setUnlocking]    = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
@@ -272,6 +291,17 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
         const map: Record<string, string> = {}
         for (const row of tokenRows) map[row.team_label] = row.token
         setTeamTokens(map)
+      }
+
+      // Load draft statuses for each team token (admin-only RPC)
+      const { data: statusRows } = await supabase.rpc('tryout_team_eval_statuses', {
+        p_org_id:    params.orgId,
+        p_season_id: seasonData.id,
+      })
+      if (Array.isArray(statusRows)) {
+        const map: Record<string, DraftStatus> = {}
+        for (const row of statusRows) map[row.team_label] = row
+        setDraftStatuses(map)
       }
     }
 
@@ -650,6 +680,34 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
                         {isBusy ? 'Generating…' : 'Generate link'}
                       </button>
                     )}
+                    {/* Eval status */}
+                    {(() => {
+                      const ds = draftStatuses[team]
+                      const st = ds?.status ?? 'not_started'
+                      if (st === 'not_started') return (
+                        <span style={{ fontSize: '10px', color: s.dim, flexShrink: 0, marginLeft: 'auto' }}>Not started</span>
+                      )
+                      const submitted = st === 'submitted'
+                      const timeStr = submitted
+                        ? (ds.submitted_at ? fmtRelative(ds.submitted_at) : null)
+                        : (ds.last_saved_at ? `saved ${fmtRelative(ds.last_saved_at)}` : null)
+                      return (
+                        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: '10px', padding: '2px 7px', borderRadius: '20px', fontWeight: 700,
+                            background: submitted ? 'rgba(109,184,117,0.12)' : 'rgba(232,160,32,0.10)',
+                            color: submitted ? '#6DB875' : 'var(--accent)',
+                          }}>
+                            {submitted ? '✓ Submitted' : '● In progress'}
+                          </span>
+                          {(ds.coach_name || timeStr) && (
+                            <span style={{ fontSize: '10px', color: s.dim, textAlign: 'right' }}>
+                              {[ds.coach_name, timeStr].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
