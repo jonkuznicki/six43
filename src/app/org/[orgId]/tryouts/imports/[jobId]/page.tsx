@@ -64,7 +64,7 @@ export default function ImportReviewPage({
   const [bulkConfirming, setBulkConfirming] = useState(false)
   const [bulkCreating,   setBulkCreating]   = useState(false)
   // Track locally-resolved rows so UI updates without re-fetching
-  const [localResolutions, setLocalResolutions] = useState<Map<number, { playerId: string | null; status: 'auto' | 'skipped' }>>(new Map())
+  const [localResolutions, setLocalResolutions] = useState<Map<number, { playerId: string | null; status: ReportRow['status'] }>>(new Map())
 
   useEffect(() => { loadJob() }, [])
 
@@ -119,6 +119,20 @@ export default function ImportReviewPage({
     if (res.ok) {
       const { playerId } = await res.json()
       setLocalResolutions(prev => new Map(prev).set(rowIndex, { playerId, status: 'auto' }))
+    }
+    setSaving(null)
+  }
+
+  async function unmatch(rowIndex: number) {
+    setSaving(rowIndex)
+    const res = await fetch(`/api/tryouts/imports/${params.jobId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'unmatch', rowIndex }),
+    })
+    if (res.ok) {
+      const { status } = await res.json()
+      setLocalResolutions(prev => new Map(prev).set(rowIndex, { playerId: null, status }))
     }
     setSaving(null)
   }
@@ -299,7 +313,7 @@ export default function ImportReviewPage({
               borderRadius: '10px', padding: '14px 16px',
             }}>
               {/* Row header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: status === 'auto' ? 0 : '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '4px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontWeight: 700, fontSize: '15px' }}>{row.rawName}</span>
@@ -327,6 +341,19 @@ export default function ImportReviewPage({
                   flexShrink: 0,
                 }}>{cfg.label}</span>
               </div>
+
+              {/* Unmatch option for auto-matched rows */}
+              {status === 'auto' && (
+                <div style={{ marginTop: '6px' }}>
+                  <button
+                    onClick={() => unmatch(row.rowIndex)}
+                    disabled={isSaving}
+                    style={{ fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: isSaving ? 'default' : 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    {isSaving ? '…' : 'Wrong match? Unmatch'}
+                  </button>
+                </div>
+              )}
 
               {/* Actions for suggested rows */}
               {status === 'suggested' && row.candidates.length > 0 && (

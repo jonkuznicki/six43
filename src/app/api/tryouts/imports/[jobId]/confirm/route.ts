@@ -49,7 +49,7 @@ export async function POST(
   if (!isMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json() as {
-    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested' | 'create_all_new' | 'skip'
+    action:    'confirm_match' | 'create_new' | 'confirm_all_suggested' | 'create_all_new' | 'skip' | 'unmatch'
     rowIndex?: number
     playerId?: string
   }
@@ -78,6 +78,10 @@ export async function POST(
 
   if (body.action === 'skip') {
     return skipRow({ supabase, job, report, row, userId: user.id })
+  }
+
+  if (body.action === 'unmatch') {
+    return unmatchRow({ supabase, job, report, row, userId: user.id })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
@@ -432,6 +436,24 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
   })
 
   return NextResponse.json({ ok: true, confirmed: results.length })
+}
+
+async function unmatchRow({ supabase, job, report, row, userId }: any) {
+  const topCandidate = (row.candidates ?? [])[0] ?? null
+  const resetStatus  = topCandidate ? 'suggested' : 'unresolved'
+  const updatedReport = report.map((r: any) =>
+    r.rowIndex === row.rowIndex
+      ? {
+          ...r,
+          status:           resetStatus,
+          resolvedPlayerId: null,
+          confidence:       topCandidate?.confidence ?? null,
+          matchReason:      topCandidate?.reason     ?? null,
+        }
+      : r
+  )
+  await updateJobReport({ supabase, jobId: job.id, report: updatedReport, userId, orgId: job.org_id, action: `Unmatched row: ${row.rawName}` })
+  return NextResponse.json({ ok: true, status: resetStatus })
 }
 
 async function skipRow({ supabase, job, report, row, userId }: any) {
