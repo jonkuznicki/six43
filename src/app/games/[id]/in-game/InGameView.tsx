@@ -71,6 +71,16 @@ export default function InGameView({
   const supabase = createClient()
   const router   = useRouter()
 
+  // ── Location (Home/Away) — local override so scoreboard flips immediately ──
+  const [gameLocation, setGameLocation] = useState<string | null>(game.location ?? null)
+
+  async function toggleLocation() {
+    if (locked) return
+    const next = gameLocation === 'Home' ? 'Away' : 'Home'
+    setGameLocation(next)
+    await supabase.from('games').update({ location: next }).eq('id', game.id)
+  }
+
   // ── Inning & batting order ─────────────────────────────────────────────────
   const [inning,           setInning]           = useState(0)
   const [highlightedOrder, setHighlightedOrder] = useState<number | null>(null)
@@ -430,7 +440,7 @@ export default function InGameView({
           </div>
 
           {/* Away team on top, home team on bottom */}
-          {(game.location === 'Away'
+          {(gameLocation === 'Away'
             ? [
                 { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
                 { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },
@@ -705,6 +715,32 @@ export default function InGameView({
             {themTotal}
           </span>
         </div>
+
+        {/* Home/Away toggle */}
+        {isOwner && (
+          <button
+            onClick={toggleLocation}
+            title="Toggle Home / Away"
+            disabled={locked}
+            style={{
+              flexShrink: 0, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+              border: gameLocation === 'Away'
+                ? '0.5px solid rgba(232,160,32,0.4)'
+                : gameLocation === 'Home'
+                ? '0.5px solid rgba(109,184,117,0.4)'
+                : '0.5px solid var(--border-md)',
+              background: gameLocation === 'Away'
+                ? 'rgba(232,160,32,0.12)'
+                : gameLocation === 'Home'
+                ? 'rgba(109,184,117,0.12)'
+                : 'var(--bg-card)',
+              color: gameLocation === 'Away' ? '#E8A020' : gameLocation === 'Home' ? '#6DB875' : 'rgba(var(--fg-rgb),0.45)',
+              cursor: locked ? 'default' : 'pointer',
+            }}
+          >
+            {gameLocation === 'Away' ? 'Away' : gameLocation === 'Home' ? 'Home' : 'H/A'}
+          </button>
+        )}
 
         {/* View toggle */}
         <div style={{
@@ -1076,7 +1112,7 @@ export default function InGameView({
           </div>
 
           {/* Away team on top, home team on bottom */}
-          {(game.location === 'Away'
+          {(gameLocation === 'Away'
             ? [
                 { label: teamName,      isUs: true,  values: us,   total: usTotal,   onChange: setUsInning },
                 { label: game.opponent, isUs: false, values: them, total: themTotal, onChange: setThemInning },

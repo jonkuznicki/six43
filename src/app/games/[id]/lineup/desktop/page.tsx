@@ -793,6 +793,12 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     }
   }
 
+  async function toggleLocation() {
+    const next = game?.location === 'Home' ? 'Away' : 'Home'
+    setGame((g: any) => ({ ...g, location: next }))
+    await supabase.from('games').update({ location: next }).eq('id', params.id)
+  }
+
   async function savePlayerNotes() {
     const seasonId = game?.season_id
     if (!seasonId) return
@@ -1155,6 +1161,16 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <button onClick={() => setConfirmClear(true)} style={topBtn(true)}>Clear lineup</button>
           )}
           <button onClick={openCopy} style={topBtn(true)}>Copy from…</button>
+          <button
+            onClick={toggleLocation}
+            title="Toggle Home / Away"
+            style={{
+              ...topBtn(true),
+              color: game?.location === 'Away' ? '#E8A020' : game?.location === 'Home' ? '#6DB875' : 'rgba(255,255,255,0.55)',
+            }}
+          >
+            {game?.location === 'Away' ? 'Away' : game?.location === 'Home' ? 'Home' : 'H/A'}
+          </button>
           {isOwner && game && <GameEditButton game={game} />}
           {isOwner && (
             <button

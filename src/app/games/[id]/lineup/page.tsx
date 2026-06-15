@@ -208,6 +208,12 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     setStatusSaving(false)
   }
 
+  async function toggleLocation() {
+    const next = game?.location === 'Home' ? 'Away' : 'Home'
+    setGame((g: any) => ({ ...g, location: next }))
+    await supabase.from('games').update({ location: next }).eq('id', params.id)
+  }
+
   async function saveScore() {
     const usVal   = parseInt(scoreUs)   || 0
     const themVal = parseInt(scoreThem) || 0
@@ -531,6 +537,33 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
               <option value="in_progress">In Game</option>
               <option value="final">Final</option>
             </select>
+
+            {/* Home/Away toggle */}
+            <button
+              onClick={toggleLocation}
+              title="Toggle Home / Away"
+              style={{
+                padding: '5px 10px', borderRadius: '5px', fontSize: '12px', fontWeight: 700,
+                border: game?.location === 'Away'
+                  ? '0.5px solid rgba(232,160,32,0.4)'
+                  : game?.location === 'Home'
+                  ? '0.5px solid rgba(109,184,117,0.4)'
+                  : '0.5px solid var(--border-md)',
+                background: game?.location === 'Away'
+                  ? 'rgba(232,160,32,0.12)'
+                  : game?.location === 'Home'
+                  ? 'rgba(109,184,117,0.12)'
+                  : 'var(--bg-input)',
+                color: game?.location === 'Away'
+                  ? '#E8A020'
+                  : game?.location === 'Home'
+                  ? '#6DB875'
+                  : 'rgba(var(--fg-rgb), 0.4)',
+                cursor: 'pointer',
+              }}
+            >
+              {game?.location === 'Away' ? 'Away' : game?.location === 'Home' ? 'Home' : 'H/A'}
+            </button>
 
             {/* Play Game button */}
             {(game?.status === 'scheduled' || game?.status === 'lineup_ready' || game?.status === 'in_progress') && (
