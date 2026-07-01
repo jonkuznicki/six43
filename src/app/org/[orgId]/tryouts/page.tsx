@@ -46,6 +46,7 @@ const SECTIONS = [
     desc:  'Import all data sources, verify players are mapped correctly, and confirm everything is complete before tryouts begin.',
     color: 'rgba(80,160,232,0.05)',
     items: [
+      { href: 'players',                    label: 'Players',              icon: '👤', desc: 'View and manage all players in this org' },
       { href: 'imports?type=registration', label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
       { href: 'imports?type=rosters',      label: 'Import Rosters',       icon: '📁', desc: 'Upload current season rosters to assign players to teams' },
       { href: 'imports?type=gc_stats',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats per team' },
