@@ -33,9 +33,11 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
   const [search,    setSearch]    = useState('')
   const [ageFilter, setAgeFilter] = useState('all')
   const [expanded,  setExpanded]  = useState<string | null>(null)
-  const [mergeMode, setMergeMode] = useState(false)
-  const [selected,  setSelected]  = useState<Set<string>>(new Set())
-  const [merging,   setMerging]   = useState(false)
+  const [mergeMode,     setMergeMode]     = useState(false)
+  const [selected,      setSelected]      = useState<Set<string>>(new Set())
+  const [merging,       setMerging]       = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting,      setDeleting]      = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -48,6 +50,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
     const { data: playerData } = await supabase
       .from('tryout_players').select('id, first_name, last_name, age_group, dob, parent_email, parent_phone, prior_team, is_active, created_at')
       .eq('org_id', params.orgId)
+      .eq('is_active', true)
       .order('last_name').order('first_name')
 
     if (!playerData?.length) { setPlayers([]); setLoading(false); return }
@@ -128,6 +131,17 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
     setMergeMode(false)
     setMerging(false)
     await loadData()
+  }
+
+  async function deletePlayer(playerId: string) {
+    setDeleting(playerId)
+    await supabase.from('tryout_player_aliases').delete().eq('player_id', playerId)
+    await supabase.from('tryout_registration_staging').delete().eq('player_id', playerId)
+    await supabase.from('tryout_players').update({ is_active: false }).eq('id', playerId)
+    setPlayers(prev => prev.filter(p => p.id !== playerId))
+    setExpanded(null)
+    setDeleteConfirm(null)
+    setDeleting(null)
   }
 
   const s = {
@@ -280,6 +294,54 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
                     )}
                     <div style={{ marginTop: '4px', fontSize: '11px', color: s.dim }}>
                       Added {new Date(player.created_at).toLocaleDateString()}
+                    </div>
+
+                    {/* Delete section */}
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '0.5px solid var(--border-subtle)' }}>
+                      {deleteConfirm === player.id ? (
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#E87060', marginBottom: '8px' }}>
+                            {(player._scoreCount ?? 0) > 0
+                              ? `This player has ${player._scoreCount} score record${player._scoreCount === 1 ? '' : 's'} — those will remain but the player will be hidden and their aliases cleared. `
+                              : ''}
+                            Remove from list and clear import aliases so they can be reimported fresh?
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => deletePlayer(player.id)}
+                              disabled={deleting === player.id}
+                              style={{
+                                padding: '6px 14px', borderRadius: '6px', border: 'none',
+                                background: 'rgba(232,80,80,0.15)', color: '#E87060',
+                                fontSize: '12px', fontWeight: 700, cursor: deleting === player.id ? 'default' : 'pointer',
+                                opacity: deleting === player.id ? 0.6 : 1,
+                              }}
+                            >
+                              {deleting === player.id ? 'Removing…' : 'Yes, remove'}
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(null)}
+                              style={{
+                                padding: '6px 12px', borderRadius: '6px',
+                                border: '0.5px solid var(--border-md)', background: 'transparent',
+                                color: s.dim, fontSize: '12px', cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(player.id)}
+                          style={{
+                            background: 'none', border: 'none', padding: 0,
+                            fontSize: '12px', color: s.dim, cursor: 'pointer', textDecoration: 'underline',
+                          }}
+                        >
+                          Remove player
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
