@@ -258,17 +258,19 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
     const isCombinedRow = hasBattingCols && ipIdx !== -1
 
     if (isCombinedRow) {
-      const battingSeen = new Set<string>()
+      // Shared seenKeys so batting columns claim shared keys (g, h) first.
+      // BB→bb vs BB→bb_allowed and SO→so vs SO→k are different keys, so they
+      // still get captured correctly from each half.
+      const seenKeys = new Set<string>()
       for (let ci = 0; ci < ipIdx; ci++) {
         if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
         const mapped = BATTING_MAP[headers[ci]]
-        if (mapped && !battingSeen.has(mapped)) { statMap[ci] = mapped; battingSeen.add(mapped) }
+        if (mapped && !seenKeys.has(mapped)) { statMap[ci] = mapped; seenKeys.add(mapped) }
       }
-      const pitchingSeen = new Set<string>()
       for (let ci = ipIdx; ci < headers.length; ci++) {
         if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
         const mapped = PITCHING_MAP[headers[ci]]
-        if (mapped && !pitchingSeen.has(mapped)) { statMap[ci] = mapped; pitchingSeen.add(mapped) }
+        if (mapped && !seenKeys.has(mapped)) { statMap[ci] = mapped; seenKeys.add(mapped) }
       }
     } else {
       const seenStatKeys = new Set<string>()
