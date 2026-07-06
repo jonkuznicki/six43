@@ -99,10 +99,10 @@ async function upsertRegStaging(supabase: any, row: Record<string, any>) {
 // ── Action handlers ──────────────────────────────────────────────────────────
 
 async function writeGcStatsForPlayer({ supabase, row, playerId, orgId, seasonId }: any) {
-  // Fetch season year from season record
+  // GC stats belong to the PREVIOUS season year (data hub queries syear - 1)
   const { data: season } = await supabase
     .from('tryout_seasons').select('year').eq('id', seasonId).single()
-  const seasonYear = season?.year?.toString() ?? new Date().getFullYear().toString()
+  const seasonYear = season?.year ? String(season.year - 1) : String(new Date().getFullYear() - 1)
 
   const s = row.stats ?? {}
   const bb_per_inn = s.bb_per_inn != null
