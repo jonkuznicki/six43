@@ -446,12 +446,18 @@ function ImportsInner({ params }: { params: { orgId: string } }) {
                     background: `${st.color}18`, color: st.color,
                     border: `0.5px solid ${st.color}55`,
                   }}>{st.label}</span>
-                  {needsReview && (
+                  {needsReview ? (
                     <Link href={`/org/${params.orgId}/tryouts/imports/${job.id}`} style={{
                       fontSize: '12px', fontWeight: 700, padding: '5px 14px', borderRadius: '5px',
                       background: 'rgba(232,160,32,0.12)', color: '#E8A020',
                       border: '0.5px solid rgba(232,160,32,0.35)', textDecoration: 'none',
                     }}>Review</Link>
+                  ) : (
+                    <Link href={`/org/${params.orgId}/tryouts/imports/${job.id}`} style={{
+                      fontSize: '12px', fontWeight: 600, padding: '5px 14px', borderRadius: '5px',
+                      background: 'transparent', color: s.dim,
+                      border: '0.5px solid var(--border-md)', textDecoration: 'none',
+                    }}>View</Link>
                   )}
                 </div>
               </div>
