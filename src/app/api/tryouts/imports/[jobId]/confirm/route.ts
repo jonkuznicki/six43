@@ -216,7 +216,7 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
         jersey_number: row.jerseyNumber ?? null,
       }, { onConflict: 'player_id,season_id' })
     }
-  } else if (job.type === 'gamechanger') {
+  } else if (job.type === 'gc_stats') {
     // Write GC stats and compute scores
     if (job.season_id) {
       await writeGcStatsForPlayer({ supabase, row, playerId, orgId: job.org_id, seasonId: job.season_id })
@@ -445,7 +445,7 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
     const topCandidate = row.candidates?.[0]
     if (!topCandidate) continue
 
-    const aliasSource = isRoster ? 'roster' : job.type === 'gamechanger' ? 'gamechanger' : 'registration'
+    const aliasSource = isRoster ? 'roster' : job.type === 'gc_stats' ? 'gamechanger' : 'registration'
     await supabase.from('tryout_player_aliases').insert({
       player_id:     topCandidate.id,
       raw_name:      row.rawName,
@@ -457,7 +457,7 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       import_job_id: job.id,
     })
 
-    if (job.type === 'gamechanger' && job.season_id) {
+    if (job.type === 'gc_stats' && job.season_id) {
       await writeGcStatsForPlayer({ supabase, row, playerId: topCandidate.id, orgId: job.org_id, seasonId: job.season_id })
     } else if (isRoster) {
       // Update player record
