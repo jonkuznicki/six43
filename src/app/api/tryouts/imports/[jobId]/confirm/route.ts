@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '../../../../../../lib/supabase-server'
+import { computeGcScores, GcPlayerStat, GcScoringConfigRow } from '../../../../../../lib/tryouts/computeGcScores'
 
 export async function POST(
   req: NextRequest,
@@ -97,6 +98,90 @@ async function upsertRegStaging(supabase: any, row: Record<string, any>) {
 
 // ── Action handlers ──────────────────────────────────────────────────────────
 
+async function writeGcStatsForPlayer({ supabase, row, playerId, orgId, seasonId }: any) {
+  // Fetch season year from season record
+  const { data: season } = await supabase
+    .from('tryout_seasons').select('year').eq('id', seasonId).single()
+  const seasonYear = season?.year?.toString() ?? new Date().getFullYear().toString()
+
+  const s = row.stats ?? {}
+  const bb_per_inn = s.bb_per_inn != null
+    ? s.bb_per_inn
+    : (s.bb_allowed != null && s.ip != null && s.ip > 0)
+      ? Math.round((s.bb_allowed / s.ip) * 1000) / 1000
+      : null
+
+  await supabase.from('tryout_gc_stats').upsert({
+    player_id:    playerId,
+    org_id:       orgId,
+    season_year:  seasonYear,
+    team_label:   row.teamLabel ?? null,
+    source:       'gamechanger',
+    games_played: s.g       ?? null,
+    pa:     s.pa            ?? null,
+    ab:     s.ab            ?? null,
+    avg:    s.avg           ?? null,
+    obp:    s.obp           ?? null,
+    slg:    s.slg           ?? null,
+    ops:    s.ops           ?? null,
+    h:      s.h             ?? null,
+    doubles: s.doubles      ?? null,
+    triples: s.triples      ?? null,
+    hr:     s.hr            ?? null,
+    rbi:    s.rbi           ?? null,
+    r:      s.r             ?? null,
+    bb:     s.bb            ?? null,
+    so:     s.so            ?? null,
+    sb:     s.sb            ?? null,
+    hbp:    s.hbp           ?? null,
+    sac:    s.sac           ?? null,
+    tb:     s.tb            ?? null,
+    ip:     s.ip            ?? null,
+    gs:     s.gs            ?? null,
+    w:      s.w             ?? null,
+    l:      s.l             ?? null,
+    sv:     s.sv            ?? null,
+    era:    s.era           ?? null,
+    whip:   s.whip          ?? null,
+    k:      s.k             ?? null,
+    bb_allowed: s.bb_allowed ?? null,
+    bf:     s.bf            ?? null,
+    baa:    s.baa           ?? null,
+    bb_per_inn,
+    k_bb:       s.k_bb      ?? null,
+    strike_pct: s.strike_pct ?? null,
+  }, { onConflict: 'player_id,org_id,season_year' })
+
+  // Compute and save GC scores
+  const [{ data: scoringCfg }, { data: playerRow }] = await Promise.all([
+    supabase.from('tryout_gc_scoring_config')
+      .select('age_group, stat_key, included, weight')
+      .eq('org_id', orgId).eq('season_id', seasonId),
+    supabase.from('tryout_players').select('age_group').eq('id', playerId).single(),
+  ])
+  if (scoringCfg?.length) {
+    const playerStat: GcPlayerStat = {
+      player_id:  playerId,
+      age_group:  playerRow?.age_group ?? null,
+      avg: s.avg, obp: s.obp, slg: s.slg, ops: s.ops,
+      rbi: s.rbi, r:   s.r,   hr:  s.hr,  sb:  s.sb,
+      bb:  s.bb,  so:  s.so,
+      era: s.era, whip: s.whip, ip: s.ip,
+      k:   s.k,   bb_allowed: s.bb_allowed, bf: s.bf,
+      baa: s.baa, bb_per_inn, k_bb: s.k_bb, strike_pct: s.strike_pct,
+      w:   s.w,   sv: s.sv,
+    }
+    const scores = computeGcScores([playerStat], scoringCfg as GcScoringConfigRow[])
+    const score = scores.get(playerId)
+    if (score) {
+      await supabase.from('tryout_gc_stats').upsert({
+        player_id: playerId, org_id: orgId, season_year: seasonYear,
+        gc_hitting_score: score.hitting, gc_pitching_score: score.pitching,
+      }, { onConflict: 'player_id,org_id,season_year' })
+    }
+  }
+}
+
 async function confirmMatch({ supabase, job, report, row, playerId, userId }: any) {
   if (job.type === 'roster') {
     // Roster: update prior_team and jersey number on the player record
@@ -131,6 +216,23 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
         jersey_number: row.jerseyNumber ?? null,
       }, { onConflict: 'player_id,season_id' })
     }
+  } else if (job.type === 'gamechanger') {
+    // Write GC stats and compute scores
+    if (job.season_id) {
+      await writeGcStatsForPlayer({ supabase, row, playerId, orgId: job.org_id, seasonId: job.season_id })
+    }
+
+    // Create alias
+    await supabase.from('tryout_player_aliases').insert({
+      player_id:     playerId,
+      raw_name:      row.rawName,
+      source:        'gamechanger',
+      confidence:    row.confidence ?? 0.90,
+      confirmed:     true,
+      confirmed_by:  userId,
+      confirmed_at:  new Date().toISOString(),
+      import_job_id: job.id,
+    })
   } else {
     // Registration: update player record with registration data
     const payload = row.createPayload
@@ -343,10 +445,11 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
     const topCandidate = row.candidates?.[0]
     if (!topCandidate) continue
 
+    const aliasSource = isRoster ? 'roster' : job.type === 'gamechanger' ? 'gamechanger' : 'registration'
     await supabase.from('tryout_player_aliases').insert({
       player_id:     topCandidate.id,
       raw_name:      row.rawName,
-      source:        isRoster ? 'roster' : 'registration',
+      source:        aliasSource,
       confidence:    topCandidate.confidence,
       confirmed:     true,
       confirmed_by:  userId,
@@ -354,7 +457,9 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
       import_job_id: job.id,
     })
 
-    if (isRoster) {
+    if (job.type === 'gamechanger' && job.season_id) {
+      await writeGcStatsForPlayer({ supabase, row, playerId: topCandidate.id, orgId: job.org_id, seasonId: job.season_id })
+    } else if (isRoster) {
       // Update player record
       await supabase.from('tryout_players').update({
         prior_team:    row.teamName ?? null,
