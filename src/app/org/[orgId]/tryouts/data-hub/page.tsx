@@ -32,6 +32,7 @@ interface GcRow  {
   h: number|null; doubles: number|null; triples: number|null; hr: number|null
   rbi: number|null; r: number|null; bb: number|null; so: number|null
   sb: number|null; hbp: number|null; sac: number|null; tb: number|null
+  k: number|null; bb_allowed: number|null
   era: number|null; whip: number|null; ip: number|null
   w: number|null; sv: number|null; k_bb: number|null; strike_pct: number|null
   gc_hitting_score:  number|null
@@ -371,7 +372,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     if (target === 'gc') {
       const q = supabase
         .from('tryout_gc_stats')
-        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,era,whip,ip,w,sv,k_bb,strike_pct,gc_hitting_score,gc_pitching_score')
+        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,k,bb_allowed,era,whip,ip,w,sv,k_bb,strike_pct,gc_hitting_score,gc_pitching_score')
         .eq('org_id', params.orgId)
       const { data } = syear ? await q.eq('season_year', String(syear - 1)) : await q
       setGcFull(data ?? [])
@@ -977,6 +978,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           GP: 'games_played', AVG: 'avg', OBP: 'obp', SLG: 'slg', OPS: 'ops',
           H: 'h', '2B': 'doubles', '3B': 'triples', HR: 'hr', RBI: 'rbi',
           R: 'r', BB: 'bb', SO: 'so', SB: 'sb', HBP: 'hbp', SAC: 'sac', TB: 'tb',
+          K: 'k', pBB: 'bb_allowed',
           ERA: 'era', WHIP: 'whip', IP: 'ip', W: 'w', SV: 'sv', 'K/BB': 'k_bb', 'STR%': 'strike_pct',
           'Hit Score': 'gc_hitting_score',
           'Pit Score': 'gc_pitching_score',
@@ -1025,7 +1027,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         }
 
         const batting  = ['GP','AVG','OBP','SLG','OPS','H','2B','3B','HR','RBI','R','BB','SO','SB','HBP','SAC','TB']
-        const pitching = ['ERA','WHIP','IP','W','SV','K/BB','STR%']
+        const pitching = ['K','pBB','ERA','WHIP','IP','W','SV','K/BB','STR%']
+        const pitchingLabel: Record<string, string> = { pBB: 'BB' }
 
         const thGc = (col: string, extra?: React.CSSProperties) => ({
           ...th, cursor: 'pointer',
@@ -1095,8 +1098,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                       </th>
                     ))}
                     {pitching.map(l => (
-                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'ERA' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
-                        {l}{gcArrow(l)}
+                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'K' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
+                        {pitchingLabel[l] ?? l}{gcArrow(l)}
                       </th>
                     ))}
                   </tr>
@@ -1132,7 +1135,9 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, textAlign: 'right' }}>{gc?.sac ?? '—'}</td>
                         <td style={{ ...td, textAlign: 'right' }}>{gc?.tb ?? '—'}</td>
                         {/* Pitching */}
-                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{fmt(gc?.era ?? null, 2)}</td>
+                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.k ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{gc?.bb_allowed ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.era ?? null, 2)}</td>
                         <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
                         <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.ip ?? null, 1)}</td>
                         <td style={{ ...td, textAlign: 'right' }}>{gc?.w ?? '—'}</td>
