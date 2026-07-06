@@ -220,9 +220,13 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
     return { rows: [], errors, teamLabel, detectedType: 'unknown' }
   }
 
+  const firstHeaders = rows[sections[0].headerIdx].map(normalizeHeader)
+  const firstIpIdx   = firstHeaders.indexOf('ip')
+  const firstHasBatting = firstHeaders.some(h => ['avg', 'obp', 'slg'].includes(h))
   const detectedType: GcParseResult['detectedType'] =
-    sections.length > 1          ? 'combined' :
-    sections[0].type === 'pitching' ? 'pitching' : 'batting'
+    sections.length > 1                                    ? 'combined' :
+    (firstHasBatting && firstIpIdx !== -1)                 ? 'combined' :
+    sections[0].type === 'pitching'                        ? 'pitching' : 'batting'
 
   const result: GcStatsRow[] = []
 
@@ -243,22 +247,44 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
       continue
     }
 
-    // Build column mapping for stats — for combined exports apply both maps
-    // (first occurrence of a key wins, so batting stats before pitching are preferred)
+    // Build column mapping for stats.
+    // GC sometimes exports a single header row with batting + pitching + fielding columns
+    // all together, with duplicate column names (BB, SO, H, GP appear in both batting and
+    // pitching). Use 'ip' position as the boundary: columns before it are batting, at/after
+    // are pitching, each mapped independently so duplicates land in the right stat key.
     const statMap: Record<number, string> = {}
-    const seenStatKeys = new Set<string>()
-    const colDicts = section.type === 'pitching'
-      ? [PITCHING_MAP, BATTING_MAP]
-      : [BATTING_MAP, PITCHING_MAP]
+    const ipIdx = headers.indexOf('ip')
+    const hasBattingCols = headers.some(h => ['avg', 'obp', 'slg'].includes(h))
+    const isCombinedRow = hasBattingCols && ipIdx !== -1
 
-    for (let ci = 0; ci < headers.length; ci++) {
-      if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
-      for (const dict of colDicts) {
-        const mapped = dict[headers[ci]]
-        if (mapped && !seenStatKeys.has(mapped)) {
-          statMap[ci] = mapped
-          seenStatKeys.add(mapped)
-          break
+    if (isCombinedRow) {
+      const battingSeen = new Set<string>()
+      for (let ci = 0; ci < ipIdx; ci++) {
+        if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
+        const mapped = BATTING_MAP[headers[ci]]
+        if (mapped && !battingSeen.has(mapped)) { statMap[ci] = mapped; battingSeen.add(mapped) }
+      }
+      const pitchingSeen = new Set<string>()
+      for (let ci = ipIdx; ci < headers.length; ci++) {
+        if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
+        const mapped = PITCHING_MAP[headers[ci]]
+        if (mapped && !pitchingSeen.has(mapped)) { statMap[ci] = mapped; pitchingSeen.add(mapped) }
+      }
+    } else {
+      const seenStatKeys = new Set<string>()
+      const colDicts = section.type === 'pitching'
+        ? [PITCHING_MAP, BATTING_MAP]
+        : [BATTING_MAP, PITCHING_MAP]
+
+      for (let ci = 0; ci < headers.length; ci++) {
+        if (ci === nameIdx || ci === jerseyIdx || ci === firstIdx || ci === lastIdx) continue
+        for (const dict of colDicts) {
+          const mapped = dict[headers[ci]]
+          if (mapped && !seenStatKeys.has(mapped)) {
+            statMap[ci] = mapped
+            seenStatKeys.add(mapped)
+            break
+          }
         }
       }
     }
@@ -305,7 +331,7 @@ export function parseGcStatsFile(buffer: ArrayBuffer): GcParseResult {
           rawName,
           jerseyNumber,
           teamLabel,
-          type:         section.type,
+          type:         isCombinedRow ? 'unknown' : section.type,
           stats,
         })
       }
