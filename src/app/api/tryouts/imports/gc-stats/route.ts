@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       normalized:       normalizeName(row.rawName),
       jerseyNumber:     row.jerseyNumber,
       type:             row.type,
-      teamLabel:        finalTeamLabel ?? row.teamLabel,
+      teamLabel:        resolvedTeamFromFile ?? row.teamLabel,
       status,
       confidence:       topMatch?.confidence ?? null,
       matchReason:      topMatch?.matchReason ?? null,
