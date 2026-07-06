@@ -172,7 +172,12 @@ function isHeaderRow(row: string[]): boolean {
 
 function isPitchingHeader(cols: string[]): boolean {
   const lower = cols.map(normalizeHeader)
-  return lower.includes('ip') || lower.includes('innings pitched') || lower.includes('era')
+  return lower.includes('ip')
+    || lower.includes('innings pitched')
+    || lower.includes('era')
+    || lower.includes('whip')
+    || lower.includes('bf')
+    || lower.includes('batters faced')
 }
 
 function extractTeamLabel(rows: string[][]): string | null {
