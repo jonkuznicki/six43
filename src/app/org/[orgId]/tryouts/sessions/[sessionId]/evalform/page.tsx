@@ -276,31 +276,46 @@ export default function EvalFormPage({ params }: { params: { orgId: string; sess
                       </tr>
                     ))
                   ) : (
-                    checkins.map(c => {
-                      const name = c.is_write_in
-                        ? (c.write_in_name ?? 'Write-in')
-                        : c.player
-                          ? `${c.player.last_name}, ${c.player.first_name}`
-                          : 'Unknown'
-                      return (
-                        <tr key={c.id}>
-                          <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)', textAlign: 'center', fontWeight: 700, fontSize: '11px' }}>
-                            {c.tryout_number}
+                    <>
+                      {checkins.map(c => {
+                        const name = c.is_write_in
+                          ? (c.write_in_name ?? 'Write-in')
+                          : c.player
+                            ? `${c.player.last_name}, ${c.player.first_name}`
+                            : 'Unknown'
+                        return (
+                          <tr key={c.id}>
+                            <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)', textAlign: 'center', fontWeight: 700, fontSize: '11px' }}>
+                              {c.tryout_number}
+                            </td>
+                            <td style={{ padding: '5px 8px', border: '0.5px solid var(--border)', fontWeight: 600, fontSize: '11px' }}>
+                              {name}
+                            </td>
+                            {allCols.map((col, ci) => (
+                              <td key={ci} style={{
+                                padding: '5px 4px', border: '0.5px solid var(--border)',
+                                width: '36px',
+                                background: col.isTiebreaker ? `rgba(var(--fg-rgb),0.015)` : 'transparent',
+                              }}>&nbsp;</td>
+                            ))}
+                            <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)' }}>&nbsp;</td>
+                          </tr>
+                        )
+                      })}
+                      {/* 5 blank rows for walk-up players */}
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={`walkup-${i}`} style={{ background: `rgba(var(--fg-rgb),0.01)` }}>
+                          <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)', textAlign: 'center', color: `rgba(var(--fg-rgb),0.25)`, fontSize: '10px' }}>
+                            {i === 0 ? 'W' : ''}
                           </td>
-                          <td style={{ padding: '5px 8px', border: '0.5px solid var(--border)', fontWeight: 600, fontSize: '11px' }}>
-                            {name}
-                          </td>
+                          <td style={{ padding: '5px 8px', border: '0.5px solid var(--border)' }}>&nbsp;</td>
                           {allCols.map((col, ci) => (
-                            <td key={ci} style={{
-                              padding: '5px 4px', border: '0.5px solid var(--border)',
-                              width: '36px',
-                              background: col.isTiebreaker ? `rgba(var(--fg-rgb),0.015)` : 'transparent',
-                            }}>&nbsp;</td>
+                            <td key={ci} style={{ padding: '5px 4px', border: '0.5px solid var(--border)', width: '36px' }}>&nbsp;</td>
                           ))}
                           <td style={{ padding: '5px 6px', border: '0.5px solid var(--border)' }}>&nbsp;</td>
                         </tr>
-                      )
-                    })
+                      ))}
+                    </>
                   )}
                 </tbody>
               </table>
