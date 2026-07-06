@@ -104,6 +104,20 @@ async function writeGcStatsForPlayer({ supabase, row, playerId, orgId, seasonId 
     .from('tryout_seasons').select('year').eq('id', seasonId).single()
   const seasonYear = season?.year ? String(season.year - 1) : String(new Date().getFullYear() - 1)
 
+  // If no per-row teamLabel (team came from filename), look it up from existing stats
+  let teamLabel = row.teamLabel ?? null
+  if (!teamLabel) {
+    const { data: existingStat } = await supabase
+      .from('tryout_gc_stats')
+      .select('team_label')
+      .eq('org_id', orgId)
+      .eq('season_year', seasonYear)
+      .not('team_label', 'is', null)
+      .limit(1)
+      .maybeSingle()
+    teamLabel = existingStat?.team_label ?? null
+  }
+
   const s = row.stats ?? {}
   const bb_per_inn = s.bb_per_inn != null
     ? s.bb_per_inn
@@ -115,7 +129,7 @@ async function writeGcStatsForPlayer({ supabase, row, playerId, orgId, seasonId 
     player_id:    playerId,
     org_id:       orgId,
     season_year:  seasonYear,
-    team_label:   row.teamLabel ?? null,
+    team_label:   teamLabel,
     source:       'gamechanger',
     games_played: s.g       ?? null,
     pa:     s.pa            ?? null,
