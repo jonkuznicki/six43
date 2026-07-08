@@ -704,6 +704,15 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
     return (
       <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
+        <style>{`
+          @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            th, td { border: 0.5px solid #ccc !important; }
+            table { font-size: 10px !important; }
+          }
+        `}</style>
+
         {/* Sticky header */}
         <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)', borderBottom: '0.5px solid var(--border)', padding: '12px 1.5rem' }}>
           <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -727,7 +736,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                 <span>· {formData.season.label}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {allComplete ? (
                 <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(109,184,117,0.15)', color: '#2f855a', border: '0.5px solid rgba(109,184,117,0.3)' }}>
                   ✓ Ready to submit
@@ -738,6 +747,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                 </span>
               )}
               <button onClick={() => setStep('score')} style={{ padding: '7px 16px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: 'var(--fg)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>← Back to edit</button>
+              <button onClick={() => window.print()} style={{ padding: '7px 16px', borderRadius: '6px', border: '0.5px solid var(--border-md)', background: 'var(--bg2)', color: 'var(--fg)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>⬇ Save as PDF</button>
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !allComplete}
@@ -861,13 +871,16 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="no-print" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={handleSubmit}
               disabled={submitting || !allComplete}
               style={{ padding: '12px 28px', borderRadius: '8px', border: 'none', background: allComplete ? 'var(--accent)' : 'rgba(var(--fg-rgb),0.12)', color: allComplete ? 'var(--accent-text)' : s.dim, fontSize: '14px', fontWeight: 700, cursor: allComplete ? 'pointer' : 'not-allowed', opacity: submitting ? 0.6 : 1 }}
             >
               {submitting ? 'Submitting…' : 'Submit evaluations'}
+            </button>
+            <button onClick={() => window.print()} style={{ padding: '12px 16px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer' }}>
+              ⬇ Save as PDF
             </button>
             <button onClick={() => setStep('score')} style={{ padding: '12px 16px', borderRadius: '8px', border: '0.5px solid var(--border-md)', background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer' }}>
               ← Back to edit
