@@ -63,7 +63,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   const [editingName, setEditingName] = useState(false)
 
   const [scores,         setScores]         = useState<Record<string, Record<string, number | null>>>({})
-  const [naFlags,        setNaFlags]        = useState<Record<string, Set<string>>>({})
   const [playerComments, setPlayerComments] = useState<Record<string, string>>({})
   const [overallNotes,   setOverallNotes]   = useState('')
 
@@ -128,21 +127,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       if (draft.overall_notes) setOverallNotes(draft.overall_notes)
       if (draft.last_saved_at) setLastSaved(new Date(draft.last_saved_at))
 
-      // Server draft doesn't store naFlags — load them from localStorage
-      try {
-        const raw = localStorage.getItem(`eval_team_draft_${params.teamToken}`)
-        if (raw) {
-          const saved = JSON.parse(raw)
-          if (saved.naFlags) {
-            const restored: Record<string, Set<string>> = {}
-            for (const [pid, arr] of Object.entries(saved.naFlags as Record<string, string[]>)) {
-              restored[pid] = new Set(arr)
-            }
-            setNaFlags(restored)
-          }
-        }
-      } catch { /* ignore */ }
-
       if (draft.status === 'submitted') {
         if (draft.coach_name) setCoachName(draft.coach_name)
         setAlreadySubmitted(true)
@@ -173,15 +157,11 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   useEffect(() => {
     if (step !== 'score') return
     try {
-      const serializedNaFlags: Record<string, string[]> = {}
-      for (const [pid, set] of Object.entries(naFlags)) {
-        if (set.size > 0) serializedNaFlags[pid] = [...set]
-      }
       localStorage.setItem(`eval_team_draft_${params.teamToken}`, JSON.stringify({
-        coachName, scores, playerComments, overallNotes, naFlags: serializedNaFlags, savedAt: new Date().toISOString(),
+        coachName, scores, playerComments, overallNotes, savedAt: new Date().toISOString(),
       }))
     } catch { /* ignore */ }
-  }, [scores, playerComments, overallNotes, naFlags, step])
+  }, [scores, playerComments, overallNotes, step])
 
   // Auto-save to server every 60s during scoring
   useEffect(() => {
@@ -227,13 +207,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       if (draft.playerComments) setPlayerComments(draft.playerComments)
       if (draft.overallNotes)   setOverallNotes(draft.overallNotes)
       if (draft.savedAt)        setLastSaved(new Date(draft.savedAt))
-      if (draft.naFlags) {
-        const restored: Record<string, Set<string>> = {}
-        for (const [pid, arr] of Object.entries(draft.naFlags as Record<string, string[]>)) {
-          restored[pid] = new Set(arr)
-        }
-        setNaFlags(restored)
-      }
     } catch { /* ignore */ }
     setStep('score')
   }
@@ -390,31 +363,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     if (e.key === 'ArrowDown')  { e.preventDefault(); moveSelected(1, 0, numRows, numCols); return }
     if (e.key === 'ArrowUp')    { e.preventDefault(); moveSelected(-1, 0, numRows, numCols); return }
     if (e.key === 'Escape')     { setSelected(null); return }
-  }
-
-  function toggleNa(playerId: string, naKey: string, fields: EvalField[]) {
-    setNaFlags(prev => {
-      const cur = new Set(prev[playerId] ?? [])
-      if (cur.has(naKey)) {
-        cur.delete(naKey)
-      } else {
-        cur.add(naKey)
-        setScores(ps => {
-          const ps2 = { ...(ps[playerId] ?? {}) }
-          for (const f of fields) delete ps2[f.field_key]
-          return { ...ps, [playerId]: ps2 }
-        })
-      }
-      return { ...prev, [playerId]: cur }
-    })
-  }
-
-  function isNa(playerId: string, naKey: string) {
-    return naFlags[playerId]?.has(naKey) ?? false
-  }
-
-  function fieldNaKey(fieldKey: string, sectionKey: string): string {
-    return sectionKey === 'pitching_catching' ? fieldKey : sectionKey
   }
 
   async function handleSubmit() {
@@ -698,9 +646,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
               all players you have seen at this age level.
             </p>
             <p style={{ margin: 0 }}>
-              If a player <strong style={{ color: 'var(--fg)' }}>did not pitch</strong>, check <strong style={{ color: 'var(--fg)' }}>P N/A</strong>.
-              If they <strong style={{ color: 'var(--fg)' }}>did not catch</strong>, check <strong style={{ color: 'var(--fg)' }}>C N/A</strong>.
-              This marks those fields as not applicable rather than leaving them blank.
+              If a player <strong style={{ color: 'var(--fg)' }}>did not pitch or catch</strong>, simply{' '}
+              <strong style={{ color: 'var(--fg)' }}>leave those fields blank</strong> — they are optional and will not block submission.
             </p>
             <p style={{ margin: 0 }}>
               <strong style={{ color: 'var(--fg)' }}>Player notes are very important.</strong>{' '}
@@ -720,10 +667,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
     const playerStatus = players.map(p => {
       const ps = scores[p.id] ?? {}
-      const missingScores = requiredFields.filter(f => {
-        const sk = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
-        return ps[f.field_key] == null && !isNa(p.id, fieldNaKey(f.field_key, sk))
-      })
+      const missingScores = requiredFields.filter(f => ps[f.field_key] == null)
       const hasComment = !!(playerComments[p.id]?.trim())
       return { player: p, missingScores, hasComment, complete: missingScores.length === 0 && hasComment }
     })
@@ -846,12 +790,10 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                       </td>
                       {allFields.map(f => {
                         const v = ps[f.field_key] ?? null
-                        const fSecKey = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
-                        const na = isNa(p.id, fieldNaKey(f.field_key, fSecKey))
                         return (
                           <td key={f.field_key} style={{ padding: '4px 2px', textAlign: 'center' }}>
-                            <span style={{ display: 'inline-block', width: '30px', height: '26px', lineHeight: '26px', borderRadius: '5px', fontWeight: 700, fontSize: '13px', background: na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(v), color: v != null && !na ? 'var(--fg)' : s.dim }}>
-                              {na ? 'N/A' : (v ?? '—')}
+                            <span style={{ display: 'inline-block', width: '30px', height: '26px', lineHeight: '26px', borderRadius: '5px', fontWeight: 700, fontSize: '13px', background: scoreColor(v), color: v != null ? 'var(--fg)' : s.dim }}>
+                              {v ?? '—'}
                             </span>
                           </td>
                         )
@@ -1030,8 +972,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                 <span style={{ opacity: 0.75 }}>compared to all players you've seen at this age level.</span>
               </div>
               <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
-                <strong>P N/A / C N/A</strong>{' '}
-                <span style={{ opacity: 0.75 }}>— check these if a player did not pitch or did not catch. Do not leave those fields blank.</span>
+                <strong>Pitcher/catcher fields are optional</strong>{' '}
+                <span style={{ opacity: 0.75 }}>— leave them blank if a player did not pitch or catch.</span>
               </div>
               <div style={{ color: 'var(--fg)', opacity: 0.8 }}>
                 <strong>Player notes are very important</strong>{' '}
@@ -1058,7 +1000,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                     {sec.label}
                   </th>
                 ))}
-                <th colSpan={2} style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
+                <th style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', padding: 0 }} />
               </tr>
               {/* Column label row */}
               <tr>
@@ -1097,17 +1039,13 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                   )
                 })}
                 <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 6px', textAlign: 'center', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: '11px', color: s.dim, whiteSpace: 'nowrap', width: '60px' }}>Notes</th>
-                <th style={{ position: 'sticky', top: '29px', zIndex: 2, padding: '5px 4px', background: 'var(--bg-card)', borderBottom: '0.5px solid var(--border)', width: '80px' }} />
               </tr>
             </thead>
             <tbody>
               {players.map((player, pi) => {
                 const ps = scores[player.id] ?? {}
                 const required = sections.filter(sec => !sec.is_optional).flatMap(sec => sec.fields)
-                const complete = required.every(f => {
-                  const sk = sections.find(sec => sec.fields.some(sf => sf.field_key === f.field_key))?.key ?? ''
-                  return ps[f.field_key] != null || isNa(player.id, fieldNaKey(f.field_key, sk))
-                }) && !!playerComments[player.id]?.trim()
+                const complete = required.every(f => ps[f.field_key] != null) && !!playerComments[player.id]?.trim()
                 const rowBg = pi % 2 === 0 ? 'var(--bg)' : 'rgba(var(--fg-rgb),0.02)'
                 const hasComment = !!(playerComments[player.id]?.trim())
                 const commentOpen = expandedComment === player.id
@@ -1122,18 +1060,16 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
                       {allFields.map((field, fi) => {
                         const val = ps[field.field_key] ?? null
-                        const sectionKey = sections.find(sec => sec.fields.some(sf => sf.field_key === field.field_key))?.key ?? ''
-                        const na = isNa(player.id, fieldNaKey(field.field_key, sectionKey))
                         const isFirstSec = fi === 0 || allFields[fi - 1].section !== field.section
                         const isSelected = selected?.rowIdx === pi && selected?.colIdx === fi
 
                         return (
                           <td key={field.field_key}
-                            onClick={() => { if (na) return; setSelected({ rowIdx: pi, colIdx: fi }); setColFillKey(null); gridRef.current?.focus() }}
-                            style={{ padding: '3px 2px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)', textAlign: 'center', cursor: na ? 'default' : 'pointer', background: isSelected ? 'rgba(26,54,93,0.12)' : na ? 'rgba(var(--fg-rgb),0.04)' : scoreColor(val), outline: isSelected ? '2px solid rgba(26,54,93,0.7)' : 'none', outlineOffset: '-2px', position: 'relative', userSelect: 'none', width: '52px', minWidth: '52px' }}
+                            onClick={() => { setSelected({ rowIdx: pi, colIdx: fi }); setColFillKey(null); gridRef.current?.focus() }}
+                            style={{ padding: '3px 2px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', borderLeft: isFirstSec ? '1px solid var(--border)' : '0.5px solid rgba(var(--fg-rgb),0.06)', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(26,54,93,0.12)' : scoreColor(val), outline: isSelected ? '2px solid rgba(26,54,93,0.7)' : 'none', outlineOffset: '-2px', position: 'relative', userSelect: 'none', width: '52px', minWidth: '52px' }}
                           >
-                            <span style={{ fontSize: '13px', fontWeight: val != null || (isSelected && pendingInput) ? 700 : 400, color: na ? s.dim : val != null || (isSelected && pendingInput) ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
-                              {na ? 'N/A' : isSelected && pendingInput ? pendingInput : val ?? '·'}
+                            <span style={{ fontSize: '13px', fontWeight: val != null || (isSelected && pendingInput) ? 700 : 400, color: val != null || (isSelected && pendingInput) ? 'var(--fg)' : 'rgba(var(--fg-rgb),0.2)' }}>
+                              {isSelected && pendingInput ? pendingInput : val ?? '·'}
                             </span>
                           </td>
                         )
@@ -1145,26 +1081,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                         </button>
                       </td>
 
-                      <td style={{ padding: '3px 4px', borderBottom: commentOpen ? 'none' : '0.5px solid var(--border)', fontSize: '10px', color: s.dim, width: '80px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          {sections.filter(sec => sec.is_optional).flatMap(sec => {
-                            if (sec.key === 'pitching_catching') {
-                              return sec.fields.map(f => (
-                                <label key={f.field_key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                                  <input type="checkbox" checked={isNa(player.id, f.field_key)} onChange={() => toggleNa(player.id, f.field_key, [f])} style={{ width: '11px', height: '11px' }} />
-                                  <span style={{ fontSize: '9px' }}>{f.label.charAt(0)} N/A</span>
-                                </label>
-                              ))
-                            }
-                            return [(
-                              <label key={sec.key} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                                <input type="checkbox" checked={isNa(player.id, sec.key)} onChange={() => toggleNa(player.id, sec.key, sec.fields)} style={{ width: '11px', height: '11px' }} />
-                                <span style={{ fontSize: '9px' }}>N/A</span>
-                              </label>
-                            )]
-                          })}
-                        </div>
-                      </td>
                     </tr>
 
                     {commentOpen && (
