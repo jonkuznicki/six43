@@ -705,11 +705,14 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     return (
       <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif' }}>
         <style>{`
+          @page { size: landscape; margin: 0.5cm; }
           @media print {
             .no-print { display: none !important; }
             body { background: white !important; color: black !important; }
-            th, td { border: 0.5px solid #ccc !important; }
-            table { font-size: 10px !important; }
+            th, td { border: 0.5px solid #ccc !important; padding: 3px 4px !important; }
+            table { font-size: 9px !important; width: 100% !important; table-layout: auto !important; }
+            .print-table-wrap { overflow: visible !important; }
+            .print-player-col { position: static !important; background: white !important; }
           }
         `}</style>
 
@@ -788,11 +791,11 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
           )}
 
           {/* Scores table */}
-          <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+          <div className="print-table-wrap" style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                  <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: '150px', position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 1 }}>Player</th>
+                  <th className="print-player-col" style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, fontSize: '11px', color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: '150px', position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 1 }}>Player</th>
                   {allFields.map(f => (
                     <th key={f.field_key} title={f.label} style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600, fontSize: '10px', color: s.dim, textTransform: 'uppercase', minWidth: '52px', maxWidth: '64px' }}>
                       {f.label.length > 9 ? f.label.slice(0, 8) + '…' : f.label}
@@ -807,7 +810,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
                   const st = playerStatus[i]
                   return (
                     <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
-                      <td style={{ padding: '7px 10px', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 1 }}>
+                      <td className="print-player-col" style={{ padding: '7px 10px', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--bg)', zIndex: 1 }}>
                         <span style={{ marginRight: '5px', fontSize: '11px', color: st.complete ? '#2f855a' : '#B7791F' }}>
                           {st.complete ? '✓' : '⚠'}
                         </span>
