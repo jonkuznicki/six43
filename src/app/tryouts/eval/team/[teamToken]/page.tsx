@@ -314,10 +314,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoScore(); return }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoScore(); return }
 
-    const sectionKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
-    const cellNa = isNa(player.id, fieldNaKey(field.field_key, sectionKey))
-
-    if (!cellNa && e.key >= '1' && e.key <= '5') {
+    if (e.key >= '1' && e.key <= '5') {
       e.preventDefault()
       const buf = pendingInputRef.current
       if (buf.includes('.')) {
@@ -339,7 +336,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       }
       return
     }
-    if (!cellNa && e.key === '.') {
+    if (e.key === '.') {
       e.preventDefault()
       const buf = pendingInputRef.current
       // Allow '.' only after a single digit 1–4 (5.5 is out of range)
@@ -349,7 +346,7 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       }
       return
     }
-    if (!cellNa && (e.key === 'Delete' || e.key === 'Backspace')) {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
       pendingInputRef.current = ''
       setPendingInput('')
@@ -1140,8 +1137,6 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
         const field  = allFields[selected.colIdx]
         if (!player || !field) return null
         const val = scores[player.id]?.[field.field_key] ?? null
-        const barSecKey = sections.find(sec => sec.fields.some(f => f.field_key === field.field_key))?.key ?? ''
-        const na  = isNa(player.id, fieldNaKey(field.field_key, barSecKey))
         return (
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: '#1a365d', borderTop: '2px solid #2a4a7d', padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1150,21 +1145,17 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
               </span>
               <button onClick={() => setSelected(null)} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '5px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>Done</button>
             </div>
-            {na ? (
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: '6px 0' }}>N/A for this player</div>
-            ) : (
-              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                {SCORE_OPTIONS.map(v => (
-                  <button key={v} onClick={() => {
-                    if (val === v) { commitScore(player.id, field.field_key, null) }
-                    else { commitScore(player.id, field.field_key, v); moveSelected(0, 1, players.length, allFields.length) }
-                  }} style={{ flex: 1, height: '44px', borderRadius: '6px', border: 'none', background: val === v ? '#ffffff' : 'rgba(255,255,255,0.15)', color: val === v ? '#1a365d' : '#ffffff', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{v}</button>
-                ))}
-                {val != null && (
-                  <button onClick={() => commitScore(player.id, field.field_key, null)} style={{ width: '36px', height: '44px', borderRadius: '6px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>×</button>
-                )}
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+              {SCORE_OPTIONS.map(v => (
+                <button key={v} onClick={() => {
+                  if (val === v) { commitScore(player.id, field.field_key, null) }
+                  else { commitScore(player.id, field.field_key, v); moveSelected(0, 1, players.length, allFields.length) }
+                }} style={{ flex: 1, height: '44px', borderRadius: '6px', border: 'none', background: val === v ? '#ffffff' : 'rgba(255,255,255,0.15)', color: val === v ? '#1a365d' : '#ffffff', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{v}</button>
+              ))}
+              {val != null && (
+                <button onClick={() => commitScore(player.id, field.field_key, null)} style={{ width: '36px', height: '44px', borderRadius: '6px', border: '0.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>×</button>
+              )}
+            </div>
           </div>
         )
       })()}
