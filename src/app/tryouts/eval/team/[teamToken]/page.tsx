@@ -128,6 +128,21 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       if (draft.overall_notes) setOverallNotes(draft.overall_notes)
       if (draft.last_saved_at) setLastSaved(new Date(draft.last_saved_at))
 
+      // Server draft doesn't store naFlags — load them from localStorage
+      try {
+        const raw = localStorage.getItem(`eval_team_draft_${params.teamToken}`)
+        if (raw) {
+          const saved = JSON.parse(raw)
+          if (saved.naFlags) {
+            const restored: Record<string, Set<string>> = {}
+            for (const [pid, arr] of Object.entries(saved.naFlags as Record<string, string[]>)) {
+              restored[pid] = new Set(arr)
+            }
+            setNaFlags(restored)
+          }
+        }
+      } catch { /* ignore */ }
+
       if (draft.status === 'submitted') {
         if (draft.coach_name) setCoachName(draft.coach_name)
         setAlreadySubmitted(true)
@@ -158,11 +173,15 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
   useEffect(() => {
     if (step !== 'score') return
     try {
+      const serializedNaFlags: Record<string, string[]> = {}
+      for (const [pid, set] of Object.entries(naFlags)) {
+        if (set.size > 0) serializedNaFlags[pid] = [...set]
+      }
       localStorage.setItem(`eval_team_draft_${params.teamToken}`, JSON.stringify({
-        coachName, scores, playerComments, overallNotes, savedAt: new Date().toISOString(),
+        coachName, scores, playerComments, overallNotes, naFlags: serializedNaFlags, savedAt: new Date().toISOString(),
       }))
     } catch { /* ignore */ }
-  }, [scores, playerComments, overallNotes, step])
+  }, [scores, playerComments, overallNotes, naFlags, step])
 
   // Auto-save to server every 60s during scoring
   useEffect(() => {
@@ -208,6 +227,13 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
       if (draft.playerComments) setPlayerComments(draft.playerComments)
       if (draft.overallNotes)   setOverallNotes(draft.overallNotes)
       if (draft.savedAt)        setLastSaved(new Date(draft.savedAt))
+      if (draft.naFlags) {
+        const restored: Record<string, Set<string>> = {}
+        for (const [pid, arr] of Object.entries(draft.naFlags as Record<string, string[]>)) {
+          restored[pid] = new Set(arr)
+        }
+        setNaFlags(restored)
+      }
     } catch { /* ignore */ }
     setStep('score')
   }
@@ -306,6 +332,8 @@ export default function TeamEvalPage({ params }: { params: { teamToken: string }
 
   function handleGridKeyDown(e: React.KeyboardEvent, numRows: number, numCols: number) {
     if (!selected) return
+    const tag = (e.target as HTMLElement).tagName
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return
     const player = players[selected.rowIdx]
     const field  = allFields[selected.colIdx]
     if (!player || !field) return
