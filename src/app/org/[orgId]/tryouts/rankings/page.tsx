@@ -175,8 +175,13 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   const [sortCol,   setSortCol]   = useState('combinedRank')
   const [sortDir,   setSortDir]   = useState<1 | -1>(1)   // 1 = asc for ranks, -1 = desc for scores
 
-  // Cutoff lines per age group
-  const [cutoffs, setCutoffs] = useState<Record<string, { blue: number; white: number }>>({})
+  // Cutoff lines per age group — persisted to localStorage keyed by org+season
+  const [cutoffs, setCutoffs] = useState<Record<string, { blue: number; white: number }>>(() => {
+    try {
+      const raw = localStorage.getItem(`tryout_cutoffs_${params.orgId}`)
+      return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+  })
 
   // Player card panel
   const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
@@ -203,6 +208,9 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   useEffect(() => {
     if (editingNotes && notesInputRef.current) notesInputRef.current.focus()
   }, [editingNotes])
+  useEffect(() => {
+    try { localStorage.setItem(`tryout_cutoffs_${params.orgId}`, JSON.stringify(cutoffs)) } catch { /* ignore */ }
+  }, [cutoffs])
 
   async function loadData() {
     const { data: seasonData } = await supabase
