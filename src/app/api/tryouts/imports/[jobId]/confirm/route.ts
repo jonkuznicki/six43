@@ -500,6 +500,11 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
         ...(payload.ageGroup ? { age_group: payload.ageGroup, tryout_age_group: payload.ageGroup } : {}),
         ...(!current?.first_name && payload.firstName ? { first_name: payload.firstName } : {}),
         ...(!current?.last_name  && payload.lastName  ? { last_name:  payload.lastName }  : {}),
+        ...(payload.parentEmail       ? { parent_email:        payload.parentEmail }       : {}),
+        ...(payload.parentPhone       ? { parent_phone:        payload.parentPhone }       : {}),
+        ...(payload.guardianFirstName ? { guardian_first_name: payload.guardianFirstName } : {}),
+        ...(payload.guardianLastName  ? { guardian_last_name:  payload.guardianLastName }  : {}),
+        ...(payload.grade             ? { grade:               payload.grade }             : {}),
       }).eq('id', topCandidate.id)
       // Write registration staging
       await upsertRegStaging(supabase, {

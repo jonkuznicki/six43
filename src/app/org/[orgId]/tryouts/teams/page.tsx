@@ -81,20 +81,45 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
 
     const allPlayerIds = (assignData ?? []).map((a: any) => a.player_id)
     let playerDetails: any[] = []
+    let stagingDetails: any[] = []
     if (allPlayerIds.length > 0) {
-      const { data } = await supabase.from('tryout_players')
-        .select('id, first_name, last_name, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
-        .in('id', allPlayerIds)
-      playerDetails = data ?? []
+      const [{ data: pd }, { data: sd }] = await Promise.all([
+        supabase.from('tryout_players')
+          .select('id, first_name, last_name, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
+          .in('id', allPlayerIds),
+        supabase.from('tryout_registration_staging')
+          .select('player_id, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
+          .eq('season_id', seasonData.id)
+          .in('player_id', allPlayerIds),
+      ])
+      playerDetails  = pd ?? []
+      stagingDetails = sd ?? []
     }
 
     const playerMap: Record<string, any> = {}
     for (const p of playerDetails) playerMap[p.id] = p
 
+    // Staging has more reliable contact data (always written from raw CSV)
+    const stagingMap: Record<string, any> = {}
+    for (const s of stagingDetails) stagingMap[s.player_id] = s
+
     const pbt: Record<string, PlayerContact[]> = {}
     for (const [teamId, pids] of Object.entries(byTeam)) {
       pbt[teamId] = pids
-        .map(pid => playerMap[pid] ? { ...playerMap[pid], team_id: teamId } : null)
+        .map(pid => {
+          const p = playerMap[pid]
+          if (!p) return null
+          const st = stagingMap[pid] ?? {}
+          return {
+            ...p,
+            grade:               st.grade               ?? p.grade               ?? null,
+            parent_email:        st.parent_email        ?? p.parent_email        ?? null,
+            parent_phone:        st.parent_phone        ?? p.parent_phone        ?? null,
+            guardian_first_name: st.guardian_first_name ?? p.guardian_first_name ?? null,
+            guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
+            team_id: teamId,
+          }
+        })
         .filter(Boolean)
         .sort((a: any, b: any) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name))
     }

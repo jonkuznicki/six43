@@ -57,7 +57,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
     const playerIds = (assignData ?? []).map((a: any) => a.player_id)
     if (playerIds.length === 0) { setLoading(false); return }
 
-    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }] = await Promise.all([
+    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
@@ -69,9 +69,15 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         .in('player_id', playerIds).eq('status', 'submitted'),
       supabase.from('tryout_coach_eval_config')
         .select('field_key').eq('org_id', params.orgId).eq('is_active', true),
+      supabase.from('tryout_registration_staging')
+        .select('player_id, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
+        .eq('season_id', teamData.season_id)
+        .in('player_id', playerIds),
     ])
 
     const evalFields = (evalCfg ?? []).map((f: any) => f.field_key)
+    const stagingMap: Record<string, any> = {}
+    for (const s of (stagingData ?? [])) stagingMap[s.player_id] = s
 
     // Aggregate scores
     const scoresByPlayer: Record<string, number[]> = {}
@@ -107,13 +113,14 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       else if (tryoutAvg != null) combinedScore = tryoutAvg
       else if (coachEvalAvg != null) combinedScore = coachEvalAvg
 
+      const st = stagingMap[p.id] ?? {}
       return {
         ...p,
-        grade:               p.grade               ?? null,
-        parent_email:        p.parent_email         ?? null,
-        parent_phone:        p.parent_phone         ?? null,
-        guardian_first_name: p.guardian_first_name  ?? null,
-        guardian_last_name:  p.guardian_last_name   ?? null,
+        grade:               st.grade               ?? p.grade               ?? null,
+        parent_email:        st.parent_email        ?? p.parent_email        ?? null,
+        parent_phone:        st.parent_phone        ?? p.parent_phone        ?? null,
+        guardian_first_name: st.guardian_first_name ?? p.guardian_first_name ?? null,
+        guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
         tryoutAvg, coachEvalAvg, combinedScore,
         scoreCount: scores.length, evalCount: evalGroups.length,
       }
