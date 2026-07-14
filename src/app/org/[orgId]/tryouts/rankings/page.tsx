@@ -779,6 +779,127 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
   function fmtRank(v: number | null) { return v != null ? String(v) : '—' }
 
+  // ── Draft board (assignment-aware positioning) ────────────────────────────
+  type DraftZone = 'blue-assigned' | 'blue-fill' | 'white-assigned' | 'white-fill' | 'bubble'
+
+  const isDraftMode = ageFilter !== 'all' && (ageCutoff.blue > 0 || ageCutoff.white > 0)
+
+  const blueTeamId: string | null = !isDraftMode ? null :
+    (teams.find(t => t.name.toLowerCase().includes('blue') && (t.age_group ?? '').toLowerCase() === ageFilter.toLowerCase()) ??
+     teams.find(t => t.name.toLowerCase().includes('blue')))?.id ?? null
+  const whiteTeamId: string | null = !isDraftMode ? null :
+    (teams.find(t => t.name.toLowerCase().includes('white') && (t.age_group ?? '').toLowerCase() === ageFilter.toLowerCase()) ??
+     teams.find(t => t.name.toLowerCase().includes('white')))?.id ?? null
+
+  const draftBlueAsgn   = isDraftMode ? activeFiltered.filter(r => r.assignedTeamId === blueTeamId)  : []
+  const draftWhiteAsgn  = isDraftMode ? activeFiltered.filter(r => r.assignedTeamId === whiteTeamId) : []
+  const draftUnassigned = isDraftMode ? activeFiltered.filter(r => !r.assignedTeamId) : []
+  const draftBlueOpen   = Math.max(0, ageCutoff.blue  - draftBlueAsgn.length)
+  const draftWhiteOpen  = Math.max(0, ageCutoff.white - draftWhiteAsgn.length)
+  const draftBlueFill   = draftUnassigned.slice(0, draftBlueOpen)
+  const draftWhiteFill  = draftUnassigned.slice(draftBlueOpen, draftBlueOpen + draftWhiteOpen)
+  const draftBlueFillIds  = new Set(draftBlueFill.map(r => r.player.id))
+  const draftWhiteFillIds = new Set(draftWhiteFill.map(r => r.player.id))
+  const draftBubble = isDraftMode ? activeFiltered.filter(r =>
+    r.assignedTeamId !== blueTeamId && r.assignedTeamId !== whiteTeamId &&
+    !draftBlueFillIds.has(r.player.id) && !draftWhiteFillIds.has(r.player.id)
+  ) : []
+
+  const renderRow = (row: RankedPlayer, zone: DraftZone | null, altRow: boolean) => {
+    const team      = teams.find(t => t.id === row.assignedTeamId)
+    const tOpts     = teamOptions(row.ageGroup)
+    const teamColor = team?.color ?? '#6DB875'
+    const borderC =
+      zone === 'blue-assigned'  ? 'rgba(64,144,224,0.85)' :
+      zone === 'blue-fill'      ? 'rgba(64,144,224,0.35)' :
+      zone === 'white-assigned' ? 'rgba(180,180,180,0.85)' :
+      zone === 'white-fill'     ? 'rgba(180,180,180,0.35)' : 'transparent'
+    const rowBg =
+      zone === 'blue-assigned'  ? 'rgba(64,144,224,0.07)' :
+      zone === 'blue-fill'      ? 'rgba(64,144,224,0.03)' :
+      zone === 'white-assigned' ? 'rgba(var(--fg-rgb),0.05)' :
+      zone === 'white-fill'     ? 'rgba(var(--fg-rgb),0.02)' :
+      altRow ? 'rgba(var(--fg-rgb),0.015)' : 'transparent'
+    return (
+      <tr key={row.player.id} style={{ borderLeft: `3px solid ${borderC}`, background: rowBg }}>
+        <td style={{ ...td, padding: '7px 4px', textAlign: 'center', width: '28px' }}>
+          <input type="checkbox" checked={compareIds.includes(row.player.id)}
+            onChange={() => toggleCompare(row.player.id)}
+            title={compareIds.length >= 4 && !compareIds.includes(row.player.id) ? 'Max 4 players' : 'Compare'}
+            disabled={compareIds.length >= 4 && !compareIds.includes(row.player.id)}
+            style={{ cursor: 'pointer', accentColor: 'var(--accent)' }} />
+        </td>
+        <td style={{ ...stickyTeamTd, background: 'var(--bg)', width: `${TEAM_W}px` }}>
+          <select value={row.assignedTeamId ?? ''} onChange={e => assignTeam(row.player.id, e.target.value || null)}
+            disabled={assigning === row.player.id}
+            style={{ background: team ? `${teamColor}18` : 'var(--bg-input)', border: `0.5px solid ${team ? `${teamColor}55` : 'var(--border-md)'}`, borderRadius: '5px', padding: '4px 6px', fontSize: '12px', color: team ? teamColor : s.muted, cursor: assigning === row.player.id ? 'default' : 'pointer', width: '100%', fontWeight: team ? 700 : 400 }}>
+            <option value="">—</option>
+            {tOpts.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </td>
+        <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
+          <div onClick={() => setPanelPlayerId(row.player.id)}
+            style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--fg)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg)')}>
+            {row.player.last_name}, {row.player.first_name}
+          </div>
+        </td>
+        <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
+        <td style={{ ...td, fontWeight: 800, fontSize: '14px', color: row.combinedScore != null ? 'var(--accent)' : s.dim }}>{fmt(row.combinedScore)}</td>
+        <td style={{ ...td, textAlign: 'center' }}><span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', fontSize: '11px', fontWeight: 600 }}>{row.ageGroup}</span></td>
+        <td style={{ ...td, textAlign: 'center', fontSize: '11px', color: row.player.grade ? s.muted : s.dim }}>{row.player.grade ?? '—'}</td>
+        <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? '#40A0E8' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.player.prior_team ?? '—'}</td>
+        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400 }}>{fmt(row.tryoutScore)}</td>
+        <td style={{ ...td, textAlign: 'center', color: row.tryoutRank != null ? '#80B0E8' : s.dim, fontSize: '11px' }}>{fmtRank(row.tryoutRank)}</td>
+        <td style={{ ...td, color: row.tryoutPitching != null ? '#80B0E8' : s.dim }}>{fmt(row.tryoutPitching)}</td>
+        <td style={{ ...td, color: row.tryoutHitting != null ? '#80B0E8' : s.dim }}>{fmt(row.tryoutHitting)}</td>
+        <td style={{ ...td, color: row.speed != null ? '#80B0E8' : s.dim }}>{row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}</td>
+        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400 }}>{fmt(row.coachEval)}</td>
+        <td style={{ ...td, textAlign: 'center', color: row.coachRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>{fmtRank(row.coachRank)}</td>
+        <td style={{ ...td, color: row.intangibles != null ? '#6DB875' : s.dim, fontWeight: row.intangibles != null ? 600 : 400 }}>{fmt(row.intangibles)}</td>
+        <td style={{ ...td, textAlign: 'center', color: row.intangiblesRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>{fmtRank(row.intangiblesRank)}</td>
+        <td style={{ ...td, color: row.teamPitching != null ? '#6DB875' : s.dim }}>{fmt(row.teamPitching)}</td>
+        <td style={{ ...td, color: row.teamHitting != null ? '#6DB875' : s.dim }}>{fmt(row.teamHitting)}</td>
+        <td style={{ ...td, color: row.evalSpeed != null ? '#6DB875' : s.dim }}>{row.evalSpeed?.toFixed(1) ?? '—'}</td>
+        <td style={{ ...td, color: row.evalAthleticism != null ? '#6DB875' : s.dim }}>{row.evalAthleticism?.toFixed(1) ?? '—'}</td>
+        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.gcHittingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>{fmt(row.gcHittingScore)}</td>
+        <td style={{ ...td, color: row.gcPitchingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>{fmt(row.gcPitchingScore)}</td>
+        <td style={{ ...td, textAlign: 'center', width: '60px' }}>
+          <button onClick={() => toggleExclude(row.player.id)}
+            title={row.isExcluded ? 'Click to re-include' : 'Exclude from team making'}
+            style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid', borderColor: row.isExcluded ? 'rgba(232,112,96,0.5)' : 'var(--border-md)', background: row.isExcluded ? 'rgba(232,112,96,0.12)' : 'transparent', color: row.isExcluded ? '#E87060' : s.dim }}>
+            {row.isExcluded ? 'Excl' : '—'}
+          </button>
+        </td>
+        <td style={{ ...td, textAlign: 'left', minWidth: '160px', verticalAlign: 'top', paddingTop: '6px' }}>
+          {editingNotes === row.player.id ? (
+            <textarea ref={notesInputRef} value={notesVal}
+              onChange={e => setNotesVal(e.target.value)}
+              onBlur={() => saveNotes(row.player.id, notesVal)}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingNotes(null) }}
+              rows={3}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: '4px', padding: '3px 6px', fontSize: '12px', color: 'var(--fg)', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }} />
+          ) : (
+            <div onClick={() => { setEditingNotes(row.player.id); setNotesVal(row.adminNotes ?? '') }}
+              title="Click to add board notes"
+              style={{ cursor: 'text', minHeight: '22px', padding: '2px 4px', borderRadius: '4px', color: row.adminNotes ? 'var(--fg)' : s.dim, fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: 1.4, border: '1px solid transparent', transition: 'border-color 0.1s' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
+              {savingNotes === row.player.id ? <span style={{ color: s.dim }}>Saving…</span>
+                : row.adminNotes || <span style={{ color: s.dim }}>+ add note</span>}
+            </div>
+          )}
+        </td>
+        <td style={{ ...td, textAlign: 'left', minWidth: '180px', maxWidth: '280px' }}>
+          {row.coachComments
+            ? <span title={row.coachComments} style={{ fontSize: '11px', color: s.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'help' }}>{row.coachComments}</span>
+            : <span style={{ color: s.dim, fontSize: '11px' }}>—</span>}
+        </td>
+      </tr>
+    )
+  }
+
   if (loading) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       Loading…
@@ -1032,21 +1153,89 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
             </thead>
 
             <tbody>
-              {filtered.map((row, idx) => {
-                const team     = teams.find(t => t.id === row.assignedTeamId)
-                const tOpts    = teamOptions(row.ageGroup)
-                const isBlue   = ageFilter !== 'all' && ageCutoff.blue  > 0 && idx <  ageCutoff.blue
-                const isWhite  = ageFilter !== 'all' && ageCutoff.white > 0 && idx >= ageCutoff.blue && idx < ageCutoff.blue + ageCutoff.white
-                const borderC  = isBlue ? 'rgba(64,144,224,0.5)' : isWhite ? 'rgba(var(--fg-rgb),0.2)' : 'transparent'
-                const showBlueLine  = ageFilter !== 'all' && ageCutoff.blue  > 0 && idx === ageCutoff.blue
-                const showWhiteLine = ageFilter !== 'all' && ageCutoff.white > 0 && idx === ageCutoff.blue + ageCutoff.white
-                const rowBg = idx % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.015)'
+              {isDraftMode ? (
+                <>
+                  {/* ── Blue zone ── */}
+                  <tr key="draft-blue-header">
+                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(64,144,224,0.08)', borderBottom: '0.5px solid rgba(64,144,224,0.2)' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4090E0', flexShrink: 0 }} />
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: '#4090E0' }}>Blue</span>
+                        <span style={{ fontSize: '11px', color: '#4090E0', opacity: 0.8 }}>
+                          {draftBlueAsgn.length} confirmed · {draftBlueFill.length} tentative
+                          {draftBlueOpen - draftBlueFill.length > 0 && <span style={{ marginLeft: '6px', fontWeight: 700 }}>· {draftBlueOpen - draftBlueFill.length} open</span>}
+                          {draftBlueOpen - draftBlueFill.length === 0 && draftBlueAsgn.length + draftBlueFill.length > 0 && <span style={{ marginLeft: '6px', opacity: 0.6 }}>· full</span>}
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#4090E0', opacity: 0.6 }}>{draftBlueAsgn.length + draftBlueFill.length}/{ageCutoff.blue} spots</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {draftBlueAsgn.map((row, i) => renderRow(row, 'blue-assigned', i % 2 !== 0))}
+                  {draftBlueFill.map((row, i) => renderRow(row, 'blue-fill', (draftBlueAsgn.length + i) % 2 !== 0))}
 
-                // Team color — use the color stored on the team record, fall back to a neutral accent
-                const teamColor = team?.color ?? '#6DB875'
+                  {/* ── Blue / White separator ── */}
+                  <tr key="draft-blue-white-sep">
+                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
+                        <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
+                        <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
+                      </div>
+                    </td>
+                  </tr>
 
-                return (
-                  <React.Fragment key={row.player.id}>
+                  {/* ── White zone ── */}
+                  <tr key="draft-white-header">
+                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(var(--fg-rgb),0.04)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.muted, flexShrink: 0 }} />
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: s.muted }}>White</span>
+                        <span style={{ fontSize: '11px', color: s.muted, opacity: 0.8 }}>
+                          {draftWhiteAsgn.length} confirmed · {draftWhiteFill.length} tentative
+                          {draftWhiteOpen - draftWhiteFill.length > 0 && <span style={{ marginLeft: '6px', fontWeight: 700 }}>· {draftWhiteOpen - draftWhiteFill.length} open</span>}
+                          {draftWhiteOpen - draftWhiteFill.length === 0 && draftWhiteAsgn.length + draftWhiteFill.length > 0 && <span style={{ marginLeft: '6px', opacity: 0.6 }}>· full</span>}
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontSize: '10px', color: s.muted, opacity: 0.6 }}>{draftWhiteAsgn.length + draftWhiteFill.length}/{ageCutoff.white} spots</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {draftWhiteAsgn.map((row, i) => renderRow(row, 'white-assigned', i % 2 !== 0))}
+                  {draftWhiteFill.map((row, i) => renderRow(row, 'white-fill', (draftWhiteAsgn.length + i) % 2 !== 0))}
+
+                  {/* ── White / Cut separator ── */}
+                  <tr key="draft-white-cut-sep">
+                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
+                        <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
+                        <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* ── Bubble ── */}
+                  {draftBubble.length > 0 && (
+                    <>
+                      <tr key="draft-bubble-header">
+                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                          <div style={{ padding: '5px 10px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bubble · {draftBubble.length} players</span>
+                          </div>
+                        </td>
+                      </tr>
+                      {draftBubble.map((row, i) => renderRow(row, 'bubble', i % 2 !== 0))}
+                    </>
+                  )}
+                </>
+              ) : (
+                activeFiltered.map((row, idx) => {
+                  const isBlue   = ageFilter !== 'all' && ageCutoff.blue  > 0 && idx <  ageCutoff.blue
+                  const isWhite  = ageFilter !== 'all' && ageCutoff.white > 0 && idx >= ageCutoff.blue && idx < ageCutoff.blue + ageCutoff.white
+                  const zone: DraftZone | null = isBlue ? 'blue-fill' : isWhite ? 'white-fill' : null
+                  const showBlueLine  = ageFilter !== 'all' && ageCutoff.blue  > 0 && idx === ageCutoff.blue
+                  const showWhiteLine = ageFilter !== 'all' && ageCutoff.white > 0 && idx === ageCutoff.blue + ageCutoff.white
+                  return (
+                    <React.Fragment key={row.player.id}>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
                         <td colSpan={24} style={{ padding: 0, border: 'none' }}>
@@ -1070,193 +1259,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                       </tr>
                     )}
 
-                    <tr key={row.player.id} style={{ borderLeft: `3px solid ${borderC}`, background: rowBg }}>
-
-                      {/* ── Compare checkbox ── */}
-                      <td style={{ ...td, padding: '7px 4px', textAlign: 'center', width: '28px' }}>
-                        <input
-                          type="checkbox"
-                          checked={compareIds.includes(row.player.id)}
-                          onChange={() => toggleCompare(row.player.id)}
-                          title={compareIds.length >= 4 && !compareIds.includes(row.player.id) ? 'Max 4 players' : 'Compare'}
-                          disabled={compareIds.length >= 4 && !compareIds.includes(row.player.id)}
-                          style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
-                        />
-                      </td>
-
-                      {/* ── Next Season Team (sticky) ── */}
-                      <td style={{ ...stickyTeamTd, background: rowBg !== 'transparent' ? 'var(--bg)' : 'var(--bg)', width: `${TEAM_W}px` }}>
-                        <select
-                          value={row.assignedTeamId ?? ''}
-                          onChange={e => assignTeam(row.player.id, e.target.value || null)}
-                          disabled={assigning === row.player.id}
-                          style={{
-                            background: team ? `${teamColor}18` : 'var(--bg-input)',
-                            border: `0.5px solid ${team ? `${teamColor}55` : 'var(--border-md)'}`,
-                            borderRadius: '5px', padding: '4px 6px', fontSize: '12px',
-                            color: team ? teamColor : s.muted,
-                            cursor: assigning === row.player.id ? 'default' : 'pointer',
-                            width: '100%', fontWeight: team ? 700 : 400,
-                          }}
-                        >
-                          <option value="">—</option>
-                          {tOpts.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      </td>
-
-                      {/* ── Player name (sticky) ── */}
-                      <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
-                        <div
-                          onClick={() => setPanelPlayerId(row.player.id)}
-                          style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--fg)' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg)')}
-                        >
-                          {row.player.last_name}, {row.player.first_name}
-                        </div>
-                      </td>
-
-                      {/* ── Combined rank + score ── */}
-                      <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>
-                        {fmtRank(row.combinedRank)}
-                      </td>
-                      <td style={{ ...td, fontWeight: 800, fontSize: '14px', color: row.combinedScore != null ? 'var(--accent)' : s.dim }}>
-                        {fmt(row.combinedScore)}
-                      </td>
-
-                      {/* ── Age + Grade + Prior Team ── */}
-                      <td style={{ ...td, textAlign: 'center' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', fontSize: '11px', fontWeight: 600 }}>
-                          {row.ageGroup}
-                        </span>
-                      </td>
-                      <td style={{ ...td, textAlign: 'center', fontSize: '11px', color: row.player.grade ? s.muted : s.dim }}>
-                        {row.player.grade ?? '—'}
-                      </td>
-                      <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? '#40A0E8' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {row.player.prior_team ?? '—'}
-                      </td>
-
-                      {/* ── Tryout (Blue) ── */}
-                      <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400 }}>
-                        {fmt(row.tryoutScore)}
-                      </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.tryoutRank != null ? '#80B0E8' : s.dim, fontSize: '11px' }}>
-                        {fmtRank(row.tryoutRank)}
-                      </td>
-                      <td style={{ ...td, color: row.tryoutPitching != null ? '#80B0E8' : s.dim }}>
-                        {fmt(row.tryoutPitching)}
-                      </td>
-                      <td style={{ ...td, color: row.tryoutHitting != null ? '#80B0E8' : s.dim }}>
-                        {fmt(row.tryoutHitting)}
-                      </td>
-                      <td style={{ ...td, color: row.speed != null ? '#80B0E8' : s.dim }}>
-                        {row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}
-                      </td>
-
-                      {/* ── Coach Eval (Green) ── */}
-                      <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400 }}>
-                        {fmt(row.coachEval)}
-                      </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.coachRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>
-                        {fmtRank(row.coachRank)}
-                      </td>
-                      <td style={{ ...td, color: row.intangibles != null ? '#6DB875' : s.dim, fontWeight: row.intangibles != null ? 600 : 400 }}>
-                        {fmt(row.intangibles)}
-                      </td>
-                      <td style={{ ...td, textAlign: 'center', color: row.intangiblesRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>
-                        {fmtRank(row.intangiblesRank)}
-                      </td>
-                      <td style={{ ...td, color: row.teamPitching != null ? '#6DB875' : s.dim }}>
-                        {fmt(row.teamPitching)}
-                      </td>
-                      <td style={{ ...td, color: row.teamHitting != null ? '#6DB875' : s.dim }}>
-                        {fmt(row.teamHitting)}
-                      </td>
-                      <td style={{ ...td, color: row.evalSpeed != null ? '#6DB875' : s.dim }}>
-                        {row.evalSpeed?.toFixed(1) ?? '—'}
-                      </td>
-                      <td style={{ ...td, color: row.evalAthleticism != null ? '#6DB875' : s.dim }}>
-                        {row.evalAthleticism?.toFixed(1) ?? '—'}
-                      </td>
-
-                      {/* ── GC (Purple) ── */}
-                      <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.gcHittingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>
-                        {fmt(row.gcHittingScore)}
-                      </td>
-                      <td style={{ ...td, color: row.gcPitchingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>
-                        {fmt(row.gcPitchingScore)}
-                      </td>
-
-                      {/* ── Exclude toggle ── */}
-                      <td style={{ ...td, textAlign: 'center', width: '60px' }}>
-                        <button
-                          onClick={() => toggleExclude(row.player.id)}
-                          title={row.isExcluded ? 'Click to re-include' : 'Exclude from team making'}
-                          style={{
-                            padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
-                            cursor: 'pointer', border: '0.5px solid',
-                            borderColor: row.isExcluded ? 'rgba(232,112,96,0.5)' : 'var(--border-md)',
-                            background:  row.isExcluded ? 'rgba(232,112,96,0.12)' : 'transparent',
-                            color:       row.isExcluded ? '#E87060' : s.dim,
-                          }}
-                        >{row.isExcluded ? 'Excl' : '—'}</button>
-                      </td>
-
-                      {/* ── Board Notes (inline textarea) ── */}
-                      <td style={{ ...td, textAlign: 'left', minWidth: '160px', verticalAlign: 'top', paddingTop: '6px' }}>
-                        {editingNotes === row.player.id ? (
-                          <textarea
-                            ref={notesInputRef}
-                            value={notesVal}
-                            onChange={e => setNotesVal(e.target.value)}
-                            onBlur={() => saveNotes(row.player.id, notesVal)}
-                            onKeyDown={e => {
-                              if (e.key === 'Escape') { setEditingNotes(null) }
-                            }}
-                            rows={3}
-                            style={{
-                              width: '100%', background: 'var(--bg-input)',
-                              border: '1px solid var(--accent)', borderRadius: '4px',
-                              padding: '3px 6px', fontSize: '12px', color: 'var(--fg)', outline: 'none',
-                              resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            onClick={() => { setEditingNotes(row.player.id); setNotesVal(row.adminNotes ?? '') }}
-                            title="Click to add board notes"
-                            style={{
-                              cursor: 'text', minHeight: '22px', padding: '2px 4px', borderRadius: '4px',
-                              color: row.adminNotes ? 'var(--fg)' : s.dim,
-                              fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: 1.4,
-                              border: '1px solid transparent', transition: 'border-color 0.1s',
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
-                            onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}
-                          >
-                            {savingNotes === row.player.id ? <span style={{ color: s.dim }}>Saving…</span>
-                              : row.adminNotes || <span style={{ color: s.dim }}>+ add note</span>}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* ── Coach Comments (read-only, truncated) ── */}
-                      <td style={{ ...td, textAlign: 'left', minWidth: '180px', maxWidth: '280px' }}>
-                        {row.coachComments ? (
-                          <span
-                            title={row.coachComments}
-                            style={{ fontSize: '11px', color: s.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'help' }}
-                          >
-                            {row.coachComments}
-                          </span>
-                        ) : <span style={{ color: s.dim, fontSize: '11px' }}>—</span>}
-                      </td>
-
-                    </tr>
+                    {renderRow(row, zone, idx % 2 !== 0)}
                   </React.Fragment>
                 )
-              })}
+              })
+              )}
               {/* ── Excluded players section ── */}
               {excludedFiltered.length > 0 && (
                 <>
