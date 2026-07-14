@@ -153,6 +153,20 @@ function sectionAvg(
   return vals.length > 0 ? vals.reduce((a, b) => a + b) / vals.length : null
 }
 
+/** Weighted average of scored fields using the org's eval config weights (weight > 0 only). */
+function computeWeightedEvalScore(
+  scores: Record<string, number> | null,
+  config: EvalConfigRow[],
+): number | null {
+  if (!scores || config.length === 0) return null
+  const active = config.filter(c => c.weight > 0 && typeof scores[c.field_key] === 'number')
+  if (active.length === 0) return null
+  const totalWeight = active.reduce((s, c) => s + c.weight, 0)
+  if (totalWeight === 0) return null
+  const weighted = active.reduce((s, c) => s + scores[c.field_key] * c.weight, 0)
+  return Math.round(weighted / totalWeight * 100) / 100
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function TeamMakingPage({ params }: { params: { orgId: string } }) {
@@ -489,7 +503,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
         // Coach eval
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const coachEval        = evalRow?.computed_score ?? null
+        const coachEval        = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig)
         const intangibles      = evalRow?.intangibles_score ?? null
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
@@ -562,7 +576,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, pitchingKeys, hittingKeys, scoringConfig])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, evalConfig, pitchingKeys, hittingKeys, scoringConfig])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 
