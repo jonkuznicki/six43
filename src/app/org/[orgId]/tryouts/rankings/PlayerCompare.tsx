@@ -89,7 +89,7 @@ export default function PlayerCompare({ players, gcRows, teams, ranked, onClose 
     { label: 'TO Pitch',      color: '#80B0E8',    getValue: p => p.tryoutPitching,  getRank: _ => null, higherBetter: true },
     { label: 'TO Hit',        color: '#80B0E8',    getValue: p => p.tryoutHitting,   getRank: _ => null, higherBetter: true },
     { label: 'Eval Pitch',    color: '#6DB875',    getValue: p => p.teamPitching,    getRank: _ => null, higherBetter: true },
-    { label: 'Eval Hit',      color: '#6DB875',    getValue: p => p.teamHitting,     getRank: _ => null, higherBetter: true },
+    { label: 'Eval F/H',      color: '#6DB875',    getValue: p => p.teamHitting,     getRank: _ => null, higherBetter: true },
     { label: 'GC Hitting',  color: s.muted,         getValue: p => p.gcHittingScore,  getRank: _ => null,              higherBetter: true },
     { label: 'GC Pitching', color: s.muted,         getValue: p => p.gcPitchingScore, getRank: _ => null,              higherBetter: true },
   ]

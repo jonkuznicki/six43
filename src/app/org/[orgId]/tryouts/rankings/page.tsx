@@ -1129,7 +1129,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('teamPitching')}>Eval Pitch{sortArrow('teamPitching')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('teamHitting')}>Eval Hit{sortArrow('teamHitting')}</th>
+                  onClick={() => toggleSort('teamHitting')}>Eval F/H{sortArrow('teamHitting')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('evalSpeed')}>Spd{sortArrow('evalSpeed')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
