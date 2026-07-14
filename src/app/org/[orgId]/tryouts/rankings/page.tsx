@@ -98,11 +98,13 @@ interface RankedPlayer {
   tryoutHitting:   number | null
   speed:           number | null   // raw 60yd time in seconds
   // Coach eval
-  coachEval:       number | null
-  intangibles:     number | null
-  teamPitching:    number | null   // avg of pitching_catching section
-  teamHitting:     number | null   // avg of fielding_hitting section
-  coachComments:   string | null
+  coachEval:        number | null  // computed_score — weighted avg of all scored fields
+  intangibles:      number | null
+  teamPitching:     number | null  // avg of pitching_catching section
+  teamHitting:      number | null  // avg of fielding_hitting section
+  evalSpeed:        number | null  // coach-scored speed (1–5)
+  evalAthleticism:  number | null  // coach-scored athleticism (1–5)
+  coachComments:    string | null
   // GC
   gcHittingScore:  number | null
   gcPitchingScore: number | null
@@ -487,11 +489,13 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
         // Coach eval
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const coachEval     = evalRow ? (evalRow.computed_score ?? evalRow.coach_eval_score ?? null) : null
-        const intangibles   = evalRow?.intangibles_score ?? null
-        const teamPitching  = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
-        const teamHitting   = sectionAvg(evalRow?.scores ?? null, hittingKeys)
-        const coachComments = evalRow?.comments ?? null
+        const coachEval        = evalRow?.computed_score ?? null
+        const intangibles      = evalRow?.intangibles_score ?? null
+        const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
+        const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
+        const evalSpeed        = evalRow?.scores?.['speed']       != null ? Number(evalRow.scores['speed'])       : null
+        const evalAthleticism  = evalRow?.scores?.['athleticism'] != null ? Number(evalRow.scores['athleticism']) : null
+        const coachComments    = evalRow?.comments ?? null
 
         // GC
         const gcRow          = gcByPlayer.get(player.id) ?? null
@@ -520,6 +524,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           intangibles,
           teamPitching,
           teamHitting,
+          evalSpeed,
+          evalAthleticism,
           coachComments,
           gcHittingScore,
           gcPitchingScore,
@@ -586,6 +592,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         case 'tryoutPitching':  return r.tryoutPitching  ?? -1
         case 'teamHitting':     return r.teamHitting     ?? -1
         case 'tryoutHitting':   return r.tryoutHitting   ?? -1
+        case 'evalSpeed':       return r.evalSpeed       ?? -1
+        case 'evalAthleticism': return r.evalAthleticism ?? -1
         case 'speed':           return r.speed           ?? 9999
         case 'gcHittingScore':  return r.gcHittingScore  ?? -1
         case 'gcPitchingScore': return r.gcPitchingScore ?? -1
@@ -647,7 +655,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         'Next Season Team', 'Notes', 'Combined Rank', 'Player', 'Age Group', 'Grade', `${priorYear} Team`,
         'Combined Score',
         'Tryout Score', 'Tryout Rank', 'TO Pitching', 'TO Hitting', 'Speed (60yd)',
-        'Coach Eval', 'Coach Rank', 'Intangibles', 'Intangibles Rank', 'Eval Pitching', 'Eval Hitting',
+        'Coach Eval', 'Coach Rank', 'Intangibles', 'Intangibles Rank', 'Eval Pitching', 'Eval Hitting', 'Eval Speed', 'Eval Athleticism',
         'GC Hitting', 'GC Pitching',
         'Comments',
       ],
@@ -673,6 +681,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           String(r.intangiblesRank        ?? ''),
           r.teamPitching?.toFixed(2)     ?? '',
           r.teamHitting?.toFixed(2)      ?? '',
+          r.evalSpeed?.toFixed(1)        ?? '',
+          r.evalAthleticism?.toFixed(1)  ?? '',
           r.gcHittingScore?.toFixed(2)   ?? '',
           r.gcPitchingScore?.toFixed(2)  ?? '',
           r.coachComments ?? '',
@@ -918,8 +928,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#80B0E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Tryout</th>
-                {/* Coach Eval — Score, Rank, Intangibles, Rank, Eval Pitch, Eval Hit */}
-                <th colSpan={6} style={{
+                {/* Coach Eval — Score, Rank, Intangibles, Rank, Eval Pitch, Eval Hit, Speed, Athleticism */}
+                <th colSpan={8} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#6DB875', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Coach Eval</th>
@@ -985,6 +995,10 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   onClick={() => toggleSort('teamPitching')}>Eval Pitch{sortArrow('teamPitching')}</th>
                 <th style={{ ...th, color: '#6DB875' }}
                   onClick={() => toggleSort('teamHitting')}>Eval Hit{sortArrow('teamHitting')}</th>
+                <th style={{ ...th, color: '#6DB875' }}
+                  onClick={() => toggleSort('evalSpeed')}>Spd{sortArrow('evalSpeed')}</th>
+                <th style={{ ...th, color: '#6DB875' }}
+                  onClick={() => toggleSort('evalAthleticism')}>Ath{sortArrow('evalAthleticism')}</th>
 
                 {/* ── GC (Purple) ── */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
@@ -1021,7 +1035,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   <React.Fragment key={row.player.id}>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
-                        <td colSpan={22} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -1032,7 +1046,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                     )}
                     {showWhiteLine && (
                       <tr key={`cut-w-${idx}`}>
-                        <td colSpan={22} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -1145,6 +1159,12 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                       <td style={{ ...td, color: row.teamHitting != null ? '#6DB875' : s.dim }}>
                         {fmt(row.teamHitting)}
                       </td>
+                      <td style={{ ...td, color: row.evalSpeed != null ? '#6DB875' : s.dim }}>
+                        {row.evalSpeed?.toFixed(1) ?? '—'}
+                      </td>
+                      <td style={{ ...td, color: row.evalAthleticism != null ? '#6DB875' : s.dim }}>
+                        {row.evalAthleticism?.toFixed(1) ?? '—'}
+                      </td>
 
                       {/* ── GC (Purple) ── */}
                       <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.gcHittingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>
@@ -1227,7 +1247,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
               {excludedFiltered.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={22} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px 4px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(232,112,96,0.3)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#E87060', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Excluded from team making ({excludedFiltered.length})</span>
@@ -1254,7 +1274,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                             {row.player.last_name}, {row.player.first_name}
                           </span>
                         </td>
-                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={18} />
+                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={20} />
                         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
                           <button onClick={() => toggleExclude(row.player.id)} title="Re-include this player"
                             style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid rgba(232,112,96,0.5)', background: 'rgba(232,112,96,0.12)', color: '#E87060' }}>
