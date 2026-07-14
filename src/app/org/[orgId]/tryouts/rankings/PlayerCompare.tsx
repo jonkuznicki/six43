@@ -86,8 +86,10 @@ export default function PlayerCompare({ players, gcRows, teams, ranked, onClose 
     { label: 'Tryout',      color: '#80B0E8',       getValue: p => p.tryoutScore,    getRank: p => p.tryoutRank,      higherBetter: true },
     { label: 'Coach Eval',  color: '#6DB875',       getValue: p => p.coachEval,      getRank: p => p.coachRank,       higherBetter: true },
     { label: 'Intangibles', color: '#6DB875',       getValue: p => p.intangibles,    getRank: p => p.intangiblesRank, higherBetter: true },
-    { label: 'Tryout Pitching', color: '#C080E8',    getValue: p => p.teamPitching,   getRank: _ => null,              higherBetter: true },
-    { label: 'Tryout Catching', color: '#C080E8',   getValue: p => p.teamHitting,    getRank: _ => null,              higherBetter: true },
+    { label: 'TO Pitch',      color: '#80B0E8',    getValue: p => p.tryoutPitching,  getRank: _ => null, higherBetter: true },
+    { label: 'TO Hit',        color: '#80B0E8',    getValue: p => p.tryoutHitting,   getRank: _ => null, higherBetter: true },
+    { label: 'Eval Pitch',    color: '#6DB875',    getValue: p => p.teamPitching,    getRank: _ => null, higherBetter: true },
+    { label: 'Eval Hit',      color: '#6DB875',    getValue: p => p.teamHitting,     getRank: _ => null, higherBetter: true },
     { label: 'GC Hitting',  color: s.muted,         getValue: p => p.gcHittingScore,  getRank: _ => null,              higherBetter: true },
     { label: 'GC Pitching', color: s.muted,         getValue: p => p.gcPitchingScore, getRank: _ => null,              higherBetter: true },
   ]
