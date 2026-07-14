@@ -83,10 +83,11 @@ interface Season {
 }
 
 interface Team {
-  id:        string
-  name:      string
-  age_group: string
-  color:     string | null
+  id:              string
+  name:            string
+  age_group:       string
+  color:           string | null
+  eval_multiplier: number
 }
 
 interface RankedPlayer {
@@ -287,7 +288,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .eq('org_id', params.orgId).eq('season_year', String(seasonData.year - 1)),
 
       supabase.from('tryout_teams')
-        .select('id, name, age_group, color')
+        .select('id, name, age_group, color, eval_multiplier')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id),
 
       supabase.from('tryout_team_assignments')
@@ -503,7 +504,13 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
 
         // Coach eval
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const coachEval        = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig)
+        const rawCoachEval     = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig)
+        const assignedTeamId   = assignments[player.id] ?? null
+        const assignedTeam     = teams.find(t => t.id === assignedTeamId)
+        const evalMultiplier   = assignedTeam?.eval_multiplier ?? 1.0
+        const coachEval        = rawCoachEval != null
+          ? Math.round(rawCoachEval * evalMultiplier * 100) / 100
+          : null
         const intangibles      = evalRow?.intangibles_score ?? null
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)

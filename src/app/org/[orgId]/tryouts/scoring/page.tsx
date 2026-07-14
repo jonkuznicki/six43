@@ -40,6 +40,13 @@ interface Season {
   label: string
 }
 
+interface TeamRow {
+  id:              string
+  name:            string
+  age_group:       string | null
+  eval_multiplier: number
+}
+
 interface GcStatConfig {
   stat_key:  string
   included:  boolean
@@ -73,6 +80,10 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
   const [tryoutMsg,    setTryoutMsg]    = useState<string | null>(null)
   const [evalMsg,      setEvalMsg]      = useState<string | null>(null)
 
+  const [teams,        setTeams]        = useState<TeamRow[]>([])
+  const [savingTeams,  setSavingTeams]  = useState(false)
+  const [teamsMsg,     setTeamsMsg]     = useState<string | null>(null)
+
   // GC stat scoring
   const [ageGroups,    setAgeGroups]    = useState<string[]>([])
   const [gcAgeGroup,   setGcAgeGroup]   = useState<string>('')
@@ -94,7 +105,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: scoreCfg }, { data: evalCfg }, { data: gcCfgRows }, { data: playerRows }] = await Promise.all([
+    const [{ data: scoreCfg }, { data: evalCfg }, { data: gcCfgRows }, { data: playerRows }, { data: teamRows }] = await Promise.all([
       supabase.from('tryout_scoring_config')
         .select('id, category, label, weight, subcategories, is_optional, is_tiebreaker, sort_order')
         .eq('season_id', seasonData.id)
@@ -112,6 +123,10 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         .eq('org_id', params.orgId)
         .eq('is_active', true)
         .not('age_group', 'is', null),
+      supabase.from('tryout_teams')
+        .select('id, name, age_group, eval_multiplier')
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id)
+        .order('name'),
     ])
 
     // Distinct sorted age groups
@@ -161,6 +176,14 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
         is_optional: f.is_optional,
         sort_order:  f.sort_order,
         weight:      f.weight ?? 1.0,
+      }))
+    )
+    setTeams(
+      (teamRows ?? []).map((t: any) => ({
+        id:              t.id,
+        name:            t.name,
+        age_group:       t.age_group ?? null,
+        eval_multiplier: t.eval_multiplier ?? 1.0,
       }))
     )
     setLoading(false)
@@ -359,6 +382,24 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
     setSavingEval(false)
   }
 
+  async function saveTeamAdjustments() {
+    setSavingTeams(true)
+    setTeamsMsg(null)
+    const updates = teams.map(t =>
+      supabase.from('tryout_teams')
+        .update({ eval_multiplier: t.eval_multiplier })
+        .eq('id', t.id)
+    )
+    const results = await Promise.all(updates)
+    const err = results.find(r => r.error)?.error
+    if (err) {
+      setTeamsMsg(`Error: ${err.message}`)
+    } else {
+      setTeamsMsg('Saved.')
+    }
+    setSavingTeams(false)
+  }
+
   // ── GC scoring helpers ────────────────────────────────────────────────────
 
   function updateGcStat(ageGroup: string, statKey: string, patch: Partial<GcStatConfig>) {
@@ -511,6 +552,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
                 'Coach Eval = weighted avg of all fields with weight > 0.',
                 'The Weight column amplifies or dampens each field\'s impact.',
                 'Set weight to 0 to exclude a field from the score.',
+                'A Team Eval Multiplier (e.g. 0.9) scales the final score down for that team.',
               ],
             },
             {
@@ -784,6 +826,69 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
           {evalMsg && <span style={{ fontSize: '12px', color: evalMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{evalMsg}</span>}
         </div>
       </div>
+
+      {/* ── Team Eval Adjustments ───────────────────────────────────────────── */}
+      {teams.length > 0 && (
+        <div style={{ marginTop: '3rem' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700 }}>Team Eval Adjustments</div>
+            <div style={{ fontSize: '12px', color: s.dim, marginTop: '2px' }}>
+              Scale Coach Eval scores for players assigned to a specific team.
+              Use <strong style={{ color: 'var(--fg)' }}>0.9</strong> to reduce scores by 10%, <strong style={{ color: 'var(--fg)' }}>1.0</strong> for no adjustment.
+              The adjustment applies to the displayed eval score and the combined ranking score.
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+            {teams.map((team, i) => (
+              <div key={team.id} style={{
+                display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+                borderBottom: i < teams.length - 1 ? '0.5px solid var(--border)' : 'none',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700 }}>{team.name}</span>
+                  {team.age_group && (
+                    <span style={{ fontSize: '11px', color: s.dim, marginLeft: '8px' }}>{team.age_group}</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <span style={{ fontSize: '11px', color: s.dim }}>Eval multiplier</span>
+                  <input
+                    type="number" min={0.1} max={2.0} step={0.01}
+                    value={team.eval_multiplier}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value)
+                      if (!isNaN(val)) {
+                        setTeams(prev => prev.map((t, j) => j === i ? { ...t, eval_multiplier: val } : t))
+                      }
+                    }}
+                    style={{
+                      ...inputStyle, width: '64px', textAlign: 'right', padding: '4px 6px', fontSize: '13px',
+                      color: team.eval_multiplier !== 1.0 ? 'var(--accent)' : 'var(--fg)',
+                      fontWeight: team.eval_multiplier !== 1.0 ? 700 : 400,
+                    }}
+                  />
+                  {team.eval_multiplier !== 1.0 && (
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 700 }}>
+                      ({team.eval_multiplier < 1 ? '−' : '+'}{Math.abs(Math.round((team.eval_multiplier - 1) * 100))}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+            <button onClick={saveTeamAdjustments} disabled={savingTeams} style={{
+              padding: '9px 22px', borderRadius: '7px', border: 'none',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              fontSize: '13px', fontWeight: 700, cursor: savingTeams ? 'not-allowed' : 'pointer',
+              opacity: savingTeams ? 0.6 : 1,
+            }}>{savingTeams ? 'Saving…' : 'Save Team Adjustments'}</button>
+            {teamsMsg && <span style={{ fontSize: '12px', color: teamsMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{teamsMsg}</span>}
+          </div>
+        </div>
+      )}
 
       {/* ── GC Stat Scoring ─────────────────────────────────────────────────── */}
       <div style={{ marginTop: '3rem' }}>
