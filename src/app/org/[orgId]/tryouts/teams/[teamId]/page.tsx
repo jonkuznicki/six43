@@ -13,17 +13,22 @@ interface Team {
 }
 
 interface RosterPlayer {
-  id:            string
-  first_name:    string
-  last_name:     string
-  age_group:     string
-  jersey_number: string | null
-  prior_team:    string | null
-  tryoutAvg:     number | null
-  coachEvalAvg:  number | null
-  combinedScore: number | null
-  scoreCount:    number
-  evalCount:     number
+  id:                   string
+  first_name:           string
+  last_name:            string
+  age_group:            string
+  jersey_number:        string | null
+  prior_team:           string | null
+  grade:                string | null
+  parent_email:         string | null
+  parent_phone:         string | null
+  guardian_first_name:  string | null
+  guardian_last_name:   string | null
+  tryoutAvg:            number | null
+  coachEvalAvg:         number | null
+  combinedScore:        number | null
+  scoreCount:           number
+  evalCount:            number
 }
 
 export default function TeamRosterPage({ params }: { params: { orgId: string; teamId: string } }) {
@@ -54,7 +59,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
 
     const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }] = await Promise.all([
       supabase.from('tryout_players')
-        .select('id, first_name, last_name, age_group, jersey_number, prior_team')
+        .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
       supabase.from('tryout_scores')
         .select('player_id, tryout_score')
@@ -102,7 +107,16 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       else if (tryoutAvg != null) combinedScore = tryoutAvg
       else if (coachEvalAvg != null) combinedScore = coachEvalAvg
 
-      return { ...p, tryoutAvg, coachEvalAvg, combinedScore, scoreCount: scores.length, evalCount: evalGroups.length }
+      return {
+        ...p,
+        grade:               p.grade               ?? null,
+        parent_email:        p.parent_email         ?? null,
+        parent_phone:        p.parent_phone         ?? null,
+        guardian_first_name: p.guardian_first_name  ?? null,
+        guardian_last_name:  p.guardian_last_name   ?? null,
+        tryoutAvg, coachEvalAvg, combinedScore,
+        scoreCount: scores.length, evalCount: evalGroups.length,
+      }
     }).sort((a: RosterPlayer, b: RosterPlayer) => (b.combinedScore ?? -1) - (a.combinedScore ?? -1))
 
     setPlayers(rosterPlayers)
@@ -121,19 +135,24 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
   function exportRoster() {
     if (!team) return
     const rows = [
-      ['#', 'Name', 'Age Group', 'Prior Team', 'Tryout Score', 'Coach Eval', 'Combined', 'Sources'],
+      ['#', 'Last Name', 'First Name', 'Age Group', 'Grade', 'Guardian First', 'Guardian Last', 'Parent Email', 'Parent Phone', 'Prior Team', 'Tryout Score', 'Coach Eval', 'Combined'],
       ...players.map((p, i) => [
         String(i + 1),
-        `${p.first_name} ${p.last_name}`,
+        p.last_name,
+        p.first_name,
         p.age_group,
-        p.prior_team ?? '',
-        p.tryoutAvg?.toFixed(2) ?? '',
+        p.grade               ?? '',
+        p.guardian_first_name ?? '',
+        p.guardian_last_name  ?? '',
+        p.parent_email        ?? '',
+        p.parent_phone        ?? '',
+        p.prior_team          ?? '',
+        p.tryoutAvg?.toFixed(2)    ?? '',
         p.coachEvalAvg?.toFixed(2) ?? '',
         p.combinedScore?.toFixed(2) ?? '',
-        [p.scoreCount > 0 ? `${p.scoreCount} tryout` : '', p.evalCount > 0 ? `${p.evalCount} eval` : ''].filter(Boolean).join(', '),
       ])
     ]
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const csv  = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
