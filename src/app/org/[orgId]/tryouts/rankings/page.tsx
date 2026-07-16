@@ -304,6 +304,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     setTryoutRows(tryoutData ?? [])
     setEvalRows(evalData ?? [])
     setEvalConfig(evalCfgData ?? [])
+    console.warn('[six43 debug] evalConfig rows:', evalCfgData?.length, evalCfgData?.filter((c: any) => c.section === 'intangibles'))
     setScoringConfig((scoringCfgData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
       is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false,
@@ -441,6 +442,10 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     () => evalConfig.filter(c => c.section === 'fielding_hitting').map(c => c.field_key),
     [evalConfig]
   )
+  const intangiblesKeys = useMemo(
+    () => evalConfig.filter(c => c.section === 'intangibles').map(c => c.field_key),
+    [evalConfig]
+  )
 
   const ranked = useMemo((): RankedPlayer[] => {
     // Per-player tryout: average across evaluators
@@ -511,7 +516,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         const coachEval        = rawCoachEval != null
           ? Math.round(rawCoachEval * evalMultiplier * 100) / 100
           : null
-        const intangibles      = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig.filter(c => c.section === 'intangibles'))
+        const intangibles      = sectionAvg(evalRow?.scores ?? null, intangiblesKeys)
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
         const evalSpeed        = evalRow?.scores?.['speed']       != null ? Number(evalRow.scores['speed'])       : null
@@ -583,7 +588,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, evalConfig, pitchingKeys, hittingKeys, scoringConfig])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 
