@@ -511,7 +511,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         const coachEval        = rawCoachEval != null
           ? Math.round(rawCoachEval * evalMultiplier * 100) / 100
           : null
-        const intangibles      = evalRow?.intangibles_score ?? null
+        const intangibles      = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig.filter(c => c.section === 'intangibles'))
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
         const evalSpeed        = evalRow?.scores?.['speed']       != null ? Number(evalRow.scores['speed'])       : null
