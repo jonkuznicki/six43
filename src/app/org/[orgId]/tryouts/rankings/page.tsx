@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import PlayerCard from './PlayerCard'
@@ -172,8 +173,9 @@ function computeWeightedEvalScore(
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function TeamMakingPage({ params }: { params: { orgId: string } }) {
-  const supabase = createClient()
+function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
+  const supabase     = createClient()
+  const searchParams = useSearchParams()
 
   const [season,        setSeason]        = useState<Season | null>(null)
   const [players,       setPlayers]       = useState<Player[]>([])
@@ -187,6 +189,8 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   const [notesMap,      setNotesMap]      = useState<Record<string, string>>({})
   const [excludedMap,   setExcludedMap]   = useState<Record<string, boolean>>({})
   const [acceptedMap,   setAcceptedMap]   = useState<Record<string, boolean>>({})
+  const [actionCounts,       setActionCounts]       = useState<Record<string, number>>({}) // team_id -> open action items
+  const [playerActionCounts, setPlayerActionCounts] = useState<Record<string, number>>({}) // player_id -> open action items
   const [loading,       setLoading]       = useState(true)
 
   // Filters / sort
@@ -232,6 +236,20 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     try { localStorage.setItem(`tryout_cutoffs_${params.orgId}`, JSON.stringify(cutoffs)) } catch { /* ignore */ }
   }, [cutoffs])
 
+  // Deep-link support from the Action Items page: ?player=<id> opens that
+  // player's card, ?team=<id> jumps the age filter to that team's group.
+  useEffect(() => {
+    if (teams.length === 0 && players.length === 0) return
+    const playerId = searchParams.get('player')
+    const teamId   = searchParams.get('team')
+    if (playerId) setPanelPlayerId(playerId)
+    if (teamId) {
+      const team = teams.find(t => t.id === teamId)
+      if (team?.age_group) setAgeFilter(team.age_group.toUpperCase())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams, players])
+
   async function loadData() {
     const { data: seasonData } = await supabase
       .from('tryout_seasons')
@@ -258,6 +276,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       { data: teamData },
       { data: assignData },
       { data: combinedData },
+      { data: actionItemData },
     ] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, tryout_age_group, prior_team, grade')
@@ -301,6 +320,11 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       supabase.from('tryout_combined_scores')
         .select('player_id, admin_notes, is_excluded')
         .eq('season_id', seasonData.id),
+
+      supabase.from('tryout_action_items')
+        .select('team_id, player_id, status')
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id)
+        .in('status', ['open', 'waiting', 'in_progress', 'blocked']),
     ])
 
     setPlayers(playerData ?? [])
@@ -333,6 +357,16 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     }
     setNotesMap(notes)
     setExcludedMap(excluded)
+
+    const teamCounts:   Record<string, number> = {}
+    const playerCounts: Record<string, number> = {}
+    for (const a of (actionItemData ?? [])) {
+      if (a.team_id)   teamCounts[a.team_id]     = (teamCounts[a.team_id]     ?? 0) + 1
+      if (a.player_id) playerCounts[a.player_id] = (playerCounts[a.player_id] ?? 0) + 1
+    }
+    setActionCounts(teamCounts)
+    setPlayerActionCounts(playerCounts)
+
     setLoading(false)
   }
 
@@ -905,6 +939,15 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                 </span>
               </label>
             )}
+            {(playerActionCounts[row.player.id] ?? 0) > 0 && (
+              <Link href={`/org/${params.orgId}/tryouts/action-items?player=${row.player.id}&status=open`}
+                title={`${playerActionCounts[row.player.id]} open action item(s)`}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  fontSize: '10px', fontWeight: 700, color: '#E87060', flexShrink: 0,
+                  padding: '1px 6px', borderRadius: '10px', background: 'rgba(232,112,96,0.12)', textDecoration: 'none',
+                }}>⚑ {playerActionCounts[row.player.id]}</Link>
+            )}
           </div>
         </td>
         <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
@@ -1072,6 +1115,25 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
             Create teams → (use the "+ New team" button)
           </Link>
+        </div>
+      )}
+
+      {/* ── Open action items per team ── */}
+      {teams.filter(t => ageFilter === 'all' || t.age_group === ageFilter).length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px', alignItems: 'center' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action items</span>
+          {teams.filter(t => ageFilter === 'all' || t.age_group === ageFilter).map(t => {
+            const count = actionCounts[t.id] ?? 0
+            return (
+              <Link key={t.id} href={`/org/${params.orgId}/tryouts/action-items?team=${t.id}&status=open`} style={{
+                padding: '3px 9px', borderRadius: '20px', border: '0.5px solid',
+                borderColor: count > 0 ? 'rgba(232,112,96,0.5)' : 'var(--border-md)',
+                background: count > 0 ? 'rgba(232,112,96,0.1)' : 'var(--bg-input)',
+                color: count > 0 ? '#E87060' : s.dim,
+                fontSize: '11px', fontWeight: count > 0 ? 700 : 400, textDecoration: 'none',
+              }}>{t.name} · {count} open</Link>
+            )
+          })}
         </div>
       )}
 
@@ -1425,5 +1487,17 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       })()}
 
     </main>
+  )
+}
+
+export default function TeamMakingPage({ params }: { params: { orgId: string } }) {
+  return (
+    <Suspense fallback={
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading…
+      </main>
+    }>
+      <TeamMakingPageInner params={params} />
+    </Suspense>
   )
 }

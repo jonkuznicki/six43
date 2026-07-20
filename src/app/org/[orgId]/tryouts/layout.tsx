@@ -33,8 +33,9 @@ const NAV = [
   {
     label: 'Team Making',
     items: [
-      { href: 'rankings', label: 'Team Making' },
-      { href: 'teams',    label: 'Final Rosters' },
+      { href: 'rankings',     label: 'Team Making' },
+      { href: 'teams',        label: 'Final Rosters' },
+      { href: 'action-items', label: 'Action Items' },
     ],
   },
 ]
