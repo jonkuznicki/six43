@@ -122,6 +122,8 @@ interface RankedPlayer {
   adminNotes:      string | null
   // Exclude from team-making
   isExcluded:      boolean
+  // Whether the player has accepted their roster spot (only relevant once assigned)
+  isAccepted:      boolean
 }
 
 // ── Rank helpers ───────────────────────────────────────────────────────────────
@@ -184,6 +186,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
   const [assignments,   setAssignments]   = useState<Record<string, string>>({})
   const [notesMap,      setNotesMap]      = useState<Record<string, string>>({})
   const [excludedMap,   setExcludedMap]   = useState<Record<string, boolean>>({})
+  const [acceptedMap,   setAcceptedMap]   = useState<Record<string, boolean>>({})
   const [loading,       setLoading]       = useState(true)
 
   // Filters / sort
@@ -292,7 +295,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         .eq('org_id', params.orgId).eq('season_id', seasonData.id),
 
       supabase.from('tryout_team_assignments')
-        .select('player_id, team_id')
+        .select('player_id, team_id, is_accepted')
         .eq('season_id', seasonData.id),
 
       supabase.from('tryout_combined_scores')
@@ -313,9 +316,14 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     setGcRows(gcData ?? [])
     setTeams(teamData ?? [])
 
-    const asgn: Record<string, string> = {}
-    for (const a of (assignData ?? [])) asgn[a.player_id] = a.team_id
+    const asgn: Record<string, string>  = {}
+    const acc:  Record<string, boolean> = {}
+    for (const a of (assignData ?? [])) {
+      asgn[a.player_id] = a.team_id
+      acc[a.player_id]  = !!a.is_accepted
+    }
     setAssignments(asgn)
+    setAcceptedMap(acc)
 
     const notes:    Record<string, string>  = {}
     const excluded: Record<string, boolean> = {}
@@ -374,19 +382,44 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     if (!season) return
     setAssigning(playerId)
     if (teamId) {
+      // Assigning or reassigning always resets acceptance — the player needs
+      // to accept the (new) roster spot again.
       const { error } = await supabase.from('tryout_team_assignments').upsert(
-        { player_id: playerId, team_id: teamId, season_id: season.id, org_id: params.orgId, assigned_by: 'manual' },
+        { player_id: playerId, team_id: teamId, season_id: season.id, org_id: params.orgId, assigned_by: 'manual', is_accepted: false },
         { onConflict: 'player_id,season_id' }
       )
-      if (!error) setAssignments(prev => ({ ...prev, [playerId]: teamId }))
+      if (!error) {
+        setAssignments(prev => ({ ...prev, [playerId]: teamId }))
+        setAcceptedMap(prev => ({ ...prev, [playerId]: false }))
+      }
       else console.error('assignTeam upsert failed:', error.message)
     } else {
       const { error } = await supabase.from('tryout_team_assignments').delete()
         .eq('player_id', playerId).eq('season_id', season.id)
-      if (!error) setAssignments(prev => { const n = { ...prev }; delete n[playerId]; return n })
+      if (!error) {
+        setAssignments(prev => { const n = { ...prev }; delete n[playerId]; return n })
+        setAcceptedMap(prev => { const n = { ...prev }; delete n[playerId]; return n })
+      }
       else console.error('assignTeam delete failed:', error.message)
     }
     setAssigning(null)
+  }
+
+  // ── Accepted toggle ──────────────────────────────────────────────────────────
+
+  async function toggleAccepted(playerId: string) {
+    if (!season) return
+    const teamId = assignments[playerId]
+    if (!teamId) return   // only relevant once a player is assigned to a team
+    const next = !acceptedMap[playerId]
+    setAcceptedMap(prev => ({ ...prev, [playerId]: next }))
+    const { error } = await supabase.from('tryout_team_assignments')
+      .update({ is_accepted: next })
+      .eq('player_id', playerId).eq('season_id', season.id)
+    if (error) {
+      console.error('toggleAccepted failed:', error.message)
+      setAcceptedMap(prev => ({ ...prev, [playerId]: !next }))
+    }
   }
 
   // ── Compare toggle ───────────────────────────────────────────────────────────
@@ -559,6 +592,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           assignedTeamId: assignments[player.id] ?? null,
           adminNotes:     notesMap[player.id] ?? null,
           isExcluded:     excludedMap[player.id] ?? false,
+          isAccepted:     acceptedMap[player.id] ?? false,
         }
       })
 
@@ -588,7 +622,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, acceptedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 
@@ -678,7 +712,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
     const priorYear = season.year - 1
     const rows = [
       [
-        'Next Season Team', 'Notes', 'Combined Rank', 'Player', 'Age Group', 'Grade', `${priorYear} Team`,
+        'Next Season Team', 'Accepted', 'Notes', 'Combined Rank', 'Player', 'Age Group', 'Grade', `${priorYear} Team`,
         'Combined Score',
         'Tryout Score', 'Tryout Rank', 'TO Pitching', 'TO Hitting', 'Speed (60yd)',
         'Coach Eval', 'Coach Rank', 'Intangibles', 'Intangibles Rank', 'Eval Pitching', 'Eval Hitting', 'Eval Speed', 'Eval Athleticism',
@@ -689,6 +723,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
         const team = teams.find(t => t.id === r.assignedTeamId)
         return [
           team?.name ?? '',
+          r.assignedTeamId ? (r.isAccepted ? 'Yes' : 'No') : '',
           r.adminNotes ?? '',
           String(r.combinedRank ?? ''),
           `${r.player.last_name}, ${r.player.first_name}`,
@@ -850,11 +885,26 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
           </select>
         </td>
         <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
-          <div onClick={() => setPanelPlayerId(row.player.id)}
-            style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--fg)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg)')}>
-            {row.player.last_name}, {row.player.first_name}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div onClick={() => setPanelPlayerId(row.player.id)}
+              style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--fg)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg)')}>
+              {row.player.last_name}, {row.player.first_name}
+            </div>
+            {row.assignedTeamId && (
+              <label
+                title={row.isAccepted ? 'Player has accepted their roster spot — click to unmark' : 'Mark player as having accepted their roster spot'}
+                style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', flexShrink: 0 }}
+                onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={row.isAccepted}
+                  onChange={() => toggleAccepted(row.player.id)}
+                  style={{ cursor: 'pointer', accentColor: '#6DB875' }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? '#6DB875' : s.dim, whiteSpace: 'nowrap' }}>
+                  {row.isAccepted ? 'Accepted' : 'Accept'}
+                </span>
+              </label>
+            )}
           </div>
         </td>
         <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
@@ -1099,7 +1149,7 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                   Next Team
                 </th>
                 {/* Sticky: Player */}
-                <th style={{ ...stickyPlayerTh, width: '170px', minWidth: '160px' }}
+                <th style={{ ...stickyPlayerTh, width: '230px', minWidth: '220px' }}
                   onClick={() => toggleSort('name')}>
                   Player{sortArrow('name')}
                 </th>
@@ -1303,9 +1353,23 @@ export default function TeamMakingPage({ params }: { params: { orgId: string } }
                           </select>
                         </td>
                         <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
-                          <span style={{ fontWeight: 700, fontSize: '13px', textDecoration: 'line-through', color: s.muted }}>
-                            {row.player.last_name}, {row.player.first_name}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '13px', textDecoration: 'line-through', color: s.muted }}>
+                              {row.player.last_name}, {row.player.first_name}
+                            </span>
+                            {row.assignedTeamId && (
+                              <label
+                                title={row.isAccepted ? 'Player has accepted their roster spot — click to unmark' : 'Mark player as having accepted their roster spot'}
+                                style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', flexShrink: 0 }}>
+                                <input type="checkbox" checked={row.isAccepted}
+                                  onChange={() => toggleAccepted(row.player.id)}
+                                  style={{ cursor: 'pointer', accentColor: '#6DB875' }} />
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? '#6DB875' : s.dim, whiteSpace: 'nowrap' }}>
+                                  {row.isAccepted ? 'Accepted' : 'Accept'}
+                                </span>
+                              </label>
+                            )}
+                          </div>
                         </td>
                         <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={20} />
                         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
