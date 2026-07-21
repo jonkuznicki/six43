@@ -28,7 +28,7 @@ interface ActionItem {
 
 interface Team   { id: string; name: string; age_group: string; color: string | null }
 interface Player { id: string; first_name: string; last_name: string; age_group: string | null; tryout_age_group: string | null }
-interface Assignment { player_id: string; team_id: string }
+interface Assignment { player_id: string; team_id: string; is_accepted: boolean }
 interface OrgMember { id: string; name: string | null; email: string; user_id: string | null; is_active: boolean }
 interface Season { id: string; label: string; year: number; age_groups: string[] }
 
@@ -94,6 +94,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
   const [form,              setForm]            = useState(BLANK_FORM)
   const [saving,            setSaving]          = useState(false)
   const [saveError,         setSaveError]       = useState<string | null>(null)
+  const [copied,            setCopied]          = useState(false)
 
   // Preset filters from an incoming deep link (Team Making → here)
   useEffect(() => {
@@ -134,7 +135,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
         .order('last_name').order('first_name'),
 
       supabase.from('tryout_team_assignments')
-        .select('player_id, team_id')
+        .select('player_id, team_id, is_accepted')
         .eq('season_id', seasonData.id),
 
       supabase.from('tryout_org_members')
@@ -260,6 +261,20 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
     setShowForm(false)
   }
 
+  function logAcceptanceFollowUp(player: Player, team: Team) {
+    setForm({
+      ...BLANK_FORM,
+      age_group: team.age_group,
+      team_id:   team.id,
+      player_id: player.id,
+      title:     `Confirm ${player.first_name} ${player.last_name} accepts ${team.name} roster spot`,
+    })
+    setEditId(null)
+    setFollowUpParentId(null)
+    setSaveError(null)
+    setShowForm(true)
+  }
+
   // ── Derived data ───────────────────────────────────────────────────────────────
 
   const ageGroups = season?.age_groups?.length ? season.age_groups : FALLBACK_AGE_GROUPS
@@ -271,6 +286,18 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
   }, [members, items])
 
   const allItemsById = useMemo(() => new Map(items.map(i => [i.id, i])), [items])
+
+  // Players assigned to a team but not yet marked "accepted" on Team Making —
+  // a reminder to confirm everyone before the roster is posted.
+  const pendingAcceptance = useMemo(() => {
+    return assignments
+      .filter(a => !a.is_accepted)
+      .map(a => ({ player: players.find(p => p.id === a.player_id), team: teams.find(t => t.id === a.team_id) }))
+      .filter((x): x is { player: Player; team: Team } => !!x.player && !!x.team)
+      .filter(x => ageFilter  === 'all' || x.team.age_group === ageFilter)
+      .filter(x => teamFilter === 'all' || x.team.id === teamFilter)
+      .sort((a, b) => (a.team.name + a.player.last_name).localeCompare(b.team.name + b.player.last_name))
+  }, [assignments, players, teams, ageFilter, teamFilter])
 
   const todayStr = new Date().toISOString().slice(0, 10)
 
@@ -347,6 +374,84 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
 
   const playerFilterPlayer = playerFilter ? players.find(p => p.id === playerFilter) : null
 
+  // ── Copy for email / CSV export (both operate on the currently filtered list) ──
+
+  function groupedForExport() {
+    const groups = new Map<string, ActionItem[]>()
+    for (const item of filtered) {
+      const team = teams.find(t => t.id === item.team_id)
+      const key  = team ? `${team.name} (${team.age_group})` : `${item.age_group} — No team`
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(item)
+    }
+    return groups
+  }
+
+  function buildEmailText(): string {
+    const lines: string[] = []
+    lines.push(`Team Selection Action Items — ${season?.label ?? ''}`)
+    lines.push(`Generated ${new Date().toLocaleString()}`)
+    lines.push('')
+    for (const [groupName, groupItems] of Array.from(groupedForExport())) {
+      lines.push(groupName)
+      for (const item of groupItems) {
+        const player = players.find(p => p.id === item.player_id)
+        const indent = item.parent_id ? '    ' : '  '
+        let line = `${indent}[${STATUS_STYLES[item.status]?.label ?? item.status}] ${item.title}`
+        if (player)          line += ` — ${player.last_name}, ${player.first_name}`
+        if (item.owner_name) line += ` — Owner: ${item.owner_name}`
+        if (item.due_date)   line += ` — Due: ${item.due_date}`
+        lines.push(line)
+        if (item.details)          lines.push(`${indent}    Notes: ${item.details}`)
+        if (item.resolution_notes) lines.push(`${indent}    Resolution: ${item.resolution_notes}`)
+      }
+      lines.push('')
+    }
+    return lines.join('\n')
+  }
+
+  async function copyForEmail() {
+    try {
+      await navigator.clipboard.writeText(buildEmailText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('copyForEmail failed:', err)
+    }
+  }
+
+  function exportCsv() {
+    const rows = [
+      ['Status', 'Title', 'Age Group', 'Team', 'Player', 'Owner', 'Priority', 'Due Date', 'Created', 'Updated', 'Details', 'Resolution'],
+      ...filtered.map(item => {
+        const team   = teams.find(t => t.id === item.team_id)
+        const player = players.find(p => p.id === item.player_id)
+        return [
+          STATUS_STYLES[item.status]?.label ?? item.status,
+          item.title,
+          item.age_group,
+          team?.name ?? '',
+          player ? `${player.last_name}, ${player.first_name}` : '',
+          item.owner_name ?? '',
+          item.priority ? PRIORITY_STYLES[item.priority].label : '',
+          item.due_date ?? '',
+          new Date(item.created_at).toLocaleDateString(),
+          new Date(item.updated_at).toLocaleDateString(),
+          item.details ?? '',
+          item.resolution_notes ?? '',
+        ]
+      }),
+    ]
+    const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = `action-items-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Styles ────────────────────────────────────────────────────────────────────
 
   const s = {
@@ -398,12 +503,52 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
             {season.label} · {openCount} open
           </div>
         </div>
-        <button onClick={startCreate} style={{
-          padding: '8px 18px', borderRadius: '7px', border: 'none',
-          background: 'var(--accent)', color: 'var(--accent-text)',
-          fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-        }}>+ New Action Item</button>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={copyForEmail} style={{
+            padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
+          }}>{copied ? '✓ Copied!' : '⎋ Copy for email'}</button>
+          <button onClick={exportCsv} style={{
+            padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
+            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
+          }}>↓ CSV</button>
+          <button onClick={startCreate} style={{
+            padding: '8px 18px', borderRadius: '7px', border: 'none',
+            background: 'var(--accent)', color: 'var(--accent-text)',
+            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+          }}>+ New Action Item</button>
+        </div>
       </div>
+
+      {/* ── Pending roster acceptance reminder ── */}
+      {pendingAcceptance.length > 0 && (
+        <div style={{
+          background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '1.25rem',
+        }}>
+          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent)', marginBottom: '4px' }}>
+            ⚠ Pending Roster Acceptance ({pendingAcceptance.length})
+          </div>
+          <div style={{ fontSize: '11px', color: s.muted, marginBottom: '10px' }}>
+            Assigned to a team but not yet marked accepted on Team Making — confirm everyone before posting the roster.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {pendingAcceptance.map(({ player, team }) => (
+              <div key={player.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', flexWrap: 'wrap' }}>
+                <Link href={`/org/${params.orgId}/tryouts/rankings?player=${player.id}`} style={{ fontWeight: 700, color: 'var(--fg)', textDecoration: 'none' }}>
+                  {player.last_name}, {player.first_name}
+                </Link>
+                <span style={{ color: s.dim }}>·</span>
+                <span style={{ color: s.muted }}>{team.name} ({team.age_group})</span>
+                <button onClick={() => logAcceptanceFollowUp(player, team)} style={{
+                  marginLeft: 'auto', fontSize: '11px', padding: '3px 9px', borderRadius: '5px',
+                  border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, cursor: 'pointer',
+                }}>+ Log follow-up</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Player deep-link chip */}
       {playerFilterPlayer && (
