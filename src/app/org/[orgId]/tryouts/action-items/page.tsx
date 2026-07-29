@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,13 +33,14 @@ interface Assignment { player_id: string; team_id: string; is_accepted: boolean 
 interface OrgMember { id: string; name: string | null; email: string; user_id: string | null; is_active: boolean }
 interface Season { id: string; label: string; year: number; age_groups: string[] }
 
-const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  open:        { label: 'Open',        color: '#E8A020',                 bg: 'rgba(232,160,32,0.12)' },
-  waiting:     { label: 'Waiting',     color: '#40A0E8',                 bg: 'rgba(64,144,224,0.12)' },
-  in_progress: { label: 'In Progress', color: '#6DB875',                 bg: 'rgba(109,184,117,0.12)' },
-  blocked:     { label: 'Blocked',     color: '#E87060',                 bg: 'rgba(232,112,96,0.12)' },
-  completed:   { label: 'Completed',   color: `rgba(var(--fg-rgb),0.5)`, bg: `rgba(var(--fg-rgb),0.06)` },
-  cancelled:   { label: 'Cancelled',   color: `rgba(var(--fg-rgb),0.35)`, bg: `rgba(var(--fg-rgb),0.04)` },
+// Shared with PlayerCard's Follow-up section — keep these two in sync.
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Open', waiting: 'Waiting', in_progress: 'In Progress', blocked: 'Blocked',
+  completed: 'Completed', cancelled: 'Cancelled',
+}
+const STATUS_TONE: Record<string, StatusTone> = {
+  open: 'warn', waiting: 'info', in_progress: 'good', blocked: 'bad',
+  completed: 'neutral', cancelled: 'neutral',
 }
 const ACTIVE_STATUSES = ['open', 'waiting', 'in_progress', 'blocked']
 const CLOSED_STATUSES = ['completed', 'cancelled']
@@ -397,7 +399,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
       for (const item of groupItems) {
         const player = players.find(p => p.id === item.player_id)
         const indent = item.parent_id ? '    ' : '  '
-        let line = `${indent}[${STATUS_STYLES[item.status]?.label ?? item.status}] ${item.title}`
+        let line = `${indent}[${STATUS_LABEL[item.status] ?? item.status}] ${item.title}`
         if (player)          line += ` — ${player.last_name}, ${player.first_name}`
         if (item.owner_name) line += ` — Owner: ${item.owner_name}`
         if (item.due_date)   line += ` — Due: ${item.due_date}`
@@ -427,7 +429,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
         const team   = teams.find(t => t.id === item.team_id)
         const player = players.find(p => p.id === item.player_id)
         return [
-          STATUS_STYLES[item.status]?.label ?? item.status,
+          STATUS_LABEL[item.status] ?? item.status,
           item.title,
           item.age_group,
           team?.name ?? '',
@@ -523,10 +525,10 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
       {/* ── Pending roster acceptance reminder ── */}
       {pendingAcceptance.length > 0 && (
         <div style={{
-          background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
+          background: 'var(--status-warn-bg)', border: '0.5px solid var(--border-md)',
           borderRadius: '10px', padding: '12px 16px', marginBottom: '1.25rem',
         }}>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent)', marginBottom: '4px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--status-warn)', marginBottom: '4px' }}>
             ⚠ Pending Roster Acceptance ({pendingAcceptance.length})
           </div>
           <div style={{ fontSize: '11px', color: s.muted, marginBottom: '10px' }}>
@@ -644,7 +646,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
             <div>
               <label style={labelStyle}>Status</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inputStyle}>
-                {STATUS_OPTIONS.map(st => <option key={st} value={st}>{STATUS_STYLES[st].label}</option>)}
+                {STATUS_OPTIONS.map(st => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
               </select>
             </div>
             <div>
@@ -699,7 +701,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
             const player  = players.find(p => p.id === item.player_id)
             const parent  = item.parent_id ? allItemsById.get(item.parent_id) : null
             const overdue = item.due_date != null && item.due_date < todayStr && !CLOSED_STATUSES.includes(item.status)
-            const st      = STATUS_STYLES[item.status] ?? STATUS_STYLES.open
+            const statusTone = STATUS_TONE[item.status] ?? 'warn'
 
             return (
               <div key={item.id} style={{ marginLeft: item.parent_id ? '28px' : 0 }}>
@@ -713,7 +715,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
                   padding: '10px 14px', borderLeft: overdue ? '3px solid #E87060' : '3px solid transparent',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '20px', background: st.bg, color: st.color, fontWeight: 700, flexShrink: 0 }}>{st.label}</span>
+                    <span style={{ flexShrink: 0 }}><StatusPill tone={statusTone}>{STATUS_LABEL[item.status] ?? item.status}</StatusPill></span>
                     {overdue && <span style={{ fontSize: '10px', fontWeight: 800, color: '#E87060' }}>OVERDUE</span>}
                     <div style={{ fontWeight: 700, fontSize: '13px', flex: 1, minWidth: '160px' }}>{item.title}</div>
                     {item.priority && (
@@ -723,7 +725,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
                       background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '5px',
                       padding: '3px 6px', fontSize: '11px', color: 'var(--fg)', cursor: 'pointer',
                     }}>
-                      {STATUS_OPTIONS.map(so => <option key={so} value={so}>{STATUS_STYLES[so].label}</option>)}
+                      {STATUS_OPTIONS.map(so => <option key={so} value={so}>{STATUS_LABEL[so]}</option>)}
                     </select>
                     <button onClick={() => startEdit(item)} style={{
                       fontSize: '11px', padding: '3px 9px', borderRadius: '5px',

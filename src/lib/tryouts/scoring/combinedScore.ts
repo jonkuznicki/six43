@@ -41,7 +41,13 @@ export interface EvalConfigField {
   weight: number
 }
 
-/** Dense rank within a group (ties share a rank, no gaps). Highest value = rank 1. */
+/**
+ * Standard competition ranking within a group — highest value = rank 1,
+ * ties share a rank, and the rank after a tie skips (two players tied for
+ * 1st are followed by 3rd, not 2nd — golf/Olympic-style, not "dense" rank
+ * despite the name). Preserved exactly as Rankings already computed it;
+ * renaming this would be a larger change than this pass calls for.
+ */
 export function denseRank(items: Array<{ id: string; v: number | null }>): Map<string, number> {
   const sorted = items.filter(x => x.v != null).sort((a, b) => b.v! - a.v!)
   const map = new Map<string, number>()

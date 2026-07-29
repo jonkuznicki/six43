@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../../lib/supabase'
 import Link from 'next/link'
+import { StatusPill } from '../../../../../../components/ui/StatusPill'
 import {
   averagePresent,
   computeCoachEvalScore,
@@ -38,6 +39,7 @@ interface RosterPlayer {
   combinedScore:        number | null
   scoreCount:           number
   evalCount:            number
+  isAccepted:           boolean
 }
 
 // Non-null, structural — a player has at most one active eval considered
@@ -79,22 +81,39 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
 
     // Get assigned players
     const { data: assignData } = await supabase
-      .from('tryout_team_assignments').select('player_id')
+      .from('tryout_team_assignments').select('player_id, is_accepted')
       .eq('team_id', params.teamId).eq('season_id', teamData.season_id)
 
     const playerIds = (assignData ?? []).map((a: any) => a.player_id)
     if (playerIds.length === 0) { setLoading(false); return }
+    const acceptedMap = new Map((assignData ?? []).map((a: any) => [a.player_id, !!a.is_accepted]))
+
+    // Tryout scores must be scoped to THIS season's sessions — previously this
+    // query had no season filter at all and could pull in a prior season's
+    // scores for a returning player. Matches Rankings/Data Hub.
+    const { data: sessionRows } = await supabase
+      .from('tryout_sessions').select('id').eq('season_id', teamData.season_id)
+    const sessionIds = (sessionRows ?? []).map((s: any) => s.id as string)
+
+    // Coach evals: same [year, year-1] window Rankings uses, not "every eval
+    // ever recorded for this player" — avoids picking up a stale prior-cycle
+    // eval when nothing recent exists.
+    const evalYears = seasonData ? [String(seasonData.year), String(seasonData.year - 1)] : []
 
     const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
-      supabase.from('tryout_scores')
-        .select('player_id, tryout_score')
-        .in('player_id', playerIds),
-      supabase.from('tryout_coach_evals')
-        .select('player_id, season_year, scores')
-        .in('player_id', playerIds).eq('status', 'submitted'),
+      sessionIds.length > 0
+        ? supabase.from('tryout_scores')
+            .select('player_id, tryout_score')
+            .in('player_id', playerIds).in('session_id', sessionIds)
+        : Promise.resolve({ data: [] as any[] }),
+      evalYears.length > 0
+        ? supabase.from('tryout_coach_evals')
+            .select('player_id, season_year, scores')
+            .in('player_id', playerIds).in('season_year', evalYears).eq('status', 'submitted')
+        : Promise.resolve({ data: [] as any[] }),
       supabase.from('tryout_coach_eval_config')
         .select('field_key, section, weight').eq('org_id', params.orgId),
       supabase.from('tryout_registration_staging')
@@ -164,6 +183,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
         tryoutAvg, coachEvalAvg, combinedScore,
         scoreCount: scores.length, evalCount: evalRow ? 1 : 0,
+        isAccepted: acceptedMap.get(p.id) ?? false,
       }
     }).sort((a: RosterPlayer, b: RosterPlayer) => (b.combinedScore ?? -1) - (a.combinedScore ?? -1))
 
@@ -183,7 +203,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
   function exportRoster() {
     if (!team) return
     const rows = [
-      ['#', 'Last Name', 'First Name', 'Age Group', 'Grade', 'Guardian First', 'Guardian Last', 'Parent Email', 'Parent Phone', 'Prior Team', 'Tryout Score', 'Coach Eval', 'Combined'],
+      ['#', 'Last Name', 'First Name', 'Age Group', 'Grade', 'Guardian First', 'Guardian Last', 'Parent Email', 'Parent Phone', 'Prior Team', 'Tryout Score', 'Coach Eval', 'Combined', 'Accepted'],
       ...players.map((p, i) => [
         String(i + 1),
         p.last_name,
@@ -198,6 +218,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         p.tryoutAvg?.toFixed(2)    ?? '',
         p.coachEvalAvg?.toFixed(2) ?? '',
         p.combinedScore?.toFixed(2) ?? '',
+        p.isAccepted ? 'Yes' : 'No',
       ])
     ]
     const csv  = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -267,10 +288,12 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
                 {player.combinedScore != null ? idx + 1 : '–'}
               </div>
 
-              {/* Player info */}
+              {/* Player info — full score breakdown lives on Rankings, not duplicated here */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 700, fontSize: '14px' }}>{player.first_name} {player.last_name}</span>
+                  <Link href={`/org/${params.orgId}/tryouts/rankings?player=${player.id}`} style={{ fontWeight: 700, fontSize: '14px', color: 'var(--fg)', textDecoration: 'none' }}>
+                    {player.first_name} {player.last_name}
+                  </Link>
                   {player.jersey_number && (
                     <span style={{ fontSize: '11px', color: s.dim }}>#{player.jersey_number}</span>
                   )}
@@ -279,6 +302,9 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
                       was: {player.prior_team}
                     </span>
                   )}
+                  <StatusPill tone={player.isAccepted ? 'good' : 'neutral'} size="sm">
+                    {player.isAccepted ? 'Accepted' : 'Pending'}
+                  </StatusPill>
                 </div>
                 <div style={{ fontSize: '11px', color: s.dim, marginTop: '2px' }}>
                   {player.scoreCount > 0 ? `${player.scoreCount} tryout score${player.scoreCount !== 1 ? 's' : ''}` : 'No tryout scores'}
@@ -286,27 +312,13 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
                 </div>
               </div>
 
-              {/* Scores */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-                {player.tryoutAvg != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{player.tryoutAvg.toFixed(2)}</div>
-                    <div style={{ fontSize: '10px', color: s.dim }}>tryout</div>
-                  </div>
-                )}
-                {player.coachEvalAvg != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{player.coachEvalAvg.toFixed(2)}</div>
-                    <div style={{ fontSize: '10px', color: s.dim }}>eval</div>
-                  </div>
-                )}
-                {player.combinedScore != null && (
-                  <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--accent)' }}>{player.combinedScore.toFixed(2)}</div>
-                    <div style={{ fontSize: '10px', color: s.dim }}>combined</div>
-                  </div>
-                )}
-              </div>
+              {/* Combined score — the one headline number; see Rankings for the full breakdown */}
+              <Link href={`/org/${params.orgId}/tryouts/rankings?player=${player.id}`} style={{ textAlign: 'center', minWidth: '48px', flexShrink: 0, textDecoration: 'none' }}>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: player.combinedScore != null ? 'var(--accent)' : s.dim }}>
+                  {player.combinedScore != null ? player.combinedScore.toFixed(2) : '—'}
+                </div>
+                <div style={{ fontSize: '10px', color: s.dim }}>combined</div>
+              </Link>
 
               <button
                 onClick={() => removeFromTeam(player.id)}

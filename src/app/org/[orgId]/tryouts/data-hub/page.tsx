@@ -52,7 +52,7 @@ interface GcRow  {
   gc_pitching_score: number|null
 }
 interface EvalField { field_key: string; label: string; section: string; sort_order: number; weight: number }
-interface EvalRow   { player_id: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
+interface EvalRow   { player_id: string; season_year: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
 interface ScoreRow  { player_id: string; tryout_score: number|null; evaluator_name: string|null; session_id: string }
 interface TeamRow   { id: string; name: string; age_group: string; color: string | null }
 
@@ -233,7 +233,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         ? supabase.from('tryout_gc_stats').select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,k,bb_allowed,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score,bf,baa,bb_per_inn,gc_hitting_score,gc_pitching_score').eq('org_id', params.orgId).eq('season_year', String(syear - 1))
         : Promise.resolve({ data: [] as any[] }),
       syear
-        ? supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('season_year', String(syear - 1)).eq('status', 'submitted')
+        ? supabase.from('tryout_coach_evals').select('player_id,season_year,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).in('season_year', [String(syear), String(syear - 1)]).eq('status', 'submitted')
         : Promise.resolve({ data: [] as any[] }),
       supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order'),
       sessionIds.length > 0
@@ -427,7 +427,16 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   // ── Per-player scoring (shared with Rankings — see lib/tryouts/scoring/combinedScore.ts) ──
 
   const gcMap = useMemo(() => new Map(gcRows.map(r => [r.player_id, r])), [gcRows])
-  const evalMap = useMemo(() => new Map(evalRows.map(r => [r.player_id, r])), [evalRows])
+  // Latest submitted eval per player (by season_year) — matches Rankings,
+  // rather than an arbitrary row when a player has evals from multiple years.
+  const evalMap = useMemo(() => {
+    const map = new Map<string, EvalRow>()
+    for (const r of evalRows) {
+      const existing = map.get(r.player_id)
+      if (!existing || Number(r.season_year) > Number(existing.season_year)) map.set(r.player_id, r)
+    }
+    return map
+  }, [evalRows])
   const scoreAvgMap = useMemo(() => {
     const byPlayer = new Map<string, number[]>()
     for (const r of scoreRows) {

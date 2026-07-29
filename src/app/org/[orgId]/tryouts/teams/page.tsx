@@ -10,6 +10,7 @@ interface Team {
   age_group: string
   color:     string | null
   _playerCount?: number
+  _acceptedCount?: number
 }
 
 interface PlayerContact {
@@ -67,14 +68,16 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
       supabase.from('tryout_teams').select('id, name, age_group, color')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('age_group').order('name'),
-      supabase.from('tryout_team_assignments').select('player_id, team_id')
+      supabase.from('tryout_team_assignments').select('player_id, team_id, is_accepted')
         .eq('season_id', seasonData.id),
     ])
 
     const counts: Record<string, number> = {}
+    const acceptedCounts: Record<string, number> = {}
     const byTeam: Record<string, string[]> = {}
     for (const a of (assignData ?? [])) {
       counts[a.team_id] = (counts[a.team_id] ?? 0) + 1
+      if (a.is_accepted) acceptedCounts[a.team_id] = (acceptedCounts[a.team_id] ?? 0) + 1
       if (!byTeam[a.team_id]) byTeam[a.team_id] = []
       byTeam[a.team_id].push(a.player_id)
     }
@@ -124,7 +127,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
         .sort((a: any, b: any) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name))
     }
     setPlayersByTeam(pbt)
-    setTeams((teamData ?? []).map((t: any) => ({ ...t, _playerCount: counts[t.id] ?? 0 })))
+    setTeams((teamData ?? []).map((t: any) => ({ ...t, _playerCount: counts[t.id] ?? 0, _acceptedCount: acceptedCounts[t.id] ?? 0 })))
     setLoading(false)
   }
 
@@ -254,7 +257,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
           <button key={ag} onClick={() => setAgeFilter(ag)} style={{
             padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
             borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
-            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+            background: ageFilter === ag ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
             color: ageFilter === ag ? 'var(--accent)' : s.muted,
             fontSize: '12px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
           }}>{ag === 'all' ? 'All' : ag}</button>

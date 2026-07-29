@@ -104,6 +104,17 @@ interface Team {
   eval_multiplier: number
 }
 
+// Lightweight action-item shape for the Rankings/PlayerCard "Follow-up"
+// integration — deliberately not the full ActionItem record the dedicated
+// Action Items page manages (title/status/owner/due date is all this needs).
+export interface PlayerActionItem {
+  id:         string
+  title:      string
+  status:     string
+  owner_name: string | null
+  due_date:   string | null
+}
+
 interface RankedPlayer {
   player:          Player
   ageGroup:        string
@@ -175,6 +186,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
   const [acceptedMap,   setAcceptedMap]   = useState<Record<string, boolean>>({})
   const [actionCounts,       setActionCounts]       = useState<Record<string, number>>({}) // team_id -> open action items
   const [playerActionCounts, setPlayerActionCounts] = useState<Record<string, number>>({}) // player_id -> open action items
+  const [playerActionsMap,   setPlayerActionsMap]   = useState<Record<string, PlayerActionItem[]>>({}) // player_id -> open action items (full)
   const [loading,       setLoading]       = useState(true)
 
   // Filters / sort
@@ -306,16 +318,16 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         .eq('season_id', seasonData.id),
 
       supabase.from('tryout_action_items')
-        .select('team_id, player_id, status')
+        .select('id, team_id, player_id, title, status, owner_name, due_date, updated_at')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
-        .in('status', ['open', 'waiting', 'in_progress', 'blocked']),
+        .in('status', ['open', 'waiting', 'in_progress', 'blocked'])
+        .order('updated_at', { ascending: false }),
     ])
 
     setPlayers(playerData ?? [])
     setTryoutRows(tryoutData ?? [])
     setEvalRows(evalData ?? [])
     setEvalConfig(evalCfgData ?? [])
-    console.warn('[six43 debug] evalConfig rows:', evalCfgData?.length, evalCfgData?.filter((c: any) => c.section === 'intangibles'))
     setScoringConfig((scoringCfgData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
       is_optional: c.is_optional, is_tiebreaker: c.is_tiebreaker ?? false,
@@ -344,12 +356,21 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
     const teamCounts:   Record<string, number> = {}
     const playerCounts: Record<string, number> = {}
+    const playerActions: Record<string, PlayerActionItem[]> = {}
     for (const a of (actionItemData ?? [])) {
       if (a.team_id)   teamCounts[a.team_id]     = (teamCounts[a.team_id]     ?? 0) + 1
-      if (a.player_id) playerCounts[a.player_id] = (playerCounts[a.player_id] ?? 0) + 1
+      if (a.player_id) {
+        playerCounts[a.player_id] = (playerCounts[a.player_id] ?? 0) + 1
+        if (!playerActions[a.player_id]) playerActions[a.player_id] = []
+        playerActions[a.player_id].push({
+          id: a.id, title: a.title, status: a.status,
+          owner_name: a.owner_name, due_date: a.due_date,
+        })
+      }
     }
     setActionCounts(teamCounts)
     setPlayerActionCounts(playerCounts)
+    setPlayerActionsMap(playerActions)
 
     setLoading(false)
   }
@@ -438,6 +459,40 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       console.error('toggleAccepted failed:', error.message)
       setAcceptedMap(prev => ({ ...prev, [playerId]: !next }))
     }
+  }
+
+  // ── Action items (lightweight — full management stays on the Action Items page) ──
+
+  const CLOSED_ACTION_STATUSES = ['completed', 'cancelled']
+
+  async function quickSetActionItemStatus(playerId: string, itemId: string, status: string) {
+    const isClosing = CLOSED_ACTION_STATUSES.includes(status)
+    setPlayerActionsMap(prev => {
+      const next = { ...prev }
+      const list = (next[playerId] ?? []).filter(a => a.id !== itemId || !isClosing).map(a => a.id === itemId ? { ...a, status } : a)
+      next[playerId] = isClosing ? list.filter(a => a.id !== itemId) : list
+      return next
+    })
+    setPlayerActionCounts(prev => isClosing ? { ...prev, [playerId]: Math.max(0, (prev[playerId] ?? 1) - 1) } : prev)
+    const { error } = await supabase.from('tryout_action_items')
+      .update({ status, completed_at: isClosing ? new Date().toISOString() : null })
+      .eq('id', itemId)
+    if (error) { console.error('quickSetActionItemStatus failed:', error.message); await loadData() }
+  }
+
+  async function quickCreateActionItem(row: RankedPlayer) {
+    if (!season) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const payload = {
+      org_id: params.orgId, season_id: season.id,
+      age_group: row.ageGroup, team_id: row.assignedTeamId, player_id: row.player.id,
+      title: `Follow up on ${row.player.first_name} ${row.player.last_name}`,
+      status: 'open', created_by: user?.id ?? null,
+    }
+    const { data, error } = await supabase.from('tryout_action_items').insert(payload).select('id, title, status, owner_name, due_date').single()
+    if (error) { console.error('quickCreateActionItem failed:', error.message); return }
+    setPlayerActionsMap(prev => ({ ...prev, [row.player.id]: [data as PlayerActionItem, ...(prev[row.player.id] ?? [])] }))
+    setPlayerActionCounts(prev => ({ ...prev, [row.player.id]: (prev[row.player.id] ?? 0) + 1 }))
   }
 
   // ── Compare toggle ───────────────────────────────────────────────────────────
@@ -882,6 +937,24 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     !draftBlueFillIds.has(r.player.id) && !draftWhiteFillIds.has(r.player.id)
   ) : []
 
+  // One compact "Follow-up" indicator instead of separate signals for open
+  // action items / blocked items / notes — consolidates what used to be a
+  // single action-item-only badge.
+  function followUpInfo(playerId: string): { fg: string; bg: string; title: string; count: number } | null {
+    const actions    = playerActionsMap[playerId] ?? []
+    const openCount  = playerActionCounts[playerId] ?? 0
+    const hasBlocked = actions.some(a => a.status === 'blocked')
+    const hasNotes   = !!notesMap[playerId]
+    if (openCount === 0 && !hasNotes) return null
+    const fg = hasBlocked ? 'var(--status-bad)' : openCount > 0 ? 'var(--status-warn)' : 'var(--status-info)'
+    const bg = hasBlocked ? 'var(--status-bad-bg)' : openCount > 0 ? 'var(--status-warn-bg)' : 'var(--status-info-bg)'
+    const title = [
+      openCount > 0 && `${openCount} open action item${openCount > 1 ? 's' : ''}${hasBlocked ? ' (blocked)' : ''}`,
+      hasNotes && 'has notes',
+    ].filter(Boolean).join(' · ')
+    return { fg, bg, title, count: openCount }
+  }
+
   const renderRow = (row: RankedPlayer, zone: DraftZone | null, altRow: boolean) => {
     const team      = teams.find(t => t.id === row.assignedTeamId)
     const tOpts     = teamOptions(row.ageGroup)
@@ -929,21 +1002,24 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={row.isAccepted}
                   onChange={() => toggleAccepted(row.player.id)}
-                  style={{ cursor: 'pointer', accentColor: '#6DB875' }} />
-                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? '#6DB875' : s.dim, whiteSpace: 'nowrap' }}>
+                  style={{ cursor: 'pointer', accentColor: 'var(--status-good)' }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? 'var(--status-good)' : s.dim, whiteSpace: 'nowrap' }}>
                   {row.isAccepted ? 'Accepted' : 'Accept'}
                 </span>
               </label>
             )}
-            {(playerActionCounts[row.player.id] ?? 0) > 0 && (
-              <Link href={`/org/${params.orgId}/tryouts/action-items?player=${row.player.id}&status=open`}
-                title={`${playerActionCounts[row.player.id]} open action item(s)`}
-                onClick={e => e.stopPropagation()}
-                style={{
-                  fontSize: '10px', fontWeight: 700, color: '#E87060', flexShrink: 0,
-                  padding: '1px 6px', borderRadius: '10px', background: 'rgba(232,112,96,0.12)', textDecoration: 'none',
-                }}>⚑ {playerActionCounts[row.player.id]}</Link>
-            )}
+            {followUpInfo(row.player.id) && (() => {
+              const fu = followUpInfo(row.player.id)!
+              return (
+                <Link href={`/org/${params.orgId}/tryouts/action-items?player=${row.player.id}&status=open`}
+                  title={fu.title}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    fontSize: '10px', fontWeight: 700, color: fu.fg, flexShrink: 0,
+                    padding: '1px 6px', borderRadius: '10px', background: fu.bg, textDecoration: 'none',
+                  }}>⚑{fu.count > 0 ? ` ${fu.count}` : ''}</Link>
+              )
+            })()}
           </div>
         </td>
         <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
@@ -1478,6 +1554,10 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             teams={teams}
             totalInAge={totalInAge}
             weights={seasonWeights}
+            orgId={params.orgId}
+            actionItems={playerActionsMap[panelPlayerId] ?? []}
+            onQuickActionStatus={(itemId, status) => quickSetActionItemStatus(panelPlayerId, itemId, status)}
+            onQuickCreateAction={() => quickCreateActionItem(rp)}
             onClose={() => setPanelPlayerId(null)}
           />
         )

@@ -1,8 +1,20 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { GC_STAT_DEFS } from '../../../../../lib/tryouts/gcStatDefs'
 import { DEFAULT_SEASON_WEIGHTS, type SeasonWeights } from '../../../../../lib/tryouts/scoring/combinedScore'
+import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
+import type { PlayerActionItem } from './page'
+
+const ACTION_STATUS_TONE: Record<string, StatusTone> = {
+  open: 'warn', waiting: 'info', in_progress: 'good', blocked: 'bad',
+  completed: 'neutral', cancelled: 'neutral',
+}
+const ACTION_STATUS_LABEL: Record<string, string> = {
+  open: 'Open', waiting: 'Waiting', in_progress: 'In Progress', blocked: 'Blocked',
+  completed: 'Completed', cancelled: 'Cancelled',
+}
 
 interface RankedPlayer {
   player:          { id: string; first_name: string; last_name: string; age_group: string; tryout_age_group: string | null; prior_team: string | null }
@@ -88,6 +100,13 @@ interface Props {
   onClose:         () => void
   weights?:        SeasonWeights
   registration?:   PlayerRegistrationDetail | null
+  // Action-item integration — only wired up from Rankings (see phase summary
+  // for why Data Hub's instance omits these: Data Hub is data quality/analysis,
+  // not team-selection decisions).
+  orgId?:              string
+  actionItems?:        PlayerActionItem[]
+  onQuickActionStatus?: (itemId: string, status: string) => void
+  onQuickCreateAction?: () => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -198,7 +217,11 @@ function StatChip({ label, value, color }: { label: string; value: string | null
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, totalInAge, onClose, weights = DEFAULT_SEASON_WEIGHTS, registration }: Props) {
+export default function PlayerCard({
+  player: rp, gcRow, ageGroupGcRows, teams, totalInAge, onClose,
+  weights = DEFAULT_SEASON_WEIGHTS, registration,
+  orgId, actionItems, onQuickActionStatus, onQuickCreateAction,
+}: Props) {
   const team = teams.find(t => t.id === rp.assignedTeamId)
   const teamColor = team?.name?.toLowerCase() === 'blue'  ? '#4090E0'
                   : team?.name?.toLowerCase() === 'white' ? 'rgba(var(--fg-rgb),0.5)'
@@ -343,6 +366,50 @@ export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, t
               {weightCaption}
             </div>
           </Section>
+
+          {/* Follow-up / Action Items — only wired from Rankings, not Data Hub */}
+          {actionItems && orgId && (
+            <Section label="Follow-up" color="var(--status-warn)">
+              {actionItems.length === 0 ? (
+                <div style={{ fontSize: '12px', color: s.dim, marginBottom: '8px' }}>No open action items.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                  {actionItems.map(item => (
+                    <div key={item.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                      padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                    }}>
+                      <StatusPill tone={ACTION_STATUS_TONE[item.status] ?? 'neutral'} size="sm">
+                        {ACTION_STATUS_LABEL[item.status] ?? item.status}
+                      </StatusPill>
+                      <span style={{ fontSize: '12px', flex: 1, minWidth: '120px' }}>{item.title}</span>
+                      {item.owner_name && <span style={{ fontSize: '11px', color: s.muted }}>{item.owner_name}</span>}
+                      {onQuickActionStatus && (
+                        <select
+                          value={item.status}
+                          onChange={e => onQuickActionStatus(item.id, e.target.value)}
+                          style={{ fontSize: '11px', padding: '2px 4px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)' }}
+                        >
+                          {Object.keys(ACTION_STATUS_LABEL).map(st => <option key={st} value={st}>{ACTION_STATUS_LABEL[st]}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {onQuickCreateAction && (
+                  <button onClick={onQuickCreateAction} style={{
+                    fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
+                    border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted,
+                  }}>+ New action item</button>
+                )}
+                <Link href={`/org/${orgId}/tryouts/action-items?player=${rp.player.id}`} style={{ fontSize: '11px', color: 'var(--accent)' }}>
+                  Manage all →
+                </Link>
+              </div>
+            </Section>
+          )}
 
           {/* Registration — only present when this card is opened from Data Hub */}
           {registration && (
