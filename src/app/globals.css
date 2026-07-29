@@ -24,12 +24,27 @@
   --fg: #EDF2F7;
   --fg-rgb: 237, 242, 247;
   --accent: #4B9CD3;
+  --accent-rgb: 75, 156, 211;
   --accent-text: #0B1F3A;
   --border-subtle: rgba(237,242,247,0.08);
   --border: rgba(237,242,247,0.1);
   --border-md: rgba(237,242,247,0.15);
   --border-strong: rgba(237,242,247,0.2);
   --nav-bg: rgba(11,31,58,0.96);
+
+  /* Semantic status colors — meaning only, never a navigation/brand accent.
+     Values match what Data Hub/Rankings already used inline; promoted here
+     so every screen shares one definition instead of re-declaring its own. */
+  --status-good: #6DB875;
+  --status-good-bg: rgba(109,184,117,0.15);
+  --status-warn: #E8A020;
+  --status-warn-bg: rgba(232,160,32,0.15);
+  --status-bad: #e05252;
+  --status-bad-bg: rgba(224,82,82,0.15);
+  --status-info: var(--accent);
+  --status-info-bg: rgba(75,156,211,0.12);
+  --status-neutral: rgba(237,242,247,0.5);
+  --status-neutral-bg: rgba(237,242,247,0.08);
 }
 
 html[data-theme="light"] {
@@ -42,12 +57,26 @@ html[data-theme="light"] {
   --fg: #0B1F3A;
   --fg-rgb: 11, 31, 58;
   --accent: #2B7AB5;
+  --accent-rgb: 43, 122, 181;
   --accent-text: #ffffff;
   --border-subtle: rgba(11,31,58,0.07);
   --border: rgba(11,31,58,0.1);
   --border-md: rgba(11,31,58,0.14);
   --border-strong: rgba(11,31,58,0.2);
   --nav-bg: rgba(235,240,247,0.96);
+
+  /* Semantic status colors — darker/desaturated slightly vs. dark mode for
+     contrast against a light background; same hue identity throughout. */
+  --status-good: #3f8a52;
+  --status-good-bg: rgba(63,138,82,0.12);
+  --status-warn: #a6741f;
+  --status-warn-bg: rgba(166,116,31,0.13);
+  --status-bad: #b23b3b;
+  --status-bad-bg: rgba(178,59,59,0.12);
+  --status-info: var(--accent);
+  --status-info-bg: rgba(43,122,181,0.10);
+  --status-neutral: rgba(11,31,58,0.5);
+  --status-neutral-bg: rgba(11,31,58,0.06);
 }
 
 /* ── Native select/option dark mode fix ── */

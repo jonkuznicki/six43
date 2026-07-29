@@ -462,7 +462,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
   const pill = (active: boolean): React.CSSProperties => ({
     padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
     borderColor: active ? 'var(--accent)' : 'var(--border-md)',
-    background: active ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+    background: active ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
     color: active ? 'var(--accent)' : s.muted,
     fontSize: '11px', fontWeight: active ? 700 : 400, cursor: 'pointer',
   })

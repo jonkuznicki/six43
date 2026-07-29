@@ -183,7 +183,7 @@ export default function MembersPage({ params }: { params: { orgId: string } }) {
                 <button key={opt.value} onClick={() => setRole(opt.value)} style={{
                   padding: '8px 14px', borderRadius: '8px', border: '0.5px solid',
                   borderColor: role === opt.value ? 'var(--accent)' : 'var(--border-md)',
-                  background: role === opt.value ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+                  background: role === opt.value ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
                   color: role === opt.value ? 'var(--accent)' : s.muted,
                   fontSize: '13px', fontWeight: role === opt.value ? 700 : 400,
                   cursor: 'pointer', textAlign: 'left',
@@ -249,7 +249,7 @@ export default function MembersPage({ params }: { params: { orgId: string } }) {
                           {ROLE_LABELS[m.role] ?? m.role}
                         </span>
                         {m.role === 'head_coach' && !m.team_id && (
-                          <span style={{ fontSize: '11px', padding: '1px 7px', borderRadius: '4px', background: 'rgba(232,160,32,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '11px', padding: '1px 7px', borderRadius: '4px', background: 'var(--status-warn-bg)', color: 'var(--status-warn)', fontWeight: 600 }}>
                             No team
                           </span>
                         )}
@@ -325,7 +325,7 @@ export default function MembersPage({ params }: { params: { orgId: string } }) {
                       {ROLE_LABELS[m.role] ?? m.role}
                     </span>
                     {!m.user_id && (
-                      <span style={{ fontSize: '11px', padding: '1px 7px', borderRadius: '20px', background: 'rgba(232,160,32,0.1)', color: 'var(--accent)', fontWeight: 700 }}>
+                      <span style={{ fontSize: '11px', padding: '1px 7px', borderRadius: '20px', background: 'var(--status-warn-bg)', color: 'var(--status-warn)', fontWeight: 700 }}>
                         Pending
                       </span>
                     )}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -93,19 +94,12 @@ const STATUS_LABEL: Record<AgeStatus, string> = {
   no_dob:     '? No DOB',
   no_group:   '? No Group',
 }
-const STATUS_COLOR: Record<AgeStatus, string> = {
-  correct:    'rgba(109,184,117,0.15)',
-  playing_up: 'rgba(232,160,32,0.13)',
-  overage:    'rgba(224,82,82,0.15)',
-  no_dob:     'rgba(var(--fg-rgb),0.08)',
-  no_group:   'rgba(var(--fg-rgb),0.08)',
-}
-const STATUS_TEXT: Record<AgeStatus, string> = {
-  correct:    '#6DB875',
-  playing_up: '#E8A020',
-  overage:    '#e05252',
-  no_dob:     'rgba(var(--fg-rgb),0.5)',
-  no_group:   'rgba(var(--fg-rgb),0.5)',
+const STATUS_TONE: Record<AgeStatus, StatusTone> = {
+  correct:    'good',
+  playing_up: 'warn',
+  overage:    'bad',
+  no_dob:     'neutral',
+  no_group:   'neutral',
 }
 
 function nextAgeGroup(ag: string | null) {
@@ -1482,12 +1476,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                               : <span style={{ opacity: 0.3, fontStyle: 'italic' }}>not set</span>}
                           </td>
                           <td style={td}>
-                            <span style={{
-                              fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '20px',
-                              background: STATUS_COLOR[status],
-                              color: STATUS_TEXT[status],
-                              whiteSpace: 'nowrap',
-                            }}>{STATUS_LABEL[status]}</span>
+                            <StatusPill tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</StatusPill>
                           </td>
                           <td style={{ ...td, color: s.dim, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.age_group_override_reason ?? <span style={{ opacity: 0.25 }}>—</span>}

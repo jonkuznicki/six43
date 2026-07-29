@@ -307,7 +307,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                   <button key={ag} onClick={() => added ? removeAgeGroup(ag) : addAgeGroup(ag)} style={{
                     padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
                     borderColor: added ? 'var(--accent)' : 'var(--border-md)',
-                    background: added ? 'rgba(232,160,32,0.12)' : 'var(--bg-input)',
+                    background: added ? 'rgba(var(--accent-rgb),0.12)' : 'var(--bg-input)',
                     color: added ? 'var(--accent)' : s.dim,
                     fontSize: '12px', fontWeight: added ? 700 : 400, cursor: 'pointer',
                   }}>{ag}</button>

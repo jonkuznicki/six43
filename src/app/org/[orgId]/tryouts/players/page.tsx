@@ -172,7 +172,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
               <span style={{ fontSize: '13px', color: s.muted }}>{selected.size} selected</span>
               <button onClick={mergeSelected} disabled={selected.size < 2 || merging} style={{
                 padding: '7px 14px', borderRadius: '6px', border: 'none',
-                background: selected.size >= 2 ? 'rgba(232,160,32,0.15)' : 'var(--bg-input)',
+                background: selected.size >= 2 ? 'rgba(var(--accent-rgb),0.15)' : 'var(--bg-input)',
                 color: selected.size >= 2 ? 'var(--accent)' : s.dim,
                 fontSize: '13px', fontWeight: 700, cursor: 'pointer',
               }}>{merging ? 'Merging…' : 'Merge'}</button>
@@ -195,7 +195,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
         <button onClick={() => setAgeFilter('all')} style={{
           padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
           borderColor: ageFilter === 'all' ? 'var(--accent)' : 'var(--border-md)',
-          background: ageFilter === 'all' ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+          background: ageFilter === 'all' ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
           color: ageFilter === 'all' ? 'var(--accent)' : s.muted,
           fontSize: '12px', fontWeight: ageFilter === 'all' ? 700 : 400, cursor: 'pointer',
         }}>All ({players.length})</button>
@@ -203,7 +203,7 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
           <button key={ag} onClick={() => setAgeFilter(ag)} style={{
             padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
             borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
-            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+            background: ageFilter === ag ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
             color: ageFilter === ag ? 'var(--accent)' : s.muted,
             fontSize: '12px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
           }}>{ag} ({ageCounts[ag] ?? 0})</button>
@@ -232,8 +232,8 @@ export default function PlayersPage({ params }: { params: { orgId: string } }) {
             const isSelected = selected.has(player.id)
             return (
               <div key={player.id} style={{
-                background: isSelected ? 'rgba(232,160,32,0.07)' : 'var(--bg-card)',
-                border: `0.5px solid ${isSelected ? 'rgba(232,160,32,0.4)' : 'var(--border)'}`,
+                background: isSelected ? 'rgba(var(--accent-rgb),0.07)' : 'var(--bg-card)',
+                border: `0.5px solid ${isSelected ? 'rgba(var(--accent-rgb),0.4)' : 'var(--border)'}`,
                 borderRadius: '10px', overflow: 'hidden',
               }}>
                 <div

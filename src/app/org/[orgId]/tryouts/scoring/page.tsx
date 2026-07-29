@@ -912,7 +912,7 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
                 <button key={g} onClick={() => setGcAgeGroup(g)} style={{
                   padding: '6px 14px', borderRadius: '20px', border: '0.5px solid',
                   borderColor: gcAgeGroup === g ? 'var(--accent)' : 'var(--border)',
-                  background: gcAgeGroup === g ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+                  background: gcAgeGroup === g ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
                   color: gcAgeGroup === g ? 'var(--accent)' : s.muted,
                   fontSize: '12px', fontWeight: gcAgeGroup === g ? 700 : 400,
                   cursor: 'pointer',

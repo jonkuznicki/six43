@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../lib/supabase'
 import Link from 'next/link'
+import { tryoutNavLabel } from './navConfig'
 
 interface OrgData {
   name:  string
@@ -27,51 +28,54 @@ interface Stats {
 }
 
 // ── Workflow sections ──────────────────────────────────────────────────────────
+// Mirrors the sidebar's four groups (see navConfig.ts) so this page and the
+// sidebar can't drift apart on naming again. Items that also live in the
+// sidebar reuse tryoutNavLabel() for their label; Players and the three
+// filtered import shortcuts don't have a sidebar entry (by design — see
+// audit) so they're labeled directly here.
 
 const SECTIONS = [
   {
     step:  1,
     label: 'Setup',
     desc:  'Configure before anything else — set the season and age groups, invite staff, and define how players will be scored.',
-    color: 'rgba(var(--fg-rgb), 0.06)',
     items: [
-      { href: 'seasons', label: 'Seasons',      icon: '📅', desc: 'Set the active season and age groups' },
-      { href: 'members', label: 'Members',       icon: '🔑', desc: 'Invite coaches and evaluators' },
-      { href: 'scoring', label: 'Scoring Setup', icon: '⚙',  desc: 'Define tryout categories, weights, and the eval rubric' },
+      { href: 'seasons', label: tryoutNavLabel('seasons'), desc: 'Set the active season and age groups' },
+      { href: 'members', label: tryoutNavLabel('members'), desc: 'Invite coaches and evaluators' },
+      { href: 'scoring', label: tryoutNavLabel('scoring'), desc: 'Define tryout categories, weights, and the eval rubric' },
     ],
   },
   {
     step:  2,
     label: 'Player Data',
     desc:  'Import all data sources, verify players are mapped correctly, and confirm everything is complete before tryouts begin.',
-    color: 'rgba(80,160,232,0.05)',
     items: [
-      { href: 'players',                    label: 'Players',              icon: '👤', desc: 'View and manage all players in this org' },
-      { href: 'imports?type=registration', label: 'Import Registrations', icon: '📋', desc: 'Upload your tryout registration spreadsheet' },
-      { href: 'imports?type=rosters',      label: 'Import Rosters',       icon: '📁', desc: 'Upload current season rosters to assign players to teams' },
-      { href: 'imports?type=gc_stats',     label: 'Import Season Stats',  icon: '📊', desc: 'Upload end-of-season GameChanger stats per team' },
-      { href: 'data-hub',  label: 'Data Hub',      icon: '⊞', desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
-      { href: 'readiness', label: 'Readiness Check', icon: '✓', desc: 'Confirm all data sources are complete before tryouts begin' },
+      { href: 'players',                   label: 'Players',              desc: 'View and manage all players in this org' },
+      { href: 'imports?type=registration', label: 'Import Registrations', desc: 'Upload your tryout registration spreadsheet' },
+      { href: 'imports?type=rosters',      label: 'Import Rosters',       desc: 'Upload current season rosters to assign players to teams' },
+      { href: 'imports?type=gc_stats',     label: 'Import Season Stats',  desc: 'Upload end-of-season GameChanger stats per team' },
+      { href: 'registration', label: tryoutNavLabel('registration'), desc: 'Registration counts, returning vs. new, board-update summary' },
+      { href: 'data-hub',     label: tryoutNavLabel('data-hub'),     desc: 'Review all sources, resolve conflicts, and set tryout age groups' },
+      { href: 'readiness',   label: tryoutNavLabel('readiness'),   desc: 'Confirm all data sources are complete before tryouts begin' },
     ],
   },
   {
     step:  3,
     label: 'Tryouts',
     desc:  'Create sessions, check in players as they arrive, collect evaluator scores, and gather season evaluations from coaches.',
-    color: 'rgba(232,160,32,0.05)',
     items: [
-      { href: 'sessions',    label: 'Sessions',                          icon: '🗓', desc: 'Set up sessions, assign evaluators, check in players, and enter scores' },
-      { href: 'coach-evals', label: 'Season Evaluations & Tryout Scores', icon: '📝', desc: 'Send eval forms to coaches and review submitted evaluations' },
+      { href: 'sessions',    label: tryoutNavLabel('sessions'),    desc: 'Set up sessions, assign evaluators, check in players, and enter scores' },
+      { href: 'coach-evals', label: tryoutNavLabel('coach-evals'), desc: 'Send eval forms to coaches and review submitted evaluations' },
     ],
   },
   {
     step:  4,
     label: 'Team Making',
     desc:  'Review combined scores and coach evaluations, then assign players to teams.',
-    color: 'rgba(109,184,117,0.05)',
     items: [
-      { href: 'rankings', label: 'Team Making', icon: '🏆', desc: 'Assign players to teams using scores, evals, and coach comments' },
-      { href: 'teams',    label: 'Teams',       icon: '⚾',  desc: 'View and manage teams and their assigned rosters' },
+      { href: 'rankings',     label: tryoutNavLabel('rankings'),     desc: 'Assign players to teams using scores, evals, and coach comments' },
+      { href: 'teams',        label: tryoutNavLabel('teams'),        desc: 'View and manage teams and their assigned rosters' },
+      { href: 'action-items', label: tryoutNavLabel('action-items'), desc: 'Track follow-ups and decisions from the selection meeting' },
     ],
   },
 ]
@@ -181,7 +185,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                   {stats.players} players
                 </span>
                 {stats.regCount > 0 && (
-                  <span style={{ fontSize: '11px', color: stats.regCount < stats.players ? '#E8A020' : s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
+                  <span style={{ fontSize: '11px', color: stats.regCount < stats.players ? 'var(--status-warn)' : s.dim, padding: '1px 7px', borderRadius: '20px', background: 'rgba(var(--fg-rgb),0.05)', border: '0.5px solid var(--border)' }}>
                     {stats.regCount} registered
                   </span>
                 )}
@@ -205,8 +209,8 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
             )}
           </div>
         ) : (
-          <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
-            ⚠ No active season — set one up →
+          <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ fontSize: '13px', color: 'var(--status-warn)', textDecoration: 'none', fontWeight: 600 }}>
+            No active season — set one up →
           </Link>
         )}
       </div>
@@ -223,11 +227,11 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                 display: 'flex', alignItems: 'flex-start', gap: '14px',
                 marginBottom: '12px',
               }}>
-                {/* Step badge */}
+                {/* Step number */}
                 <div style={{
                   flexShrink: 0,
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  border: '0.5px solid var(--border-md)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '12px', fontWeight: 800, color: s.muted,
                   marginTop: '2px',
@@ -242,9 +246,9 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                       <span key={b.label} style={{
                         fontSize: '11px', fontWeight: 600, padding: '2px 8px',
                         borderRadius: '20px',
-                        background: b.accent ? 'rgba(232,160,32,0.12)' : 'rgba(var(--fg-rgb),0.06)',
+                        background: b.accent ? 'rgba(var(--accent-rgb),0.12)' : 'rgba(var(--fg-rgb),0.06)',
                         color: b.accent ? 'var(--accent)' : s.muted,
-                        border: `0.5px solid ${b.accent ? 'rgba(232,160,32,0.3)' : 'transparent'}`,
+                        border: `0.5px solid ${b.accent ? 'rgba(var(--accent-rgb),0.3)' : 'transparent'}`,
                       }}>
                         {b.label}
                       </span>
@@ -254,27 +258,28 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
                 </div>
               </div>
 
-              {/* Cards */}
+              {/* Links */}
               <div style={{
-                marginLeft: '42px',
+                marginLeft: '40px',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                gap: '8px',
+                gap: '1px',
+                background: 'var(--border)',
+                border: '0.5px solid var(--border)',
+                borderRadius: '8px',
+                overflow: 'hidden',
               }}>
                 {section.items.map(item => (
                   <Link
                     key={item.label}
                     href={`/org/${params.orgId}/tryouts/${item.href}`}
                     style={{
-                      display: 'block', padding: '1rem 1.1rem',
-                      borderRadius: '10px',
-                      background: section.color,
-                      border: '0.5px solid var(--border)',
+                      display: 'block', padding: '0.85rem 1.1rem',
+                      background: 'var(--bg-card)',
                       textDecoration: 'none', color: 'var(--fg)',
                     }}
                   >
-                    <div style={{ fontSize: '20px', marginBottom: '6px' }}>{item.icon}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '3px' }}>{item.label}</div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 700, marginBottom: '3px' }}>{item.label}</div>
                     <div style={{ fontSize: '11px', color: s.muted, lineHeight: 1.5 }}>{item.desc}</div>
                   </Link>
                 ))}
@@ -282,7 +287,7 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
 
               {/* Divider with next-step hint */}
               {section.step < SECTIONS.length && (
-                <div style={{ marginTop: '2rem', marginLeft: '42px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ marginTop: '2rem', marginLeft: '40px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
                   <div style={{ fontSize: '10px', fontWeight: 600, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
                     then Step {section.step + 1}
@@ -293,13 +298,6 @@ export default function TryoutsOverviewPage({ params }: { params: { orgId: strin
             </div>
           )
         })}
-      </div>
-
-      {/* Dev tools link — unobtrusive footer */}
-      <div style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '0.5px solid var(--border)', textAlign: 'right' }}>
-        <Link href={`/org/${params.orgId}/tryouts/dev`} style={{ fontSize: '11px', color: s.dim, textDecoration: 'none' }}>
-          Test data →
-        </Link>
       </div>
 
     </main>

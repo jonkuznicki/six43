@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { PageHeader } from '../PageHeader'
+import { StatusPill } from '../../../../../components/ui/StatusPill'
 
 interface Season { id: string; label: string; age_groups: string[]; year: number }
 interface RegRow {
@@ -32,15 +34,15 @@ interface Player {
 }
 
 const s = {
-  muted:  'rgba(var(--fg-rgb),0.50)',
-  dim:    'rgba(var(--fg-rgb),0.32)',
+  muted:  'rgba(var(--fg-rgb),0.55)',
+  dim:    'rgba(var(--fg-rgb),0.35)',
 } as const
 
 function pct(n: number, total: number) {
   return total > 0 ? Math.round((n / total) * 100) : 0
 }
 
-function MiniBar({ value, total, color }: { value: number; total: number; color: string }) {
+function MiniBar({ value, total, color = 'var(--accent)' }: { value: number; total: number; color?: string }) {
   const p = pct(value, total)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -52,14 +54,15 @@ function MiniBar({ value, total, color }: { value: number; total: number; color:
   )
 }
 
+// Flat, hairline-bordered panel — matches the Data Hub / Rankings surface
+// treatment instead of a white, shadowed card.
 function Card({ children, style, className }: { children: React.ReactNode; style?: React.CSSProperties; className?: string }) {
   return (
     <div className={className} style={{
-      background: 'white',
-      border: '1px solid #e8eaed',
-      borderRadius: 12,
+      background: 'var(--bg-card)',
+      border: '0.5px solid var(--border)',
+      borderRadius: 8,
       overflow: 'hidden',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
       ...style,
     }}>
       {children}
@@ -71,10 +74,10 @@ function SectionHead({ title, count }: { title: string; count?: number }) {
   return (
     <div style={{
       padding: '13px 18px',
-      borderBottom: '1px solid #f0f1f3',
+      borderBottom: '0.5px solid var(--border)',
       display: 'flex', alignItems: 'center', gap: 10,
     }}>
-      <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>{title}</span>
+      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>{title}</span>
       {count !== undefined && (
         <span style={{ fontSize: 12, color: s.muted, background: 'rgba(var(--fg-rgb),0.06)', borderRadius: 10, padding: '1px 8px' }}>
           {count}
@@ -93,7 +96,7 @@ function SortTh({
   return (
     <th
       onClick={() => onSort(col)}
-      style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: active ? '#1a1a1a' : s.dim, textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+      style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: active ? 'var(--fg)' : s.dim, textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
     >
       {label}{active ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
     </th>
@@ -146,7 +149,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     setNewSort(prev => prev.col === col ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
   }
 
-  // ── Computed data ──────────────────────────────────────────────────────────
+  // ── Computed data (unchanged from prior implementation) ─────────────────────
 
   const ageGroups = useMemo(() => {
     const groups = new Set<string>()
@@ -304,13 +307,12 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     })
   }, [newPlayers, newSort])
 
-  // ── Board update email text ────────────────────────────────────────────────
+  // ── Board update email text (unchanged) ─────────────────────────────────────
 
   const emailSummary = useMemo(() => {
     if (!season || regs.length === 0) return ''
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
-    // Always use all regs (not filtered) so the board update is complete
     const allReturning = regs.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return false
       const p = players.find(pl => pl.id === r.player_id)
@@ -364,8 +366,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       lines.push('All prior HBA players have registered — great turnout!')
     }
 
-    // Returning players by team — use all prior HBA players (not eligibleHbaPlayers) so
-    // the denominator stays stable even as age_group gets updated for 14U-aging players
     const teamTotals = new Map<string, number>()
     activePlayers
       .filter(p => p.prior_team != null && !p.is_walkup)
@@ -450,40 +450,44 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     </div>
   )
 
-  return (
-    <div className="page-wide" style={{ padding: '2rem 1.5rem 6rem', background: '#f5f6f8', minHeight: '100vh' }}>
+  function filterChip(active: boolean) {
+    return {
+      padding: '4px 11px', borderRadius: 20, fontSize: 12, fontWeight: active ? 700 : 400,
+      border: `0.5px solid ${active ? 'var(--accent)' : 'var(--border-md)'}`,
+      background: active ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
+      color: active ? 'var(--accent)' : s.muted,
+      cursor: 'pointer',
+    } as React.CSSProperties
+  }
 
-      {/* ── Header ── */}
-      <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#111' }}>Registration Dashboard</h1>
-          <div style={{ fontSize: 13, color: s.muted, marginTop: 4 }}>{season.label}</div>
-        </div>
-        <button
-          className="no-print"
-          onClick={() => window.print()}
-          style={{
-            padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-            border: '1px solid #dde0e5', background: 'white', color: '#555',
-            cursor: 'pointer', marginTop: 4,
-          }}
-        >
-          Export PDF
-        </button>
-      </div>
+  return (
+    <main className="page-wide" style={{ padding: '2rem 1.5rem 6rem', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', minHeight: '100vh' }}>
+
+      <PageHeader
+        title="Registration Dashboard"
+        subtitle={season.label}
+        backHref={`/org/${params.orgId}/tryouts`}
+        action={
+          <button
+            className="no-print"
+            onClick={() => window.print()}
+            style={{
+              padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+              border: '0.5px solid var(--border-md)', background: 'var(--bg-card)', color: s.muted,
+              cursor: 'pointer',
+            }}
+          >
+            Export PDF
+          </button>
+        }
+      />
 
       {/* ── Filters ── */}
       <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: s.dim, marginRight: 2 }}>Age:</span>
           {['all', ...ageGroups].map(ag => (
-            <button key={ag} onClick={() => setAgeFilter(ag)} style={{
-              padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-              border: '1px solid #dde0e5',
-              background: ageFilter === ag ? 'rgba(232,160,32,0.12)' : 'white',
-              color: ageFilter === ag ? '#b87a00' : '#666',
-              cursor: 'pointer',
-            }}>
+            <button key={ag} onClick={() => setAgeFilter(ag)} style={filterChip(ageFilter === ag)}>
               {ag === 'all' ? 'All' : ag}
             </button>
           ))}
@@ -493,13 +497,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: s.dim, marginRight: 2 }}>Date:</span>
             {['all', ...tryoutDates].map(d => (
-              <button key={d} onClick={() => setDateFilter(d)} style={{
-                padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                border: '1px solid #dde0e5',
-                background: dateFilter === d ? 'rgba(128,176,232,0.12)' : 'white',
-                color: dateFilter === d ? '#4a7fb5' : '#666',
-                cursor: 'pointer',
-              }}>
+              <button key={d} onClick={() => setDateFilter(d)} style={filterChip(dateFilter === d)}>
                 {d === 'all' ? 'All dates' : new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </button>
             ))}
@@ -508,30 +506,30 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </div>
 
       {/* ── Summary cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: '1.5rem' }}>
         {[
-          { label: 'Total Registered',           value: total,                sub: 'this season',               color: '#111' },
-          { label: 'Returning HBA',               value: returning.length,    sub: `of ${total} registered`,    color: '#3a9e4a' },
-          { label: 'New Players',                 value: newPlayers.length,   sub: `${pct(newPlayers.length, total)}% of registrations`, color: '#4a7fb5' },
-          { label: 'Not Yet Registered',          value: missingPlayers.length, sub: 'prior HBA players',       color: missingPlayers.length > 0 ? '#c47a00' : '#999' },
-          { label: 'Data Issues',                 value: issues.length,       sub: 'missing required fields',   color: issues.length > 0 ? '#c93a3a' : '#999' },
-          { label: 'Duplicates',                  value: duplicates.length,   sub: 'registered more than once', color: duplicates.length > 0 ? '#c93a3a' : '#999' },
+          { label: 'Total Registered',   value: total,                 sub: 'this season',                color: 'var(--fg)' },
+          { label: 'Returning HBA',      value: returning.length,      sub: `of ${total} registered`,      color: 'var(--status-good)' },
+          { label: 'New Players',        value: newPlayers.length,     sub: `${pct(newPlayers.length, total)}% of registrations`, color: 'var(--accent)' },
+          { label: 'Not Yet Registered', value: missingPlayers.length, sub: 'prior HBA players',           color: missingPlayers.length > 0 ? 'var(--status-warn)' : s.dim },
+          { label: 'Data Issues',        value: issues.length,        sub: 'missing required fields',      color: issues.length > 0 ? 'var(--status-bad)' : s.dim },
+          { label: 'Duplicates',         value: duplicates.length,    sub: 'registered more than once',    color: duplicates.length > 0 ? 'var(--status-bad)' : s.dim },
         ].map(card => (
           <Card key={card.label}>
-            <div style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            <div style={{ padding: '13px 15px' }}>
+              <div style={{ fontSize: 11, color: s.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                 {card.label}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: card.color, lineHeight: 1 }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: card.color, lineHeight: 1 }}>
                 {card.value}
               </div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 5 }}>{card.sub}</div>
+              <div style={{ fontSize: 11, color: s.dim, marginTop: 5 }}>{card.sub}</div>
             </div>
           </Card>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
 
         {/* ── Section 1: by age group ── */}
         <Card>
@@ -545,10 +543,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{ag}</span>
                   <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
                 </div>
-                <MiniBar value={count} total={total} color="var(--accent)" />
+                <MiniBar value={count} total={total} />
               </div>
             ))}
-            <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
+            <div style={{ fontSize: 11, color: s.dim, marginTop: 8 }}>% of total registrations</div>
           </div>
         </Card>
 
@@ -567,27 +565,27 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
                     <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
                   </div>
-                  <MiniBar value={count} total={total} color="#80B0E8" />
+                  <MiniBar value={count} total={total} />
                 </div>
               )
             })}
-            <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of total registrations</div>
+            <div style={{ fontSize: 11, color: s.dim, marginTop: 8 }}>% of total registrations</div>
           </div>
         </Card>
       </div>
 
       {/* ── Section 3: returning HBA players by prior team ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <SectionHead title="Returning HBA Players" count={returning.length} />
         <div style={{ padding: '12px 18px' }}>
           <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#3a9e4a' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {total} registered</span></div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>share of this season's registrations</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-good)' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {total} registered</span></div>
+              <div style={{ fontSize: 11, color: s.dim, marginTop: 2 }}>share of this season's registrations</div>
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#3a9e4a' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {eligibleHbaPlayers.length} prior HBA</span></div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>prior HBA players who have registered</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-good)' }}>{returning.length} <span style={{ fontSize: 13, fontWeight: 400, color: s.muted }}>of {eligibleHbaPlayers.length} prior HBA</span></div>
+              <div style={{ fontSize: 11, color: s.dim, marginTop: 2 }}>prior HBA players who have registered</div>
             </div>
           </div>
           {returningByTeam.length === 0 ? (
@@ -597,14 +595,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
               {returningByTeam.map(({ team, rows }) => (
                 <div key={team} style={{
                   padding: '10px 14px', borderRadius: 8,
-                  background: '#f4fbf5',
-                  border: '1px solid #d0ecd4',
+                  background: 'var(--bg-card-alt)',
+                  border: '0.5px solid var(--border)',
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, color: '#1a1a1a' }}>{team}</div>
-                  <div style={{ fontSize: 11, color: '#777' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--fg)' }}>{team}</div>
+                  <div style={{ fontSize: 11, color: s.muted }}>
                     {rows.map(r => `${r.player_first_name ?? ''} ${r.player_last_name ?? ''}`.trim()).join(', ')}
                   </div>
-                  <div style={{ fontSize: 11, color: '#3a9e4a', marginTop: 4, fontWeight: 600 }}>
+                  <div style={{ fontSize: 11, color: 'var(--status-good)', marginTop: 4, fontWeight: 600 }}>
                     {rows.length} registered
                   </div>
                 </div>
@@ -615,21 +613,19 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </Card>
 
       {/* ── Section 4: prior HBA players not yet registered ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <div style={{
           padding: '13px 18px',
-          borderBottom: showMissing && missingPlayers.length > 0 ? '1px solid #f0f1f3' : undefined,
+          borderBottom: showMissing && missingPlayers.length > 0 ? '0.5px solid var(--border)' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Returning Players Not Yet Registered</span>
-            <span style={{ fontSize: 12, color: missingPlayers.length > 0 ? '#c47a00' : '#aaa', background: missingPlayers.length > 0 ? 'rgba(232,160,32,0.1)' : '#f4f4f4', borderRadius: 10, padding: '1px 8px' }}>
-              {missingPlayers.length}
-            </span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>Returning Players Not Yet Registered</span>
+            <StatusPill tone={missingPlayers.length > 0 ? 'warn' : 'neutral'}>{missingPlayers.length}</StatusPill>
           </div>
           {missingPlayers.length > 0 && (
             <button className="no-print" onClick={() => setShowMissing(x => !x)} style={{
-              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showMissing ? 'Hide' : 'Show'}
             </button>
@@ -637,14 +633,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
         </div>
         <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
           {missingPlayers.length === 0
-            ? <span style={{ color: '#3a9e4a' }}>All returning HBA players have registered.</span>
+            ? <span style={{ color: 'var(--status-good)' }}>All returning HBA players have registered.</span>
             : `${missingPlayers.length} of ${eligibleHbaPlayers.length} prior HBA players haven't registered yet.`}
         </div>
         {showMissing && missingPlayers.length > 0 && (
-          <div style={{ overflowX: 'auto', borderTop: '1px solid #f0f1f3' }}>
+          <div style={{ overflowX: 'auto', borderTop: '0.5px solid var(--border)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
+                <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
                   {['Name', 'Prior Team', 'Age Group'].map(h => (
                     <th key={h} style={{ padding: '8px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: s.dim, textTransform: 'uppercase' }}>{h}</th>
                   ))}
@@ -652,7 +648,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
               </thead>
               <tbody>
                 {missingPlayers.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #f7f8f9' }}>
+                  <tr key={p.id} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{p.first_name} {p.last_name}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{p.prior_team}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{p.age_group}</td>
@@ -665,37 +661,35 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </Card>
 
       {/* ── Section 5: new / non-HBA players ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <div style={{
           padding: '13px 18px',
-          borderBottom: showNewPlayers && newPlayers.length > 0 ? '1px solid #f0f1f3' : undefined,
+          borderBottom: showNewPlayers && newPlayers.length > 0 ? '0.5px solid var(--border)' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>New / Non-HBA Players</span>
-            <span style={{ fontSize: 12, color: '#4a7fb5', background: 'rgba(128,176,232,0.1)', borderRadius: 10, padding: '1px 8px' }}>
-              {newPlayers.length}
-            </span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>New / Non-HBA Players</span>
+            <StatusPill tone="info">{newPlayers.length}</StatusPill>
           </div>
           {newPlayers.length > 0 && (
             <button className="no-print" onClick={() => setShowNewPlayers(x => !x)} style={{
-              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showNewPlayers ? 'Hide' : 'Show'}
             </button>
           )}
         </div>
         <div style={{ padding: '10px 18px', fontSize: 13, color: s.dim }}>
-          <MiniBar value={newPlayers.length} total={total} color="#80B0E8" />
+          <MiniBar value={newPlayers.length} total={total} />
           <div style={{ marginTop: 4 }}>
             {newPlayers.length} player{newPlayers.length === 1 ? '' : 's'} with no prior HBA record ({pct(newPlayers.length, total)}% of registrations)
           </div>
         </div>
         {showNewPlayers && newPlayers.length > 0 && (
-          <div style={{ overflowX: 'auto', borderTop: '1px solid #f0f1f3' }}>
+          <div style={{ overflowX: 'auto', borderTop: '0.5px solid var(--border)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
+                <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
                   <SortTh label="Name"       col="name"   active={newSort.col === 'name'}   dir={newSort.dir} onSort={toggleNewSort} />
                   <SortTh label="Age Group"  col="age"    active={newSort.col === 'age'}    dir={newSort.dir} onSort={toggleNewSort} />
                   <SortTh label="Prior Org"  col="org"    active={newSort.col === 'org'}    dir={newSort.dir} onSort={toggleNewSort} />
@@ -705,7 +699,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
               </thead>
               <tbody>
                 {sortedNewPlayers.map((r, i) => (
-                  <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '1px solid #f7f8f9' }}>
+                  <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{r.player_first_name} {r.player_last_name}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{r.age_group ?? '—'}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{isOther(r.prior_team) ? (r.prior_org?.trim() || '—') : (r.prior_org?.trim() || r.prior_team?.trim() || '—')}</td>
@@ -724,7 +718,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </Card>
 
       {/* ── Section 6: by prior org ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <SectionHead title="Player Source / Prior Org" count={newPlayers.length} />
         <div style={{ padding: '12px 18px' }}>
           {byOrg.length === 0 ? (
@@ -735,30 +729,30 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{org}</span>
                 <span style={{ fontSize: 13, color: s.muted }}>{count}</span>
               </div>
-              <MiniBar value={count} total={newPlayers.length} color="rgba(232,160,32,0.7)" />
+              <MiniBar value={count} total={newPlayers.length} />
             </div>
           ))}
-          <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>% of new / non-HBA players</div>
+          <div style={{ fontSize: 11, color: s.dim, marginTop: 8 }}>% of new / non-HBA players</div>
         </div>
       </Card>
 
       {/* ── Board Update ── */}
-      <Card className="no-print" style={{ marginBottom: 16 }}>
+      <Card className="no-print" style={{ marginBottom: 14 }}>
         <div style={{
-          padding: '13px 18px', borderBottom: '1px solid #f0f1f3',
+          padding: '13px 18px', borderBottom: '0.5px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Board Update</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>Board Update</span>
             <span style={{ fontSize: 12, color: s.dim, marginLeft: 10 }}>ready to copy into an email</span>
           </div>
           <button
             onClick={copyToClipboard}
             style={{
               padding: '5px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-              border: `1px solid ${copied ? '#b2dfbb' : '#dde0e5'}`,
-              background: copied ? '#f0fff4' : 'white',
-              color: copied ? '#3a9e4a' : '#555',
+              border: `0.5px solid ${copied ? 'var(--status-good)' : 'var(--border-md)'}`,
+              background: copied ? 'var(--status-good-bg)' : 'var(--bg-card)',
+              color: copied ? 'var(--status-good)' : s.muted,
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
@@ -770,10 +764,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
             readOnly
             value={emailSummary}
             style={{
-              width: '100%', border: '1px solid #e8eaed', outline: 'none',
-              background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
+              width: '100%', border: '0.5px solid var(--border-md)', outline: 'none',
+              background: 'var(--bg-input)', borderRadius: 8, padding: '12px 14px',
               fontSize: 13, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7,
-              color: '#333', resize: 'vertical', minHeight: 260,
+              color: 'var(--fg)', resize: 'vertical', minHeight: 260,
               boxSizing: 'border-box',
             }}
           />
@@ -781,28 +775,24 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       </Card>
 
       {/* ── Section 7: data quality ── */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <div style={{
           padding: '13px 18px',
-          borderBottom: showIssues && (issues.length > 0 || duplicates.length > 0) ? '1px solid #f0f1f3' : undefined,
+          borderBottom: showIssues && (issues.length > 0 || duplicates.length > 0) ? '0.5px solid var(--border)' : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Data Quality</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>Data Quality</span>
             {issues.length > 0 && (
-              <span style={{ fontSize: 12, color: '#c93a3a', background: 'rgba(224,82,82,0.08)', borderRadius: 10, padding: '1px 8px' }}>
-                {issues.length} issue{issues.length === 1 ? '' : 's'}
-              </span>
+              <StatusPill tone="bad">{issues.length} issue{issues.length === 1 ? '' : 's'}</StatusPill>
             )}
             {duplicates.length > 0 && (
-              <span style={{ fontSize: 12, color: '#c93a3a', background: 'rgba(224,82,82,0.08)', borderRadius: 10, padding: '1px 8px' }}>
-                {duplicates.length} duplicate{duplicates.length === 1 ? '' : 's'}
-              </span>
+              <StatusPill tone="bad">{duplicates.length} duplicate{duplicates.length === 1 ? '' : 's'}</StatusPill>
             )}
           </div>
           {(issues.length > 0 || duplicates.length > 0) && (
             <button className="no-print" onClick={() => setShowIssues(x => !x)} style={{
-              fontSize: 12, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: s.muted, background: 'transparent', border: 'none', cursor: 'pointer',
             }}>
               {showIssues ? 'Hide' : 'Show'}
             </button>
@@ -811,10 +801,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
         <div style={{ padding: '10px 18px' }}>
           {issues.length === 0 && duplicates.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#3a9e4a' }}>No data issues found.</div>
+            <div style={{ fontSize: 13, color: 'var(--status-good)' }}>No data issues found.</div>
           ) : !showIssues && (
             <div style={{ fontSize: 13, color: s.dim }}>
-              {issues.length > 0 && <div style={{ marginBottom: 4 }}><MiniBar value={issues.length} total={total} color="#e05252" /></div>}
+              {issues.length > 0 && <div style={{ marginBottom: 4 }}><MiniBar value={issues.length} total={total} color="var(--status-bad)" /></div>}
               <div style={{ marginTop: 4 }}>
                 {[
                   issues.length > 0 && `${issues.length} registration${issues.length === 1 ? '' : 's'} missing required fields`,
@@ -833,7 +823,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 <div style={{ overflowX: 'auto', marginBottom: 16 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #f0f1f3' }}>
+                      <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
                         {['Name', 'Age Group', 'Missing'].map(h => (
                           <th key={h} style={{ padding: '6px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: s.dim, textTransform: 'uppercase' }}>{h}</th>
                         ))}
@@ -850,10 +840,10 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                           !r.parent_phone      && 'Phone',
                         ].filter(Boolean).join(', ')
                         return (
-                          <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '1px solid #f7f8f9' }}>
+                          <tr key={`${r.player_id}-${i}`} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
                             <td style={{ padding: '6px 12px', fontWeight: 500 }}>{r.player_first_name} {r.player_last_name}</td>
                             <td style={{ padding: '6px 12px', color: s.muted }}>{r.age_group ?? '—'}</td>
-                            <td style={{ padding: '6px 12px', color: '#c93a3a', fontSize: 12 }}>{missing}</td>
+                            <td style={{ padding: '6px 12px', color: 'var(--status-bad)', fontSize: 12 }}>{missing}</td>
                           </tr>
                         )
                       })}
@@ -868,7 +858,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 {duplicates.map(({ id, rows }) => (
                   <div key={id} style={{
                     padding: '8px 12px', marginBottom: 6, borderRadius: 6,
-                    background: 'rgba(224,82,82,0.04)', border: '1px solid rgba(224,82,82,0.15)',
+                    background: 'var(--status-bad-bg)', border: '0.5px solid var(--border-md)',
                     fontSize: 13,
                   }}>
                     <span style={{ fontWeight: 600 }}>{rows[0].player_first_name} {rows[0].player_last_name}</span>
@@ -883,6 +873,6 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
         )}
       </Card>
 
-    </div>
+    </main>
   )
 }
