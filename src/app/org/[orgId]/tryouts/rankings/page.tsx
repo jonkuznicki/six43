@@ -8,6 +8,15 @@ import PlayerCard from './PlayerCard'
 import PlayerCompare from './PlayerCompare'
 import type { GcStatDef } from '../../../../../lib/tryouts/gcStatDefs'
 import { computeTryoutScore, computePitchingScore, type ScoringCategory } from '../../../../../lib/tryouts/computeScore'
+import {
+  denseRank,
+  averagePresent,
+  computeCoachEvalScore,
+  computeIntangiblesScore,
+  computeCombinedScore,
+  DEFAULT_SEASON_WEIGHTS,
+  type SeasonWeights,
+} from '../../../../../lib/tryouts/scoring/combinedScore'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -81,6 +90,10 @@ interface Season {
   year:                 number
   age_groups:           string[]
   rankings_share_token: string | null
+  tryout_weight:        number
+  coach_eval_weight:    number
+  intangibles_weight:   number
+  prior_stats_weight:   number
 }
 
 interface Team {
@@ -127,25 +140,10 @@ interface RankedPlayer {
   isAccepted:      boolean
 }
 
-// ── Rank helpers ───────────────────────────────────────────────────────────────
-
-/** Dense rank (ties share the same rank, no gaps). High-value = rank 1. */
-function denseRank(
-  items: Array<{ id: string; v: number | null }>,
-): Map<string, number> {
-  const sorted = items.filter(x => x.v != null).sort((a, b) => b.v! - a.v!)
-  const map = new Map<string, number>()
-  let rank = 1
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i].v === sorted[i - 1].v) {
-      map.set(sorted[i].id, map.get(sorted[i - 1].id)!)
-    } else {
-      map.set(sorted[i].id, rank)
-    }
-    rank++
-  }
-  return map
-}
+// ── Display-only helper ─────────────────────────────────────────────────────────
+// (Combined-score math lives in lib/tryouts/scoring/combinedScore.ts — this one
+// is purely for the informational teamPitching/teamHitting display columns,
+// which are not inputs to the combined score.)
 
 /** Compute section average from a scores JSON using matching field keys. */
 function sectionAvg(
@@ -155,20 +153,6 @@ function sectionAvg(
   if (!scores || keys.length === 0) return null
   const vals = keys.map(k => scores[k]).filter((v): v is number => typeof v === 'number')
   return vals.length > 0 ? vals.reduce((a, b) => a + b) / vals.length : null
-}
-
-/** Weighted average of scored fields using the org's eval config weights (weight > 0 only). */
-function computeWeightedEvalScore(
-  scores: Record<string, number> | null,
-  config: EvalConfigRow[],
-): number | null {
-  if (!scores || config.length === 0) return null
-  const active = config.filter(c => c.weight > 0 && typeof scores[c.field_key] === 'number')
-  if (active.length === 0) return null
-  const totalWeight = active.reduce((s, c) => s + c.weight, 0)
-  if (totalWeight === 0) return null
-  const weighted = active.reduce((s, c) => s + scores[c.field_key] * c.weight, 0)
-  return Math.round(weighted / totalWeight * 100) / 100
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -253,7 +237,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
   async function loadData() {
     const { data: seasonData } = await supabase
       .from('tryout_seasons')
-      .select('id, label, year, age_groups, rankings_share_token')
+      .select('id, label, year, age_groups, rankings_share_token, tryout_weight, coach_eval_weight, intangibles_weight, prior_stats_weight')
       .eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
 
     setSeason(seasonData)
@@ -514,6 +498,13 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     [evalConfig]
   )
 
+  const seasonWeights: SeasonWeights = useMemo(() => season ? {
+    tryoutWeight:      season.tryout_weight,
+    coachEvalWeight:   season.coach_eval_weight,
+    intangiblesWeight: season.intangibles_weight,
+    priorStatsWeight:  season.prior_stats_weight,
+  } : DEFAULT_SEASON_WEIGHTS, [season])
+
   const ranked = useMemo((): RankedPlayer[] => {
     // Per-player tryout: average across evaluators
     const tryoutByPlayer = new Map<string, TryoutScoreRow[]>()
@@ -574,16 +565,21 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           if (sk && speed == null) speed = r.scores[sk]
         }
 
-        // Coach eval
+        // Coach eval — recomputed live from raw scores + the org's *current*
+        // eval config (not the stale computed_score/coach_eval_score snapshot
+        // taken at submission time), so Scoring Setup changes take effect
+        // immediately. coachEval and intangibles are section-scoped and
+        // mutually exclusive — see combinedScore.ts — so neither double-counts
+        // the other in the combined score below.
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const rawCoachEval     = computeWeightedEvalScore(evalRow?.scores ?? null, evalConfig)
+        const rawCoachEval     = computeCoachEvalScore(evalRow?.scores ?? null, evalConfig)
         const assignedTeamId   = assignments[player.id] ?? null
         const assignedTeam     = teams.find(t => t.id === assignedTeamId)
         const evalMultiplier   = assignedTeam?.eval_multiplier ?? 1.0
         const coachEval        = rawCoachEval != null
           ? Math.round(rawCoachEval * evalMultiplier * 100) / 100
           : null
-        const intangibles      = sectionAvg(evalRow?.scores ?? null, intangiblesKeys)
+        const intangibles      = computeIntangiblesScore(evalRow?.scores ?? null, evalConfig)
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
         const evalSpeed        = evalRow?.scores?.['speed']       != null ? Number(evalRow.scores['speed'])       : null
@@ -594,17 +590,17 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         const gcRow          = gcByPlayer.get(player.id) ?? null
         const gcHittingScore  = gcRow?.gc_hitting_score  ?? null
         const gcPitchingScore = gcRow?.gc_pitching_score ?? null
+        const priorStatScore  = averagePresent([gcHittingScore, gcPitchingScore])
 
-        // Combined: 33% tryout + 67% eval; falls back to whichever is available
-        let combinedScore: number | null = null
-        if (tryoutScore != null && coachEval != null) {
-          combinedScore = tryoutScore * 0.33 + coachEval * 0.67
-        } else if (tryoutScore != null) {
-          combinedScore = tryoutScore
-        } else if (coachEval != null) {
-          combinedScore = coachEval
-        }
-        if (combinedScore != null) combinedScore = Math.round(combinedScore * 100) / 100
+        // Combined: per the season's configured weights (tryout / coach eval /
+        // intangibles / prior stats), redistributed across whichever
+        // components are actually present for this player. See
+        // lib/tryouts/scoring/combinedScore.ts for the shared formula used
+        // here and on the per-team roster page.
+        const combinedScore = computeCombinedScore(
+          { tryoutScore, coachEvalScore: coachEval, intangiblesScore: intangibles, priorStatScore },
+          seasonWeights,
+        )
 
         return {
           player,
@@ -656,7 +652,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, acceptedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, acceptedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig, seasonWeights])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 
@@ -1034,8 +1030,8 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           {compareIds.length >= 2 && (
             <button onClick={() => setShowCompare(true)} style={{
               padding: '5px 12px', borderRadius: '6px',
-              border: '0.5px solid rgba(232,160,32,0.5)',
-              background: 'rgba(232,160,32,0.12)', color: 'var(--accent)',
+              border: '0.5px solid rgba(var(--accent-rgb),0.5)',
+              background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)',
               fontSize: '12px', fontWeight: 700, cursor: 'pointer',
             }}>Compare {compareIds.length}</button>
           )}
@@ -1070,7 +1066,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           <button key={ag} onClick={() => setAgeFilter(ag)} style={{
             padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
             borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
-            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+            background: ageFilter === ag ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
             color: ageFilter === ag ? 'var(--accent)' : s.muted,
             fontSize: '11px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
           }}>{ag === 'all' ? 'All ages' : ag}</button>
@@ -1086,9 +1082,9 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
           {[
             { label: 'Active',    val: activeFiltered.length,                                color: undefined as string | undefined },
-            { label: 'Assigned',  val: assignedCount,                                        color: '#6DB875' },
-            { label: 'Left',      val: activeFiltered.length - assignedCount,                color: activeFiltered.length - assignedCount > 0 ? '#E8A020' : undefined },
-            { label: 'Excluded',  val: excludedCount,                                        color: excludedCount > 0 ? '#E87060' : undefined },
+            { label: 'Assigned',  val: assignedCount,                                        color: 'var(--status-good)' },
+            { label: 'Left',      val: activeFiltered.length - assignedCount,                color: activeFiltered.length - assignedCount > 0 ? 'var(--status-warn)' : undefined },
+            { label: 'Excluded',  val: excludedCount,                                        color: excludedCount > 0 ? 'var(--status-bad)' : undefined },
           ].map(({ label, val, color }) => (
             <div key={label} style={{
               padding: '3px 10px', borderRadius: '6px',
@@ -1107,12 +1103,12 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       {teams.length === 0 && (
         <div style={{
           marginBottom: '6px', padding: '6px 12px', borderRadius: '6px',
-          background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)',
-          fontSize: '11px', color: 'var(--accent)',
+          background: 'var(--status-warn-bg)', border: '0.5px solid var(--border-md)',
+          fontSize: '11px', color: 'var(--status-warn)',
           display: 'flex', alignItems: 'center', gap: '8px',
         }}>
           <span>⚠ No teams set up yet.</span>
-          <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
+          <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ color: 'var(--status-warn)', fontWeight: 700, textDecoration: 'none' }}>
             Create teams → (use the "+ New team" button)
           </Link>
         </div>
@@ -1481,6 +1477,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             ageGroupGcRows={ageGroupGcRows}
             teams={teams}
             totalInAge={totalInAge}
+            weights={seasonWeights}
             onClose={() => setPanelPlayerId(null)}
           />
         )

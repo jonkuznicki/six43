@@ -4,6 +4,16 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
+import PlayerCard, { type PlayerRegistrationDetail } from '../rankings/PlayerCard'
+import {
+  averagePresent,
+  computeCoachEvalScore,
+  computeIntangiblesScore,
+  computeCombinedScore,
+  denseRank,
+  DEFAULT_SEASON_WEIGHTS,
+  type SeasonWeights,
+} from '../../../../../lib/tryouts/scoring/combinedScore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,23 +46,28 @@ interface GcRow  {
   k: number|null; bb_allowed: number|null
   era: number|null; whip: number|null; ip: number|null
   w: number|null; sv: number|null; k_bb: number|null; strike_pct: number|null
+  gc_computed_score: number|null
+  bf: number|null; baa: number|null; bb_per_inn: number|null
   gc_hitting_score:  number|null
   gc_pitching_score: number|null
 }
 interface EvalField { field_key: string; label: string; section: string; sort_order: number; weight: number }
 interface EvalRow   { player_id: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
 interface ScoreRow  { player_id: string; tryout_score: number|null; evaluator_name: string|null; session_id: string }
+interface TeamRow   { id: string; name: string; age_group: string; color: string | null }
 
-type Tab = 'master' | 'registration' | 'roster' | 'gc' | 'evals' | 'scores' | 'age'
+type DataFilter = 'all' | 'complete' | 'missing_reg' | 'missing_roster' | 'missing_tryout' | 'missing_eval' | 'missing_gc'
+
+// Registration, Roster, GC Stats, Coach Evals, and Tryout Scores used to be
+// their own tabs. They're now column groups + filters on Master and the
+// player detail panel instead — see the Phase 2 cleanup summary. Age Check
+// stays a dedicated tab: it's a data-fixing workflow (inline age-group
+// correction), not a viewing mode.
+type Tab = 'master' | 'age'
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'master',       label: 'Master' },
-  { key: 'registration', label: 'Registration' },
-  { key: 'roster',       label: 'Roster' },
-  { key: 'gc',           label: 'GC Stats' },
-  { key: 'evals',        label: 'Coach Evals' },
-  { key: 'scores',       label: 'Tryout Scores' },
-  { key: 'age',          label: 'Age Check' },
+  { key: 'master', label: 'Master' },
+  { key: 'age',    label: 'Age Check' },
 ]
 
 // ── Baseball age helpers ──────────────────────────────────────────────────────
@@ -119,20 +134,6 @@ function scoreColor(v: number | null): string {
 
 function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
 
-const EVAL_SECTION_ORDER: Record<string, number> = {
-  fielding_hitting:  0,
-  athleticism:       1,
-  pitching_catching: 2,
-  intangibles:       3,
-}
-
-const EVAL_SECTION_LABELS: Record<string, string> = {
-  fielding_hitting:  'Fielding / Hitting',
-  athleticism:       'Athleticism',
-  pitching_catching: 'Pitching / Catching',
-  intangibles:       'Intangibles',
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DataHubPage({ params }: { params: { orgId: string } }) {
@@ -142,32 +143,28 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [players,       setPlayers]       = useState<Player[]>([])
   const [regMap,        setRegMap]        = useState<Map<string, RegRow>>(new Map())
   const [rosterMap,     setRosterMap]     = useState<Map<string, RosterRow>>(new Map())
-  const [gcIds,         setGcIds]         = useState<Set<string>>(new Set())
-  const [evalIds,       setEvalIds]       = useState<Set<string>>(new Set())
-  const [scoreIds,      setScoreIds]      = useState<Set<string>>(new Set())
+  const [gcRows,        setGcRows]        = useState<GcRow[]>([])
+  const [evalRows,      setEvalRows]      = useState<EvalRow[]>([])
+  const [evalConfig,    setEvalConfig]    = useState<EvalField[]>([])
+  const [scoreRows,     setScoreRows]     = useState<ScoreRow[]>([])
+  const [teams,         setTeams]         = useState<TeamRow[]>([])
   const [assignedTeamMap, setAssignedTeamMap] = useState<Map<string, string>>(new Map()) // player_id → team name
+  const [acceptedMap,   setAcceptedMap]   = useState<Map<string, boolean>>(new Map())
+  const [seasonWeights, setSeasonWeights] = useState<SeasonWeights>(DEFAULT_SEASON_WEIGHTS)
   const [seasonId,      setSeasonId]      = useState<string | null>(null)
   const [seasonYear,    setSeasonYear]    = useState<number | null>(null)
   const [seasonAgeGroups, setSeasonAgeGroups] = useState<string[]>([])
   const [loading,       setLoading]       = useState(true)
 
-  // GC tab state
-  const [gcSortCol,     setGcSortCol]     = useState('name')
-  const [gcSortDir,     setGcSortDir]     = useState<1 | -1>(1)
-  const [gcTeamFilter,  setGcTeamFilter]  = useState<string[]>([])
-  const [gcSelected,    setGcSelected]    = useState<string[]>([])
-
-  // Lazy-loaded tab data
-  const [gcFull,        setGcFull]        = useState<GcRow[]    | null>(null)
-  const [evalFields,    setEvalFields]    = useState<EvalField[] | null>(null)
-  const [evalFull,      setEvalFull]      = useState<EvalRow[]  | null>(null)
-  const [scoresFull,    setScoresFull]    = useState<ScoreRow[] | null>(null)
-  const [lazyLoading,   setLazyLoading]   = useState(false)
+  // Player detail panel
+  const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
 
   // UI state
   const [tab,           setTab]           = useState<Tab>('master')
   const [search,        setSearch]        = useState('')
   const [ageFilter,     setAgeFilter]     = useState('all')
+  const [dataFilter,    setDataFilter]    = useState<DataFilter>('all')
+  const [showRegDetail, setShowRegDetail] = useState(false)
   const [sortCol,       setSortCol]       = useState('name')
   const [sortDir,       setSortDir]       = useState<1 | -1>(1)
   const [autoFilling,   setAutoFilling]   = useState(false)
@@ -192,34 +189,29 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [backfillDone,  setBackfillDone]  = useState(false)
   const [backfillError, setBackfillError] = useState('')
 
-  // Per-tab sort state
-  const [regSortCol,    setRegSortCol]    = useState('name')
-  const [regSortDir,    setRegSortDir]    = useState<1 | -1>(1)
-  const [rosterSortCol, setRosterSortCol] = useState('name')
-  const [rosterSortDir, setRosterSortDir] = useState<1 | -1>(1)
-  const [evalsSortCol,  setEvalsSortCol]  = useState('score')
-  const [evalsSortDir,  setEvalsSortDir]  = useState<1 | -1>(-1)
-  const [scoresSortCol, setScoresSortCol] = useState('avg')
-  const [scoresSortDir, setScoresSortDir] = useState<1 | -1>(-1)
+  // Age Check sort state
   const [ageSortCol,    setAgeSortCol]    = useState('name')
   const [ageSortDir,    setAgeSortDir]    = useState<1 | -1>(1)
 
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (editingCell && inputRef.current) inputRef.current.focus() }, [editingCell])
 
-  useEffect(() => {
-    if (tab === 'gc'     && gcFull    === null) lazyLoad('gc')
-    if (tab === 'evals'  && evalFull  === null) lazyLoad('evals')
-    if (tab === 'scores' && scoresFull === null) lazyLoad('scores')
-  }, [tab])
-
   async function loadData() {
-    const { data: seasonData } = await supabase.from('tryout_seasons').select('id,year,age_groups').eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
+    const { data: seasonData } = await supabase
+      .from('tryout_seasons')
+      .select('id,year,age_groups,tryout_weight,coach_eval_weight,intangibles_weight,prior_stats_weight')
+      .eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
     const sid   = seasonData?.id   ?? null
     const syear = seasonData?.year ?? null
     setSeasonId(sid)
     setSeasonYear(syear)
     setSeasonAgeGroups(seasonData?.age_groups ?? [])
+    setSeasonWeights(seasonData ? {
+      tryoutWeight:      seasonData.tryout_weight,
+      coachEvalWeight:   seasonData.coach_eval_weight,
+      intangiblesWeight: seasonData.intangibles_weight,
+      priorStatsWeight:  seasonData.prior_stats_weight,
+    } : DEFAULT_SEASON_WEIGHTS)
 
     // Get session IDs for the active season so we can filter tryout_scores
     const sessionIds: string[] = []
@@ -230,20 +222,25 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
     const [
       { data: playerData }, { data: rosterData },
-      { data: gcData }, { data: evalData }, { data: scoreData },
+      { data: gcData }, { data: evalData }, { data: evalCfgData }, { data: scoreData },
+      { data: teamsData },
     ] = await Promise.all([
       supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
       sid
         ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('season_id', sid)
         : Promise.resolve({ data: [] as any[] }),
       syear
-        ? supabase.from('tryout_gc_stats').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear - 1))
+        ? supabase.from('tryout_gc_stats').select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,k,bb_allowed,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score,bf,baa,bb_per_inn,gc_hitting_score,gc_pitching_score').eq('org_id', params.orgId).eq('season_year', String(syear - 1))
         : Promise.resolve({ data: [] as any[] }),
       syear
-        ? supabase.from('tryout_coach_evals').select('player_id').eq('org_id', params.orgId).eq('season_year', String(syear - 1)).eq('status', 'submitted')
+        ? supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('season_year', String(syear - 1)).eq('status', 'submitted')
         : Promise.resolve({ data: [] as any[] }),
+      supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order'),
       sessionIds.length > 0
-        ? supabase.from('tryout_scores').select('player_id').in('session_id', sessionIds)
+        ? supabase.from('tryout_scores').select('player_id,tryout_score,evaluator_name,session_id').in('session_id', sessionIds)
+        : Promise.resolve({ data: [] as any[] }),
+      sid
+        ? supabase.from('tryout_teams').select('id,name,age_group,color').eq('season_id', sid)
         : Promise.resolve({ data: [] as any[] }),
     ])
 
@@ -257,25 +254,29 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       regData = data ?? []
     }
 
-    // Team assignments — fetch teams for season, then assignments for those teams
+    // Team assignments — name + accepted flag, keyed by player
     let assignMap = new Map<string, string>()
-    if (sid) {
-      const { data: teamsData } = await supabase.from('tryout_teams').select('id,name').eq('season_id', sid)
-      const teamIds = (teamsData ?? []).map((t: any) => t.id as string)
-      if (teamIds.length > 0) {
-        const { data: assignData } = await supabase.from('tryout_team_assignments').select('player_id,team_id').in('team_id', teamIds)
-        const nameById = new Map((teamsData ?? []).map((t: any) => [t.id, t.name as string]))
-        for (const a of (assignData ?? [])) assignMap.set(a.player_id, nameById.get(a.team_id) ?? '')
+    let acceptMap  = new Map<string, boolean>()
+    const teamIds = (teamsData ?? []).map((t: any) => t.id as string)
+    if (teamIds.length > 0) {
+      const { data: assignData } = await supabase.from('tryout_team_assignments').select('player_id,team_id,is_accepted').in('team_id', teamIds)
+      const nameById = new Map((teamsData ?? []).map((t: any) => [t.id, t.name as string]))
+      for (const a of (assignData ?? [])) {
+        assignMap.set(a.player_id, nameById.get(a.team_id) ?? '')
+        acceptMap.set(a.player_id, !!a.is_accepted)
       }
     }
 
     setPlayers(playerData ?? [])
     setRegMap(new Map(regData.map((r: any) => [r.player_id, r])))
     setRosterMap(new Map((rosterData ?? []).map((r: any) => [r.player_id, r])))
-    setGcIds(new Set((gcData ?? []).map((r: any) => r.player_id)))
-    setEvalIds(new Set((evalData ?? []).map((r: any) => r.player_id)))
-    setScoreIds(new Set((scoreData ?? []).map((r: any) => r.player_id)))
+    setGcRows(gcData ?? [])
+    setEvalRows(evalData ?? [])
+    setEvalConfig((evalCfgData ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
+    setScoreRows(scoreData ?? [])
+    setTeams(teamsData ?? [])
     setAssignedTeamMap(assignMap)
+    setAcceptedMap(acceptMap)
     setLoading(false)
   }
 
@@ -361,43 +362,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     await loadData()
   }
 
-  async function lazyLoad(target: 'gc' | 'evals' | 'scores', sid = seasonId, syear = seasonYear) {
-    setLazyLoading(true)
-    if (target === 'gc') {
-      const q = supabase
-        .from('tryout_gc_stats')
-        .select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,k,bb_allowed,era,whip,ip,w,sv,k_bb,strike_pct,gc_hitting_score,gc_pitching_score')
-        .eq('org_id', params.orgId)
-      const { data } = syear ? await q.eq('season_year', String(syear - 1)) : await q
-      setGcFull(data ?? [])
-    }
-    if (target === 'evals') {
-      const evalQ = supabase.from('tryout_coach_evals').select('player_id,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('status', 'submitted')
-      const cfgQ  = supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order')
-      const [{ data: fields }, { data: evals }] = await Promise.all([
-        sid   ? cfgQ.eq('season_id', sid)                    : cfgQ,
-        syear ? evalQ.eq('season_year', String(syear - 1))   : evalQ,
-      ])
-      const mappedFields = (fields ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 }))
-      mappedFields.sort((a, b) => {
-        const sd = (EVAL_SECTION_ORDER[a.section] ?? 99) - (EVAL_SECTION_ORDER[b.section] ?? 99)
-        return sd !== 0 ? sd : a.sort_order - b.sort_order
-      })
-      setEvalFields(mappedFields)
-      setEvalFull(evals ?? [])
-    }
-    if (target === 'scores') {
-      if (!sid) { setScoresFull([]); setLazyLoading(false); return }
-      const { data: sessions } = await supabase.from('tryout_sessions').select('id').eq('season_id', sid)
-      const sids = (sessions ?? []).map((s: any) => s.id)
-      const { data } = sids.length > 0
-        ? await supabase.from('tryout_scores').select('player_id,tryout_score,evaluator_name,session_id').in('session_id', sids)
-        : { data: [] as any[] }
-      setScoresFull(data ?? [])
-    }
-    setLazyLoading(false)
-  }
-
   // ── Master: inline edit ───────────────────────────────────────────────────
 
   function pv(p: Player, field: keyof Player): string | null {
@@ -460,9 +424,95 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     [players]
   )
 
+  // ── Per-player scoring (shared with Rankings — see lib/tryouts/scoring/combinedScore.ts) ──
+
+  const gcMap = useMemo(() => new Map(gcRows.map(r => [r.player_id, r])), [gcRows])
+  const evalMap = useMemo(() => new Map(evalRows.map(r => [r.player_id, r])), [evalRows])
+  const scoreAvgMap = useMemo(() => {
+    const byPlayer = new Map<string, number[]>()
+    for (const r of scoreRows) {
+      if (r.tryout_score == null) continue
+      if (!byPlayer.has(r.player_id)) byPlayer.set(r.player_id, [])
+      byPlayer.get(r.player_id)!.push(r.tryout_score)
+    }
+    const out = new Map<string, { avg: number | null; count: number }>()
+    for (const [pid, vals] of Array.from(byPlayer)) out.set(pid, { avg: averagePresent(vals), count: vals.length })
+    return out
+  }, [scoreRows])
+
+  interface ScoredPlayer {
+    tryoutScore: number | null
+    coachEvalScore: number | null
+    intangibles: number | null
+    gcHitting: number | null
+    gcPitching: number | null
+    combinedScore: number | null
+    combinedRank: number | null
+  }
+
+  const scoredMap = useMemo(() => {
+    const base = new Map<string, Omit<ScoredPlayer, 'combinedRank'>>()
+    for (const p of players) {
+      const tryoutScore = scoreAvgMap.get(p.id)?.avg ?? null
+      const evalRow = evalMap.get(p.id) ?? null
+      const coachEvalScore = computeCoachEvalScore(evalRow?.scores ?? null, evalConfig)
+      const intangibles = computeIntangiblesScore(evalRow?.scores ?? null, evalConfig)
+      const gcRow = gcMap.get(p.id) ?? null
+      const gcHitting = gcRow?.gc_hitting_score ?? null
+      const gcPitching = gcRow?.gc_pitching_score ?? null
+      const priorStatScore = averagePresent([gcHitting, gcPitching])
+      const combinedScore = computeCombinedScore(
+        { tryoutScore, coachEvalScore, intangiblesScore: intangibles, priorStatScore },
+        seasonWeights,
+      )
+      base.set(p.id, { tryoutScore, coachEvalScore, intangibles, gcHitting, gcPitching, combinedScore })
+    }
+
+    // Rank within age group (tryout age group takes priority, matching Age Check)
+    const byAge = new Map<string, string[]>()
+    for (const p of players) {
+      const ag = (p.tryout_age_group ?? p.age_group ?? '?U').toUpperCase()
+      if (!byAge.has(ag)) byAge.set(ag, [])
+      byAge.get(ag)!.push(p.id)
+    }
+    const rankMap = new Map<string, number>()
+    for (const ids of Array.from(byAge.values())) {
+      denseRank(ids.map(id => ({ id, v: base.get(id)?.combinedScore ?? null }))).forEach((v, k) => rankMap.set(k, v))
+    }
+
+    const out = new Map<string, ScoredPlayer>()
+    for (const [id, v] of Array.from(base)) out.set(id, { ...v, combinedRank: rankMap.get(id) ?? null })
+    return out
+  }, [players, scoreAvgMap, evalMap, evalConfig, gcMap, seasonWeights])
+
+  interface DataStatus { count: number; reg: boolean; roster: boolean; score: boolean; eval: boolean; gc: boolean }
+
+  function dataStatus(p: Player): DataStatus {
+    const reg    = regMap.has(p.id)
+    const roster = rosterMap.has(p.id)
+    const score  = scoreAvgMap.has(p.id)
+    const eval_  = evalMap.has(p.id)
+    const gc     = gcMap.has(p.id)
+    return { count: [reg, roster, score, eval_, gc].filter(Boolean).length, reg, roster, score, eval: eval_, gc }
+  }
+
   const filtered = useMemo(() => {
     let list = players
     if (ageFilter !== 'all') list = list.filter(p => p.age_group === ageFilter)
+    if (dataFilter !== 'all') {
+      list = list.filter(p => {
+        const ds = dataStatus(p)
+        switch (dataFilter) {
+          case 'complete':       return ds.count === 5
+          case 'missing_reg':    return !ds.reg
+          case 'missing_roster': return !ds.roster
+          case 'missing_tryout': return !ds.score
+          case 'missing_eval':   return !ds.eval
+          case 'missing_gc':     return !ds.gc
+          default:                return true
+        }
+      })
+    }
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(p => {
@@ -500,9 +550,24 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       if (sortCol === 'grade')     { va = regMap.get(a.id)?.grade ?? a.grade ?? ''; vb = regMap.get(b.id)?.grade ?? b.grade ?? '' }
       if (sortCol === 'email')     { va = regMap.get(a.id)?.parent_email ?? a.parent_email ?? ''; vb = regMap.get(b.id)?.parent_email ?? b.parent_email ?? '' }
       if (sortCol === 'phone')     { va = regMap.get(a.id)?.parent_phone ?? a.parent_phone ?? ''; vb = regMap.get(b.id)?.parent_phone ?? b.parent_phone ?? '' }
+      const numericCols: Record<string, (id: string) => number | null> = {
+        data:         id => dataStatus(players.find(p => p.id === id)!).count,
+        tryoutScore:  id => scoredMap.get(id)?.tryoutScore ?? null,
+        coachEval:    id => scoredMap.get(id)?.coachEvalScore ?? null,
+        gcBat:        id => scoredMap.get(id)?.gcHitting ?? null,
+        gcPit:        id => scoredMap.get(id)?.gcPitching ?? null,
+        combined:     id => scoredMap.get(id)?.combinedScore ?? null,
+        rank:         id => scoredMap.get(id)?.combinedRank ?? null,
+        accepted:     id => (acceptedMap.get(id) ? 1 : 0),
+      }
+      if (numericCols[sortCol]) {
+        const na = numericCols[sortCol](a.id) ?? -Infinity
+        const nb = numericCols[sortCol](b.id) ?? -Infinity
+        return (na - nb) * sortDir
+      }
       return va.localeCompare(vb) * sortDir
     })
-  }, [players, ageFilter, search, sortCol, sortDir, localUpdates, regMap])
+  }, [players, ageFilter, dataFilter, search, sortCol, sortDir, localUpdates, regMap, rosterMap, scoreAvgMap, evalMap, gcMap, scoredMap, acceptedMap])
 
   const ageAlerts = useMemo(() =>
     players.filter(p => {
@@ -512,6 +577,24 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     }).length,
     [players, regMap, seasonYear]
   )
+
+  const dataFilterCounts = useMemo(() => {
+    const counts: Record<DataFilter, number> = {
+      all: players.length, complete: 0,
+      missing_reg: 0, missing_roster: 0, missing_tryout: 0, missing_eval: 0, missing_gc: 0,
+    }
+    for (const p of players) {
+      const ds = dataStatus(p)
+      if (ds.count === 5) counts.complete++
+      if (!ds.reg)    counts.missing_reg++
+      if (!ds.roster) counts.missing_roster++
+      if (!ds.score)  counts.missing_tryout++
+      if (!ds.eval)   counts.missing_eval++
+      if (!ds.gc)     counts.missing_gc++
+    }
+    return counts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players, regMap, rosterMap, scoreAvgMap, evalMap, gcMap])
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 1 ? -1 : 1)
@@ -556,6 +639,16 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const dataFilterChips: { key: DataFilter; label: string }[] = [
+    { key: 'all',            label: 'All' },
+    { key: 'complete',       label: '5/5 Complete' },
+    { key: 'missing_reg',    label: 'Missing Registration' },
+    { key: 'missing_roster', label: 'Missing Roster' },
+    { key: 'missing_tryout', label: 'Missing Tryout Score' },
+    { key: 'missing_eval',   label: 'Missing Coach Eval' },
+    { key: 'missing_gc',     label: 'Missing GC Stats' },
+  ]
+
   return (
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 4rem' }}>
       <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
@@ -563,7 +656,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>Data Hub</h1>
-          <p style={{ fontSize: '13px', color: s.muted, margin: 0 }}>Review all imported data by source · {players.length} players</p>
+          <p style={{ fontSize: '13px', color: s.muted, margin: 0 }}>One row per player · data quality and analysis · {players.length} players</p>
         </div>
         {tab === 'master' && (
           <button onClick={autoFillTryoutAgeGroups} disabled={autoFilling} style={{
@@ -577,15 +670,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: '2px', marginBottom: '1.25rem', borderBottom: '0.5px solid var(--border)', paddingBottom: '0' }}>
         {TABS.map(t => {
-          const counts: Record<Tab, number> = {
-            master: players.length,
-            registration: regMap.size > 0 ? regMap.size : players.length,
-            roster: rosterMap.size,
-            gc: gcIds.size,
-            evals: evalIds.size,
-            scores: scoreIds.size,
-            age: ageAlerts,
-          }
+          const counts: Record<Tab, number> = { master: players.length, age: ageAlerts }
           const active = tab === t.key
           return (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
@@ -598,7 +683,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
               {t.label}
               <span style={{
                 marginLeft: '6px', fontSize: '11px', fontWeight: 400,
-                color: t.key === 'age' && counts[t.key] > 0 ? '#e05252' : s.dim,
+                color: t.key === 'age' && counts[t.key] > 0 ? 'var(--status-bad)' : s.dim,
               }}>
                 {counts[t.key]}
               </span>
@@ -608,7 +693,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       </div>
 
       {/* Search + Age filter — shared across tabs */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: tab === 'master' ? '0.6rem' : '1rem', alignItems: 'center' }}>
         <div style={{ position: 'relative' }}>
           <input
             type="text" value={search} onChange={e => setSearch(e.target.value)}
@@ -627,719 +712,233 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           <button key={ag} onClick={() => setAgeFilter(ag)} style={{
             padding: '5px 12px', borderRadius: '20px', border: '0.5px solid',
             borderColor: ageFilter === ag ? 'var(--accent)' : 'var(--border-md)',
-            background: ageFilter === ag ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+            background: ageFilter === ag ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
             color: ageFilter === ag ? 'var(--accent)' : s.muted,
             fontSize: '12px', fontWeight: ageFilter === ag ? 700 : 400, cursor: 'pointer',
           }}>{ag === 'all' ? 'All' : ag}</button>
         ))}
       </div>
 
-      {lazyLoading && (
-        <div style={{ padding: '2rem', textAlign: 'center', color: s.dim, fontSize: '13px' }}>Loading…</div>
-      )}
-
       {/* ── Master tab ─────────────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'master' && (
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr>
-                {[
-                  { key: 'name',        label: 'Player' },
-                  { key: 'age',         label: 'Bsbl Age' },
-                  { key: 'tryout_ag',   label: 'Tryout AG' },
-                  { key: 'team',        label: 'Current Team' },
-                  { key: null,          label: 'Reg Team' },
-                  { key: null,          label: 'Roster Team' },
-                  { key: 'assigned',    label: 'Assigned Team' },
-                  { key: 'grade',     label: 'Grade' },
-                  { key: 'school',    label: 'School' },
-                  { key: null,        label: 'Parent' },
-                  { key: 'email',     label: 'Email' },
-                  { key: 'phone',     label: 'Phone' },
-                  { key: null,        label: 'Data' },
-                ].map((col, i) => (
-                  <th key={i} style={{ ...th, cursor: col.key ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}
-                    onClick={() => col.key && toggleSort(col.key)}>
-                    {col.label}{col.key ? sortArrow(col.key) : null}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p, i) => {
-                const reg = regMap.get(p.id); const ros = rosterMap.get(p.id)
-                const team = pv(p, 'prior_team'); const tag = pv(p, 'tryout_age_group')
-                const conflict = !!(reg?.prior_team && ros?.team_name && reg.prior_team.toLowerCase() !== ros.team_name.toLowerCase())
-                const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
-                const dob = p.dob ?? reg?.dob ?? null
-                const bbAge = dob && seasonYear ? calcBaseballAge(dob, seasonYear) : null
-                const assignedTeam = assignedTeamMap.get(p.id) ?? null
-                const grade = reg?.grade ?? p.grade ?? null
-                const school = reg?.school ?? p.school ?? null
-                const parentName = reg ? [reg.guardian_first_name, reg.guardian_last_name].filter(Boolean).join(' ') || null : null
-                const email = reg?.parent_email ?? p.parent_email ?? null
-                const phone = reg?.parent_phone ?? p.parent_phone ?? null
-
-                return (
-                  <tr key={p.id} style={{ background: rowBg }}>
-                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                    <td style={{ ...td, color: s.muted, textAlign: 'center' }}>{bbAge ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-
-                    {/* Tryout AG — editable */}
-                    <td style={td}>
-                      {editingCell === `${p.id}_tryout_ag` ? (
-                        <input ref={inputRef} value={editVal} onChange={e => setEditVal(e.target.value)}
-                          onBlur={() => commitEdit(p.id, 'tryout_ag')}
-                          onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, 'tryout_ag'); if (e.key==='Escape') setEditingCell(null) }}
-                          style={{ ...editInput, width: '64px' }} />
-                      ) : (
-                        <span onClick={() => startEdit(p.id, 'tryout_ag', tag ?? p.age_group)}
-                          style={{ cursor: 'text', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid transparent', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
-                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
-                          {tag
-                            ? <b>{tag}</b>
-                            : <span style={{ opacity: 0.35, fontStyle: 'italic' }}>{nextAgeGroup(p.age_group)}?</span>
-                          }
-                          {savedCell === `${p.id}_tryout_ag` && <span style={{ color: '#6DB875', fontSize: '11px' }}>✓</span>}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Current Team — editable */}
-                    <td style={td}>
-                      {editingCell === `${p.id}_team` ? (
-                        <input ref={inputRef} value={editVal} onChange={e => setEditVal(e.target.value)}
-                          onBlur={() => commitEdit(p.id, 'team')}
-                          onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, 'team'); if (e.key==='Escape') setEditingCell(null) }}
-                          style={{ ...editInput, width: '140px' }} />
-                      ) : (
-                        <span onClick={() => startEdit(p.id, 'team', team ?? '')}
-                          style={{ cursor: 'text', padding: '2px 5px', borderRadius: '3px', border: `0.5px solid ${conflict ? 'rgba(232,160,32,0.5)' : 'transparent'}`, background: conflict ? 'rgba(232,160,32,0.07)' : 'transparent', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = conflict ? 'rgba(232,160,32,0.7)' : 'var(--border-md)')}
-                          onMouseLeave={e => (e.currentTarget.style.borderColor = conflict ? 'rgba(232,160,32,0.5)' : 'transparent')}>
-                          {conflict && <span style={{ fontSize: '11px', color: '#E8A020' }}>⚠</span>}
-                          {team ? <span style={{ fontWeight: 600 }}>{team}</span> : <span style={{ opacity: 0.3, fontStyle: 'italic' }}>—</span>}
-                          {savedCell === `${p.id}_team` && <span style={{ color: '#6DB875', fontSize: '11px' }}>✓</span>}
-                        </span>
-                      )}
-                    </td>
-
-                    <td style={{ ...td, color: reg?.prior_team ? '#80B0E8' : s.dim, fontSize: '12px' }}>
-                      {reg?.prior_team ?? <span style={{ opacity: 0.3 }}>—</span>}
-                    </td>
-                    <td style={{ ...td, color: ros?.team_name ? '#6DB875' : s.dim, fontSize: '12px' }}>
-                      {ros?.team_name ?? <span style={{ opacity: 0.3 }}>—</span>}
-                    </td>
-
-                    <td style={{ ...td, fontSize: '12px', fontWeight: assignedTeam ? 600 : 400, color: assignedTeam ? 'var(--accent)' : s.dim }}>
-                      {assignedTeam ?? <span style={{ opacity: 0.3 }}>—</span>}
-                    </td>
-
-                    <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                    <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                    <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{parentName ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                    <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                    <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-
-                    {/* Data dots */}
-                    <td style={td}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {[
-                          { has: !!reg,                  color: '#80B0E8', title: 'Registration' },
-                          { has: !!ros,                  color: '#6DB875', title: 'Roster' },
-                          { has: gcIds.has(p.id),        color: '#E8A020', title: 'GC Stats' },
-                          { has: evalIds.has(p.id),      color: '#C084FC', title: 'Coach Eval' },
-                          { has: scoreIds.has(p.id),     color: '#F472B6', title: 'Tryout Score' },
-                        ].map(({ has, color, title }) => (
-                          <span key={title} title={title} style={{ width: 8, height: 8, borderRadius: '50%', background: has ? color : 'rgba(var(--fg-rgb),0.1)', flexShrink: 0 }} />
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players match your filters.</div>}
-        </div>
-      )}
-
-      {/* ── Registration tab ──────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'registration' && (() => {
-        const rows = filtered.map(p => ({ p, reg: regMap.get(p.id) ?? null }))
-        const hasAnyReg = rows.some(r => r.reg)
-
-        function regVal(p: Player, reg: RegRow | null, col: string): string {
-          switch (col) {
-            case 'name':         return `${p.last_name} ${p.first_name}`
-            case 'age':          return reg?.age_group ?? p.age_group ?? ''
-            case 'dob':          return reg?.dob ?? p.dob ?? ''
-            case 'grade':        return reg?.grade ?? p.grade ?? ''
-            case 'school':       return reg?.school ?? p.school ?? ''
-            case 'prior_org':    return reg?.prior_org ?? p.prior_org ?? ''
-            case 'team':         return reg?.prior_team ?? p.prior_team ?? ''
-            case 'email':        return reg?.parent_email ?? p.parent_email ?? ''
-            case 'phone':        return reg?.parent_phone ?? p.parent_phone ?? ''
-            case 'pref_date':    return reg?.preferred_tryout_date ?? ''
-            case 'imported':     return reg?.imported_at ?? ''
-            case 'guardian':     return [reg?.guardian_first_name, reg?.guardian_last_name].filter(Boolean).join(' ')
-            case 'address':      return [reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ')
-            case 'reg_date':     return reg?.registration_date ?? ''
-            case 'reg_name':     return [reg?.player_first_name, reg?.player_last_name].filter(Boolean).join(' ')
-            default:             return ''
-          }
-        }
-
-        const sorted = [...rows].sort((a, b) => {
-          const va = regVal(a.p, a.reg, regSortCol)
-          const vb = regVal(b.p, b.reg, regSortCol)
-          return va.localeCompare(vb) * regSortDir
-        })
-
-        function regToggleSort(col: string) {
-          if (regSortCol === col) setRegSortDir(d => d === 1 ? -1 : 1)
-          else { setRegSortCol(col); setRegSortDir(1) }
-        }
-        function regArrow(col: string) {
-          if (regSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
-          return <span style={{ color: 'var(--accent)' }}>{regSortDir === 1 ? ' ↑' : ' ↓'}</span>
-        }
-
-        const cols: { key: string; label: string; sticky?: boolean }[] = [
-          { key: 'name',        label: 'Player',        sticky: true },
-          { key: 'reg_name',    label: 'Reg. Name' },
-          { key: 'age',         label: 'Age Group' },
-          { key: 'dob',         label: 'DOB' },
-          { key: 'grade',       label: 'Grade' },
-          { key: 'school',      label: 'School' },
-          { key: 'prior_org',   label: 'Prior Org' },
-          { key: 'team',        label: 'Prior Team' },
-          { key: 'guardian',    label: 'Guardian' },
-          { key: 'email',       label: 'Parent Email' },
-          { key: 'phone',       label: 'Parent Phone' },
-          { key: 'address',     label: 'Address' },
-          { key: 'pref_date',   label: 'Pref. Date' },
-          { key: 'reg_date',    label: 'Reg. Date' },
-          { key: 'imported',    label: 'Imported' },
-        ]
-
-        return (
-          <div>
-            {!hasAnyReg && rows.length > 0 && !backfillDone && (
-              <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '12px', color: '#E8A020', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <span style={{ flex: 1 }}>Registration was imported before a season was created — staging data is missing. Click to backfill from import history.</span>
-                {backfillError && <span style={{ color: '#E87060' }}>{backfillError}</span>}
-                <button onClick={backfillStaging} disabled={backfilling || !seasonId} style={{
-                  padding: '5px 14px', borderRadius: '6px', border: 'none', cursor: backfilling || !seasonId ? 'default' : 'pointer',
-                  background: 'rgba(232,160,32,0.25)', color: '#E8A020', fontWeight: 700, fontSize: '12px',
-                  opacity: backfilling || !seasonId ? 0.6 : 1, whiteSpace: 'nowrap',
-                }}>
-                  {backfilling ? 'Fixing…' : seasonId ? 'Fix now' : 'No active season'}
-                </button>
-              </div>
-            )}
-            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 270px)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr>
-                    {cols.map((col) => (
-                      <th key={col.key} onClick={() => regToggleSort(col.key)} style={{ ...th, cursor: 'pointer', whiteSpace: 'nowrap', ...(col.sticky ? stickyPlayerTh : {}) }}>
-                        {col.label}{regArrow(col.key)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map(({ p, reg }, i) => {
-                    const dob = reg?.dob ?? p.dob
-                    const imported = reg?.imported_at
-                    return (
-                      <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                        <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {(reg?.player_first_name || reg?.player_last_name)
-                            ? `${reg?.player_first_name ?? ''} ${reg?.player_last_name ?? ''}`.trim()
-                            : <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ ...td, color: s.muted }}>{reg?.age_group ?? p.age_group}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {dob ? new Date(dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.grade ?? p.grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reg?.school ?? p.school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.prior_org ?? p.prior_org ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: '#80B0E8', whiteSpace: 'nowrap' }}>{reg?.prior_team ?? p.prior_team ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {(reg?.guardian_first_name || reg?.guardian_last_name)
-                            ? `${reg?.guardian_first_name ?? ''} ${reg?.guardian_last_name ?? ''}`.trim()
-                            : <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{reg?.parent_email ?? p.parent_email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.parent_phone ?? p.parent_phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {[reg?.address, reg?.city, reg?.state, reg?.zip].filter(Boolean).join(', ') || <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ ...td, color: '#40A0E8', fontSize: '12px', whiteSpace: 'nowrap' }}>{reg?.preferred_tryout_date ? new Date(reg.preferred_tryout_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}</td>
-                        <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {reg?.registration_date ? new Date(reg.registration_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ ...td, color: s.dim, fontSize: '12px', whiteSpace: 'nowrap' }}>{imported ? new Date(imported).toLocaleDateString() : <span style={{ opacity: 0.3 }}>—</span>}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a registration file first.</div>}
-            </div>
+      {tab === 'master' && (
+        <>
+          {/* Data-completeness filter chips */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '0.6rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: s.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data:</span>
+            {dataFilterChips.map(c => (
+              <button key={c.key} onClick={() => setDataFilter(c.key)} style={{
+                padding: '4px 11px', borderRadius: '20px', border: '0.5px solid',
+                borderColor: dataFilter === c.key ? 'var(--accent)' : 'var(--border-md)',
+                background: dataFilter === c.key ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
+                color: dataFilter === c.key ? 'var(--accent)' : s.muted,
+                fontSize: '12px', fontWeight: dataFilter === c.key ? 700 : 400, cursor: 'pointer',
+              }}>{c.label} <span style={{ opacity: 0.6 }}>{dataFilterCounts[c.key]}</span></button>
+            ))}
+            <button onClick={() => setShowRegDetail(v => !v)} style={{
+              marginLeft: 'auto', fontSize: '12px', fontWeight: 600, padding: '5px 12px',
+              borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              background: showRegDetail ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
+              color: showRegDetail ? 'var(--accent)' : s.muted, cursor: 'pointer',
+            }}>{showRegDetail ? '− Hide registration detail' : '+ Registration detail'}</button>
           </div>
-        )
-      })()}
 
-      {/* ── Roster tab ────────────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'roster' && (() => {
-        const rows = filtered.map(p => ({ p, ros: rosterMap.get(p.id), reg: regMap.get(p.id) }))
+          {seasonId && regMap.size === 0 && players.length > 0 && !backfillDone && (
+            <div style={{ marginBottom: '10px', padding: '10px 14px', background: 'var(--status-warn-bg)', border: '0.5px solid var(--border-md)', borderRadius: '8px', fontSize: '12px', color: 'var(--status-warn)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ flex: 1 }}>Registration was imported before a season was created — staging data is missing. Click to backfill from import history.</span>
+              {backfillError && <span style={{ color: 'var(--status-bad)' }}>{backfillError}</span>}
+              <button onClick={backfillStaging} disabled={backfilling} style={{
+                padding: '5px 14px', borderRadius: '6px', border: 'none', cursor: backfilling ? 'default' : 'pointer',
+                background: 'var(--status-warn-bg)', color: 'var(--status-warn)', fontWeight: 700, fontSize: '12px',
+                opacity: backfilling ? 0.6 : 1, whiteSpace: 'nowrap',
+              }}>{backfilling ? 'Fixing…' : 'Fix now'}</button>
+            </div>
+          )}
 
-        function rosterToggleSort(col: string) {
-          if (rosterSortCol === col) setRosterSortDir(d => d === 1 ? -1 : 1)
-          else { setRosterSortCol(col); setRosterSortDir(1) }
-        }
-        function rosterArrow(col: string) {
-          if (rosterSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
-          return <span style={{ color: 'var(--accent)' }}>{rosterSortDir === 1 ? ' ↑' : ' ↓'}</span>
-        }
-
-        const sorted = [...rows].sort((a, b) => {
-          if (rosterSortCol === 'name')     return rosterSortDir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
-          if (rosterSortCol === 'age')      return rosterSortDir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
-          if (rosterSortCol === 'team')     return rosterSortDir * (a.ros?.team_name ?? '').localeCompare(b.ros?.team_name ?? '')
-          if (rosterSortCol === 'jersey')   return rosterSortDir * (a.ros?.jersey_number ?? '').localeCompare(b.ros?.jersey_number ?? '')
-          if (rosterSortCol === 'registered') return rosterSortDir * (a.reg ? -1 : 1) - rosterSortDir * (b.reg ? -1 : 1)
-          return 0
-        })
-
-        const cols = [
-          { key: 'name',       label: 'Player',     sticky: true },
-          { key: 'age',        label: 'Age Group' },
-          { key: 'team',       label: 'Team' },
-          { key: 'jersey',     label: 'Jersey #' },
-          { key: 'registered', label: 'Registered' },
-        ]
-
-        return (
-          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr>
-                {cols.map((col) => (
-                  <th key={col.key} onClick={() => rosterToggleSort(col.key)}
-                    style={{ ...th, cursor: 'pointer', ...(col.sticky ? stickyPlayerTh : {}) }}>
-                    {col.label}{rosterArrow(col.key)}
-                  </th>
-                ))}
-              </tr></thead>
+              <thead>
+                <tr>
+                  {([
+                    { key: 'name',     label: 'Player',   sticky: true },
+                    { key: 'data',     label: 'Data' },
+                    { key: 'tryout_ag', label: 'Tryout AG' },
+                    ...(showRegDetail ? ([
+                      { key: 'grade',  label: 'Grade' },
+                      { key: 'school', label: 'School' },
+                      { key: 'email',  label: 'Parent Email' },
+                      { key: 'phone',  label: 'Phone' },
+                    ] as const) : []),
+                    { key: 'tryoutScore', label: 'Tryout' },
+                    { key: 'coachEval',   label: 'Coach Eval' },
+                    { key: 'gcBat',       label: 'GC Bat' },
+                    { key: 'gcPit',       label: 'GC Pitch' },
+                    { key: 'combined',    label: 'Combined' },
+                    { key: 'rank',        label: 'Rank' },
+                    { key: 'assigned',    label: 'Assigned Team' },
+                    { key: 'accepted',    label: 'Accepted' },
+                  ] as { key: string | null; label: string; sticky?: boolean }[]).map((col, i) => (
+                    <th key={i} style={{ ...th, cursor: col.key ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}
+                      onClick={() => col.key && toggleSort(col.key)}>
+                      {col.label}{col.key ? sortArrow(col.key) : null}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
-                {sorted.map(({ p, ros, reg }, i) => (
-                  <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                    <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                    <td style={{ ...td, color: s.muted }}>{p.age_group}</td>
-                    <td style={{ ...td, color: ros ? '#6DB875' : s.dim }}>{ros?.team_name ?? '—'}</td>
-                    <td style={{ ...td, color: s.muted }}>{ros?.jersey_number ?? '—'}</td>
-                    <td style={{ ...td }}>
-                      {reg
-                        ? <span style={{ color: '#6DB875', fontSize: '11px', fontWeight: 600 }}>✓ Yes</span>
-                        : <span style={{ color: s.dim, fontSize: '11px' }}>—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players found. Import a roster file and confirm matches first.</div>}
-          </div>
-        )
-      })()}
+                {filtered.map((p, i) => {
+                  const reg = regMap.get(p.id); const ros = rosterMap.get(p.id)
+                  const tag = pv(p, 'tryout_age_group')
+                  const conflict = !!(reg?.prior_team && ros?.team_name && reg.prior_team.toLowerCase() !== ros.team_name.toLowerCase())
+                  const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(var(--fg-rgb),0.02)'
+                  const assignedTeam = assignedTeamMap.get(p.id) ?? null
+                  const accepted = acceptedMap.get(p.id) ?? false
+                  const grade = reg?.grade ?? p.grade ?? null
+                  const school = reg?.school ?? p.school ?? null
+                  const email = reg?.parent_email ?? p.parent_email ?? null
+                  const phone = reg?.parent_phone ?? p.parent_phone ?? null
+                  const ds = dataStatus(p)
+                  const scored = scoredMap.get(p.id)
+                  const dsTitle = [
+                    ds.reg    ? 'Registration ✓' : 'Registration ✗',
+                    ds.roster ? 'Roster ✓'       : 'Roster ✗',
+                    ds.score  ? 'Tryout Score ✓' : 'Tryout Score ✗',
+                    ds.eval   ? 'Coach Eval ✓'   : 'Coach Eval ✗',
+                    ds.gc     ? 'GC Stats ✓'     : 'GC Stats ✗',
+                    conflict  ? '⚠ Registration/Roster team mismatch' : '',
+                  ].filter(Boolean).join(' · ')
 
-      {/* ── GC Stats tab ──────────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'gc' && gcFull !== null && (() => {
-        const gcMap = new Map(gcFull.map(r => [r.player_id, r]))
-
-        // Distinct teams from loaded stats
-        const gcTeams = Array.from(new Set(gcFull.map(r => r.team_label).filter(Boolean) as string[])).sort()
-
-        // Column → GcRow key mapping
-        const GC_COL_KEY: Record<string, keyof GcRow> = {
-          name: 'player_id', age: 'player_id', team: 'team_label', year: 'season_year',
-          GP: 'games_played', AVG: 'avg', OBP: 'obp', SLG: 'slg', OPS: 'ops',
-          H: 'h', '2B': 'doubles', '3B': 'triples', HR: 'hr', RBI: 'rbi',
-          R: 'r', BB: 'bb', SO: 'so', SB: 'sb', HBP: 'hbp', SAC: 'sac', TB: 'tb',
-          K: 'k', pBB: 'bb_allowed',
-          ERA: 'era', WHIP: 'whip', IP: 'ip', W: 'w', SV: 'sv', 'K/BB': 'k_bb', 'STR%': 'strike_pct',
-          'Hit Score': 'gc_hitting_score',
-          'Pit Score': 'gc_pitching_score',
-        }
-
-        function gcToggleSort(col: string) {
-          if (gcSortCol === col) setGcSortDir(d => d === 1 ? -1 : 1)
-          else { setGcSortCol(col); setGcSortDir(col === 'name' || col === 'age' || col === 'team' || col === 'year' ? 1 : -1) }
-        }
-        function gcArrow(col: string) {
-          if (gcSortCol !== col) return <span style={{ opacity: 0.2, fontSize: '9px' }}> ↕</span>
-          return <span style={{ color: 'var(--accent)', fontSize: '9px' }}>{gcSortDir === 1 ? ' ↑' : ' ↓'}</span>
-        }
-
-        function toggleTeamFilter(team: string) {
-          setGcTeamFilter(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team])
-        }
-
-        // Build filtered + sorted rows
-        let rows = filtered.map(p => ({ p, gc: gcMap.get(p.id) })).filter(r => r.gc)
-        if (gcTeamFilter.length > 0) {
-          rows = rows.filter(r => r.gc!.team_label && gcTeamFilter.includes(r.gc!.team_label))
-        }
-        rows = rows.sort((a, b) => {
-          const col = gcSortCol
-          const dir = gcSortDir
-          if (col === 'name') return dir * `${a.p.last_name}${a.p.first_name}`.localeCompare(`${b.p.last_name}${b.p.first_name}`)
-          if (col === 'age')  return dir * (a.p.age_group ?? '').localeCompare(b.p.age_group ?? '')
-          if (col === 'team') return dir * (a.gc!.team_label ?? '').localeCompare(b.gc!.team_label ?? '')
-          if (col === 'year') return dir * (a.gc!.season_year ?? '').localeCompare(b.gc!.season_year ?? '')
-          const key = GC_COL_KEY[col]
-          if (!key) return 0
-          const va = (a.gc as any)[key] ?? -Infinity
-          const vb = (b.gc as any)[key] ?? -Infinity
-          return dir * (va - vb)
-        })
-
-        const allIds = rows.map(r => r.p.id)
-        const allSelected = allIds.length > 0 && allIds.every(id => gcSelected.includes(id))
-        function toggleSelectAll() {
-          if (allSelected) setGcSelected(prev => prev.filter(id => !allIds.includes(id)))
-          else setGcSelected(prev => Array.from(new Set([...prev, ...allIds])))
-        }
-        function toggleSelectOne(id: string) {
-          setGcSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-        }
-
-        const batting  = ['GP','AVG','OBP','SLG','OPS','H','2B','3B','HR','RBI','R','BB','SO','SB','HBP','SAC','TB']
-        const pitching = ['K','pBB','ERA','WHIP','IP','W','SV','K/BB','STR%']
-        const pitchingLabel: Record<string, string> = { pBB: 'BB' }
-
-        const thGc = (col: string, extra?: React.CSSProperties) => ({
-          ...th, cursor: 'pointer',
-          ...extra,
-          onClick: () => gcToggleSort(col),
-        })
-
-        return (
-          <div>
-            {rows.length === 0 && gcFull.length === 0 && (
-              <div style={{ padding: '12px 16px', marginBottom: '10px', background: 'rgba(232,160,32,0.08)', border: '0.5px solid rgba(232,160,32,0.3)', borderRadius: '8px', fontSize: '13px', color: '#E8A020' }}>
-                No GC stats saved. If you already imported a file, check the <strong>Import history</strong> — if the job shows "Needs review", open it to confirm player matches.
-              </div>
-            )}
-
-            {/* Team filter chips */}
-            {gcTeams.length > 0 && (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: s.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Team:</span>
-                {gcTeams.map(team => {
-                  const active = gcTeamFilter.includes(team)
                   return (
-                    <button key={team} onClick={() => toggleTeamFilter(team)} style={{
-                      padding: '4px 10px', borderRadius: '20px', border: '0.5px solid',
-                      borderColor: active ? 'var(--accent)' : 'var(--border-md)',
-                      background: active ? 'rgba(232,160,32,0.12)' : 'var(--bg-input)',
-                      color: active ? 'var(--accent)' : s.muted,
-                      fontSize: '12px', fontWeight: active ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}>{team}</button>
-                  )
-                })}
-                {gcTeamFilter.length > 0 && (
-                  <button onClick={() => setGcTeamFilter([])} style={{ fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>
-                    Clear
-                  </button>
-                )}
-                {gcSelected.length > 0 && (
-                  <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>
-                    {gcSelected.length} selected
-                    <button onClick={() => setGcSelected([])} style={{ marginLeft: '6px', fontSize: '11px', color: s.dim, background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {/* Checkbox — sticky left:0 */}
-                    <th style={{ ...th, ...stickyPlayerTh, width: '32px', cursor: 'pointer', paddingRight: '4px', boxShadow: 'none' }} rowSpan={2} onClick={toggleSelectAll}>
-                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
-                    </th>
-                    <th style={thGc('name', { minWidth: '160px', position: 'sticky', left: '32px', zIndex: 3, background: 'var(--bg)', boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)' })} rowSpan={2}>Player{gcArrow('name')}</th>
-                    <th style={thGc('age', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Age{gcArrow('age')}</th>
-                    <th style={thGc('team', { textAlign: 'left', minWidth: '120px', whiteSpace: 'nowrap' })} rowSpan={2}>Team{gcArrow('team')}</th>
-                    <th style={thGc('year', { textAlign: 'right', minWidth: '48px' })} rowSpan={2}>Year{gcArrow('year')}</th>
-                    <th colSpan={batting.length} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid var(--border)', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Batting</th>
-                    <th colSpan={pitching.length} style={{ ...th, textAlign: 'center', borderRight: '0.5px solid var(--border)', fontSize: '10px', background: 'rgba(var(--fg-rgb),0.02)', cursor: 'default' }}>Pitching</th>
-                    <th style={thGc('Hit Score', { textAlign: 'right', color: '#6DB875' })} rowSpan={2}>Hit{gcArrow('Hit Score')}</th>
-                    <th style={thGc('Pit Score', { textAlign: 'right', color: '#6DB875' })} rowSpan={2}>Pit{gcArrow('Pit Score')}</th>
-                  </tr>
-                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {batting.map(l => (
-                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'GP' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
-                        {l}{gcArrow(l)}
-                      </th>
-                    ))}
-                    {pitching.map(l => (
-                      <th key={l} onClick={() => gcToggleSort(l)} style={{ ...th, textAlign: 'right', minWidth: '40px', fontSize: '10px', fontWeight: gcSortCol === l ? 700 : 500, cursor: 'pointer', borderLeft: l === 'K' ? '0.5px solid var(--border)' : undefined, borderRight: l === 'STR%' ? '0.5px solid var(--border)' : undefined, color: gcSortCol === l ? 'var(--accent)' : s.dim }}>
-                        {pitchingLabel[l] ?? l}{gcArrow(l)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(({ p, gc }, i) => {
-                    const selected = gcSelected.includes(p.id)
-                    return (
-                      <tr key={p.id} style={{ background: selected ? 'rgba(232,160,32,0.06)' : i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
-                        <td style={{ ...td, ...stickyPlayerTd, paddingRight: '4px', width: '32px', boxShadow: 'none' }}>
-                          <input type="checkbox" checked={selected} onChange={() => toggleSelectOne(p.id)} style={{ cursor: 'pointer' }} />
-                        </td>
-                        <td style={{ ...td, position: 'sticky', left: '32px', zIndex: 1, background: 'var(--bg)', boxShadow: '2px 0 4px rgba(var(--fg-rgb),0.06)', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                        <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
-                        <td style={{ ...td, textAlign: 'left', color: s.dim, fontSize: '11px', whiteSpace: 'nowrap', minWidth: '120px' }}>{gc?.team_label ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right', color: s.dim }}>{gc?.season_year ?? '—'}</td>
-                        {/* Batting */}
-                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.games_played ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.avg ?? null, 3)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.obp ?? null, 3)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.slg ?? null, 3)}</td>
-                        <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fmt(gc?.ops ?? null, 3)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.h ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.doubles ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.triples ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.hr ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.rbi ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.r ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.bb ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.so ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sb ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.hbp ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sac ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.tb ?? '—'}</td>
-                        {/* Pitching */}
-                        <td style={{ ...td, textAlign: 'right', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.k ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.bb_allowed ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.era ?? null, 2)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.whip ?? null, 2)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.ip ?? null, 1)}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.w ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{gc?.sv ?? '—'}</td>
-                        <td style={{ ...td, textAlign: 'right' }}>{fmt(gc?.k_bb ?? null, 2)}</td>
-                        <td style={{ ...td, textAlign: 'right', borderRight: '0.5px solid rgba(var(--fg-rgb),0.06)' }}>{gc?.strike_pct != null ? `${(gc.strike_pct * 100).toFixed(0)}%` : '—'}</td>
-                        {/* Scores */}
-                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: gc?.gc_hitting_score != null ? '#6DB875' : s.dim }}>
-                          {gc?.gc_hitting_score != null ? gc.gc_hitting_score.toFixed(2) : '—'}
-                        </td>
-                        <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: gc?.gc_pitching_score != null ? '#6DB875' : s.dim }}>
-                          {gc?.gc_pitching_score != null ? gc.gc_pitching_score.toFixed(2) : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {rows.length === 0 && gcFull.length > 0 && (
-                <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No GC stats match your current filter.</div>
-              )}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* ── Coach Evals tab ───────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'evals' && evalFull !== null && evalFields !== null && (() => {
-        const evalMap = new Map(evalFull.map(r => [r.player_id, r]))
-        const rows = filtered.filter(p => evalMap.has(p.id))
-        const sections = Array.from(new Set(evalFields.map(f => f.section)))
-
-        function evalsToggleSort(col: string) {
-          if (evalsSortCol === col) setEvalsSortDir(d => d === 1 ? -1 : 1)
-          else { setEvalsSortCol(col); setEvalsSortDir(col === 'name' ? 1 : -1) }
-        }
-        function evalsArrow(col: string) {
-          if (evalsSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
-          return <span style={{ color: 'var(--accent)' }}>{evalsSortDir === 1 ? ' ↑' : ' ↓'}</span>
-        }
-
-        const sorted = [...rows].sort((a, b) => {
-          if (evalsSortCol === 'name') return evalsSortDir * `${a.last_name}${a.first_name}`.localeCompare(`${b.last_name}${b.first_name}`)
-          if (evalsSortCol === 'score') {
-            const sa = evalMap.get(a.id)?.computed_score ?? -Infinity
-            const sb = evalMap.get(b.id)?.computed_score ?? -Infinity
-            return evalsSortDir * (sa - sb)
-          }
-          return 0
-        })
-
-        return (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', color: s.dim }}>{rows.length} players with submitted evals · Read-only — edit on the <Link href={`/org/${params.orgId}/tryouts/coach-evals`} style={{ color: 'var(--accent)' }}>Coach Evals page</Link></div>
-            </div>
-            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  {/* Section headers */}
-                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    <th onClick={() => evalsToggleSort('name')} style={{ ...th, ...stickyPlayerTh, minWidth: '180px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }} rowSpan={2}>
-                      Player{evalsArrow('name')}
-                    </th>
-                    {sections.map(sec => {
-                      const secFields = evalFields.filter(f => f.section === sec)
-                      return (
-                        <th key={sec} colSpan={secFields.length} style={{
-                          ...th, textAlign: 'center', fontSize: '10px',
-                          borderLeft: '0.5px solid var(--border)',
-                          background: sec === 'pitching_catching' ? 'rgba(var(--fg-rgb),0.03)' : 'var(--bg)',
-                          cursor: 'default',
-                        }}>
-                          {EVAL_SECTION_LABELS[sec] ?? sec}
-                        </th>
-                      )
-                    })}
-                    <th onClick={() => evalsToggleSort('score')} style={{ ...th, textAlign: 'right', minWidth: '72px', color: evalsSortCol === 'score' ? 'var(--accent)' : 'var(--accent)', cursor: 'pointer' }} rowSpan={2}>
-                      Score{evalsArrow('score')}
-                    </th>
-                  </tr>
-                  <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-                    {evalFields.map((f, fi) => {
-                      const isFirst = fi === 0 || evalFields[fi - 1].section !== f.section
-                      return (
-                        <th key={f.field_key} title={f.label} style={{
-                          ...th, textAlign: 'center', minWidth: '52px', maxWidth: '72px',
-                          fontSize: '10px', fontWeight: 500, cursor: 'default',
-                          borderLeft: isFirst ? '0.5px solid var(--border)' : undefined,
-                        }}>
-                          {f.label.split(' ').map((w: string) => w[0]).join('').slice(0, 4).toUpperCase()}
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((p, i) => {
-                    const ev = evalMap.get(p.id)!
-                    return (
-                      <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.04)' }}>
-                        <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          {p.last_name}, {p.first_name}
-                          <span style={{ fontSize: '10px', color: s.dim, marginLeft: '6px' }}>{p.age_group}</span>
-                        </td>
-                        {evalFields.map((f, fi) => {
-                          const v = ev.scores?.[f.field_key] ?? null
-                          const isFirst = fi === 0 || evalFields[fi - 1].section !== f.section
-                          return (
-                            <td key={f.field_key} style={{
-                              ...td, textAlign: 'center', padding: '5px 4px',
-                              background: v != null ? scoreColor(v) : 'transparent',
-                              borderLeft: isFirst ? '0.5px solid var(--border)' : undefined,
-                            }}>
-                              {v != null ? <span style={{ fontWeight: 700 }}>{v}</span> : <span style={{ opacity: 0.2 }}>—</span>}
-                            </td>
-                          )
-                        })}
-                        <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: ev.computed_score != null ? 'var(--accent)' : s.dim }}>
-                          {ev.computed_score?.toFixed(2) ?? '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No submitted coach evals yet.</div>}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* ── Scores tab ────────────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'scores' && scoresFull !== null && (() => {
-        // Aggregate: avg score per player, count of evaluators
-        const aggMap = new Map<string, { scores: number[]; evaluators: Set<string> }>()
-        for (const r of scoresFull) {
-          if (!aggMap.has(r.player_id)) aggMap.set(r.player_id, { scores: [], evaluators: new Set() })
-          const a = aggMap.get(r.player_id)!
-          if (r.tryout_score != null) a.scores.push(r.tryout_score)
-          if (r.evaluator_name) a.evaluators.add(r.evaluator_name)
-        }
-        const rows = filtered.filter(p => aggMap.has(p.id))
-
-        function scoresToggleSort(col: string) {
-          if (scoresSortCol === col) setScoresSortDir(d => d === 1 ? -1 : 1)
-          else { setScoresSortCol(col); setScoresSortDir(col === 'name' || col === 'age' ? 1 : -1) }
-        }
-        function scoresArrow(col: string) {
-          if (scoresSortCol !== col) return <span style={{ opacity: 0.2 }}> ↕</span>
-          return <span style={{ color: 'var(--accent)' }}>{scoresSortDir === 1 ? ' ↑' : ' ↓'}</span>
-        }
-
-        const sorted = [...rows].sort((a, b) => {
-          if (scoresSortCol === 'name') return scoresSortDir * `${a.last_name}${a.first_name}`.localeCompare(`${b.last_name}${b.first_name}`)
-          if (scoresSortCol === 'age')  return scoresSortDir * (a.age_group ?? '').localeCompare(b.age_group ?? '')
-          if (scoresSortCol === 'avg') {
-            const sa = aggMap.get(a.id)!.scores; const sb = aggMap.get(b.id)!.scores
-            const avgA = sa.length ? sa.reduce((x, y) => x + y, 0) / sa.length : -Infinity
-            const avgB = sb.length ? sb.reduce((x, y) => x + y, 0) / sb.length : -Infinity
-            return scoresSortDir * (avgA - avgB)
-          }
-          if (scoresSortCol === 'sessions') return scoresSortDir * (aggMap.get(a.id)!.scores.length - aggMap.get(b.id)!.scores.length)
-          return 0
-        })
-
-        const scoreCols: { key: string; label: string; align: 'left' | 'right' }[] = [
-          { key: 'name',     label: 'Player',     align: 'left' },
-          { key: 'age',      label: 'Age',        align: 'right' },
-          { key: 'avg',      label: 'Avg Score',  align: 'right' },
-          { key: 'sessions', label: 'Sessions',   align: 'right' },
-          { key: 'evals',    label: 'Evaluators', align: 'left' },
-        ]
-
-        return (
-          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr>
-                {scoreCols.map((col, i) => (
-                  <th key={col.key} onClick={() => col.key !== 'evals' && scoresToggleSort(col.key)}
-                    style={{ ...th, textAlign: col.align, cursor: col.key !== 'evals' ? 'pointer' : 'default', ...(i === 0 ? stickyPlayerTh : {}) }}>
-                    {col.label}{col.key !== 'evals' ? scoresArrow(col.key) : null}
-                  </th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {sorted.map((p, i) => {
-                  const agg = aggMap.get(p.id)!
-                  const avg = agg.scores.length ? agg.scores.reduce((a, b) => a + b, 0) / agg.scores.length : null
-                  return (
-                    <tr key={p.id} style={{ background: i % 2 ? 'rgba(var(--fg-rgb),0.02)' : 'transparent' }}>
+                    <tr
+                      key={p.id} style={{ background: rowBg, cursor: 'pointer' }}
+                      onClick={() => setPanelPlayerId(p.id)}
+                    >
                       <td style={{ ...td, ...stickyPlayerTd, fontWeight: 600, whiteSpace: 'nowrap' }}>{p.last_name}, {p.first_name}</td>
-                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{p.age_group}</td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: 'var(--accent)' }}>{fmt(avg)}</td>
-                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{agg.scores.length}</td>
-                      <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{Array.from(agg.evaluators).join(', ') || '—'}</td>
+
+                      {/* Data Status */}
+                      <td style={td} title={dsTitle} onClick={e => e.stopPropagation()}>
+                        <span onClick={() => setPanelPlayerId(p.id)} style={{ cursor: 'pointer' }}>
+                          <StatusPill tone={ds.count === 5 ? 'good' : ds.count === 0 ? 'bad' : 'warn'}>
+                            {ds.count}/5{conflict ? ' ⚠' : ''}
+                          </StatusPill>
+                        </span>
+                      </td>
+
+                      {/* Tryout AG — editable */}
+                      <td style={td} onClick={e => e.stopPropagation()}>
+                        {editingCell === `${p.id}_tryout_ag` ? (
+                          <input ref={inputRef} value={editVal} onChange={e => setEditVal(e.target.value)}
+                            onBlur={() => commitEdit(p.id, 'tryout_ag')}
+                            onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, 'tryout_ag'); if (e.key==='Escape') setEditingCell(null) }}
+                            style={{ ...editInput, width: '64px' }} />
+                        ) : (
+                          <span onClick={() => startEdit(p.id, 'tryout_ag', tag ?? p.age_group)}
+                            style={{ cursor: 'text', padding: '2px 5px', borderRadius: '3px', border: '0.5px solid transparent', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-md)')}
+                            onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
+                            {tag
+                              ? <b>{tag}</b>
+                              : <span style={{ opacity: 0.35, fontStyle: 'italic' }}>{nextAgeGroup(p.age_group)}?</span>
+                            }
+                            {savedCell === `${p.id}_tryout_ag` && <span style={{ color: 'var(--status-good)', fontSize: '11px' }}>✓</span>}
+                          </span>
+                        )}
+                      </td>
+
+                      {showRegDetail && (
+                        <>
+                          <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{grade ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                          <td style={{ ...td, color: s.muted, fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{school ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                          <td style={{ ...td, color: s.muted, fontSize: '12px' }}>{email ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                          <td style={{ ...td, color: s.muted, fontSize: '12px', whiteSpace: 'nowrap' }}>{phone ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        </>
+                      )}
+
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 600, background: scoreColor(scored?.tryoutScore ?? null) }}>{fmt(scored?.tryoutScore ?? null)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 600, background: scoreColor(scored?.coachEvalScore ?? null) }}>{fmt(scored?.coachEvalScore ?? null)}</td>
+                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{fmt(scored?.gcHitting ?? null)}</td>
+                      <td style={{ ...td, textAlign: 'right', color: s.muted }}>{fmt(scored?.gcPitching ?? null)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: scored?.combinedScore != null ? 'var(--accent)' : s.dim }}>{fmt(scored?.combinedScore ?? null)}</td>
+                      <td style={{ ...td, textAlign: 'center', color: s.muted, fontSize: '12px' }}>{scored?.combinedRank ?? <span style={{ opacity: 0.3 }}>—</span>}</td>
+
+                      <td style={{ ...td, fontSize: '12px', fontWeight: assignedTeam ? 600 : 400, color: assignedTeam ? 'var(--accent)' : s.dim }}>
+                        {assignedTeam ?? <span style={{ opacity: 0.3 }}>—</span>}
+                      </td>
+                      <td style={td}>
+                        {assignedTeam
+                          ? <StatusPill tone={accepted ? 'good' : 'neutral'}>{accepted ? 'Yes' : 'Pending'}</StatusPill>
+                          : <span style={{ opacity: 0.3 }}>—</span>}
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-            {sorted.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No tryout scores recorded yet.</div>}
+            {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>No players match your filters.</div>}
           </div>
+        </>
+      )}
+
+      {panelPlayerId && (() => {
+        const p = players.find(pl => pl.id === panelPlayerId)
+        if (!p) return null
+        const scored = scoredMap.get(p.id)
+        const reg = regMap.get(p.id)
+        const ros = rosterMap.get(p.id)
+        const gcRow = gcMap.get(p.id) ?? null
+        const evalRow = evalMap.get(p.id) ?? null
+        const ag = (p.tryout_age_group ?? p.age_group ?? '?U').toUpperCase()
+        const totalInAge = players.filter(pl => (pl.tryout_age_group ?? pl.age_group ?? '?U').toUpperCase() === ag).length
+        const ageGroupGcRows = gcRows.filter(g => {
+          const owner = players.find(pl => pl.id === g.player_id)
+          return owner && (owner.tryout_age_group ?? owner.age_group ?? '?U').toUpperCase() === ag
+        })
+        const registration: PlayerRegistrationDetail = {
+          grade:            reg?.grade ?? p.grade ?? null,
+          school:           reg?.school ?? p.school ?? null,
+          priorOrg:         reg?.prior_org ?? p.prior_org ?? null,
+          parentEmail:      reg?.parent_email ?? p.parent_email ?? null,
+          parentPhone:      reg?.parent_phone ?? p.parent_phone ?? null,
+          guardianName:     reg ? [reg.guardian_first_name, reg.guardian_last_name].filter(Boolean).join(' ') || null : null,
+          address:          reg ? [reg.address, reg.city, reg.state, reg.zip].filter(Boolean).join(', ') || null : null,
+          registrationDate: reg?.registration_date ?? null,
+          preferredDate:    reg?.preferred_tryout_date ?? null,
+          jerseyNumber:     ros?.jersey_number ?? p.jersey_number ?? null,
+          rosterTeam:       ros?.team_name ?? null,
+          registered:       !!reg,
+        }
+        return (
+          <PlayerCard
+            player={{
+              player: { id: p.id, first_name: p.first_name, last_name: p.last_name, age_group: p.age_group, tryout_age_group: p.tryout_age_group, prior_team: p.prior_team },
+              ageGroup: ag,
+              tryoutScore: scored?.tryoutScore ?? null,
+              tryoutPitching: null, tryoutHitting: null, speed: null,
+              coachEval: scored?.coachEvalScore ?? null,
+              intangibles: scored?.intangibles ?? null,
+              teamPitching: null, teamHitting: null,
+              coachComments: evalRow?.comments ?? null,
+              gcHittingScore: scored?.gcHitting ?? null,
+              gcPitchingScore: scored?.gcPitching ?? null,
+              combinedScore: scored?.combinedScore ?? null,
+              combinedRank: scored?.combinedRank ?? null,
+              tryoutRank: null, coachRank: null, intangiblesRank: null,
+              assignedTeamId: teams.find(t => t.name === assignedTeamMap.get(p.id) && t.age_group === (p.tryout_age_group ?? p.age_group))?.id ?? null,
+              adminNotes: null,
+            }}
+            gcRow={gcRow}
+            ageGroupGcRows={ageGroupGcRows}
+            teams={teams}
+            totalInAge={totalInAge}
+            weights={seasonWeights}
+            registration={registration}
+            onClose={() => setPanelPlayerId(null)}
+          />
         )
       })()}
 
+
       {/* ── Age Check tab ─────────────────────────────────────────────────── */}
-      {!lazyLoading && tab === 'age' && (() => {
+      {tab === 'age' && (() => {
         if (!seasonYear) return (
           <div style={{ textAlign: 'center', padding: '3rem', color: s.dim, fontSize: '13px' }}>
             No active season — set one up in <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--accent)' }}>Seasons</Link> first.
@@ -1389,9 +988,9 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
           <div>
             {/* Stale year warning */}
             {seasonYear !== null && seasonYear <= new Date().getFullYear() && (
-              <div style={{ background: 'rgba(232,160,32,0.13)', border: '1px solid rgba(232,160,32,0.4)', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px', fontSize: '12px', color: '#E8A020', lineHeight: 1.6 }}>
+              <div style={{ background: 'var(--status-warn-bg)', border: '1px solid var(--status-warn)', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px', fontSize: '12px', color: 'var(--status-warn)', lineHeight: 1.6 }}>
                 <strong>Season year is {seasonYear}</strong> — today is {new Date().getFullYear()}. If you&apos;re running {new Date().getFullYear() + 1} tryouts, go to{' '}
-                <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: '#E8A020', textDecoration: 'underline' }}>Seasons</Link>{' '}
+                <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--status-warn)', textDecoration: 'underline' }}>Seasons</Link>{' '}
                 and update the year to {new Date().getFullYear() + 1}. Age calculations will be off by one year until you do.
               </div>
             )}
@@ -1406,10 +1005,10 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
               {([
                 ['all',        'All',         players.length,              'rgba(var(--fg-rgb),0.1)',  'var(--fg)'  ],
-                ['overage',    '⚠ Overage',   counts_by_status.overage,    'rgba(224,82,82,0.15)',    '#e05252'    ],
-                ['playing_up', '↑ Playing Up', counts_by_status.playing_up, 'rgba(232,160,32,0.13)',   '#E8A020'    ],
+                ['overage',    '⚠ Overage',   counts_by_status.overage,    'var(--status-bad-bg)',    'var(--status-bad)'    ],
+                ['playing_up', '↑ Playing Up', counts_by_status.playing_up, 'var(--status-warn-bg)',   'var(--status-warn)'    ],
                 ['no_dob',     '? No DOB',     counts_by_status.no_dob,     'rgba(var(--fg-rgb),0.08)', s.muted     ],
-                ['correct',    '✓ Correct',    counts_by_status.correct,    'rgba(109,184,117,0.15)', '#6DB875'    ],
+                ['correct',    '✓ Correct',    counts_by_status.correct,    'var(--status-good-bg)', 'var(--status-good)'    ],
               ] as const).map(([key, label, count, bg, color]) => (
                 <button key={key} onClick={() => setAgeStatusFilter(key as AgeStatus | 'all')} style={{
                   padding: '5px 12px', borderRadius: '20px', cursor: 'pointer',
@@ -1460,7 +1059,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                           <td style={{ ...td, color: s.muted, fontSize: '12px' }}>
                             {dob
                               ? new Date(dob + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                              : <span style={{ color: '#e05252', fontStyle: 'italic' }}>missing</span>}
+                              : <span style={{ color: 'var(--status-bad)', fontStyle: 'italic' }}>missing</span>}
                           </td>
                           <td style={{ ...td, textAlign: 'center', fontWeight: 700, fontSize: '15px', color: ba != null ? 'var(--fg)' : s.dim }}>
                             {ba ?? '—'}
@@ -1485,7 +1084,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
                             <button onClick={() => isFix ? setFixingId(null) : openFix(p)} style={{
                               fontSize: '11px', padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
                               border: `0.5px solid ${isFix ? 'var(--accent)' : 'var(--border-md)'}`,
-                              background: isFix ? 'rgba(232,160,32,0.1)' : 'var(--bg-input)',
+                              background: isFix ? 'rgba(var(--accent-rgb),0.1)' : 'var(--bg-input)',
                               color: isFix ? 'var(--accent)' : s.muted,
                               fontWeight: isFix ? 700 : 400,
                             }}>{isFix ? 'Cancel' : 'Adjust'}</button>
@@ -1494,7 +1093,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
 
                         {/* Inline fix panel */}
                         {isFix && (
-                          <tr key={`${p.id}_fix`} style={{ background: 'rgba(232,160,32,0.04)' }}>
+                          <tr key={`${p.id}_fix`} style={{ background: 'rgba(var(--accent-rgb),0.04)' }}>
                             <td colSpan={9} style={{ padding: '12px 16px', borderBottom: '0.5px solid var(--border)' }}>
                               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                                 <div>

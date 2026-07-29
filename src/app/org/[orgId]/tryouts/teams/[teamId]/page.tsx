@@ -3,13 +3,22 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../../lib/supabase'
 import Link from 'next/link'
+import {
+  averagePresent,
+  computeCoachEvalScore,
+  computeIntangiblesScore,
+  computeCombinedScore,
+  DEFAULT_SEASON_WEIGHTS,
+  type SeasonWeights,
+} from '../../../../../../lib/tryouts/scoring/combinedScore'
 
 interface Team {
-  id:        string
-  name:      string
-  age_group: string
-  color:     string | null
-  season_id: string
+  id:              string
+  name:            string
+  age_group:       string
+  color:           string | null
+  season_id:       string
+  eval_multiplier: number
 }
 
 interface RosterPlayer {
@@ -31,6 +40,14 @@ interface RosterPlayer {
   evalCount:            number
 }
 
+// Non-null, structural — a player has at most one active eval considered
+// (the latest season_year), matching Rankings' behavior.
+interface EvalRow {
+  player_id:   string
+  season_year: string
+  scores:      Record<string, number> | null
+}
+
 export default function TeamRosterPage({ params }: { params: { orgId: string; teamId: string } }) {
   const supabase = createClient()
 
@@ -43,11 +60,22 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
 
   async function loadData() {
     const { data: teamData } = await supabase
-      .from('tryout_teams').select('id, name, age_group, color, season_id')
+      .from('tryout_teams').select('id, name, age_group, color, season_id, eval_multiplier')
       .eq('id', params.teamId).single()
     setTeam(teamData)
 
     if (!teamData) { setLoading(false); return }
+
+    const { data: seasonData } = await supabase
+      .from('tryout_seasons')
+      .select('year, tryout_weight, coach_eval_weight, intangibles_weight, prior_stats_weight')
+      .eq('id', teamData.season_id).maybeSingle()
+    const weights: SeasonWeights = seasonData ? {
+      tryoutWeight:      seasonData.tryout_weight,
+      coachEvalWeight:   seasonData.coach_eval_weight,
+      intangiblesWeight: seasonData.intangibles_weight,
+      priorStatsWeight:  seasonData.prior_stats_weight,
+    } : DEFAULT_SEASON_WEIGHTS
 
     // Get assigned players
     const { data: assignData } = await supabase
@@ -57,7 +85,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
     const playerIds = (assignData ?? []).map((a: any) => a.player_id)
     if (playerIds.length === 0) { setLoading(false); return }
 
-    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }] = await Promise.all([
+    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
@@ -65,21 +93,30 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         .select('player_id, tryout_score')
         .in('player_id', playerIds),
       supabase.from('tryout_coach_evals')
-        .select('player_id, scores')
+        .select('player_id, season_year, scores')
         .in('player_id', playerIds).eq('status', 'submitted'),
       supabase.from('tryout_coach_eval_config')
-        .select('field_key').eq('org_id', params.orgId).eq('is_active', true),
+        .select('field_key, section, weight').eq('org_id', params.orgId),
       supabase.from('tryout_registration_staging')
         .select('player_id, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .eq('season_id', teamData.season_id)
         .in('player_id', playerIds),
+      seasonData
+        ? supabase.from('tryout_gc_stats')
+            .select('player_id, gc_hitting_score, gc_pitching_score')
+            .eq('org_id', params.orgId).eq('season_year', String(seasonData.year - 1))
+            .in('player_id', playerIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
 
-    const evalFields = (evalCfg ?? []).map((f: any) => f.field_key)
+    const evalConfig = evalCfg ?? []
     const stagingMap: Record<string, any> = {}
     for (const s of (stagingData ?? [])) stagingMap[s.player_id] = s
+    const gcMap: Record<string, { hitting: number | null; pitching: number | null }> = {}
+    for (const g of (gcData ?? [])) gcMap[g.player_id] = { hitting: g.gc_hitting_score, pitching: g.gc_pitching_score }
 
-    // Aggregate scores
+    // Aggregate tryout scores — simple average across sessions/evaluators,
+    // same as Rankings.
     const scoresByPlayer: Record<string, number[]> = {}
     for (const s of (scoreData ?? [])) {
       if (s.tryout_score != null) {
@@ -88,30 +125,34 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       }
     }
 
-    const evalsByPlayer: Record<string, number[][]> = {}
-    for (const e of (evalData ?? [])) {
-      if (!evalsByPlayer[e.player_id]) evalsByPlayer[e.player_id] = []
-      if (e.scores) {
-        const vals = evalFields.map((k: string) => e.scores[k]).filter((v: any) => v != null)
-        if (vals.length > 0) evalsByPlayer[e.player_id].push(vals)
+    // Latest submitted eval per player (by season_year) — same as Rankings,
+    // rather than blending scores across multiple years' evals together.
+    const evalByPlayer = new Map<string, EvalRow>()
+    for (const e of ((evalData ?? []) as EvalRow[])) {
+      const existing = evalByPlayer.get(e.player_id)
+      if (!existing || Number(e.season_year) > Number(existing.season_year)) {
+        evalByPlayer.set(e.player_id, e)
       }
     }
 
     const rosterPlayers: RosterPlayer[] = (playerData ?? []).map((p: any) => {
       const scores = scoresByPlayer[p.id] ?? []
-      const tryoutAvg = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : null
+      const tryoutAvg = averagePresent(scores)
 
-      const evalGroups = evalsByPlayer[p.id] ?? []
-      let coachEvalAvg: number | null = null
-      if (evalGroups.length > 0) {
-        const perEvalAvgs = evalGroups.map((vals: number[]) => vals.reduce((a: number, b: number) => a + b, 0) / vals.length)
-        coachEvalAvg = perEvalAvgs.reduce((a: number, b: number) => a + b, 0) / perEvalAvgs.length
-      }
+      const evalRow = evalByPlayer.get(p.id) ?? null
+      const rawCoachEval = computeCoachEvalScore(evalRow?.scores ?? null, evalConfig)
+      const coachEvalAvg = rawCoachEval != null
+        ? Math.round(rawCoachEval * (teamData.eval_multiplier ?? 1.0) * 100) / 100
+        : null
+      const intangibles = computeIntangiblesScore(evalRow?.scores ?? null, evalConfig)
 
-      let combinedScore: number | null = null
-      if (tryoutAvg != null && coachEvalAvg != null) combinedScore = tryoutAvg * 0.6 + coachEvalAvg * 0.4
-      else if (tryoutAvg != null) combinedScore = tryoutAvg
-      else if (coachEvalAvg != null) combinedScore = coachEvalAvg
+      const gc = gcMap[p.id]
+      const priorStatScore = gc ? averagePresent([gc.hitting, gc.pitching]) : null
+
+      const combinedScore = computeCombinedScore(
+        { tryoutScore: tryoutAvg, coachEvalScore: coachEvalAvg, intangiblesScore: intangibles, priorStatScore },
+        weights,
+      )
 
       const st = stagingMap[p.id] ?? {}
       return {
@@ -122,7 +163,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         guardian_first_name: st.guardian_first_name ?? p.guardian_first_name ?? null,
         guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
         tryoutAvg, coachEvalAvg, combinedScore,
-        scoreCount: scores.length, evalCount: evalGroups.length,
+        scoreCount: scores.length, evalCount: evalRow ? 1 : 0,
       }
     }).sort((a: RosterPlayer, b: RosterPlayer) => (b.combinedScore ?? -1) - (a.combinedScore ?? -1))
 

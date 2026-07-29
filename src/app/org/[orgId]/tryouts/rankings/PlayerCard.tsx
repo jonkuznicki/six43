@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react'
 import { GC_STAT_DEFS } from '../../../../../lib/tryouts/gcStatDefs'
+import { DEFAULT_SEASON_WEIGHTS, type SeasonWeights } from '../../../../../lib/tryouts/scoring/combinedScore'
 
 interface RankedPlayer {
   player:          { id: string; first_name: string; last_name: string; age_group: string; tryout_age_group: string | null; prior_team: string | null }
@@ -60,6 +61,24 @@ interface Team {
   color:     string | null
 }
 
+// Optional identity/registration detail — not fetched by Rankings today, but
+// populated when this card is reused from the Data Hub (which has the fuller
+// per-player identity record). Rendered as an extra section when present.
+export interface PlayerRegistrationDetail {
+  grade:            string | null
+  school:           string | null
+  priorOrg:         string | null
+  parentEmail:      string | null
+  parentPhone:      string | null
+  guardianName:     string | null
+  address:          string | null
+  registrationDate: string | null
+  preferredDate:    string | null
+  jerseyNumber:     string | null
+  rosterTeam:       string | null
+  registered:       boolean
+}
+
 interface Props {
   player:          RankedPlayer
   gcRow:           GcStatRow | null
@@ -67,6 +86,8 @@ interface Props {
   teams:           Team[]
   totalInAge:      number
   onClose:         () => void
+  weights?:        SeasonWeights
+  registration?:   PlayerRegistrationDetail | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -146,6 +167,17 @@ function ScoreRow({ label, value, rank, totalInAge, color, max = 5 }: {
   )
 }
 
+function RegRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null
+  const s = { muted: `rgba(var(--fg-rgb), 0.55)` as const }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px', marginBottom: '6px' }}>
+      <span style={{ fontSize: '12px', color: s.muted }}>{label}</span>
+      <span style={{ fontSize: '12.5px', color: 'var(--fg)' }}>{value}</span>
+    </div>
+  )
+}
+
 function StatChip({ label, value, color }: { label: string; value: string | null; color?: string }) {
   return (
     <div style={{
@@ -166,7 +198,7 @@ function StatChip({ label, value, color }: { label: string; value: string | null
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, totalInAge, onClose }: Props) {
+export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, totalInAge, onClose, weights = DEFAULT_SEASON_WEIGHTS, registration }: Props) {
   const team = teams.find(t => t.id === rp.assignedTeamId)
   const teamColor = team?.name?.toLowerCase() === 'blue'  ? '#4090E0'
                   : team?.name?.toLowerCase() === 'white' ? 'rgba(var(--fg-rgb),0.5)'
@@ -197,6 +229,21 @@ export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, t
     muted: `rgba(var(--fg-rgb), 0.55)` as const,
     dim:   `rgba(var(--fg-rgb), 0.35)` as const,
   }
+
+  const weightCaption = useMemo(() => {
+    const parts = [
+      ['Tryout', weights.tryoutWeight],
+      ['Coach Eval', weights.coachEvalWeight],
+      ['Intangibles', weights.intangiblesWeight],
+      ['Season Stats', weights.priorStatsWeight],
+    ] as const
+    const desc = parts
+      .filter(([, w]) => w > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, w]) => `${Math.round(w * 100)}% ${label}`)
+      .join(' + ')
+    return `${desc}. Redistributed across whichever sources are available for this player.`
+  }, [weights])
 
   // GC stats that have non-null values, grouped by category
   const gcBatting  = GC_STAT_DEFS.filter(d => d.category === 'batting'  && gcRow && (gcRow as any)[d.key] != null)
@@ -293,9 +340,26 @@ export default function PlayerCard({ player: rp, gcRow, ageGroupGcRows, teams, t
           <Section label="Combined Score" color="var(--accent)">
             <ScoreRow label="Combined" value={rp.combinedScore} rank={rp.combinedRank} totalInAge={totalInAge} color="var(--accent)" />
             <div style={{ fontSize: '11px', color: s.dim, marginTop: '4px', lineHeight: 1.5 }}>
-              33% Tryout + 67% Coach Eval. Falls back to whichever source is available.
+              {weightCaption}
             </div>
           </Section>
+
+          {/* Registration — only present when this card is opened from Data Hub */}
+          {registration && (
+            <Section label="Registration" color="var(--status-info)">
+              <RegRow label="Registered"  value={registration.registered ? 'Yes' : 'No'} />
+              <RegRow label="Prior team"  value={registration.rosterTeam ?? registration.priorOrg} />
+              <RegRow label="Jersey #"    value={registration.jerseyNumber} />
+              <RegRow label="Grade"       value={registration.grade} />
+              <RegRow label="School"      value={registration.school} />
+              <RegRow label="Guardian"    value={registration.guardianName} />
+              <RegRow label="Email"       value={registration.parentEmail} />
+              <RegRow label="Phone"       value={registration.parentPhone} />
+              <RegRow label="Address"     value={registration.address} />
+              <RegRow label="Registered on" value={registration.registrationDate} />
+              <RegRow label="Preferred date" value={registration.preferredDate} />
+            </Section>
+          )}
 
           {/* Tryout */}
           {(rp.tryoutScore != null || rp.tryoutPitching != null || rp.tryoutHitting != null || rp.speed != null) && (
