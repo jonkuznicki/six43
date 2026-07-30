@@ -34,6 +34,14 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
   const [deleteError,   setDeleteError]   = useState<string | null>(null)
   const [copyFromId,    setCopyFromId]    = useState<string>('')
 
+  // "Seed Prior Rosters from <season>" — explicit per-season action, see
+  // handleSeedPriorRoster below.
+  const [seedTargetId,  setSeedTargetId]  = useState<string | null>(null)
+  const [seedSourceId,  setSeedSourceId]  = useState<string>('')
+  const [seeding,       setSeeding]       = useState(false)
+  const [seedError,     setSeedError]     = useState<string | null>(null)
+  const [seedResult,    setSeedResult]    = useState<{ seeded: number; skippedExcluded: number; skippedNoTeam: number; sourceLabel: string } | null>(null)
+
   // Form state — shared for create and edit
   const [label,     setLabel]     = useState('')
   const [year,      setYear]      = useState(new Date().getFullYear())
@@ -185,6 +193,41 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
 
     setSaving(false)
     cancelForm()
+  }
+
+  function openSeed(seasonId: string) {
+    setSeedTargetId(seasonId)
+    setSeedSourceId('')
+    setSeedError(null)
+    setSeedResult(null)
+  }
+
+  function closeSeed() {
+    setSeedTargetId(null)
+    setSeedSourceId('')
+    setSeedError(null)
+    setSeedResult(null)
+  }
+
+  async function runSeedPriorRoster() {
+    if (!seedTargetId || !seedSourceId) return
+    setSeeding(true)
+    setSeedError(null)
+    setSeedResult(null)
+    try {
+      const res = await fetch('/api/tryouts/seed-prior-roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: params.orgId, targetSeasonId: seedTargetId, sourceSeasonId: seedSourceId }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setSeedError(json.error ?? 'Seed failed'); return }
+      setSeedResult({ seeded: json.seeded, skippedExcluded: json.skippedExcluded, skippedNoTeam: json.skippedNoTeam, sourceLabel: json.sourceLabel })
+    } catch (e: any) {
+      setSeedError(e?.message ?? 'Seed failed')
+    } finally {
+      setSeeding(false)
+    }
   }
 
   async function setActive(id: string) {
@@ -429,6 +472,14 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                       border: '0.5px solid var(--border-md)', background: 'var(--bg-input)',
                       color: s.muted, cursor: 'pointer',
                     }}>Edit</button>
+                    {seasons.length > 1 && (
+                      <button onClick={() => seedTargetId === season.id ? closeSeed() : openSeed(season.id)} style={{
+                        fontSize: '12px', padding: '5px 12px', borderRadius: '5px',
+                        border: '0.5px solid rgba(75,156,211,0.4)',
+                        background: seedTargetId === season.id ? 'rgba(75,156,211,0.14)' : 'rgba(75,156,211,0.06)',
+                        color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
+                      }}>Seed prior roster…</button>
+                    )}
                     <button onClick={() => setDeleteId(season.id)} style={{
                       fontSize: '12px', padding: '5px 12px', borderRadius: '5px',
                       border: '0.5px solid rgba(220,60,60,0.35)',
@@ -437,6 +488,58 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                     }}>Delete</button>
                   </div>
                 </div>
+
+                {/* Seed Prior Rosters panel */}
+                {seedTargetId === season.id && (
+                  <div style={{
+                    marginTop: '12px', paddingTop: '12px', borderTop: '0.5px solid var(--border)',
+                  }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
+                      Seed prior-roster context for {season.label}
+                    </div>
+                    <div style={{ fontSize: '12px', color: s.dim, marginBottom: '10px', maxWidth: '520px', lineHeight: 1.6 }}>
+                      Reads the source season&apos;s <b>accepted, non-excluded</b> final roster and snapshots each
+                      player&apos;s prior team/age group for {season.label}. Does not touch {season.label}&apos;s own
+                      team assignments, acceptance, scores, or evaluations — those all start fresh.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select
+                        value={seedSourceId}
+                        onChange={e => { setSeedSourceId(e.target.value); setSeedResult(null); setSeedError(null) }}
+                        style={{ background: 'var(--bg-input)', border: '0.5px solid var(--border-md)', borderRadius: '7px', padding: '7px 10px', fontSize: '13px', color: 'var(--fg)', minWidth: '200px' }}
+                      >
+                        <option value="">— Choose source season —</option>
+                        {seasons.filter(s2 => s2.id !== season.id).map(s2 => (
+                          <option key={s2.id} value={s2.id}>{s2.label}</option>
+                        ))}
+                      </select>
+                      <button onClick={runSeedPriorRoster} disabled={!seedSourceId || seeding} style={{
+                        padding: '7px 16px', borderRadius: '7px', border: 'none',
+                        background: 'var(--accent)', color: 'var(--accent-text)',
+                        fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                        opacity: !seedSourceId || seeding ? 0.5 : 1,
+                      }}>{seeding ? 'Seeding…' : 'Run seed'}</button>
+                      <button onClick={closeSeed} style={{
+                        padding: '7px 12px', borderRadius: '7px',
+                        border: '0.5px solid var(--border-md)', background: 'transparent',
+                        color: s.muted, fontSize: '13px', cursor: 'pointer',
+                      }}>Close</button>
+                    </div>
+                    {seedError && (
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#DC3C3C', background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,60,60,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+                        Error: {seedError}
+                      </div>
+                    )}
+                    {seedResult && (
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#6DB875', background: 'rgba(109,184,117,0.08)', border: '0.5px solid rgba(109,184,117,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+                        Seeded {seedResult.seeded} player{seedResult.seeded !== 1 ? 's' : ''} from {seedResult.sourceLabel}&apos;s final roster.
+                        {seedResult.skippedExcluded > 0 && ` Skipped ${seedResult.skippedExcluded} excluded.`}
+                        {seedResult.skippedNoTeam > 0 && ` Skipped ${seedResult.skippedNoTeam} with no matching team.`}
+                        {' '}Re-running this is safe — it updates the same snapshot rather than duplicating it.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

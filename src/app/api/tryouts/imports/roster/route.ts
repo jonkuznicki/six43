@@ -3,7 +3,8 @@
  *
  * Accepts a roster file (CSV/XLSX) with: First Name, Last Name, DOB, Team, Jersey #
  * Matches each row against existing tryout_players using the identity resolver.
- * On auto-match: updates prior_team and jersey_number.
+ * On auto-match: writes team/jersey to tryout_roster_staging (season-scoped) —
+ * NOT to tryout_players, which no longer carries these season-specific facts.
  * Creates a tryout_import_jobs record for review of unresolved rows.
  */
 
@@ -109,16 +110,14 @@ export async function POST(req: NextRequest) {
   const suggestedCount  = matchReport.filter(r => r.status === 'suggested').length
   const unresolvedCount = matchReport.filter(r => r.status === 'unresolved').length
 
-  // Apply auto-matches: update prior_team and jersey_number
+  // prior_team / jersey_number are season-specific facts — this used to
+  // overwrite them directly on tryout_players (the master player record),
+  // silently clobbering whatever a prior season's roster import had set.
+  // They're captured season-scoped below in tryout_roster_staging instead;
+  // "prior team before this season" now comes from
+  // tryout_prior_roster_context, seeded explicitly from a completed
+  // season's final roster — see the season-rollover work.
   const autoRows = matchReport.filter(r => r.status === 'auto' && r.resolvedPlayerId)
-  if (autoRows.length > 0) {
-    await Promise.all(autoRows.map(r =>
-      supabase.from('tryout_players').update({
-        prior_team:    r.teamName,
-        ...(r.jerseyNumber ? { jersey_number: r.jerseyNumber } : {}),
-      }).eq('id', r.resolvedPlayerId)
-    ))
-  }
 
   // Write roster staging for auto-matched rows
   if (autoRows.length > 0 && seasonId) {

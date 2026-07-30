@@ -237,24 +237,33 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     if (!seasonData) { setLoading(false); return }
 
     const [{ data: evalData }, { data: playerData }, { data: submissionData }] = await Promise.all([
+      // Season-scoped — an org-wide fetch here would let a prior season's
+      // submission appear (or, worse, win the player_id map below) in the
+      // active season's admin grid.
       supabase.from('tryout_coach_evals')
         .select('player_id, coach_name, team_label, season_year, status, scores, comments, submitted_at')
-        .eq('org_id', params.orgId)
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('submitted_at', { ascending: false }),
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, prior_team')
         .eq('org_id', params.orgId).eq('is_active', true)
         .order('last_name').order('first_name'),
+      // tryout_coach_eval_submissions has no season_id column — season_year
+      // is the only scoping key, and every write path sets it to
+      // (season.year - 1), matching tryout_coach_evals' own convention.
       supabase.from('tryout_coach_eval_submissions')
         .select('team_label, overall_notes')
-        .eq('org_id', params.orgId),
+        .eq('org_id', params.orgId).eq('season_year', String(seasonData.year - 1)),
     ])
 
     setPlayers(playerData ?? [])
 
     const scores: Record<string, Record<string, number | null>> = {}
     const meta: Record<string, EvalMeta> = {}
+    // Rows are ordered submitted_at DESC; keep only the first (most recent)
+    // row per player so an older submission can never clobber a newer one.
     for (const ev of (evalData ?? [])) {
+      if (scores[ev.player_id]) continue
       scores[ev.player_id] = ev.scores ?? {}
       meta[ev.player_id] = { status: ev.status, coach_name: ev.coach_name, submitted_at: ev.submitted_at, comments: ev.comments ?? null }
     }
@@ -478,6 +487,7 @@ export default function CoachEvalsPage({ params }: { params: { orgId: string } }
     await supabase.from('tryout_coach_evals').upsert({
       player_id:   player.id,
       org_id:      params.orgId,
+      season_id:   season.id,
       season_year: String(evalYear),
       team_label:  player.prior_team ?? '',
       coach_name:  evalMeta[player.id]?.coach_name || myName || 'Admin',

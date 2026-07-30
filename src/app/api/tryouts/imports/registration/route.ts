@@ -198,6 +198,13 @@ export async function POST(req: NextRequest) {
   // Actual new-player creation for unresolved/suggested happens after review.
   if (newCount > 0 && candidatePool.length === 0) {
     const newRows = matchReport.filter(r => r.status === 'new')
+    // prior_team is deliberately NOT written here — it's a season-specific
+    // fact that used to live (and get silently overwritten) on the master
+    // player record. It's captured season-scoped below in
+    // tryout_registration_staging, and the authoritative "what team were
+    // they on before this season" answer now comes from
+    // tryout_prior_roster_context (seeded explicitly from a completed
+    // season's final roster) — see the season-rollover work.
     const newPlayers = newRows.map(r => ({
       org_id:               orgId,
       first_name:           r.createPayload.firstName,
@@ -212,7 +219,6 @@ export async function POST(req: NextRequest) {
       grade:                r.createPayload.grade,
       school:               r.createPayload.school,
       prior_org:            r.createPayload.priorOrg,
-      prior_team:           r.createPayload.priorTeam,
     }))
 
     const { data: createdPlayers } = await supabase

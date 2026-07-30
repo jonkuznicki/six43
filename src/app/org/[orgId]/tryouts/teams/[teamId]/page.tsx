@@ -9,6 +9,8 @@ import {
   computeCoachEvalScore,
   computeIntangiblesScore,
   computeCombinedScore,
+  selectActiveSeasonCoachEvals,
+  selectActiveSeasonEvalConfig,
   DEFAULT_SEASON_WEIGHTS,
   type SeasonWeights,
 } from '../../../../../../lib/tryouts/scoring/combinedScore'
@@ -42,12 +44,20 @@ interface RosterPlayer {
   isAccepted:           boolean
 }
 
-// Non-null, structural — a player has at most one active eval considered
-// (the latest season_year), matching Rankings' behavior.
+// A player has at most one eval considered per season — constrained to
+// this team's own season_id, never a prior season's. Matches Rankings.
 interface EvalRow {
   player_id:   string
+  season_id:   string | null
   season_year: string
   scores:      Record<string, number> | null
+}
+
+interface EvalConfigRow {
+  season_id: string | null
+  field_key: string
+  section:   string
+  weight:    number
 }
 
 export default function TeamRosterPage({ params }: { params: { orgId: string; teamId: string } }) {
@@ -95,12 +105,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       .from('tryout_sessions').select('id').eq('season_id', teamData.season_id)
     const sessionIds = (sessionRows ?? []).map((s: any) => s.id as string)
 
-    // Coach evals: same [year, year-1] window Rankings uses, not "every eval
-    // ever recorded for this player" — avoids picking up a stale prior-cycle
-    // eval when nothing recent exists.
-    const evalYears = seasonData ? [String(seasonData.year), String(seasonData.year - 1)] : []
-
-    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }] = await Promise.all([
+    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }, { data: rosterStagingData }] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
@@ -109,13 +114,13 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
             .select('player_id, tryout_score')
             .in('player_id', playerIds).in('session_id', sessionIds)
         : Promise.resolve({ data: [] as any[] }),
-      evalYears.length > 0
-        ? supabase.from('tryout_coach_evals')
-            .select('player_id, season_year, scores')
-            .in('player_id', playerIds).in('season_year', evalYears).eq('status', 'submitted')
-        : Promise.resolve({ data: [] as any[] }),
+      // Season-scoped, not a [year, year-1] window — see
+      // selectActiveSeasonCoachEvals in combinedScore.ts.
+      supabase.from('tryout_coach_evals')
+        .select('player_id, season_id, season_year, scores')
+        .in('player_id', playerIds).eq('season_id', teamData.season_id).eq('status', 'submitted'),
       supabase.from('tryout_coach_eval_config')
-        .select('field_key, section, weight').eq('org_id', params.orgId),
+        .select('season_id, field_key, section, weight').eq('org_id', params.orgId).eq('season_id', teamData.season_id),
       supabase.from('tryout_registration_staging')
         .select('player_id, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .eq('season_id', teamData.season_id)
@@ -126,11 +131,19 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
             .eq('org_id', params.orgId).eq('season_year', String(seasonData.year - 1))
             .in('player_id', playerIds)
         : Promise.resolve({ data: [] as any[] }),
+      // Jersey number is season-specific — tryout_players.jersey_number is
+      // legacy and no longer written by roster imports (see season-rollover
+      // work). This season's roster import is the source of truth.
+      supabase.from('tryout_roster_staging')
+        .select('player_id, jersey_number')
+        .eq('season_id', teamData.season_id)
+        .in('player_id', playerIds),
     ])
 
-    const evalConfig = evalCfg ?? []
+    const evalConfig = selectActiveSeasonEvalConfig((evalCfg ?? []) as EvalConfigRow[], teamData.season_id)
     const stagingMap: Record<string, any> = {}
     for (const s of (stagingData ?? [])) stagingMap[s.player_id] = s
+    const rosterStagingMap = new Map((rosterStagingData ?? []).map((r: any) => [r.player_id, r.jersey_number as string | null]))
     const gcMap: Record<string, { hitting: number | null; pitching: number | null }> = {}
     for (const g of (gcData ?? [])) gcMap[g.player_id] = { hitting: g.gc_hitting_score, pitching: g.gc_pitching_score }
 
@@ -144,15 +157,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       }
     }
 
-    // Latest submitted eval per player (by season_year) — same as Rankings,
-    // rather than blending scores across multiple years' evals together.
-    const evalByPlayer = new Map<string, EvalRow>()
-    for (const e of ((evalData ?? []) as EvalRow[])) {
-      const existing = evalByPlayer.get(e.player_id)
-      if (!existing || Number(e.season_year) > Number(existing.season_year)) {
-        evalByPlayer.set(e.player_id, e)
-      }
-    }
+    const evalByPlayer = selectActiveSeasonCoachEvals((evalData ?? []) as EvalRow[], teamData.season_id)
 
     const rosterPlayers: RosterPlayer[] = (playerData ?? []).map((p: any) => {
       const scores = scoresByPlayer[p.id] ?? []
@@ -181,6 +186,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         parent_phone:        st.parent_phone        ?? p.parent_phone        ?? null,
         guardian_first_name: st.guardian_first_name ?? p.guardian_first_name ?? null,
         guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
+        jersey_number:       rosterStagingMap.get(p.id) ?? p.jersey_number ?? null,
         tryoutAvg, coachEvalAvg, combinedScore,
         scoreCount: scores.length, evalCount: evalRow ? 1 : 0,
         isAccepted: acceptedMap.get(p.id) ?? false,

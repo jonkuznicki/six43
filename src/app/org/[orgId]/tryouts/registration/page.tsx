@@ -27,10 +27,21 @@ interface Player {
   first_name: string
   last_name:  string
   age_group:  string
-  prior_team: string | null
-  prior_org:  string | null
+  // prior_team/prior_org are legacy here — this page derives returning
+  // status from tryout_prior_roster_context (season-scoped) instead. See
+  // priorContextMap below.
   is_active:  boolean
   is_walkup:  boolean
+}
+
+// Snapshot of "what was true before this season" — seeded explicitly from a
+// completed prior season's final roster via "Seed Prior Rosters from
+// <season>" on the Seasons page. A player with NO row here this season is
+// either brand new or wasn't carried forward by the last seed run.
+interface PriorContextRow {
+  player_id:       string
+  prior_team_name: string | null
+  prior_age_group: string | null
 }
 
 const s = {
@@ -109,6 +120,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   const [season,  setSeason]  = useState<Season | null>(null)
   const [regs,    setRegs]    = useState<RegRow[]>([])
   const [players, setPlayers] = useState<Player[]>([])
+  const [priorContext, setPriorContext] = useState<PriorContextRow[]>([])
   const [loading, setLoading] = useState(true)
 
   const [ageFilter,  setAgeFilter]  = useState<string>('all')
@@ -129,19 +141,24 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     setSeason(seasonData)
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: regData }, { data: playerData }] = await Promise.all([
+    const [{ data: regData }, { data: playerData }, { data: priorContextData }] = await Promise.all([
       supabase
         .from('tryout_registration_staging')
         .select('player_id, player_first_name, player_last_name, age_group, preferred_tryout_date, prior_team, prior_org, dob, parent_email, parent_phone, school, registration_date, imported_at')
         .eq('season_id', seasonData.id),
       supabase
         .from('tryout_players')
-        .select('id, first_name, last_name, age_group, prior_team, prior_org, is_active, is_walkup')
+        .select('id, first_name, last_name, age_group, is_active, is_walkup')
         .eq('org_id', params.orgId),
+      supabase
+        .from('tryout_prior_roster_context')
+        .select('player_id, prior_team_name, prior_age_group')
+        .eq('season_id', seasonData.id),
     ])
 
     setRegs(regData ?? [])
     setPlayers(playerData ?? [])
+    setPriorContext(priorContextData ?? [])
     setLoading(false)
   }
 
@@ -197,49 +214,58 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
   const activePlayers = useMemo(() => players.filter(p => p.is_active), [players])
 
+  // Source of truth for "returning" — a row in tryout_prior_roster_context
+  // for THIS season, seeded explicitly from a completed prior season's
+  // final roster. Replaces the old tryout_players.prior_team != null
+  // proxy, which degraded over time (nothing ever reset it between
+  // seasons, so it just accumulated staleness).
+  const priorContextMap = useMemo(
+    () => new Map(priorContext.map(pc => [pc.player_id, pc])),
+    [priorContext]
+  )
+  const isReturning = (playerId: string) => priorContextMap.has(playerId)
+  const priorTeamNameFor = (playerId: string) => priorContextMap.get(playerId)?.prior_team_name ?? null
+
   const isOther = (val: string | null) => val?.trim().toLowerCase() === 'other'
-  const is14U   = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(p.prior_team ?? '')
+  const is14U   = (p: Player) => p.age_group === '14U' || /\b14[Uu]\b/.test(priorTeamNameFor(p.id) ?? '')
 
   const returning = useMemo(() =>
     filtered.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return false
-      const p = players.find(pl => pl.id === r.player_id)
-      return p && p.prior_team != null
+      return isReturning(r.player_id)
     }),
-  [filtered, players])
+  [filtered, priorContextMap])
 
   const returningByTeam = useMemo(() => {
     const map = new Map<string, RegRow[]>()
     returning.forEach(r => {
-      const p = players.find(pl => pl.id === r.player_id)
-      const team = p?.prior_team ?? 'Unknown'
+      const team = priorTeamNameFor(r.player_id) ?? 'Unknown'
       if (!map.has(team)) map.set(team, [])
       map.get(team)!.push(r)
     })
     return Array.from(map.entries())
       .map(([team, rows]) => ({ team, rows }))
       .sort((a, b) => (parseInt(a.team.match(/\d+/)?.[0] ?? '999') || 999) - (parseInt(b.team.match(/\d+/)?.[0] ?? '999') || 999))
-  }, [returning, players])
+  }, [returning, priorContextMap])
 
   // All eligible prior HBA players (used to show coverage: X of Y have registered)
   const eligibleHbaPlayers = useMemo(() =>
-    activePlayers.filter(p => p.prior_team != null && !p.is_walkup && !is14U(p)),
-  [activePlayers])
+    activePlayers.filter(p => isReturning(p.id) && !p.is_walkup && !is14U(p)),
+  [activePlayers, priorContextMap])
 
   const missingPlayers = useMemo(() => {
     return activePlayers
-      .filter(p => p.prior_team != null && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p))
+      .filter(p => isReturning(p.id) && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p))
       .filter(p => ageFilter === 'all' || p.age_group === ageFilter)
-      .sort((a, b) => (a.prior_team ?? '').localeCompare(b.prior_team ?? '') || a.last_name.localeCompare(b.last_name))
-  }, [activePlayers, registeredIds, ageFilter])
+      .sort((a, b) => (priorTeamNameFor(a.id) ?? '').localeCompare(priorTeamNameFor(b.id) ?? '') || a.last_name.localeCompare(b.last_name))
+  }, [activePlayers, registeredIds, ageFilter, priorContextMap])
 
   const newPlayers = useMemo(() =>
     filtered.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return true
-      const p = players.find(pl => pl.id === r.player_id)
-      return !p || p.prior_team == null
+      return !isReturning(r.player_id)
     }),
-  [filtered, players])
+  [filtered, priorContextMap])
 
   const orgLabel = (r: RegRow) => {
     if (isOther(r.prior_team)) return r.prior_org?.trim() || 'Other (not specified)'
@@ -315,16 +341,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
     const allReturning = regs.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return false
-      const p = players.find(pl => pl.id === r.player_id)
-      return p && p.prior_team != null
+      return isReturning(r.player_id)
     })
     const allNew = regs.filter(r => {
       if (isOther(r.prior_team) || isOther(r.prior_org)) return true
-      const p = players.find(pl => pl.id === r.player_id)
-      return !p || p.prior_team == null
+      return !isReturning(r.player_id)
     })
     const allMissing = activePlayers.filter(p =>
-      p.prior_team != null && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p)
+      isReturning(p.id) && !p.is_walkup && !registeredIds.has(p.id) && !is14U(p)
     )
 
     const ageCounts = new Map<string, number>()
@@ -368,14 +392,14 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
     const teamTotals = new Map<string, number>()
     activePlayers
-      .filter(p => p.prior_team != null && !p.is_walkup)
+      .filter(p => isReturning(p.id) && !p.is_walkup)
       .forEach(p => {
-        if (p.prior_team) teamTotals.set(p.prior_team, (teamTotals.get(p.prior_team) ?? 0) + 1)
+        const team = priorTeamNameFor(p.id)
+        if (team) teamTotals.set(team, (teamTotals.get(team) ?? 0) + 1)
       })
     const teamRegistered = new Map<string, number>()
     allReturning.forEach(r => {
-      const p = players.find(pl => pl.id === r.player_id)
-      const team = p?.prior_team
+      const team = priorTeamNameFor(r.player_id)
       if (team) teamRegistered.set(team, (teamRegistered.get(team) ?? 0) + 1)
     })
     const teamLines = Array.from(teamTotals.entries())
@@ -419,7 +443,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
     }
 
     return lines.join('\n')
-  }, [regs, players, activePlayers, registeredIds, eligibleHbaPlayers, issues, duplicates, season])
+  }, [regs, players, activePlayers, registeredIds, eligibleHbaPlayers, priorContextMap, issues, duplicates, season])
 
   function copyToClipboard() {
     navigator.clipboard.writeText(emailSummary).then(() => {
@@ -650,7 +674,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
                 {missingPlayers.map(p => (
                   <tr key={p.id} style={{ borderBottom: '0.5px solid rgba(var(--fg-rgb),0.05)' }}>
                     <td style={{ padding: '8px 18px', fontWeight: 500 }}>{p.first_name} {p.last_name}</td>
-                    <td style={{ padding: '8px 18px', color: s.muted }}>{p.prior_team}</td>
+                    <td style={{ padding: '8px 18px', color: s.muted }}>{priorTeamNameFor(p.id)}</td>
                     <td style={{ padding: '8px 18px', color: s.muted }}>{p.age_group}</td>
                   </tr>
                 ))}

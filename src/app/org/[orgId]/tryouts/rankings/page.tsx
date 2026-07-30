@@ -14,6 +14,8 @@ import {
   computeCoachEvalScore,
   computeIntangiblesScore,
   computeCombinedScore,
+  selectActiveSeasonCoachEvals,
+  selectActiveSeasonEvalConfig,
   DEFAULT_SEASON_WEIGHTS,
   type SeasonWeights,
 } from '../../../../../lib/tryouts/scoring/combinedScore'
@@ -39,6 +41,7 @@ interface TryoutScoreRow {
 
 interface CoachEvalRow {
   player_id:        string
+  season_id:        string | null
   season_year:      string
   computed_score:   number | null
   coach_eval_score: number | null
@@ -48,6 +51,7 @@ interface CoachEvalRow {
 }
 
 interface EvalConfigRow {
+  season_id: string | null
   field_key: string
   section:   string
   weight:    number
@@ -115,6 +119,16 @@ export interface PlayerActionItem {
   due_date:   string | null
 }
 
+// Snapshot of "what was true before this season" — seeded explicitly via
+// "Seed Prior Rosters from <season>" (Seasons page). Replaces reading
+// tryout_players.prior_team, which used to get silently overwritten by
+// every subsequent season's import.
+export interface PriorContextRow {
+  player_id:       string
+  prior_team_name: string | null
+  prior_age_group: string | null
+}
+
 interface RankedPlayer {
   player:          Player
   ageGroup:        string
@@ -179,6 +193,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
   const [evalConfig,    setEvalConfig]    = useState<EvalConfigRow[]>([])
   const [scoringConfig, setScoringConfig] = useState<ScoringCategory[]>([])
   const [gcRows,        setGcRows]        = useState<GcStatRow[]>([])
+  const [priorContext,  setPriorContext]  = useState<PriorContextRow[]>([])
   const [teams,         setTeams]         = useState<Team[]>([])
   const [assignments,   setAssignments]   = useState<Record<string, string>>({})
   const [notesMap,      setNotesMap]      = useState<Record<string, string>>({})
@@ -273,6 +288,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       { data: assignData },
       { data: combinedData },
       { data: actionItemData },
+      { data: priorContextData },
     ] = await Promise.all([
       supabase.from('tryout_players')
         .select('id, first_name, last_name, age_group, tryout_age_group, prior_team, grade')
@@ -285,15 +301,19 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             .in('session_id', sessionIds)
         : Promise.resolve({ data: [] as any[], error: null }),
 
+      // Season-scoped, not a [this year, last year] window — a player with
+      // no evaluation for THIS season has no eval, full stop. Never fall
+      // back to a prior season's submission. See combinedScore.ts.
       supabase.from('tryout_coach_evals')
-        .select('player_id, season_year, computed_score, coach_eval_score, intangibles_score, scores, comments')
+        .select('player_id, season_id, season_year, computed_score, coach_eval_score, intangibles_score, scores, comments')
         .eq('org_id', params.orgId)
-        .in('season_year', [String(seasonData.year), String(seasonData.year - 1)])
+        .eq('season_id', seasonData.id)
         .eq('status', 'submitted'),
 
       supabase.from('tryout_coach_eval_config')
-        .select('field_key, section, weight')
+        .select('season_id, field_key, section, weight')
         .eq('org_id', params.orgId)
+        .eq('season_id', seasonData.id)
         .order('sort_order'),
 
       supabase.from('tryout_scoring_config')
@@ -322,11 +342,20 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .in('status', ['open', 'waiting', 'in_progress', 'blocked'])
         .order('updated_at', { ascending: false }),
+
+      // "Previous team" for the active season — seeded explicitly from a
+      // completed prior season's final roster (Seasons page). Replaces the
+      // old tryout_players.prior_team read, which froze/degraded across
+      // seasons since nothing reset it.
+      supabase.from('tryout_prior_roster_context')
+        .select('player_id, prior_team_name, prior_age_group')
+        .eq('season_id', seasonData.id),
     ])
 
     setPlayers(playerData ?? [])
     setTryoutRows(tryoutData ?? [])
     setEvalRows(evalData ?? [])
+    setPriorContext(priorContextData ?? [])
     setEvalConfig(evalCfgData ?? [])
     setScoringConfig((scoringCfgData ?? []).map((c: any) => ({
       category: c.category, label: c.label, weight: c.weight,
@@ -560,6 +589,11 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     priorStatsWeight:  season.prior_stats_weight,
   } : DEFAULT_SEASON_WEIGHTS, [season])
 
+  const priorTeamMap = useMemo(
+    () => new Map(priorContext.map(pc => [pc.player_id, pc.prior_team_name])),
+    [priorContext]
+  )
+
   const ranked = useMemo((): RankedPlayer[] => {
     // Per-player tryout: average across evaluators
     const tryoutByPlayer = new Map<string, TryoutScoreRow[]>()
@@ -568,14 +602,16 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       tryoutByPlayer.get(r.player_id)!.push(r)
     }
 
-    // Per-player eval: prefer the higher season_year when evals exist for multiple years
-    const evalByPlayer = new Map<string, CoachEvalRow>()
-    for (const r of evalRows) {
-      const existing = evalByPlayer.get(r.player_id)
-      if (!existing || Number(r.season_year) > Number(existing.season_year)) {
-        evalByPlayer.set(r.player_id, r)
-      }
-    }
+    // Per-player eval — constrained to the active season only. See
+    // selectActiveSeasonCoachEvals in combinedScore.ts: a player with no
+    // row for this season_id has no eval, never a prior season's.
+    const evalByPlayer = season
+      ? selectActiveSeasonCoachEvals(evalRows, season.id)
+      : new Map<string, CoachEvalRow>()
+
+    const scopedEvalConfig = season
+      ? selectActiveSeasonEvalConfig(evalConfig, season.id)
+      : []
 
     // Per-player GC
     const gcByPlayer = new Map<string, GcStatRow>()
@@ -627,14 +663,14 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         // mutually exclusive — see combinedScore.ts — so neither double-counts
         // the other in the combined score below.
         const evalRow = evalByPlayer.get(player.id) ?? null
-        const rawCoachEval     = computeCoachEvalScore(evalRow?.scores ?? null, evalConfig)
+        const rawCoachEval     = computeCoachEvalScore(evalRow?.scores ?? null, scopedEvalConfig)
         const assignedTeamId   = assignments[player.id] ?? null
         const assignedTeam     = teams.find(t => t.id === assignedTeamId)
         const evalMultiplier   = assignedTeam?.eval_multiplier ?? 1.0
         const coachEval        = rawCoachEval != null
           ? Math.round(rawCoachEval * evalMultiplier * 100) / 100
           : null
-        const intangibles      = computeIntangiblesScore(evalRow?.scores ?? null, evalConfig)
+        const intangibles      = computeIntangiblesScore(evalRow?.scores ?? null, scopedEvalConfig)
         const teamPitching     = sectionAvg(evalRow?.scores ?? null, pitchingKeys)
         const teamHitting      = sectionAvg(evalRow?.scores ?? null, hittingKeys)
         const evalSpeed        = evalRow?.scores?.['speed']       != null ? Number(evalRow.scores['speed'])       : null
@@ -657,8 +693,13 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           seasonWeights,
         )
 
+        // "Prior team" for display/search/export comes from the season-scoped
+        // seed data, not the legacy tryout_players.prior_team field — falls
+        // back to it only if this season hasn't been seeded yet.
+        const playerForDisplay = { ...player, prior_team: priorTeamMap.get(player.id) ?? player.prior_team }
+
         return {
-          player,
+          player: playerForDisplay,
           ageGroup:       ag,
           tryoutScore,
           tryoutPitching,
@@ -707,7 +748,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
       coachRank:       coachRankMap.get(p.player.id)       ?? null,
       intangiblesRank: intangiblesRankMap.get(p.player.id) ?? null,
     }))
-  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, acceptedMap, evalConfig, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig, seasonWeights])
+  }, [players, tryoutRows, evalRows, gcRows, assignments, notesMap, excludedMap, acceptedMap, evalConfig, season, priorTeamMap, pitchingKeys, hittingKeys, intangiblesKeys, scoringConfig, seasonWeights])
 
   // ── Filter + sort ─────────────────────────────────────────────────────────────
 

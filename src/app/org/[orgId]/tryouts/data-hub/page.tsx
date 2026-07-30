@@ -11,6 +11,8 @@ import {
   computeIntangiblesScore,
   computeCombinedScore,
   denseRank,
+  selectActiveSeasonCoachEvals,
+  selectActiveSeasonEvalConfig,
   DEFAULT_SEASON_WEIGHTS,
   type SeasonWeights,
 } from '../../../../../lib/tryouts/scoring/combinedScore'
@@ -51,8 +53,8 @@ interface GcRow  {
   gc_hitting_score:  number|null
   gc_pitching_score: number|null
 }
-interface EvalField { field_key: string; label: string; section: string; sort_order: number; weight: number }
-interface EvalRow   { player_id: string; season_year: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
+interface EvalField { season_id: string | null; field_key: string; label: string; section: string; sort_order: number; weight: number }
+interface EvalRow   { player_id: string; season_id: string | null; season_year: string; computed_score: number|null; scores: Record<string,number>|null; coach_name: string|null; team_label: string|null; comments: string|null }
 interface ScoreRow  { player_id: string; tryout_score: number|null; evaluator_name: string|null; session_id: string }
 interface TeamRow   { id: string; name: string; age_group: string; color: string | null }
 
@@ -232,10 +234,14 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       syear
         ? supabase.from('tryout_gc_stats').select('player_id,season_year,team_label,games_played,avg,obp,slg,ops,h,doubles,triples,hr,rbi,r,bb,so,sb,hbp,sac,tb,k,bb_allowed,era,whip,ip,w,sv,k_bb,strike_pct,gc_computed_score,bf,baa,bb_per_inn,gc_hitting_score,gc_pitching_score').eq('org_id', params.orgId).eq('season_year', String(syear - 1))
         : Promise.resolve({ data: [] as any[] }),
-      syear
-        ? supabase.from('tryout_coach_evals').select('player_id,season_year,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).in('season_year', [String(syear), String(syear - 1)]).eq('status', 'submitted')
+      // Season-scoped, not a [this year, last year] window — see
+      // selectActiveSeasonCoachEvals in combinedScore.ts.
+      sid
+        ? supabase.from('tryout_coach_evals').select('player_id,season_id,season_year,computed_score,scores,coach_name,team_label,comments').eq('org_id', params.orgId).eq('season_id', sid).eq('status', 'submitted')
         : Promise.resolve({ data: [] as any[] }),
-      supabase.from('tryout_coach_eval_config').select('field_key,label,section,sort_order,weight').eq('org_id', params.orgId).order('sort_order'),
+      sid
+        ? supabase.from('tryout_coach_eval_config').select('season_id,field_key,label,section,sort_order,weight').eq('org_id', params.orgId).eq('season_id', sid).order('sort_order')
+        : Promise.resolve({ data: [] as any[] }),
       sessionIds.length > 0
         ? supabase.from('tryout_scores').select('player_id,tryout_score,evaluator_name,session_id').in('session_id', sessionIds)
         : Promise.resolve({ data: [] as any[] }),
@@ -272,7 +278,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setRosterMap(new Map((rosterData ?? []).map((r: any) => [r.player_id, r])))
     setGcRows(gcData ?? [])
     setEvalRows(evalData ?? [])
-    setEvalConfig((evalCfgData ?? []).map((f: any) => ({ field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
+    setEvalConfig((evalCfgData ?? []).map((f: any) => ({ season_id: f.season_id, field_key: f.field_key, label: f.label, section: f.section, sort_order: f.sort_order, weight: f.weight ?? 1 })))
     setScoreRows(scoreData ?? [])
     setTeams(teamsData ?? [])
     setAssignedTeamMap(assignMap)
@@ -427,16 +433,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   // ── Per-player scoring (shared with Rankings — see lib/tryouts/scoring/combinedScore.ts) ──
 
   const gcMap = useMemo(() => new Map(gcRows.map(r => [r.player_id, r])), [gcRows])
-  // Latest submitted eval per player (by season_year) — matches Rankings,
-  // rather than an arbitrary row when a player has evals from multiple years.
-  const evalMap = useMemo(() => {
-    const map = new Map<string, EvalRow>()
-    for (const r of evalRows) {
-      const existing = map.get(r.player_id)
-      if (!existing || Number(r.season_year) > Number(existing.season_year)) map.set(r.player_id, r)
-    }
-    return map
-  }, [evalRows])
+  // Constrained to the active season only — see selectActiveSeasonCoachEvals
+  // in combinedScore.ts. A player with no eval for THIS season has none,
+  // never a prior season's.
+  const evalMap = useMemo(
+    () => seasonId ? selectActiveSeasonCoachEvals(evalRows, seasonId) : new Map<string, EvalRow>(),
+    [evalRows, seasonId]
+  )
+  const scopedEvalConfig = useMemo(
+    () => seasonId ? selectActiveSeasonEvalConfig(evalConfig, seasonId) : [],
+    [evalConfig, seasonId]
+  )
   const scoreAvgMap = useMemo(() => {
     const byPlayer = new Map<string, number[]>()
     for (const r of scoreRows) {
@@ -464,8 +471,8 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     for (const p of players) {
       const tryoutScore = scoreAvgMap.get(p.id)?.avg ?? null
       const evalRow = evalMap.get(p.id) ?? null
-      const coachEvalScore = computeCoachEvalScore(evalRow?.scores ?? null, evalConfig)
-      const intangibles = computeIntangiblesScore(evalRow?.scores ?? null, evalConfig)
+      const coachEvalScore = computeCoachEvalScore(evalRow?.scores ?? null, scopedEvalConfig)
+      const intangibles = computeIntangiblesScore(evalRow?.scores ?? null, scopedEvalConfig)
       const gcRow = gcMap.get(p.id) ?? null
       const gcHitting = gcRow?.gc_hitting_score ?? null
       const gcPitching = gcRow?.gc_pitching_score ?? null
@@ -492,7 +499,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     const out = new Map<string, ScoredPlayer>()
     for (const [id, v] of Array.from(base)) out.set(id, { ...v, combinedRank: rankMap.get(id) ?? null })
     return out
-  }, [players, scoreAvgMap, evalMap, evalConfig, gcMap, seasonWeights])
+  }, [players, scoreAvgMap, evalMap, scopedEvalConfig, gcMap, seasonWeights])
 
   interface DataStatus { count: number; reg: boolean; roster: boolean; score: boolean; eval: boolean; gc: boolean }
 

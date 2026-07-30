@@ -198,15 +198,8 @@ async function writeGcStatsForPlayer({ supabase, row, playerId, orgId, seasonId 
 
 async function confirmMatch({ supabase, job, report, row, playerId, userId }: any) {
   if (job.type === 'roster') {
-    // Roster: update prior_team and jersey number on the player record
-    await supabase
-      .from('tryout_players')
-      .update({
-        prior_team:    row.teamName ?? null,
-        ...(row.jerseyNumber ? { jersey_number: row.jerseyNumber } : {}),
-      })
-      .eq('id', playerId)
-
+    // Roster: team/jersey are season-specific — written to tryout_roster_staging
+    // below only, never back onto the master tryout_players record.
     // Create alias
     await supabase.from('tryout_player_aliases').insert({
       player_id:     playerId,
@@ -273,7 +266,9 @@ async function confirmMatch({ supabase, job, report, row, playerId, userId }: an
           ...(payload.grade             ? { grade:               payload.grade }             : {}),
           ...(payload.school            ? { school:              payload.school }            : {}),
           ...(payload.priorOrg          ? { prior_org:           payload.priorOrg }          : {}),
-          ...(payload.priorTeam         ? { prior_team:          payload.priorTeam }         : {}),
+          // prior_team is intentionally NOT written to tryout_players — see
+          // tryout_registration_staging below and tryout_prior_roster_context
+          // (seeded from a completed season's final roster).
         })
         .eq('id', playerId)
     }
@@ -361,10 +356,10 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
       last_name:    lastName,
       dob:          payload?.dob ?? row.dob ?? null,
       age_group:    payload?.ageGroup ?? row.ageGroup ?? null,
-      ...(isRoster ? {
-        prior_team:    row.teamName ?? null,
-        jersey_number: row.jerseyNumber ?? null,
-      } : {
+      // prior_team/jersey_number are season-specific — captured in
+      // tryout_roster_staging / tryout_registration_staging below instead
+      // of the master tryout_players record.
+      ...(isRoster ? {} : {
         parent_email:        payload?.parentEmail ?? null,
         parent_phone:        payload?.parentPhone ?? null,
         guardian_first_name: payload?.guardianFirstName ?? null,
@@ -372,7 +367,6 @@ async function createNewPlayer({ supabase, job, report, row, userId }: any) {
         grade:               payload?.grade ?? null,
         school:              payload?.school ?? null,
         prior_org:           payload?.priorOrg ?? null,
-        prior_team:          payload?.priorTeam ?? null,
         tryout_age_group:    payload?.ageGroup ?? null,
       }),
     })
@@ -474,11 +468,8 @@ async function confirmAllSuggested({ supabase, job, report, userId }: any) {
     if (job.type === 'gc_stats' && job.season_id) {
       await writeGcStatsForPlayer({ supabase, row, playerId: topCandidate.id, orgId: job.org_id, seasonId: job.season_id })
     } else if (isRoster) {
-      // Update player record
-      await supabase.from('tryout_players').update({
-        prior_team:    row.teamName ?? null,
-        ...(row.jerseyNumber ? { jersey_number: row.jerseyNumber } : {}),
-      }).eq('id', topCandidate.id)
+      // Team/jersey are season-specific — written to tryout_roster_staging
+      // below only, not back onto the master tryout_players record.
 
       // Write roster staging
       if (job.season_id) {
@@ -656,8 +647,8 @@ async function createAllNew({ supabase, job, report, userId }: any) {
         dob:                 payload?.dob ?? row.dob ?? null,
         age_group:           payload?.ageGroup ?? row.ageGroup ?? null,
         tryout_age_group:    payload?.ageGroup ?? row.ageGroup ?? null,
-        prior_team:          row.teamName ?? payload?.priorTeam ?? null,
-        jersey_number:       row.jerseyNumber ?? null,
+        // prior_team/jersey_number: season-specific, captured in
+        // tryout_roster_staging (below) instead of the master record.
         parent_email:        payload?.parentEmail ?? null,
         parent_phone:        payload?.parentPhone ?? null,
         guardian_first_name: payload?.guardianFirstName ?? null,

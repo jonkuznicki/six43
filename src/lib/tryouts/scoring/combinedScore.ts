@@ -41,6 +41,56 @@ export interface EvalConfigField {
   weight: number
 }
 
+export interface SeasonScopedCoachEval {
+  player_id:   string
+  season_id:   string | null
+  season_year: string
+}
+
+/**
+ * Selects each player's coach evaluation for ONE specific season only.
+ *
+ * Rankings/Data Hub/Team Detail previously picked "whichever row has the
+ * higher season_year" out of a [this year, last year] window, which meant
+ * a player with only a prior-season evaluation on file would have that
+ * evaluation silently scored as if it were current. This never substitutes
+ * across seasons: a player with no row matching `activeSeasonId` simply has
+ * no eval this season — the caller gets `undefined`, not an older one.
+ *
+ * The `season_year > season_year` tiebreak only matters as a defensive
+ * fallback if two rows somehow share a season_id (shouldn't happen given
+ * the `(player_id, org_id, season_year)` unique constraint plus season_id
+ * being set on every write path) — it never reaches across seasons.
+ */
+export function selectActiveSeasonCoachEvals<T extends SeasonScopedCoachEval>(
+  rows: T[],
+  activeSeasonId: string,
+): Map<string, T> {
+  const map = new Map<string, T>()
+  for (const r of rows) {
+    if (r.season_id !== activeSeasonId) continue
+    const existing = map.get(r.player_id)
+    if (!existing || Number(r.season_year) > Number(existing.season_year)) {
+      map.set(r.player_id, r)
+    }
+  }
+  return map
+}
+
+/**
+ * Filters coach-eval rubric config rows down to one season. Config rows
+ * carry a nullable `season_id` (null historically meant "org default"),
+ * but every write path in Scoring Setup writes a concrete season_id, so in
+ * practice this just guards against a 2027 config row leaking into a 2028
+ * read when both are fetched org-wide.
+ */
+export function selectActiveSeasonEvalConfig<T extends { season_id: string | null }>(
+  rows: T[],
+  activeSeasonId: string,
+): T[] {
+  return rows.filter(r => r.season_id === activeSeasonId)
+}
+
 /**
  * Standard competition ranking within a group — highest value = rank 1,
  * ties share a rank, and the rank after a tie skips (two players tied for

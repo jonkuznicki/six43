@@ -11,6 +11,11 @@ interface ImportJob { id: string; type: string; status: string; team_id: string 
 interface CoachEval { player_id: string; team_label: string; status: string; season_id: string }
 interface CheckinRow { session_id: string; player_id: string | null }
 interface ScoreRow   { session_id: string; player_id: string }
+// Season-scoped "prior team" snapshot — seeded explicitly from a completed
+// prior season's final roster (Seasons page). Replaces reading
+// tryout_players.prior_team, which used to get silently overwritten by
+// every subsequent season's import.
+interface PriorContextRow { player_id: string; prior_team_name: string | null }
 
 type ReadinessStatus = 'ready' | 'partial' | 'not_started'
 
@@ -33,7 +38,8 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
   const [coachEvals, setCoachEvals] = useState<CoachEval[]>([])
   const [checkins,  setCheckins]  = useState<CheckinRow[]>([])
   const [scores,    setScores]    = useState<ScoreRow[]>([])
-  const [players,   setPlayers]   = useState<{ id: string; age_group: string; prior_team: string | null }[]>([])
+  const [players,   setPlayers]   = useState<{ id: string; age_group: string }[]>([])
+  const [priorContext, setPriorContext] = useState<PriorContextRow[]>([])
   const [loading,   setLoading]   = useState(true)
   const [drill,     setDrill]     = useState<string | null>(null)  // expanded age group
   const [unlocking, setUnlocking] = useState<string | null>(null)  // team label being unlocked
@@ -50,6 +56,7 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
     const [
       { data: teamData }, { data: sessionData }, { data: jobData },
       { data: evalData }, { data: scoreData }, { data: playerData },
+      { data: priorContextData },
     ] = await Promise.all([
       supabase.from('tryout_teams').select('id, name, age_group')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id).eq('is_active', true),
@@ -61,8 +68,10 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
         .eq('org_id', params.orgId).eq('season_id', seasonData.id),
       supabase.from('tryout_scores').select('session_id, player_id')
         .eq('org_id', params.orgId),
-      supabase.from('tryout_players').select('id, age_group, prior_team')
+      supabase.from('tryout_players').select('id, age_group')
         .eq('org_id', params.orgId).eq('is_active', true),
+      supabase.from('tryout_prior_roster_context').select('player_id, prior_team_name')
+        .eq('season_id', seasonData.id),
     ])
 
     const sessionIds = (sessionData ?? []).map((s: any) => s.id)
@@ -77,6 +86,7 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
     setCheckins(checkinData ?? [])
     setScores(scoreData ?? [])
     setPlayers(playerData ?? [])
+    setPriorContext(priorContextData ?? [])
     setLoading(false)
   }
 
@@ -99,6 +109,11 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
     setUnlocking(null)
   }
 
+  const priorTeamByPlayer = useMemo(
+    () => new Map(priorContext.map(pc => [pc.player_id, pc.prior_team_name])),
+    [priorContext]
+  )
+
   const readiness = useMemo((): AgeGroupReadiness[] => {
     if (!season) return []
     const MIN_PCT = 0.90
@@ -110,7 +125,7 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
 
       // Coach evals per team
       const coachEvalRows = agTeams.map(team => {
-        const teamPlayers  = agPlayers.filter(p => p.prior_team === team.name)
+        const teamPlayers  = agPlayers.filter(p => priorTeamByPlayer.get(p.id) === team.name)
         const submitted    = coachEvals.filter(e => e.team_label === team.name && e.status === 'submitted')
         const uniquePlayers = new Set(submitted.map(e => e.player_id)).size
         const total         = teamPlayers.length || 1
@@ -152,7 +167,7 @@ export default function ReadinessPage({ params }: { params: { orgId: string } })
 
       return { ageGroup: ag, playerCount: agPlayers.length, coachEvals: coachEvalRows, gcStats: gcRows, sessions: sessionRows, overall }
     })
-  }, [season, teams, sessions, importJobs, coachEvals, checkins, scores, players])
+  }, [season, teams, sessions, importJobs, coachEvals, checkins, scores, players, priorTeamByPlayer])
 
   const readyCt   = readiness.filter(r => r.overall === 'ready').length
   const partialCt = readiness.filter(r => r.overall === 'partial').length
