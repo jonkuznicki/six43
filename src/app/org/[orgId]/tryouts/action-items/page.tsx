@@ -49,8 +49,8 @@ const STATUS_OPTIONS  = ['open', 'waiting', 'in_progress', 'blocked', 'completed
 
 const PRIORITY_STYLES: Record<string, { label: string; color: string }> = {
   low:    { label: 'Low',    color: `rgba(var(--fg-rgb),0.4)` },
-  normal: { label: 'Normal', color: '#80B0E8' },
-  high:   { label: 'High',   color: '#E87060' },
+  normal: { label: 'Normal', color: 'var(--status-info)' },
+  high:   { label: 'High',   color: 'var(--status-bad)' },
 }
 
 const FALLBACK_AGE_GROUPS = ['8U', '9U', '10U', '11U', '12U', '13U', '14U']
@@ -682,7 +682,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
               padding: '8px 18px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
               background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer',
             }}>Cancel</button>
-            {saveError && <span style={{ fontSize: '12px', color: '#E87060' }}>Error: {saveError}</span>}
+            {saveError && <span style={{ fontSize: '12px', color: 'var(--status-bad)' }}>Error: {saveError}</span>}
           </div>
         </div>
       )}
@@ -710,11 +710,11 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
                 )}
                 <div style={{
                   background: 'var(--bg-card)', border: '0.5px solid var(--border)', borderRadius: '10px',
-                  padding: '10px 14px', borderLeft: overdue ? '3px solid #E87060' : '3px solid transparent',
+                  padding: '10px 14px', borderLeft: overdue ? '3px solid var(--status-bad)' : '3px solid transparent',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ flexShrink: 0 }}><StatusPill tone={statusTone}>{STATUS_LABEL[item.status] ?? item.status}</StatusPill></span>
-                    {overdue && <span style={{ fontSize: '10px', fontWeight: 800, color: '#E87060' }}>OVERDUE</span>}
+                    {overdue && <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--status-bad)' }}>OVERDUE</span>}
                     <div style={{ fontWeight: 700, fontSize: '13px', flex: 1, minWidth: '160px' }}>{item.title}</div>
                     {item.priority && (
                       <span style={{ fontSize: '10px', fontWeight: 700, color: PRIORITY_STYLES[item.priority].color }}>{PRIORITY_STYLES[item.priority].label}</span>
@@ -738,7 +738,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '11px', color: s.muted, marginTop: '6px' }}>
                     <span>{item.age_group}</span>
                     {team && (
-                      <Link href={`/org/${params.orgId}/tryouts/rankings?team=${team.id}`} style={{ color: '#40A0E8', textDecoration: 'none', fontWeight: 600 }}>
+                      <Link href={`/org/${params.orgId}/tryouts/rankings?team=${team.id}`} style={{ color: 'var(--status-info)', textDecoration: 'none', fontWeight: 600 }}>
                         {team.name}
                       </Link>
                     )}
@@ -748,7 +748,7 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
                       </Link>
                     )}
                     {item.owner_name && <span>Owner: {item.owner_name}</span>}
-                    {item.due_date && <span style={{ color: overdue ? '#E87060' : s.muted }}>Due: {item.due_date}</span>}
+                    {item.due_date && <span style={{ color: overdue ? 'var(--status-bad)' : s.muted }}>Due: {item.due_date}</span>}
                     <span style={{ color: s.dim }}>Updated: {new Date(item.updated_at).toLocaleDateString()}</span>
                   </div>
 

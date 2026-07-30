@@ -108,9 +108,12 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       .from('tryout_sessions').select('id').eq('season_id', teamData.season_id)
     const sessionIds = (sessionRows ?? []).map((s: any) => s.id as string)
 
-    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }, { data: rosterStagingData }] = await Promise.all([
+    const [{ data: playerData }, { data: scoreData }, { data: evalData }, { data: evalCfg }, { data: stagingData }, { data: gcData }, { data: rosterStagingData }, { data: priorContextData }] = await Promise.all([
+      // prior_team is deliberately NOT selected here — tryout_players.prior_team
+      // is legacy. Current-season "Prior Team" comes from
+      // tryout_prior_roster_context below (same source Rankings/Data Hub use).
       supabase.from('tryout_players')
-        .select('id, first_name, last_name, age_group, jersey_number, prior_team, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
+        .select('id, first_name, last_name, age_group, jersey_number, grade, parent_email, parent_phone, guardian_first_name, guardian_last_name')
         .in('id', playerIds),
       sessionIds.length > 0
         ? supabase.from('tryout_scores')
@@ -141,6 +144,10 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         .select('player_id, jersey_number')
         .eq('season_id', teamData.season_id)
         .in('player_id', playerIds),
+      supabase.from('tryout_prior_roster_context')
+        .select('player_id, prior_team_name')
+        .eq('season_id', teamData.season_id)
+        .in('player_id', playerIds),
     ])
 
     const [{ data: combinedData }, { data: actionItemData }] = await Promise.all([
@@ -165,6 +172,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
     const stagingMap: Record<string, any> = {}
     for (const s of (stagingData ?? [])) stagingMap[s.player_id] = s
     const rosterStagingMap = new Map((rosterStagingData ?? []).map((r: any) => [r.player_id, r.jersey_number as string | null]))
+    const priorTeamMap = new Map((priorContextData ?? []).map((r: any) => [r.player_id, r.prior_team_name as string | null]))
     const gcMap: Record<string, { hitting: number | null; pitching: number | null }> = {}
     for (const g of (gcData ?? [])) gcMap[g.player_id] = { hitting: g.gc_hitting_score, pitching: g.gc_pitching_score }
 
@@ -208,6 +216,7 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         guardian_first_name: st.guardian_first_name ?? p.guardian_first_name ?? null,
         guardian_last_name:  st.guardian_last_name  ?? p.guardian_last_name  ?? null,
         jersey_number:       rosterStagingMap.get(p.id) ?? p.jersey_number ?? null,
+        prior_team:          priorTeamMap.get(p.id) ?? null,
         tryoutAvg, coachEvalAvg, combinedScore,
         scoreCount: scores.length, evalCount: evalRow ? 1 : 0,
         isAccepted: acceptedMap.get(p.id) ?? false,

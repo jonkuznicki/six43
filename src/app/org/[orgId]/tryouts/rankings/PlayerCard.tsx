@@ -321,7 +321,7 @@ export default function PlayerCard({
                   <span style={{ fontSize: '11px', color: s.muted }}>Grade {rp.player.grade}</span>
                 )}
                 {rp.player.prior_team && (
-                  <span style={{ fontSize: '12px', color: '#40A0E8', fontWeight: 600 }}>
+                  <span style={{ fontSize: '12px', color: 'var(--status-info)', fontWeight: 600 }}>
                     {rp.player.prior_team}
                   </span>
                 )}

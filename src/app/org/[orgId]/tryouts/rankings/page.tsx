@@ -963,6 +963,13 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
   function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
   function fmtRank(v: number | null) { return v != null ? String(v) : '—' }
 
+  // Discoverability cue for the merged Tryout/Coach Eval/Prior Stats columns —
+  // each row's cell carries a native title tooltip with the sub-score
+  // breakdown; this just tells users to look for it, once, in the header.
+  const breakdownHint = (
+    <span title="Hover a player's score in this column for the breakdown" style={{ opacity: 0.5, marginLeft: '2px', cursor: 'help' }}>ⓘ</span>
+  )
+
   // ── Draft board (assignment-aware positioning) ────────────────────────────
   type DraftZone = 'blue-assigned' | 'blue-fill' | 'white-assigned' | 'white-fill' | 'bubble'
 
@@ -1077,7 +1084,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
         <td style={{ ...td, fontWeight: 800, fontSize: '14px', color: row.combinedScore != null ? 'var(--accent)' : s.dim }}>{fmt(row.combinedScore)}</td>
         <td style={{ ...td, textAlign: 'center' }}><span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', fontSize: '11px', fontWeight: 600 }}>{row.ageGroup}</span></td>
-        <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? '#40A0E8' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.player.prior_team ?? '—'}</td>
+        <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? 'var(--status-info)' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.player.prior_team ?? '—'}</td>
         <td title={[row.tryoutPitching != null && `Pitch ${fmt(row.tryoutPitching)}`, row.tryoutHitting != null && `Hit ${fmt(row.tryoutHitting)}`, row.speed != null && `Speed ${row.speed.toFixed(2)}s`].filter(Boolean).join(' · ') || undefined}
           style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400, cursor: row.tryoutScore != null ? 'help' : 'default' }}>{fmt(row.tryoutScore)}</td>
         <td title={[row.intangibles != null && `Intangibles ${fmt(row.intangibles)}`, row.teamPitching != null && `Pitch ${fmt(row.teamPitching)}`, row.teamHitting != null && `Hit ${fmt(row.teamHitting)}`].filter(Boolean).join(' · ') || undefined}
@@ -1087,7 +1094,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
           <button onClick={() => toggleExclude(row.player.id)}
             title={row.isExcluded ? 'Click to re-include' : 'Exclude from team making'}
-            style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid', borderColor: row.isExcluded ? 'rgba(232,112,96,0.5)' : 'var(--border-md)', background: row.isExcluded ? 'rgba(232,112,96,0.12)' : 'transparent', color: row.isExcluded ? '#E87060' : s.dim }}>
+            style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid', borderColor: row.isExcluded ? 'var(--status-bad)' : 'var(--border-md)', background: row.isExcluded ? 'var(--status-bad-bg)' : 'transparent', color: row.isExcluded ? 'var(--status-bad)' : s.dim }}>
             {row.isExcluded ? 'Excl' : '—'}
           </button>
         </td>
@@ -1156,14 +1163,14 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           )}
           <button onClick={handleShare} disabled={sharingBusy} style={{
             padding: '5px 12px', borderRadius: '6px',
-            border: `0.5px solid ${shareToken ? 'rgba(109,184,117,0.5)' : 'var(--border-md)'}`,
-            background: shareToken ? 'rgba(109,184,117,0.1)' : 'var(--bg-input)',
-            color: shareToken ? '#6DB875' : s.muted, fontSize: '12px', cursor: sharingBusy ? 'default' : 'pointer',
+            border: `0.5px solid ${shareToken ? 'var(--status-good)' : 'var(--border-md)'}`,
+            background: shareToken ? 'var(--status-good-bg)' : 'var(--bg-input)',
+            color: shareToken ? 'var(--status-good)' : s.muted, fontSize: '12px', cursor: sharingBusy ? 'default' : 'pointer',
           }}>{shareCopied ? '✓ Copied!' : shareToken ? '⎋ Copy link' : '⎋ Share'}</button>
           {shareToken && (
             <button onClick={revokeShare} disabled={sharingBusy} style={{
-              padding: '5px 12px', borderRadius: '6px', border: '0.5px solid rgba(232,112,96,0.4)',
-              background: 'rgba(232,112,96,0.08)', color: '#E87060', fontSize: '12px', cursor: 'pointer',
+              padding: '5px 12px', borderRadius: '6px', border: '0.5px solid var(--status-bad)',
+              background: 'var(--status-bad-bg)', color: 'var(--status-bad)', fontSize: '12px', cursor: 'pointer',
             }}>Revoke</button>
           )}
           <button onClick={exportCsv} style={{
@@ -1236,9 +1243,9 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             return (
               <Link key={t.id} href={`/org/${params.orgId}/tryouts/action-items?team=${t.id}&status=open`} style={{
                 padding: '3px 9px', borderRadius: '20px', border: '0.5px solid',
-                borderColor: count > 0 ? 'rgba(232,112,96,0.5)' : 'var(--border-md)',
-                background: count > 0 ? 'rgba(232,112,96,0.1)' : 'var(--bg-input)',
-                color: count > 0 ? '#E87060' : s.dim,
+                borderColor: count > 0 ? 'var(--status-bad)' : 'var(--border-md)',
+                background: count > 0 ? 'var(--status-bad-bg)' : 'var(--bg-input)',
+                color: count > 0 ? 'var(--status-bad)' : s.dim,
                 fontSize: '11px', fontWeight: count > 0 ? 700 : 400, textDecoration: 'none',
               }}>{t.name} · {count} open</Link>
             )
@@ -1339,15 +1346,15 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                 {/* Tryout — single column; breakdown on hover, full detail in PlayerCard */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#80B0E8' }}
-                  onClick={() => toggleSort('tryoutScore')}>Score{sortArrow('tryoutScore')}</th>
+                  onClick={() => toggleSort('tryoutScore')}>Score{breakdownHint}{sortArrow('tryoutScore')}</th>
 
                 {/* Coach Eval — single column; breakdown on hover, full detail in PlayerCard */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#6DB875' }}
-                  onClick={() => toggleSort('coachEval')}>Score{sortArrow('coachEval')}</th>
+                  onClick={() => toggleSort('coachEval')}>Score{breakdownHint}{sortArrow('coachEval')}</th>
 
                 {/* GC / Prior Stats — single column; hit/pitch breakdown on hover */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
-                  onClick={() => toggleSort('priorStatScore')}>Score{sortArrow('priorStatScore')}</th>
+                  onClick={() => toggleSort('priorStatScore')}>Score{breakdownHint}{sortArrow('priorStatScore')}</th>
 
                 {/* Exclude */}
                 <th style={{ ...th, textAlign: 'center', width: '60px', minWidth: '60px', cursor: 'default' }}>Excl</th>
@@ -1476,7 +1483,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                     <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px 4px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(232,112,96,0.3)' }} />
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#E87060', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Excluded from team making ({excludedFiltered.length})</span>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--status-bad)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Excluded from team making ({excludedFiltered.length})</span>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(232,112,96,0.3)' }} />
                       </div>
                     </td>
@@ -1506,9 +1513,9 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                                 style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', flexShrink: 0 }}>
                                 <input type="checkbox" checked={row.isAccepted}
                                   onChange={() => toggleAccepted(row.player.id)}
-                                  style={{ cursor: 'pointer', accentColor: '#6DB875' }} />
-                                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? '#6DB875' : s.dim, whiteSpace: 'nowrap' }}>
-                                  {row.isAccepted ? 'Accepted' : 'Accept'}
+                                  style={{ cursor: 'pointer', accentColor: row.isAccepted ? 'var(--status-good)' : 'var(--status-warn)' }} />
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? 'var(--status-good)' : 'var(--status-warn)', whiteSpace: 'nowrap' }}>
+                                  {row.isAccepted ? 'Accepted' : 'Pending'}
                                 </span>
                               </label>
                             )}
@@ -1517,7 +1524,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={7} />
                         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
                           <button onClick={() => toggleExclude(row.player.id)} title="Re-include this player"
-                            style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid rgba(232,112,96,0.5)', background: 'rgba(232,112,96,0.12)', color: '#E87060' }}>
+                            style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid var(--status-bad)', background: 'var(--status-bad-bg)', color: 'var(--status-bad)' }}>
                             Excl
                           </button>
                         </td>

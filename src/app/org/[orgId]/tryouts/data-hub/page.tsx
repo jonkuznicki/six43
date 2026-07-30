@@ -19,10 +19,13 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// prior_team is deliberately NOT here — tryout_players.prior_team is a
+// legacy field no longer treated as current-season data. Current-season
+// "Prior Team" comes from priorTeamMap (tryout_prior_roster_context) below.
 interface Player {
   id: string; first_name: string; last_name: string
   age_group: string; tryout_age_group: string | null
-  prior_team: string | null; jersey_number: string | null
+  jersey_number: string | null
   dob: string | null; age_group_override_reason: string | null
   parent_email: string | null; parent_phone: string | null
   grade: string | null; school: string | null; prior_org: string | null
@@ -151,6 +154,11 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   const [scoreRows,     setScoreRows]     = useState<ScoreRow[]>([])
   const [teams,         setTeams]         = useState<TeamRow[]>([])
   const [assignedTeamMap, setAssignedTeamMap] = useState<Map<string, string>>(new Map()) // player_id → team name
+  // "Previous team" for the active season — seeded explicitly from a
+  // completed prior season's final roster (Seasons page). The single
+  // source of truth for current-season Prior Team everywhere, replacing
+  // the legacy tryout_players.prior_team field (see season-rollover work).
+  const [priorTeamMap, setPriorTeamMap] = useState<Map<string, string | null>>(new Map())
   const [acceptedMap,   setAcceptedMap]   = useState<Map<string, boolean>>(new Map())
   const [seasonWeights, setSeasonWeights] = useState<SeasonWeights>(DEFAULT_SEASON_WEIGHTS)
   const [seasonId,      setSeasonId]      = useState<string | null>(null)
@@ -225,9 +233,9 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     const [
       { data: playerData }, { data: rosterData },
       { data: gcData }, { data: evalData }, { data: evalCfgData }, { data: scoreData },
-      { data: teamsData },
+      { data: teamsData }, { data: priorContextData },
     ] = await Promise.all([
-      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,prior_team,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
+      supabase.from('tryout_players').select('id,first_name,last_name,age_group,tryout_age_group,jersey_number,dob,age_group_override_reason,parent_email,parent_phone,grade,school,prior_org').eq('org_id', params.orgId).eq('is_active', true).order('last_name').order('first_name'),
       sid
         ? supabase.from('tryout_roster_staging').select('player_id,team_name,jersey_number,imported_at').eq('season_id', sid)
         : Promise.resolve({ data: [] as any[] }),
@@ -247,6 +255,9 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         : Promise.resolve({ data: [] as any[] }),
       sid
         ? supabase.from('tryout_teams').select('id,name,age_group,color').eq('season_id', sid)
+        : Promise.resolve({ data: [] as any[] }),
+      sid
+        ? supabase.from('tryout_prior_roster_context').select('player_id,prior_team_name').eq('season_id', sid)
         : Promise.resolve({ data: [] as any[] }),
     ])
 
@@ -283,6 +294,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     setTeams(teamsData ?? [])
     setAssignedTeamMap(assignMap)
     setAcceptedMap(acceptMap)
+    setPriorTeamMap(new Map((priorContextData ?? []).map((r: any) => [r.player_id, r.prior_team_name])))
     setLoading(false)
   }
 
@@ -385,7 +397,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     const key = `${pid}_${field}`
     if (savingCell === key) return
     setSavingCell(key); setEditingCell(null)
-    const col: Record<string, string> = { team: 'prior_team', tryout_ag: 'tryout_age_group' }
+    const col: Record<string, string> = { tryout_ag: 'tryout_age_group' }
     const dbCol = col[field]
     if (!dbCol) { setSavingCell(null); return }
     let val = editVal.trim() || null
@@ -535,7 +547,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         const reg = regMap.get(p.id)
         return (
           `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-          (pv(p, 'prior_team') ?? '').toLowerCase().includes(q) ||
+          (priorTeamMap.get(p.id) ?? '').toLowerCase().includes(q) ||
           (pv(p, 'tryout_age_group') ?? '').toLowerCase().includes(q) ||
           (p.age_group ?? '').toLowerCase().includes(q) ||
           (p.school ?? '').toLowerCase().includes(q) ||
@@ -555,7 +567,6 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
     return [...list].sort((a, b) => {
       let va = '', vb = ''
       if (sortCol === 'name')      { va = `${a.last_name}${a.first_name}`; vb = `${b.last_name}${b.first_name}` }
-      if (sortCol === 'team')      { va = pv(a, 'prior_team') ?? ''; vb = pv(b, 'prior_team') ?? '' }
       if (sortCol === 'tryout_ag') { va = pv(a, 'tryout_age_group') ?? ''; vb = pv(b, 'tryout_age_group') ?? '' }
       if (sortCol === 'age')       {
         const da = a.dob ?? regMap.get(a.id)?.dob ?? null
@@ -583,7 +594,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
       }
       return va.localeCompare(vb) * sortDir
     })
-  }, [players, ageFilter, dataFilter, search, sortCol, sortDir, localUpdates, regMap, rosterMap, scoreAvgMap, evalMap, gcMap, scoredMap, acceptedMap])
+  }, [players, ageFilter, dataFilter, search, sortCol, sortDir, localUpdates, regMap, rosterMap, scoreAvgMap, evalMap, gcMap, scoredMap, acceptedMap, priorTeamMap])
 
   const ageAlerts = useMemo(() =>
     players.filter(p => {
@@ -925,7 +936,7 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         return (
           <PlayerCard
             player={{
-              player: { id: p.id, first_name: p.first_name, last_name: p.last_name, age_group: p.age_group, tryout_age_group: p.tryout_age_group, prior_team: p.prior_team },
+              player: { id: p.id, first_name: p.first_name, last_name: p.last_name, age_group: p.age_group, tryout_age_group: p.tryout_age_group, prior_team: priorTeamMap.get(p.id) ?? null, grade: p.grade },
               ageGroup: ag,
               tryoutScore: scored?.tryoutScore ?? null,
               tryoutPitching: null, tryoutHitting: null, speed: null,

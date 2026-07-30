@@ -322,7 +322,7 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
               padding: '8px 18px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
               background: 'transparent', color: s.muted, fontSize: '13px', cursor: 'pointer',
             }}>Cancel</button>
-            {saveError && <span style={{ fontSize: '12px', color: '#E87060' }}>Error: {saveError}</span>}
+            {saveError && <span style={{ fontSize: '12px', color: 'var(--status-bad)' }}>Error: {saveError}</span>}
           </div>
         </div>
       )}
