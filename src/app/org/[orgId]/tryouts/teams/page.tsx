@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { PageHeader } from '../PageHeader'
+import { StatusPill } from '../../../../../components/ui/StatusPill'
 
 interface Team {
   id:        string
@@ -11,6 +13,7 @@ interface Team {
   color:     string | null
   _playerCount?: number
   _acceptedCount?: number
+  _openFollowUpCount?: number
 }
 
 interface PlayerContact {
@@ -64,22 +67,29 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
 
     if (!seasonData) { setLoading(false); return }
 
-    const [{ data: teamData }, { data: assignData }] = await Promise.all([
+    const [{ data: teamData }, { data: assignData }, { data: actionItemData }] = await Promise.all([
       supabase.from('tryout_teams').select('id, name, age_group, color')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .order('age_group').order('name'),
       supabase.from('tryout_team_assignments').select('player_id, team_id, is_accepted')
         .eq('season_id', seasonData.id),
+      supabase.from('tryout_action_items').select('team_id')
+        .eq('org_id', params.orgId).eq('season_id', seasonData.id)
+        .in('status', ['open', 'waiting', 'in_progress', 'blocked']),
     ])
 
     const counts: Record<string, number> = {}
     const acceptedCounts: Record<string, number> = {}
+    const followUpCounts: Record<string, number> = {}
     const byTeam: Record<string, string[]> = {}
     for (const a of (assignData ?? [])) {
       counts[a.team_id] = (counts[a.team_id] ?? 0) + 1
       if (a.is_accepted) acceptedCounts[a.team_id] = (acceptedCounts[a.team_id] ?? 0) + 1
       if (!byTeam[a.team_id]) byTeam[a.team_id] = []
       byTeam[a.team_id].push(a.player_id)
+    }
+    for (const item of (actionItemData ?? [])) {
+      if (item.team_id) followUpCounts[item.team_id] = (followUpCounts[item.team_id] ?? 0) + 1
     }
 
     const allPlayerIds = (assignData ?? []).map((a: any) => a.player_id)
@@ -127,7 +137,12 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
         .sort((a: any, b: any) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name))
     }
     setPlayersByTeam(pbt)
-    setTeams((teamData ?? []).map((t: any) => ({ ...t, _playerCount: counts[t.id] ?? 0, _acceptedCount: acceptedCounts[t.id] ?? 0 })))
+    setTeams((teamData ?? []).map((t: any) => ({
+      ...t,
+      _playerCount: counts[t.id] ?? 0,
+      _acceptedCount: acceptedCounts[t.id] ?? 0,
+      _openFollowUpCount: followUpCounts[t.id] ?? 0,
+    })))
     setLoading(false)
   }
 
@@ -220,36 +235,35 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
 
   return (
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
-      <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Teams</h1>
-          {season
-            ? <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>{season.label}</div>
-            : <div style={{ fontSize: '13px', color: '#E87060', marginTop: '2px' }}>
-                No active season — <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: '#E87060', fontWeight: 700 }}>set up a season first</Link>
-              </div>
-          }
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {totalAssignedAll > 0 && (
-            <button onClick={exportAllRosters} style={{
-              padding: '8px 16px', borderRadius: '7px',
-              border: '0.5px solid var(--border-md)',
-              background: 'var(--bg-input)', color: s.muted,
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            }}>↓ Export all rosters</button>
-          )}
-          <button onClick={() => { setShowForm(true); setEditId(null); setForm(BLANK_FORM) }} disabled={!season} style={{
-            padding: '8px 18px', borderRadius: '7px', border: 'none',
-            background: season ? 'var(--accent)' : 'var(--bg-input)',
-            color: season ? 'var(--accent-text)' : s.dim,
-            fontSize: '13px', fontWeight: 700, cursor: season ? 'pointer' : 'default',
-            opacity: season ? 1 : 0.5,
-          }}>+ New team</button>
-        </div>
-      </div>
+      <PageHeader
+        title="Teams"
+        backHref={`/org/${params.orgId}/tryouts`}
+        subtitle={season
+          ? season.label
+          : <span style={{ color: 'var(--status-bad)' }}>
+              No active season — <Link href={`/org/${params.orgId}/tryouts/seasons`} style={{ color: 'var(--status-bad)', fontWeight: 700 }}>set up a season first</Link>
+            </span>
+        }
+        action={
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {totalAssignedAll > 0 && (
+              <button onClick={exportAllRosters} style={{
+                padding: '8px 16px', borderRadius: '7px',
+                border: '0.5px solid var(--border-md)',
+                background: 'var(--bg-input)', color: s.muted,
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>↓ Export all rosters</button>
+            )}
+            <button onClick={() => { setShowForm(true); setEditId(null); setForm(BLANK_FORM) }} disabled={!season} style={{
+              padding: '8px 18px', borderRadius: '7px', border: 'none',
+              background: season ? 'var(--accent)' : 'var(--bg-input)',
+              color: season ? 'var(--accent-text)' : s.dim,
+              fontSize: '13px', fontWeight: 700, cursor: season ? 'pointer' : 'default',
+              opacity: season ? 1 : 0.5,
+            }}>+ New team</button>
+          </div>
+        }
+      />
 
       {/* Age filter */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
@@ -349,8 +363,21 @@ export default function TeamsPage({ params }: { params: { orgId: string } }) {
                           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: team.color ?? '#888', flexShrink: 0 }} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 700, fontSize: '14px' }}>{team.name}</div>
-                            <div style={{ fontSize: '12px', color: s.dim, marginTop: '1px' }}>
-                              {players.length} player{players.length !== 1 ? 's' : ''}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '12px', color: s.dim }}>
+                                {players.length} player{players.length !== 1 ? 's' : ''}
+                              </span>
+                              {players.length > 0 && (
+                                <StatusPill tone="good" size="sm">{team._acceptedCount ?? 0} accepted</StatusPill>
+                              )}
+                              {(players.length - (team._acceptedCount ?? 0)) > 0 && (
+                                <StatusPill tone="warn" size="sm">{players.length - (team._acceptedCount ?? 0)} pending</StatusPill>
+                              )}
+                              {(team._openFollowUpCount ?? 0) > 0 && (
+                                <Link href={`/org/${params.orgId}/tryouts/action-items?team=${team.id}&status=open`} style={{ textDecoration: 'none' }}>
+                                  <StatusPill tone="bad" size="sm">{team._openFollowUpCount} follow-up{team._openFollowUpCount !== 1 ? 's' : ''}</StatusPill>
+                                </Link>
+                              )}
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

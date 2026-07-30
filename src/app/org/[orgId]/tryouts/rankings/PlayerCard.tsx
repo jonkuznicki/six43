@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { GC_STAT_DEFS } from '../../../../../lib/tryouts/gcStatDefs'
 import { DEFAULT_SEASON_WEIGHTS, type SeasonWeights } from '../../../../../lib/tryouts/scoring/combinedScore'
@@ -17,7 +17,7 @@ const ACTION_STATUS_LABEL: Record<string, string> = {
 }
 
 interface RankedPlayer {
-  player:          { id: string; first_name: string; last_name: string; age_group: string; tryout_age_group: string | null; prior_team: string | null }
+  player:          { id: string; first_name: string; last_name: string; age_group: string; tryout_age_group: string | null; prior_team: string | null; grade?: string | null }
   ageGroup:        string
   tryoutScore:     number | null
   tryoutPitching:  number | null
@@ -27,9 +27,12 @@ interface RankedPlayer {
   intangibles:     number | null
   teamPitching:    number | null
   teamHitting:     number | null
+  evalSpeed?:       number | null
+  evalAthleticism?: number | null
   coachComments:   string | null
   gcHittingScore:  number | null
   gcPitchingScore: number | null
+  priorStatScore?: number | null
   combinedScore:   number | null
   combinedRank:    number | null
   tryoutRank:      number | null
@@ -37,6 +40,7 @@ interface RankedPlayer {
   intangiblesRank: number | null
   assignedTeamId:  string | null
   adminNotes:      string | null
+  isAccepted?:     boolean
 }
 
 interface GcStatRow {
@@ -106,7 +110,9 @@ interface Props {
   orgId?:              string
   actionItems?:        PlayerActionItem[]
   onQuickActionStatus?: (itemId: string, status: string) => void
-  onQuickCreateAction?: () => void
+  onQuickCreateAction?: (title?: string) => void
+  // Acceptance — only wired from Rankings, matching the Follow-up gating above.
+  onToggleAccepted?: () => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -220,8 +226,9 @@ function StatChip({ label, value, color }: { label: string; value: string | null
 export default function PlayerCard({
   player: rp, gcRow, ageGroupGcRows, teams, totalInAge, onClose,
   weights = DEFAULT_SEASON_WEIGHTS, registration,
-  orgId, actionItems, onQuickActionStatus, onQuickCreateAction,
+  orgId, actionItems, onQuickActionStatus, onQuickCreateAction, onToggleAccepted,
 }: Props) {
+  const [newActionTitle, setNewActionTitle] = useState('')
   const team = teams.find(t => t.id === rp.assignedTeamId)
   const teamColor = team?.name?.toLowerCase() === 'blue'  ? '#4090E0'
                   : team?.name?.toLowerCase() === 'white' ? 'rgba(var(--fg-rgb),0.5)'
@@ -310,6 +317,9 @@ export default function PlayerCard({
                   fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
                   background: 'rgba(var(--fg-rgb),0.07)', color: s.muted,
                 }}>{rp.ageGroup}</span>
+                {rp.player.grade && (
+                  <span style={{ fontSize: '11px', color: s.muted }}>Grade {rp.player.grade}</span>
+                )}
                 {rp.player.prior_team && (
                   <span style={{ fontSize: '12px', color: '#40A0E8', fontWeight: 600 }}>
                     {rp.player.prior_team}
@@ -322,6 +332,17 @@ export default function PlayerCard({
                     color: teamColor ?? s.muted,
                     border: `0.5px solid ${teamColor ? `${teamColor}40` : 'transparent'}`,
                   }}>→ {team.name}</span>
+                )}
+                {team && onToggleAccepted && (
+                  <label
+                    title={rp.isAccepted ? 'Player has accepted their roster spot — click to unmark' : 'Mark player as having accepted their roster spot'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!rp.isAccepted} onChange={onToggleAccepted}
+                      style={{ cursor: 'pointer', accentColor: rp.isAccepted ? 'var(--status-good)' : 'var(--status-warn)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: rp.isAccepted ? 'var(--status-good)' : 'var(--status-warn)' }}>
+                      {rp.isAccepted ? 'Accepted' : 'Pending'}
+                    </span>
+                  </label>
                 )}
               </div>
             </div>
@@ -376,33 +397,59 @@ export default function PlayerCard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
                   {actionItems.map(item => (
                     <div key={item.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                      display: 'flex', flexDirection: 'column', gap: '4px',
                       padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-card)', border: '0.5px solid var(--border)',
                     }}>
-                      <StatusPill tone={ACTION_STATUS_TONE[item.status] ?? 'neutral'} size="sm">
-                        {ACTION_STATUS_LABEL[item.status] ?? item.status}
-                      </StatusPill>
-                      <span style={{ fontSize: '12px', flex: 1, minWidth: '120px' }}>{item.title}</span>
-                      {item.owner_name && <span style={{ fontSize: '11px', color: s.muted }}>{item.owner_name}</span>}
-                      {onQuickActionStatus && (
-                        <select
-                          value={item.status}
-                          onChange={e => onQuickActionStatus(item.id, e.target.value)}
-                          style={{ fontSize: '11px', padding: '2px 4px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)' }}
-                        >
-                          {Object.keys(ACTION_STATUS_LABEL).map(st => <option key={st} value={st}>{ACTION_STATUS_LABEL[st]}</option>)}
-                        </select>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <StatusPill tone={ACTION_STATUS_TONE[item.status] ?? 'neutral'} size="sm">
+                          {ACTION_STATUS_LABEL[item.status] ?? item.status}
+                        </StatusPill>
+                        <span style={{ fontSize: '12px', flex: 1, minWidth: '120px' }}>{item.title}</span>
+                        {onQuickActionStatus && (
+                          <select
+                            value={item.status}
+                            onChange={e => onQuickActionStatus(item.id, e.target.value)}
+                            style={{ fontSize: '11px', padding: '2px 4px', borderRadius: '4px', border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)' }}
+                          >
+                            {Object.keys(ACTION_STATUS_LABEL).map(st => <option key={st} value={st}>{ACTION_STATUS_LABEL[st]}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      {(item.owner_name || item.due_date) && (
+                        <div style={{ display: 'flex', gap: '10px', fontSize: '10.5px', color: s.muted }}>
+                          {item.owner_name && <span>Owner: {item.owner_name}</span>}
+                          {item.due_date && <span>Due: {item.due_date}</span>}
+                        </div>
+                      )}
+                      {item.details && (
+                        <div title={item.details} style={{
+                          fontSize: '11px', color: s.muted, overflow: 'hidden', textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap', cursor: 'help',
+                        }}>{item.details}</div>
                       )}
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {onQuickCreateAction && (
-                  <button onClick={onQuickCreateAction} style={{
-                    fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
-                    border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted,
-                  }}>+ New action item</button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text" value={newActionTitle} onChange={e => setNewActionTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { onQuickCreateAction(newActionTitle); setNewActionTitle('') }
+                      }}
+                      placeholder={`Follow up on ${rp.player.first_name}…`}
+                      style={{
+                        flex: 1, fontSize: '11px', padding: '5px 8px', borderRadius: '5px',
+                        border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: 'var(--fg)',
+                      }}
+                    />
+                    <button onClick={() => { onQuickCreateAction(newActionTitle); setNewActionTitle('') }} style={{
+                      fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '5px', cursor: 'pointer',
+                      border: '0.5px solid var(--border-md)', background: 'var(--bg-input)', color: s.muted, whiteSpace: 'nowrap',
+                    }}>+ Add</button>
+                  </div>
                 )}
                 <Link href={`/org/${orgId}/tryouts/action-items?player=${rp.player.id}`} style={{ fontSize: '11px', color: 'var(--accent)' }}>
                   Manage all →

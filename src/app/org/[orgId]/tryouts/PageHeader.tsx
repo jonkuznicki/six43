@@ -15,7 +15,7 @@ export function PageHeader({
   backLabel = '‹ Tryouts',
   action,
 }: {
-  title: string
+  title: React.ReactNode
   subtitle?: React.ReactNode
   backHref?: string
   backLabel?: string

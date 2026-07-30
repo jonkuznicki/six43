@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../../lib/supabase'
 import Link from 'next/link'
+import { PageHeader } from '../../PageHeader'
 import { StatusPill } from '../../../../../../components/ui/StatusPill'
 import {
   averagePresent,
@@ -42,6 +43,8 @@ interface RosterPlayer {
   scoreCount:           number
   evalCount:            number
   isAccepted:           boolean
+  adminNotes:           string | null
+  openFollowUpCount:    number
 }
 
 // A player has at most one eval considered per season — constrained to
@@ -140,6 +143,24 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         .in('player_id', playerIds),
     ])
 
+    const [{ data: combinedData }, { data: actionItemData }] = await Promise.all([
+      supabase.from('tryout_combined_scores')
+        .select('player_id, admin_notes')
+        .eq('season_id', teamData.season_id)
+        .in('player_id', playerIds),
+      supabase.from('tryout_action_items')
+        .select('player_id')
+        .eq('org_id', params.orgId).eq('season_id', teamData.season_id)
+        .eq('team_id', params.teamId)
+        .in('status', ['open', 'waiting', 'in_progress', 'blocked']),
+    ])
+    const notesMap: Record<string, string | null> = {}
+    for (const c of (combinedData ?? [])) notesMap[c.player_id] = c.admin_notes
+    const followUpCountByPlayer: Record<string, number> = {}
+    for (const a of (actionItemData ?? [])) {
+      if (a.player_id) followUpCountByPlayer[a.player_id] = (followUpCountByPlayer[a.player_id] ?? 0) + 1
+    }
+
     const evalConfig = selectActiveSeasonEvalConfig((evalCfg ?? []) as EvalConfigRow[], teamData.season_id)
     const stagingMap: Record<string, any> = {}
     for (const s of (stagingData ?? [])) stagingMap[s.player_id] = s
@@ -190,6 +211,8 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
         tryoutAvg, coachEvalAvg, combinedScore,
         scoreCount: scores.length, evalCount: evalRow ? 1 : 0,
         isAccepted: acceptedMap.get(p.id) ?? false,
+        adminNotes: notesMap[p.id] ?? null,
+        openFollowUpCount: followUpCountByPlayer[p.id] ?? 0,
       }
     }).sort((a: RosterPlayer, b: RosterPlayer) => (b.combinedScore ?? -1) - (a.combinedScore ?? -1))
 
@@ -204,6 +227,20 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
       .eq('player_id', playerId).eq('team_id', team.id).eq('season_id', team.season_id)
     setPlayers(prev => prev.filter(p => p.id !== playerId))
     setRemoving(null)
+  }
+
+  async function toggleAccepted(playerId: string) {
+    if (!team) return
+    const current = players.find(p => p.id === playerId)
+    const next = !current?.isAccepted
+    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, isAccepted: next } : p))
+    const { error } = await supabase.from('tryout_team_assignments')
+      .update({ is_accepted: next })
+      .eq('player_id', playerId).eq('season_id', team.season_id)
+    if (error) {
+      console.error('toggleAccepted failed:', error.message)
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, isAccepted: !next } : p))
+    }
   }
 
   function exportRoster() {
@@ -251,29 +288,29 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
 
   return (
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
-      <Link href={`/org/${params.orgId}/tryouts/teams`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Teams</Link>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {team.color && <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: team.color, flexShrink: 0 }} />}
-          <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800 }}>{team.name}</h1>
-            <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>
-              {team.age_group} · {players.length} player{players.length !== 1 ? 's' : ''}
-            </div>
+      <PageHeader
+        title={
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {team.color && <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: team.color, flexShrink: 0, display: 'inline-block' }} />}
+            {team.name}
+          </span>
+        }
+        subtitle={`${team.age_group} · ${players.length} player${players.length !== 1 ? 's' : ''}`}
+        backHref={`/org/${params.orgId}/tryouts/teams`}
+        backLabel="‹ Teams"
+        action={
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Link href={`/org/${params.orgId}/tryouts/rankings`} style={{
+              padding: '8px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.muted, fontSize: '13px', textDecoration: 'none',
+            }}>← Rankings / assign</Link>
+            <button onClick={exportRoster} style={{
+              padding: '8px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
+            }}>↓ CSV</button>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href={`/org/${params.orgId}/tryouts/rankings`} style={{
-            padding: '8px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
-            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', textDecoration: 'none',
-          }}>← Rankings / assign</Link>
-          <button onClick={exportRoster} style={{
-            padding: '8px 14px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
-            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
-          }}>↓ CSV</button>
-        </div>
-      </div>
+        }
+      />
 
       {players.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: s.dim, fontSize: '14px' }}>
@@ -308,14 +345,31 @@ export default function TeamRosterPage({ params }: { params: { orgId: string; te
                       was: {player.prior_team}
                     </span>
                   )}
-                  <StatusPill tone={player.isAccepted ? 'good' : 'neutral'} size="sm">
-                    {player.isAccepted ? 'Accepted' : 'Pending'}
-                  </StatusPill>
+                  <button
+                    onClick={() => toggleAccepted(player.id)}
+                    title={player.isAccepted ? 'Click to unmark as accepted' : 'Click to mark as accepted'}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  >
+                    <StatusPill tone={player.isAccepted ? 'good' : 'warn'} size="sm">
+                      {player.isAccepted ? 'Accepted' : 'Pending'}
+                    </StatusPill>
+                  </button>
+                  {player.openFollowUpCount > 0 && (
+                    <Link href={`/org/${params.orgId}/tryouts/action-items?player=${player.id}&status=open`} style={{ textDecoration: 'none' }}>
+                      <StatusPill tone="bad" size="sm">⚑ {player.openFollowUpCount}</StatusPill>
+                    </Link>
+                  )}
                 </div>
                 <div style={{ fontSize: '11px', color: s.dim, marginTop: '2px' }}>
                   {player.scoreCount > 0 ? `${player.scoreCount} tryout score${player.scoreCount !== 1 ? 's' : ''}` : 'No tryout scores'}
                   {player.evalCount > 0 ? ` · ${player.evalCount} coach eval${player.evalCount !== 1 ? 's' : ''}` : ''}
                 </div>
+                {player.adminNotes && (
+                  <div title={player.adminNotes} style={{
+                    fontSize: '11px', color: s.muted, marginTop: '3px', cursor: 'help',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '480px',
+                  }}>📝 {player.adminNotes}</div>
+                )}
               </div>
 
               {/* Combined score — the one headline number; see Rankings for the full breakdown */}

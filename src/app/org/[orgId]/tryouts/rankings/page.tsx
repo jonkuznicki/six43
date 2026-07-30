@@ -114,6 +114,7 @@ interface Team {
 export interface PlayerActionItem {
   id:         string
   title:      string
+  details:    string | null
   status:     string
   owner_name: string | null
   due_date:   string | null
@@ -148,6 +149,7 @@ interface RankedPlayer {
   // GC
   gcHittingScore:  number | null
   gcPitchingScore: number | null
+  priorStatScore:  number | null  // avg(gcHittingScore, gcPitchingScore) — the actual combined-score input
   // Combined (33% tryout + 67% eval; falls back to whichever is available)
   combinedScore:   number | null
   // Ranks within age group (populated by computeRanks)
@@ -338,7 +340,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         .eq('season_id', seasonData.id),
 
       supabase.from('tryout_action_items')
-        .select('id, team_id, player_id, title, status, owner_name, due_date, updated_at')
+        .select('id, team_id, player_id, title, details, status, owner_name, due_date, updated_at')
         .eq('org_id', params.orgId).eq('season_id', seasonData.id)
         .in('status', ['open', 'waiting', 'in_progress', 'blocked'])
         .order('updated_at', { ascending: false }),
@@ -392,7 +394,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         playerCounts[a.player_id] = (playerCounts[a.player_id] ?? 0) + 1
         if (!playerActions[a.player_id]) playerActions[a.player_id] = []
         playerActions[a.player_id].push({
-          id: a.id, title: a.title, status: a.status,
+          id: a.id, title: a.title, details: a.details, status: a.status,
           owner_name: a.owner_name, due_date: a.due_date,
         })
       }
@@ -509,16 +511,16 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     if (error) { console.error('quickSetActionItemStatus failed:', error.message); await loadData() }
   }
 
-  async function quickCreateActionItem(row: RankedPlayer) {
+  async function quickCreateActionItem(row: RankedPlayer, title?: string) {
     if (!season) return
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       org_id: params.orgId, season_id: season.id,
       age_group: row.ageGroup, team_id: row.assignedTeamId, player_id: row.player.id,
-      title: `Follow up on ${row.player.first_name} ${row.player.last_name}`,
+      title: title?.trim() || `Follow up on ${row.player.first_name} ${row.player.last_name}`,
       status: 'open', created_by: user?.id ?? null,
     }
-    const { data, error } = await supabase.from('tryout_action_items').insert(payload).select('id, title, status, owner_name, due_date').single()
+    const { data, error } = await supabase.from('tryout_action_items').insert(payload).select('id, title, details, status, owner_name, due_date').single()
     if (error) { console.error('quickCreateActionItem failed:', error.message); return }
     setPlayerActionsMap(prev => ({ ...prev, [row.player.id]: [data as PlayerActionItem, ...(prev[row.player.id] ?? [])] }))
     setPlayerActionCounts(prev => ({ ...prev, [row.player.id]: (prev[row.player.id] ?? 0) + 1 }))
@@ -714,6 +716,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
           coachComments,
           gcHittingScore,
           gcPitchingScore,
+          priorStatScore,
           combinedScore,
           assignedTeamId: assignments[player.id] ?? null,
           adminNotes:     notesMap[player.id] ?? null,
@@ -783,6 +786,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         case 'speed':           return r.speed           ?? 9999
         case 'gcHittingScore':  return r.gcHittingScore  ?? -1
         case 'gcPitchingScore': return r.gcPitchingScore ?? -1
+        case 'priorStatScore':  return r.priorStatScore  ?? -1
         case 'name': return 0
         default:                return r.combinedRank    ?? 9999
       }
@@ -902,6 +906,13 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     const matched = teams.filter(t => (t.age_group ?? '').toLowerCase() === ag.toLowerCase() || t.age_group === 'all')
     return matched.length > 0 ? matched : teams  // fallback: show all teams
   }
+  // Fill count per team — shown in the assignment dropdown so admins can see
+  // "Blue (11)" at a glance without switching to the Teams page mid-meeting.
+  const teamFillCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const teamId of Object.values(assignments)) counts[teamId] = (counts[teamId] ?? 0) + 1
+    return counts
+  }, [assignments])
 
   // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -1025,7 +1036,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             disabled={assigning === row.player.id}
             style={{ background: team ? `${teamColor}18` : 'var(--bg-input)', border: `0.5px solid ${team ? `${teamColor}55` : 'var(--border-md)'}`, borderRadius: '5px', padding: '4px 6px', fontSize: '12px', color: team ? teamColor : s.muted, cursor: assigning === row.player.id ? 'default' : 'pointer', width: '100%', fontWeight: team ? 700 : 400 }}>
             <option value="">—</option>
-            {tOpts.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {tOpts.map(t => <option key={t.id} value={t.id}>{t.name} ({teamFillCounts[t.id] ?? 0})</option>)}
           </select>
         </td>
         <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
@@ -1043,9 +1054,9 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={row.isAccepted}
                   onChange={() => toggleAccepted(row.player.id)}
-                  style={{ cursor: 'pointer', accentColor: 'var(--status-good)' }} />
-                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? 'var(--status-good)' : s.dim, whiteSpace: 'nowrap' }}>
-                  {row.isAccepted ? 'Accepted' : 'Accept'}
+                  style={{ cursor: 'pointer', accentColor: row.isAccepted ? 'var(--status-good)' : 'var(--status-warn)' }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: row.isAccepted ? 'var(--status-good)' : 'var(--status-warn)', whiteSpace: 'nowrap' }}>
+                  {row.isAccepted ? 'Accepted' : 'Pending'}
                 </span>
               </label>
             )}
@@ -1066,23 +1077,13 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '14px', color: row.combinedRank ? 'var(--accent)' : s.dim, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }}>{fmtRank(row.combinedRank)}</td>
         <td style={{ ...td, fontWeight: 800, fontSize: '14px', color: row.combinedScore != null ? 'var(--accent)' : s.dim }}>{fmt(row.combinedScore)}</td>
         <td style={{ ...td, textAlign: 'center' }}><span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--fg-rgb),0.07)', fontSize: '11px', fontWeight: 600 }}>{row.ageGroup}</span></td>
-        <td style={{ ...td, textAlign: 'center', fontSize: '11px', color: row.player.grade ? s.muted : s.dim }}>{row.player.grade ?? '—'}</td>
         <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? '#40A0E8' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.player.prior_team ?? '—'}</td>
-        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400 }}>{fmt(row.tryoutScore)}</td>
-        <td style={{ ...td, textAlign: 'center', color: row.tryoutRank != null ? '#80B0E8' : s.dim, fontSize: '11px' }}>{fmtRank(row.tryoutRank)}</td>
-        <td style={{ ...td, color: row.tryoutPitching != null ? '#80B0E8' : s.dim }}>{fmt(row.tryoutPitching)}</td>
-        <td style={{ ...td, color: row.tryoutHitting != null ? '#80B0E8' : s.dim }}>{fmt(row.tryoutHitting)}</td>
-        <td style={{ ...td, color: row.speed != null ? '#80B0E8' : s.dim }}>{row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}</td>
-        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400 }}>{fmt(row.coachEval)}</td>
-        <td style={{ ...td, textAlign: 'center', color: row.coachRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>{fmtRank(row.coachRank)}</td>
-        <td style={{ ...td, color: row.intangibles != null ? '#6DB875' : s.dim, fontWeight: row.intangibles != null ? 600 : 400 }}>{fmt(row.intangibles)}</td>
-        <td style={{ ...td, textAlign: 'center', color: row.intangiblesRank != null ? '#6DB875' : s.dim, fontSize: '11px' }}>{fmtRank(row.intangiblesRank)}</td>
-        <td style={{ ...td, color: row.teamPitching != null ? '#6DB875' : s.dim }}>{fmt(row.teamPitching)}</td>
-        <td style={{ ...td, color: row.teamHitting != null ? '#6DB875' : s.dim }}>{fmt(row.teamHitting)}</td>
-        <td style={{ ...td, color: row.evalSpeed != null ? '#6DB875' : s.dim }}>{row.evalSpeed?.toFixed(1) ?? '—'}</td>
-        <td style={{ ...td, color: row.evalAthleticism != null ? '#6DB875' : s.dim }}>{row.evalAthleticism?.toFixed(1) ?? '—'}</td>
-        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.gcHittingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>{fmt(row.gcHittingScore)}</td>
-        <td style={{ ...td, color: row.gcPitchingScore != null ? '#C080E8' : s.dim, fontSize: '11px' }}>{fmt(row.gcPitchingScore)}</td>
+        <td title={[row.tryoutPitching != null && `Pitch ${fmt(row.tryoutPitching)}`, row.tryoutHitting != null && `Hit ${fmt(row.tryoutHitting)}`, row.speed != null && `Speed ${row.speed.toFixed(2)}s`].filter(Boolean).join(' · ') || undefined}
+          style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400, cursor: row.tryoutScore != null ? 'help' : 'default' }}>{fmt(row.tryoutScore)}</td>
+        <td title={[row.intangibles != null && `Intangibles ${fmt(row.intangibles)}`, row.teamPitching != null && `Pitch ${fmt(row.teamPitching)}`, row.teamHitting != null && `Hit ${fmt(row.teamHitting)}`].filter(Boolean).join(' · ') || undefined}
+          style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400, cursor: row.coachEval != null ? 'help' : 'default' }}>{fmt(row.coachEval)}</td>
+        <td title={[row.gcHittingScore != null && `GC Hit ${fmt(row.gcHittingScore)}`, row.gcPitchingScore != null && `GC Pitch ${fmt(row.gcPitchingScore)}`].filter(Boolean).join(' · ') || undefined}
+          style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.priorStatScore != null ? '#C080E8' : s.dim, fontSize: '11px', cursor: row.priorStatScore != null ? 'help' : 'default' }}>{fmt(row.priorStatScore)}</td>
         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
           <button onClick={() => toggleExclude(row.player.id)}
             title={row.isExcluded ? 'Click to re-include' : 'Exclude from team making'}
@@ -1108,11 +1109,6 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 : row.adminNotes || <span style={{ color: s.dim }}>+ add note</span>}
             </div>
           )}
-        </td>
-        <td style={{ ...td, textAlign: 'left', minWidth: '180px', maxWidth: '280px' }}>
-          {row.coachComments
-            ? <span title={row.coachComments} style={{ fontSize: '11px', color: s.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'help' }}>{row.coachComments}</span>
-            : <span style={{ color: s.dim, fontSize: '11px' }}>—</span>}
         </td>
       </tr>
     )
@@ -1294,24 +1290,24 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   color: 'var(--accent)', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Combined</th>
                 {/* Identity */}
-                <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
-                {/* Tryout — Score, Rank, TO Pitch, TO Hit, Speed */}
-                <th colSpan={5} style={{
+                <th colSpan={2} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
+                {/* Tryout */}
+                <th colSpan={1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#80B0E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Tryout</th>
-                {/* Coach Eval — Score, Rank, Intangibles, Rank, Eval Pitch, Eval Hit, Speed, Athleticism */}
-                <th colSpan={8} style={{
+                {/* Coach Eval */}
+                <th colSpan={1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#6DB875', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Coach Eval</th>
-                {/* GC */}
-                <th colSpan={2} style={{
+                {/* GC / Prior Stats */}
+                <th colSpan={1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#C080E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
-                }}>GC Stats</th>
-                {/* Excl + Notes + Comments */}
-                <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
+                }}>Prior Stats</th>
+                {/* Excl + Notes */}
+                <th colSpan={2} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
               </tr>
 
               {/* ── Column header row ── */}
@@ -1335,57 +1331,29 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 <th style={{ ...th, color: 'var(--accent)' }}
                   onClick={() => toggleSort('combinedScore')}>Score{sortArrow('combinedScore')}</th>
 
-                {/* Age + Grade + Prior Team */}
+                {/* Age + Prior Team */}
                 <th style={{ ...th }} onClick={() => toggleSort('ageGroup')}>Age</th>
-                <th style={{ ...th }}>Grade</th>
                 <th style={{ ...th, minWidth: '80px' }}>
                   {priorYear ? `${priorYear} Team` : 'Prior Team'}
                 </th>
 
-                {/* ── Tryout (Blue) ── */}
+                {/* Tryout — single column; breakdown on hover, full detail in PlayerCard */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#80B0E8' }}
                   onClick={() => toggleSort('tryoutScore')}>Score{sortArrow('tryoutScore')}</th>
-                <th style={{ ...th, color: '#80B0E8' }}
-                  onClick={() => toggleSort('tryoutRank')}>#Rank{sortArrow('tryoutRank')}</th>
-                <th style={{ ...th, color: '#80B0E8' }}
-                  onClick={() => toggleSort('tryoutPitching')}>TO Pitch{sortArrow('tryoutPitching')}</th>
-                <th style={{ ...th, color: '#80B0E8' }}
-                  onClick={() => toggleSort('tryoutHitting')}>TO Hit{sortArrow('tryoutHitting')}</th>
-                <th style={{ ...th, color: '#80B0E8' }}
-                  onClick={() => toggleSort('speed')}>Speed{sortArrow('speed')}</th>
 
-                {/* ── Coach Eval (Green) ── */}
+                {/* Coach Eval — single column; breakdown on hover, full detail in PlayerCard */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#6DB875' }}
                   onClick={() => toggleSort('coachEval')}>Score{sortArrow('coachEval')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('coachRank')}>#Rank{sortArrow('coachRank')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('intangibles')}>Intangibles{sortArrow('intangibles')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('intangiblesRank')}>#Rank{sortArrow('intangiblesRank')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('teamPitching')}>Eval Pitch{sortArrow('teamPitching')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('teamHitting')}>Eval F/H{sortArrow('teamHitting')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('evalSpeed')}>Spd{sortArrow('evalSpeed')}</th>
-                <th style={{ ...th, color: '#6DB875' }}
-                  onClick={() => toggleSort('evalAthleticism')}>Ath{sortArrow('evalAthleticism')}</th>
 
-                {/* ── GC (Purple) ── */}
+                {/* GC / Prior Stats — single column; hit/pitch breakdown on hover */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
-                  onClick={() => toggleSort('gcHittingScore')}>GC Hit{sortArrow('gcHittingScore')}</th>
-                <th style={{ ...th, color: '#C080E8' }}
-                  onClick={() => toggleSort('gcPitchingScore')}>GC Pit{sortArrow('gcPitchingScore')}</th>
+                  onClick={() => toggleSort('priorStatScore')}>Score{sortArrow('priorStatScore')}</th>
 
                 {/* Exclude */}
                 <th style={{ ...th, textAlign: 'center', width: '60px', minWidth: '60px', cursor: 'default' }}>Excl</th>
 
                 {/* Notes */}
                 <th style={{ ...th, textAlign: 'left', minWidth: '160px', cursor: 'default' }}>Board Notes</th>
-
-                {/* Comments */}
-                <th style={{ ...th, textAlign: 'left', minWidth: '180px', cursor: 'default' }}>Coach Comments</th>
               </tr>
             </thead>
 
@@ -1394,7 +1362,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 <>
                   {/* ── Blue zone ── */}
                   <tr key="draft-blue-header">
-                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(64,144,224,0.08)', borderBottom: '0.5px solid rgba(64,144,224,0.2)' }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4090E0', flexShrink: 0 }} />
                         <span style={{ fontSize: '11px', fontWeight: 800, color: '#4090E0' }}>Blue</span>
@@ -1412,7 +1380,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── Blue / White separator ── */}
                   <tr key="draft-blue-white-sep">
-                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                         <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -1423,7 +1391,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── White zone ── */}
                   <tr key="draft-white-header">
-                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(var(--fg-rgb),0.04)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.muted, flexShrink: 0 }} />
                         <span style={{ fontSize: '11px', fontWeight: 800, color: s.muted }}>White</span>
@@ -1441,7 +1409,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── White / Cut separator ── */}
                   <tr key="draft-white-cut-sep">
-                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                         <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -1454,7 +1422,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   {draftBubble.length > 0 && (
                     <>
                       <tr key="draft-bubble-header">
-                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                           <div style={{ padding: '5px 10px' }}>
                             <span style={{ fontSize: '11px', fontWeight: 800, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bubble · {draftBubble.length} players</span>
                           </div>
@@ -1475,7 +1443,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                     <React.Fragment key={row.player.id}>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
-                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -1486,7 +1454,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                     )}
                     {showWhiteLine && (
                       <tr key={`cut-w-${idx}`}>
-                        <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -1505,7 +1473,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
               {excludedFiltered.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={24} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px 4px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(232,112,96,0.3)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#E87060', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Excluded from team making ({excludedFiltered.length})</span>
@@ -1524,7 +1492,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                           <select value={row.assignedTeamId ?? ''} onChange={e => assignTeam(row.player.id, e.target.value || null)}
                             style={{ background: team ? `${teamColor}18` : 'var(--bg-input)', border: `0.5px solid ${team ? `${teamColor}55` : 'var(--border-md)'}`, borderRadius: '5px', padding: '4px 6px', fontSize: '12px', color: team ? teamColor : s.muted, width: '100%', fontWeight: team ? 700 : 400 }}>
                             <option value="">—</option>
-                            {tOpts.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {tOpts.map(t => <option key={t.id} value={t.id}>{t.name} ({teamFillCounts[t.id] ?? 0})</option>)}
                           </select>
                         </td>
                         <td style={{ ...stickyPlayerTd, background: 'var(--bg)' }}>
@@ -1546,7 +1514,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                             )}
                           </div>
                         </td>
-                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={20} />
+                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={7} />
                         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
                           <button onClick={() => toggleExclude(row.player.id)} title="Re-include this player"
                             style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid rgba(232,112,96,0.5)', background: 'rgba(232,112,96,0.12)', color: '#E87060' }}>
@@ -1556,7 +1524,6 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                         <td style={{ ...td, textAlign: 'left', minWidth: '160px' }}>
                           <span style={{ fontSize: '12px', color: s.dim }}>{row.adminNotes ?? ''}</span>
                         </td>
-                        <td style={{ ...td }} />
                       </tr>
                     )
                   })}
@@ -1598,7 +1565,8 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             orgId={params.orgId}
             actionItems={playerActionsMap[panelPlayerId] ?? []}
             onQuickActionStatus={(itemId, status) => quickSetActionItemStatus(panelPlayerId, itemId, status)}
-            onQuickCreateAction={() => quickCreateActionItem(rp)}
+            onQuickCreateAction={(title) => quickCreateActionItem(rp, title)}
+            onToggleAccepted={() => toggleAccepted(panelPlayerId)}
             onClose={() => setPanelPlayerId(null)}
           />
         )

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
+import { PageHeader } from '../PageHeader'
 import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -496,31 +497,28 @@ function ActionItemsInner({ params }: { params: { orgId: string } }) {
 
   return (
     <main className="page-wide" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', padding: '2rem 1.5rem 6rem' }}>
-      <Link href={`/org/${params.orgId}/tryouts`} style={{ fontSize: '13px', color: s.dim, textDecoration: 'none', display: 'block', marginBottom: '1.25rem' }}>‹ Tryouts</Link>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800 }}>Team Selection Action Items</h1>
-          <div style={{ fontSize: '13px', color: s.muted, marginTop: '2px' }}>
-            {season.label} · {openCount} open
+      <PageHeader
+        title="Team Selection Action Items"
+        subtitle={`${season.label} · ${openCount} open`}
+        backHref={`/org/${params.orgId}/tryouts`}
+        action={
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button onClick={copyForEmail} style={{
+              padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
+            }}>{copied ? '✓ Copied!' : '⎋ Copy for email'}</button>
+            <button onClick={exportCsv} style={{
+              padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
+              background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
+            }}>↓ CSV</button>
+            <button onClick={startCreate} style={{
+              padding: '8px 18px', borderRadius: '7px', border: 'none',
+              background: 'var(--accent)', color: 'var(--accent-text)',
+              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+            }}>+ New Action Item</button>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={copyForEmail} style={{
-            padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
-            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
-          }}>{copied ? '✓ Copied!' : '⎋ Copy for email'}</button>
-          <button onClick={exportCsv} style={{
-            padding: '8px 14px', borderRadius: '7px', border: '0.5px solid var(--border-md)',
-            background: 'var(--bg-input)', color: s.muted, fontSize: '13px', cursor: 'pointer',
-          }}>↓ CSV</button>
-          <button onClick={startCreate} style={{
-            padding: '8px 18px', borderRadius: '7px', border: 'none',
-            background: 'var(--accent)', color: 'var(--accent-text)',
-            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-          }}>+ New Action Item</button>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── Pending roster acceptance reminder ── */}
       {pendingAcceptance.length > 0 && (
