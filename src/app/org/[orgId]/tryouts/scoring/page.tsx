@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import { GC_STAT_DEFS } from '../../../../../lib/tryouts/gcStatDefs'
+import { DEFAULT_SEASON_WEIGHTS, type SeasonWeights } from '../../../../../lib/tryouts/scoring/combinedScore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,13 @@ interface EvalField {
 interface Season {
   id:    string
   label: string
+}
+
+interface SeasonWithWeights extends Season {
+  tryout_weight:      number
+  coach_eval_weight:  number
+  intangibles_weight: number
+  prior_stats_weight: number
 }
 
 interface TeamRow {
@@ -80,6 +88,14 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
   const [tryoutMsg,    setTryoutMsg]    = useState<string | null>(null)
   const [evalMsg,      setEvalMsg]      = useState<string | null>(null)
 
+  // Combined Score weights — the top-level blend of Tryout / Coach Eval /
+  // Intangibles / Season Stats shown on Team Making and the Player Card.
+  // Lives on tryout_seasons; see lib/tryouts/scoring/combinedScore.ts for
+  // the actual blend + redistribution logic these feed.
+  const [combinedWeights, setCombinedWeights] = useState<SeasonWeights>(DEFAULT_SEASON_WEIGHTS)
+  const [savingWeights, setSavingWeights] = useState(false)
+  const [weightsMsg,    setWeightsMsg]    = useState<string | null>(null)
+
   const [teams,        setTeams]        = useState<TeamRow[]>([])
   const [savingTeams,  setSavingTeams]  = useState(false)
   const [teamsMsg,     setTeamsMsg]     = useState<string | null>(null)
@@ -99,9 +115,19 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
 
   async function loadData() {
     const { data: seasonData } = await supabase
-      .from('tryout_seasons').select('id, label')
+      .from('tryout_seasons')
+      .select('id, label, tryout_weight, coach_eval_weight, intangibles_weight, prior_stats_weight')
       .eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
     setSeason(seasonData)
+    if (seasonData) {
+      const sw = seasonData as SeasonWithWeights
+      setCombinedWeights({
+        tryoutWeight:      sw.tryout_weight,
+        coachEvalWeight:   sw.coach_eval_weight,
+        intangiblesWeight: sw.intangibles_weight,
+        priorStatsWeight:  sw.prior_stats_weight,
+      })
+    }
 
     if (!seasonData) { setLoading(false); return }
 
@@ -284,6 +310,38 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
       await loadData()
     }
     setSavingTryout(false)
+  }
+
+  // ── Combined Score weights ────────────────────────────────────────────────
+
+  async function saveCombinedWeights() {
+    if (!season) return
+    setSavingWeights(true)
+    setWeightsMsg(null)
+
+    const total = combinedWeights.tryoutWeight + combinedWeights.coachEvalWeight
+      + combinedWeights.intangiblesWeight + combinedWeights.priorStatsWeight || 1
+    const normalized: SeasonWeights = {
+      tryoutWeight:      parseFloat((combinedWeights.tryoutWeight / total).toFixed(4)),
+      coachEvalWeight:   parseFloat((combinedWeights.coachEvalWeight / total).toFixed(4)),
+      intangiblesWeight: parseFloat((combinedWeights.intangiblesWeight / total).toFixed(4)),
+      priorStatsWeight:  parseFloat((combinedWeights.priorStatsWeight / total).toFixed(4)),
+    }
+
+    const { error } = await supabase.from('tryout_seasons').update({
+      tryout_weight:      normalized.tryoutWeight,
+      coach_eval_weight:  normalized.coachEvalWeight,
+      intangibles_weight: normalized.intangiblesWeight,
+      prior_stats_weight: normalized.priorStatsWeight,
+    }).eq('id', season.id)
+
+    if (error) {
+      setWeightsMsg(`Error: ${error.message}`)
+    } else {
+      setWeightsMsg('Saved.')
+      setCombinedWeights(normalized)
+    }
+    setSavingWeights(false)
   }
 
   // ── Eval config helpers ───────────────────────────────────────────────────
@@ -490,6 +548,21 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
   const totalCatWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0)
   const weightOk = Math.abs(totalCatWeight - 1.0) < 0.02
 
+  const totalCombinedWeight = combinedWeights.tryoutWeight + combinedWeights.coachEvalWeight
+    + combinedWeights.intangiblesWeight + combinedWeights.priorStatsWeight
+  const combinedWeightOk = Math.abs(totalCombinedWeight - 1.0) < 0.02
+
+  const combinedWeightDesc = ([
+    ['Tryout', combinedWeights.tryoutWeight],
+    ['Coach Eval', combinedWeights.coachEvalWeight],
+    ['Intangibles', combinedWeights.intangiblesWeight],
+    ['Season Stats', combinedWeights.priorStatsWeight],
+  ] as const)
+    .filter(([, w]) => w > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, w]) => `${Math.round(w * 100)}% ${label}`)
+    .join(' + ')
+
   if (loading) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       Loading…
@@ -531,9 +604,10 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
               label: 'Combined Score', color: 'var(--accent)',
               lines: [
                 'Shown as the primary rank on Team Making.',
-                'Both scores available → 33% Tryout + 67% Coach Eval',
-                'Only one available → uses whichever exists',
-                'Neither available → no combined score',
+                `Current weights: ${combinedWeightDesc || 'none set'}.`,
+                'Missing a source (e.g. no GC stats imported yet)? Its weight is redistributed proportionally across whichever sources are available — a player is never penalized for a source that hasn\'t come in.',
+                'No sources at all → no combined score.',
+                'Adjust weights in "Combined Score Weights" below.',
               ],
             },
             {
@@ -597,6 +671,70 @@ export default function ScoringConfigPage({ params }: { params: { orgId: string 
           ))}
         </div>
       )}
+
+      {/* ── Combined Score Weights ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: '3rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 700 }}>Combined Score Weights</div>
+            <div style={{ fontSize: '12px', color: s.dim, marginTop: '2px' }}>
+              How Tryout, Coach Eval, Intangibles, and Season Stats blend into the Combined Score shown on Team Making and the Player Card
+            </div>
+          </div>
+          <span style={{
+            fontSize: '12px', fontWeight: 700,
+            color: combinedWeightOk ? '#6DB875' : '#E8A020',
+          }}>
+            {Math.round(totalCombinedWeight * 100)}% total
+            {!combinedWeightOk && ' (will auto-normalize on save)'}
+          </span>
+        </div>
+
+        <div style={{
+          background: 'var(--bg-card)', border: '0.5px solid var(--border)',
+          borderRadius: '10px', padding: '14px 16px',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px', marginBottom: '10px' }}>
+            {([
+              ['tryoutWeight',      'Tryout',       '#80B0E8'],
+              ['coachEvalWeight',   'Coach Eval',   '#6DB875'],
+              ['intangiblesWeight', 'Intangibles',  '#6DB875'],
+              ['priorStatsWeight',  'Season Stats', '#C080E8'],
+            ] as const).map(([key, label, color]) => (
+              <div key={key}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {label}
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number" min={0} max={100} step={1}
+                    value={pct(combinedWeights[key])}
+                    onChange={e => setCombinedWeights(prev => ({ ...prev, [key]: Number(e.target.value) / 100 }))}
+                    style={{ ...inputStyle, width: '64px', textAlign: 'right' }}
+                  />
+                  <span style={{ fontSize: '12px', color: s.dim }}>%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '11px', color: s.dim, lineHeight: 1.5 }}>
+            If a player is missing one of these sources (e.g. no GC stats imported yet), weight is redistributed
+            proportionally across whichever sources are available — a player is never penalized for a source
+            that hasn&apos;t come in yet.
+          </div>
+        </div>
+
+        {/* Save combined weights */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+          <button onClick={saveCombinedWeights} disabled={savingWeights} style={{
+            padding: '9px 22px', borderRadius: '7px', border: 'none',
+            background: 'var(--accent)', color: 'var(--accent-text)',
+            fontSize: '13px', fontWeight: 700, cursor: savingWeights ? 'not-allowed' : 'pointer',
+            opacity: savingWeights ? 0.6 : 1,
+          }}>{savingWeights ? 'Saving…' : 'Save Combined Score Weights'}</button>
+          {weightsMsg && <span style={{ fontSize: '12px', color: weightsMsg.startsWith('Error') ? '#E87060' : '#6DB875' }}>{weightsMsg}</span>}
+        </div>
+      </div>
 
       {/* ── Tryout Scoring Categories ───────────────────────────────────────── */}
       <div style={{ marginBottom: '3rem' }}>

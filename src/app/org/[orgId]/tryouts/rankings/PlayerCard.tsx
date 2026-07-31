@@ -372,6 +372,9 @@ export default function PlayerCard({
             {rp.coachEval != null && (
               <StatChip label="Coach Eval" value={rp.coachEval.toFixed(2)}   color="#6DB875" />
             )}
+            {rp.intangibles != null && (
+              <StatChip label="Intangibles" value={rp.intangibles.toFixed(2)} color="#6DB875" />
+            )}
             {rp.gcHittingScore != null && (
               <StatChip label="GC Hit"  value={rp.gcHittingScore.toFixed(2)} />
             )}
@@ -496,7 +499,7 @@ export default function PlayerCard({
             <Section label="Coach Evaluation" color="#6DB875">
               {rp.coachEval    != null && <ScoreRow label="Overall"     value={rp.coachEval}    rank={rp.coachRank}       totalInAge={totalInAge} color="#6DB875" />}
               {rp.intangibles  != null && <ScoreRow label="Intangibles" value={rp.intangibles}  rank={rp.intangiblesRank} totalInAge={totalInAge} color="#6DB875" />}
-              {rp.teamHitting  != null && <ScoreRow label="Hitting"     value={rp.teamHitting}  color="#6DB875" />}
+              {rp.teamHitting  != null && <ScoreRow label="Hitting/Fielding" value={rp.teamHitting}  color="#6DB875" />}
               {rp.teamPitching != null && <ScoreRow label="Pitching"    value={rp.teamPitching} color="#6DB875" />}
             </Section>
           )}
