@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import { StatusPill, type StatusTone } from '../../../../../components/ui/StatusPill'
@@ -141,8 +142,12 @@ function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '�
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function DataHubPage({ params }: { params: { orgId: string } }) {
+// Deep-link support: Readiness links here with ?ageGroup=10U&data=missing_eval
+// (or &tab=age for age-group issues) so "who's missing X" always resolves to
+// the same player-level view Data Hub already renders — see readiness/page.tsx.
+function DataHubInner({ params }: { params: { orgId: string } }) {
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   // Core data (always loaded)
   const [players,       setPlayers]       = useState<Player[]>([])
@@ -169,11 +174,16 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
   // Player detail panel
   const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
 
-  // UI state
-  const [tab,           setTab]           = useState<Tab>('master')
+  // UI state — initial values seeded from the URL (Readiness deep-links here)
+  const initialTab        = searchParams.get('tab') === 'age' ? 'age' : 'master'
+  const initialAgeGroup   = searchParams.get('ageGroup') ?? 'all'
+  const initialDataFilter = (searchParams.get('data') as DataFilter | null) ?? 'all'
+  const VALID_DATA_FILTERS: DataFilter[] = ['all', 'complete', 'missing_reg', 'missing_roster', 'missing_tryout', 'missing_eval', 'missing_gc']
+
+  const [tab,           setTab]           = useState<Tab>(initialTab)
   const [search,        setSearch]        = useState('')
-  const [ageFilter,     setAgeFilter]     = useState('all')
-  const [dataFilter,    setDataFilter]    = useState<DataFilter>('all')
+  const [ageFilter,     setAgeFilter]     = useState(initialAgeGroup)
+  const [dataFilter,    setDataFilter]    = useState<DataFilter>(VALID_DATA_FILTERS.includes(initialDataFilter) ? initialDataFilter : 'all')
   const [showRegDetail, setShowRegDetail] = useState(false)
   const [sortCol,       setSortCol]       = useState('name')
   const [sortDir,       setSortDir]       = useState<1 | -1>(1)
@@ -1179,5 +1189,17 @@ export default function DataHubPage({ params }: { params: { orgId: string } }) {
         )
       })()}
     </main>
+  )
+}
+
+export default function DataHubPage({ params }: { params: { orgId: string } }) {
+  return (
+    <Suspense fallback={
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading…
+      </main>
+    }>
+      <DataHubInner params={params} />
+    </Suspense>
   )
 }

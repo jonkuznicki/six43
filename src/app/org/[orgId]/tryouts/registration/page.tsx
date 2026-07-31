@@ -5,6 +5,7 @@ import { createClient } from '../../../../../lib/supabase'
 import Link from 'next/link'
 import { PageHeader } from '../PageHeader'
 import { StatusPill } from '../../../../../components/ui/StatusPill'
+import { isHistoricalSeason } from '../../../../../lib/tryouts/season'
 
 interface Season { id: string; label: string; age_groups: string[]; year: number }
 interface RegRow {
@@ -118,6 +119,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   const supabase = createClient()
 
   const [season,  setSeason]  = useState<Season | null>(null)
+  const [allSeasons, setAllSeasons] = useState<{ year: number }[]>([])
   const [regs,    setRegs]    = useState<RegRow[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [priorContext, setPriorContext] = useState<PriorContextRow[]>([])
@@ -135,10 +137,13 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const { data: seasonData } = await supabase
-      .from('tryout_seasons').select('id, label, age_groups, year')
-      .eq('org_id', params.orgId).eq('is_active', true).maybeSingle()
+    const [{ data: seasonData }, { data: allSeasonsData }] = await Promise.all([
+      supabase.from('tryout_seasons').select('id, label, age_groups, year')
+        .eq('org_id', params.orgId).eq('is_active', true).maybeSingle(),
+      supabase.from('tryout_seasons').select('year').eq('org_id', params.orgId),
+    ])
     setSeason(seasonData)
+    setAllSeasons(allSeasonsData ?? [])
     if (!seasonData) { setLoading(false); return }
 
     const [{ data: regData }, { data: playerData }, { data: priorContextData }] = await Promise.all([
@@ -211,6 +216,8 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [filtered])
+
+  const historical = useMemo(() => season ? isHistoricalSeason(season, allSeasons) : false, [season, allSeasons])
 
   const activePlayers = useMemo(() => players.filter(p => p.is_active), [players])
 
@@ -489,7 +496,7 @@ export default function RegistrationPage({ params }: { params: { orgId: string }
 
       <PageHeader
         title="Registration Dashboard"
-        subtitle={season.label}
+        subtitle={<>{season.label}{historical && <span style={{ marginLeft: 8 }}><StatusPill tone="neutral" size="sm">Past season</StatusPill></span>}</>}
         backHref={`/org/${params.orgId}/tryouts`}
         action={
           <button

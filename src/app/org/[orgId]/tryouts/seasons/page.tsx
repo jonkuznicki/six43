@@ -427,7 +427,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
             const c = counts[season.id]
             return (
               <div key={season.id} style={{
-                background: 'var(--bg-card)', border: `0.5px solid ${season.is_active ? 'rgba(109,184,117,0.35)' : 'var(--border)'}`,
+                background: 'var(--bg-card)', border: `0.5px solid ${season.is_active ? 'var(--status-good)' : 'var(--border)'}`,
                 borderRadius: '12px', padding: '1rem 1.25rem',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
@@ -435,7 +435,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                       <span style={{ fontWeight: 800, fontSize: '16px' }}>{season.label}</span>
                       {season.is_active && (
-                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(109,184,117,0.12)', color: '#6DB875', fontWeight: 700, border: '0.5px solid rgba(109,184,117,0.3)' }}>
+                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: 'var(--status-good-bg)', color: 'var(--status-good)', fontWeight: 700, border: '0.5px solid var(--status-good)' }}>
                           Active
                         </span>
                       )}
@@ -462,8 +462,8 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                     {!season.is_active && (
                       <button onClick={() => setActive(season.id)} style={{
                         fontSize: '12px', padding: '5px 12px', borderRadius: '5px',
-                        border: '0.5px solid rgba(109,184,117,0.4)',
-                        background: 'rgba(109,184,117,0.08)', color: '#6DB875',
+                        border: '0.5px solid var(--status-good)',
+                        background: 'var(--status-good-bg)', color: 'var(--status-good)',
                         cursor: 'pointer', fontWeight: 600,
                       }}>Set active</button>
                     )}
@@ -475,15 +475,15 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                     {seasons.length > 1 && (
                       <button onClick={() => seedTargetId === season.id ? closeSeed() : openSeed(season.id)} style={{
                         fontSize: '12px', padding: '5px 12px', borderRadius: '5px',
-                        border: '0.5px solid rgba(75,156,211,0.4)',
-                        background: seedTargetId === season.id ? 'rgba(75,156,211,0.14)' : 'rgba(75,156,211,0.06)',
+                        border: '0.5px solid var(--status-info)',
+                        background: seedTargetId === season.id ? 'var(--status-info-bg)' : 'transparent',
                         color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
                       }}>Seed prior roster…</button>
                     )}
                     <button onClick={() => setDeleteId(season.id)} style={{
                       fontSize: '12px', padding: '5px 12px', borderRadius: '5px',
-                      border: '0.5px solid rgba(220,60,60,0.35)',
-                      background: 'rgba(220,60,60,0.06)', color: '#DC3C3C',
+                      border: '0.5px solid var(--status-bad)',
+                      background: 'var(--status-bad-bg)', color: 'var(--status-bad)',
                       cursor: 'pointer',
                     }}>Delete</button>
                   </div>
@@ -526,12 +526,12 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
                       }}>Close</button>
                     </div>
                     {seedError && (
-                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#DC3C3C', background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,60,60,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--status-bad)', background: 'var(--status-bad-bg)', border: '0.5px solid var(--status-bad)', borderRadius: '6px', padding: '8px 12px' }}>
                         Error: {seedError}
                       </div>
                     )}
                     {seedResult && (
-                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#6DB875', background: 'rgba(109,184,117,0.08)', border: '0.5px solid rgba(109,184,117,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--status-good)', background: 'var(--status-good-bg)', border: '0.5px solid var(--status-good)', borderRadius: '6px', padding: '8px 12px' }}>
                         Seeded {seedResult.seeded} player{seedResult.seeded !== 1 ? 's' : ''} from {seedResult.sourceLabel}&apos;s final roster.
                         {seedResult.skippedExcluded > 0 && ` Skipped ${seedResult.skippedExcluded} excluded.`}
                         {seedResult.skippedNoTeam > 0 && ` Skipped ${seedResult.skippedNoTeam} with no matching team.`}
@@ -566,7 +566,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
 
             {hasDeleteData ? (
               <div style={{
-                background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,60,60,0.3)',
+                background: 'var(--status-bad-bg)', border: '0.5px solid var(--status-bad)',
                 borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: s.muted,
               }}>
                 This season has data that will be permanently deleted:
@@ -584,7 +584,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
             )}
 
             {deleteError && (
-              <div style={{ marginBottom: '12px', fontSize: '13px', color: '#DC3C3C', background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,60,60,0.3)', borderRadius: '6px', padding: '8px 12px' }}>
+              <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--status-bad)', background: 'var(--status-bad-bg)', border: '0.5px solid var(--status-bad)', borderRadius: '6px', padding: '8px 12px' }}>
                 Error: {deleteError}
               </div>
             )}
@@ -597,7 +597,7 @@ export default function SeasonsPage({ params }: { params: { orgId: string } }) {
               }}>Cancel</button>
               <button onClick={confirmDelete} disabled={deleting} style={{
                 padding: '9px 20px', borderRadius: '7px', border: 'none',
-                background: '#DC3C3C', color: '#fff',
+                background: 'var(--status-bad)', color: '#fff',
                 fontSize: '14px', fontWeight: 700, cursor: 'pointer',
                 opacity: deleting ? 0.6 : 1,
               }}>{deleting ? 'Deleting…' : 'Delete season'}</button>
