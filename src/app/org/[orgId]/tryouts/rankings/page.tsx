@@ -1371,7 +1371,6 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   <tr key="draft-blue-header">
                     <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(64,144,224,0.08)', borderBottom: '0.5px solid rgba(64,144,224,0.2)' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4090E0', flexShrink: 0 }} />
                         <span style={{ fontSize: '11px', fontWeight: 800, color: '#4090E0' }}>Blue</span>
                         <span style={{ fontSize: '11px', color: '#4090E0', opacity: 0.8 }}>
                           {draftBlueAsgn.length} confirmed · {draftBlueFill.length} tentative
@@ -1400,7 +1399,6 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   <tr key="draft-white-header">
                     <td colSpan={12} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(var(--fg-rgb),0.04)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.muted, flexShrink: 0 }} />
                         <span style={{ fontSize: '11px', fontWeight: 800, color: s.muted }}>White</span>
                         <span style={{ fontSize: '11px', color: s.muted, opacity: 0.8 }}>
                           {draftWhiteAsgn.length} confirmed · {draftWhiteFill.length} tentative
