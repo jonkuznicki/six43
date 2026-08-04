@@ -220,6 +220,11 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
     } catch { return {} }
   })
 
+  // Scoring detail view — expands the table with extra score-breakdown
+  // columns (rank/pitching/hitting/intangibles/etc). Off by default to keep
+  // the board-meeting view clean; purely a display toggle, not persisted.
+  const [showScoreDetail, setShowScoreDetail] = useState(false)
+
   // Player card panel
   const [panelPlayerId, setPanelPlayerId] = useState<string | null>(null)
 
@@ -963,6 +968,18 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
   function fmt(v: number | null, dec = 2) { return v != null ? v.toFixed(dec) : '—' }
   function fmtRank(v: number | null) { return v != null ? String(v) : '—' }
 
+  // Style for the small rank cells shown in Scoring Detail view.
+  const rankCell = (v: number | null): React.CSSProperties => ({
+    ...td, textAlign: 'center', fontSize: '11px', color: v != null ? s.muted : s.dim,
+  })
+
+  // Number of columns in the base (summary) table vs. how many extra
+  // columns Scoring Detail view adds — used to size colSpan on the
+  // full-width zone/separator rows so they still span the whole table.
+  const BASE_COL_COUNT   = 12
+  const DETAIL_COL_COUNT = 13
+  const totalCols = BASE_COL_COUNT + (showScoreDetail ? DETAIL_COL_COUNT : 0)
+
   // Discoverability cue for the merged Tryout/Coach Eval/Prior Stats columns —
   // each row's cell carries a native title tooltip with the sub-score
   // breakdown; this just tells users to look for it, once, in the header.
@@ -1087,10 +1104,35 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
         <td style={{ ...td, textAlign: 'left', fontSize: '11px', color: row.player.prior_team ? 'var(--status-info)' : s.dim, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.player.prior_team ?? '—'}</td>
         <td title={[row.tryoutPitching != null && `Pitch ${fmt(row.tryoutPitching)}`, row.tryoutHitting != null && `Hit ${fmt(row.tryoutHitting)}`, row.speed != null && `Speed ${row.speed.toFixed(2)}s`].filter(Boolean).join(' · ') || undefined}
           style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.tryoutScore != null ? '#80B0E8' : s.dim, fontWeight: row.tryoutScore != null ? 700 : 400, cursor: row.tryoutScore != null ? 'help' : 'default' }}>{fmt(row.tryoutScore)}</td>
+        {showScoreDetail && (
+          <>
+            <td style={rankCell(row.tryoutRank)}>{fmtRank(row.tryoutRank)}</td>
+            <td style={numCell(row.tryoutPitching)}>{fmt(row.tryoutPitching)}</td>
+            <td style={numCell(row.tryoutHitting)}>{fmt(row.tryoutHitting)}</td>
+            <td style={{ ...td, color: row.speed != null ? 'var(--fg)' : s.dim }}>{row.speed != null ? `${row.speed.toFixed(2)}s` : '—'}</td>
+          </>
+        )}
         <td title={[row.intangibles != null && `Intangibles ${fmt(row.intangibles)}`, row.teamPitching != null && `Pitch ${fmt(row.teamPitching)}`, row.teamHitting != null && `Hit ${fmt(row.teamHitting)}`].filter(Boolean).join(' · ') || undefined}
           style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.coachEval != null ? '#6DB875' : s.dim, fontWeight: row.coachEval != null ? 700 : 400, cursor: row.coachEval != null ? 'help' : 'default' }}>{fmt(row.coachEval)}</td>
+        {showScoreDetail && (
+          <>
+            <td style={rankCell(row.coachRank)}>{fmtRank(row.coachRank)}</td>
+            <td style={numCell(row.intangibles)} title="Intangibles score (coachability, attitude, work ethic)">{fmt(row.intangibles)}</td>
+            <td style={rankCell(row.intangiblesRank)}>{fmtRank(row.intangiblesRank)}</td>
+            <td style={numCell(row.teamPitching)}>{fmt(row.teamPitching)}</td>
+            <td style={numCell(row.teamHitting)}>{fmt(row.teamHitting)}</td>
+            <td style={numCell(row.evalSpeed)}>{fmt(row.evalSpeed)}</td>
+            <td style={numCell(row.evalAthleticism)}>{fmt(row.evalAthleticism)}</td>
+          </>
+        )}
         <td title={[row.gcHittingScore != null && `GC Hit ${fmt(row.gcHittingScore)}`, row.gcPitchingScore != null && `GC Pitch ${fmt(row.gcPitchingScore)}`].filter(Boolean).join(' · ') || undefined}
           style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: row.priorStatScore != null ? '#C080E8' : s.dim, fontSize: '11px', cursor: row.priorStatScore != null ? 'help' : 'default' }}>{fmt(row.priorStatScore)}</td>
+        {showScoreDetail && (
+          <>
+            <td style={numCell(row.gcHittingScore)}>{fmt(row.gcHittingScore)}</td>
+            <td style={numCell(row.gcPitchingScore)}>{fmt(row.gcPitchingScore)}</td>
+          </>
+        )}
         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
           <button onClick={() => toggleExclude(row.player.id)}
             title={row.isExcluded ? 'Click to re-include' : 'Exclude from team making'}
@@ -1177,6 +1219,15 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
             padding: '5px 12px', borderRadius: '6px', border: '0.5px solid var(--border-md)',
             background: 'var(--bg-input)', color: s.muted, fontSize: '12px', cursor: 'pointer',
           }}>↓ CSV</button>
+          <button onClick={() => setShowScoreDetail(v => !v)}
+            title="Show every score component behind each player's ranking — rank, pitching/hitting, intangibles, and prior-stat breakdowns"
+            style={{
+              padding: '5px 12px', borderRadius: '6px',
+              border: `0.5px solid ${showScoreDetail ? 'var(--accent)' : 'var(--border-md)'}`,
+              background: showScoreDetail ? 'rgba(var(--accent-rgb),0.12)' : 'var(--bg-input)',
+              color: showScoreDetail ? 'var(--accent)' : s.muted,
+              fontSize: '12px', fontWeight: showScoreDetail ? 700 : 400, cursor: 'pointer',
+            }}>{showScoreDetail ? 'Hide Score Details' : 'Show Score Details'}</button>
         </div>
       </div>
 
@@ -1299,17 +1350,17 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 {/* Identity */}
                 <th colSpan={2} style={{ ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px' }} />
                 {/* Tryout */}
-                <th colSpan={1} style={{
+                <th colSpan={showScoreDetail ? 5 : 1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#80B0E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Tryout</th>
                 {/* Coach Eval */}
-                <th colSpan={1} style={{
+                <th colSpan={showScoreDetail ? 8 : 1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#6DB875', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Coach Eval</th>
                 {/* GC / Prior Stats */}
-                <th colSpan={1} style={{
+                <th colSpan={showScoreDetail ? 3 : 1} style={{
                   ...th, textAlign: 'center', borderBottom: 'none', padding: '4px 8px',
                   color: '#C080E8', borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)',
                 }}>Prior Stats</th>
@@ -1344,17 +1395,59 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   {priorYear ? `${priorYear} Team` : 'Prior Team'}
                 </th>
 
-                {/* Tryout — single column; breakdown on hover, full detail in PlayerCard */}
+                {/* Tryout — single column; breakdown on hover, full detail in PlayerCard.
+                    In Scoring Detail view, the breakdown is also broken out into its own columns. */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#80B0E8' }}
                   onClick={() => toggleSort('tryoutScore')}>Score{breakdownHint}{sortArrow('tryoutScore')}</th>
+                {showScoreDetail && (
+                  <>
+                    <th title="Tryout rank within age group" style={{ ...th, color: '#80B0E8' }}
+                      onClick={() => toggleSort('tryoutRank')}>Rank{sortArrow('tryoutRank')}</th>
+                    <th title="Tryout pitching component" style={{ ...th, color: '#80B0E8' }}
+                      onClick={() => toggleSort('tryoutPitching')}>Pitch{sortArrow('tryoutPitching')}</th>
+                    <th title="Tryout hitting component" style={{ ...th, color: '#80B0E8' }}
+                      onClick={() => toggleSort('tryoutHitting')}>Hit{sortArrow('tryoutHitting')}</th>
+                    <th title="60-yard dash time, in seconds (lower is better)" style={{ ...th, color: '#80B0E8' }}
+                      onClick={() => toggleSort('speed')}>60yd{sortArrow('speed')}</th>
+                  </>
+                )}
 
-                {/* Coach Eval — single column; breakdown on hover, full detail in PlayerCard */}
+                {/* Coach Eval — single column; breakdown on hover, full detail in PlayerCard.
+                    In Scoring Detail view, Intangibles gets its own visible column, plus the
+                    remaining eval sub-scores. */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#6DB875' }}
                   onClick={() => toggleSort('coachEval')}>Score{breakdownHint}{sortArrow('coachEval')}</th>
+                {showScoreDetail && (
+                  <>
+                    <th title="Coach eval rank within age group" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('coachRank')}>Rank{sortArrow('coachRank')}</th>
+                    <th title="Intangibles score — coachability, attitude, work ethic (this season only)" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('intangibles')}>Intangibles{sortArrow('intangibles')}</th>
+                    <th title="Intangibles rank within age group" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('intangiblesRank')}>Int.Rank{sortArrow('intangiblesRank')}</th>
+                    <th title="Coach-scored pitching/catching section average" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('teamPitching')}>Pitch{sortArrow('teamPitching')}</th>
+                    <th title="Coach-scored fielding/hitting section average" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('teamHitting')}>Hit{sortArrow('teamHitting')}</th>
+                    <th title="Coach-rated speed (1–5)" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('evalSpeed')}>Speed{sortArrow('evalSpeed')}</th>
+                    <th title="Coach-rated athleticism (1–5)" style={{ ...th, color: '#6DB875' }}
+                      onClick={() => toggleSort('evalAthleticism')}>Athl{sortArrow('evalAthleticism')}</th>
+                  </>
+                )}
 
-                {/* GC / Prior Stats — single column; hit/pitch breakdown on hover */}
+                {/* GC / Prior Stats — single column; hit/pitch breakdown on hover.
+                    In Scoring Detail view, hitting/pitching are broken out. */}
                 <th style={{ ...th, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)', color: '#C080E8' }}
                   onClick={() => toggleSort('priorStatScore')}>Score{breakdownHint}{sortArrow('priorStatScore')}</th>
+                {showScoreDetail && (
+                  <>
+                    <th title={`GameChanger hitting score (${priorYear ?? 'prior season'})`} style={{ ...th, color: '#C080E8' }}
+                      onClick={() => toggleSort('gcHittingScore')}>Hit{sortArrow('gcHittingScore')}</th>
+                    <th title={`GameChanger pitching score (${priorYear ?? 'prior season'})`} style={{ ...th, color: '#C080E8' }}
+                      onClick={() => toggleSort('gcPitchingScore')}>Pitch{sortArrow('gcPitchingScore')}</th>
+                  </>
+                )}
 
                 {/* Exclude */}
                 <th style={{ ...th, textAlign: 'center', width: '60px', minWidth: '60px', cursor: 'default' }}>Excl</th>
@@ -1369,7 +1462,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                 <>
                   {/* ── Blue zone ── */}
                   <tr key="draft-blue-header">
-                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(64,144,224,0.08)', borderBottom: '0.5px solid rgba(64,144,224,0.2)' }}>
                         <span style={{ fontSize: '11px', fontWeight: 800, color: '#4090E0' }}>Blue</span>
                         <span style={{ fontSize: '11px', color: '#4090E0', opacity: 0.8 }}>
@@ -1386,7 +1479,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── Blue / White separator ── */}
                   <tr key="draft-blue-white-sep">
-                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                         <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -1397,7 +1490,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── White zone ── */}
                   <tr key="draft-white-header">
-                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 10px', background: 'rgba(var(--fg-rgb),0.04)', borderBottom: '0.5px solid rgba(var(--fg-rgb),0.1)' }}>
                         <span style={{ fontSize: '11px', fontWeight: 800, color: s.muted }}>White</span>
                         <span style={{ fontSize: '11px', color: s.muted, opacity: 0.8 }}>
@@ -1414,7 +1507,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
 
                   {/* ── White / Cut separator ── */}
                   <tr key="draft-white-cut-sep">
-                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                         <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -1427,7 +1520,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                   {draftBubble.length > 0 && (
                     <>
                       <tr key="draft-bubble-header">
-                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                           <div style={{ padding: '5px 10px' }}>
                             <span style={{ fontSize: '11px', fontWeight: 800, color: s.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bubble · {draftBubble.length} players</span>
                           </div>
@@ -1448,7 +1541,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                     <React.Fragment key={row.player.id}>
                     {showBlueLine && (
                       <tr key={`cut-b-${idx}`}>
-                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(64,144,224,0.5)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: '#4090E0', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Blue / White cutoff</span>
@@ -1459,7 +1552,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                     )}
                     {showWhiteLine && (
                       <tr key={`cut-w-${idx}`}>
-                        <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                        <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px' }}>
                             <div style={{ flex: 1, height: '1.5px', background: 'rgba(var(--fg-rgb),0.25)' }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: s.muted, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>White / Cut line</span>
@@ -1478,7 +1571,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
               {excludedFiltered.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={12} style={{ padding: 0, border: 'none' }}>
+                    <td colSpan={totalCols} style={{ padding: 0, border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px 4px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(232,112,96,0.3)' }} />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--status-bad)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Excluded from team making ({excludedFiltered.length})</span>
@@ -1519,7 +1612,7 @@ function TeamMakingPageInner({ params }: { params: { orgId: string } }) {
                             )}
                           </div>
                         </td>
-                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={7} />
+                        <td style={{ ...td, borderLeft: '0.5px solid rgba(var(--fg-rgb),0.08)' }} colSpan={7 + (showScoreDetail ? DETAIL_COL_COUNT : 0)} />
                         <td style={{ ...td, textAlign: 'center', width: '60px' }}>
                           <button onClick={() => toggleExclude(row.player.id)} title="Re-include this player"
                             style={{ padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '0.5px solid var(--status-bad)', background: 'var(--status-bad-bg)', color: 'var(--status-bad)' }}>
