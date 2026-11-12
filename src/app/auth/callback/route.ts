@@ -3,6 +3,7 @@ import { createServiceClient } from '../../../lib/supabase-service'
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { addToAudience } from '../../../lib/resend-audience'
+import { findPendingTryoutInviteIds } from '../../../lib/tryouts/inviteAcceptance'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -35,18 +36,15 @@ export async function GET(request: Request) {
           .in('id', pending.map((r: any) => r.id))
       }
 
-      // Auto-accept pending tryout org member invites
-      const { data: tryoutPending } = await service
-        .from('tryout_org_members')
-        .select('id')
-        .eq('email', user.email)
-        .eq('is_active', false)
-
-      if (tryoutPending && tryoutPending.length > 0) {
+      // Auto-accept pending tryout org member invites. Removed members
+      // (inactive rows with a user_id) are excluded, so signing in can't reactivate them (R5).
+      const tryoutPendingIds = await findPendingTryoutInviteIds(service, user.email)
+      if (tryoutPendingIds.length > 0) {
         await service
           .from('tryout_org_members')
           .update({ user_id: user.id, is_active: true })
-          .in('id', tryoutPending.map((r: any) => r.id))
+          .in('id', tryoutPendingIds)
+          .is('user_id', null)
       }
     }
 
