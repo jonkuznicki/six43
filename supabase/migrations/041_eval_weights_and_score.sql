@@ -185,4 +185,6 @@ begin
 end;
 $$;
 
-grant execute on function tryout_submit_eval_by_token to anon, authenticated;
+-- Explicit signature: the 4-arg overload from 037 still exists here, so the
+-- bare name is ambiguous (SQLSTATE 42725). The 4-arg one was granted in 037.
+grant execute on function tryout_submit_eval_by_token(uuid, text, text, jsonb, jsonb, text, text) to anon, authenticated;
