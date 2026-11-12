@@ -8,10 +8,26 @@
 
 do $$
 declare
-  v_admin_id  uuid := 'YOUR_USER_ID_HERE';  -- ← replace this
+  -- Held as text so a placeholder/invalid value can be detected instead of
+  -- failing the uuid cast at block entry.
+  v_admin_raw text := 'YOUR_USER_ID_HERE';  -- ← replace this
+  v_admin_id  uuid;
   v_org_id    uuid;
   v_season_id uuid;
 begin
+
+  -- ── Guard: skip sample data unless the admin user is real ───
+  if v_admin_raw !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise notice 'Hudson Baseball sample data skipped: admin UUID "%" is a placeholder or not a valid UUID.', v_admin_raw;
+    return;
+  end if;
+
+  v_admin_id := v_admin_raw::uuid;
+
+  if not exists (select 1 from auth.users where id = v_admin_id) then
+    raise notice 'Hudson Baseball sample data skipped: admin user % not found in auth.users.', v_admin_id;
+    return;
+  end if;
 
   -- ── Create Hudson Baseball org ──────────────────────────────
   insert into tryout_orgs (name, sport, slug, admin_user_id)

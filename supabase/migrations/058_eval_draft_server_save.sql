@@ -261,6 +261,8 @@ $$;
 
 -- ── Grants ────────────────────────────────────────────────────────────────────
 
-grant execute on function tryout_save_eval_draft_by_team_token  to anon, authenticated;
+-- Explicit signature: the 5-arg overload from 047 still exists here, so the
+-- bare name is ambiguous (SQLSTATE 42725). The 5-arg one was granted in 047.
+grant execute on function tryout_save_eval_draft_by_team_token(uuid, text, jsonb, jsonb, text, text) to anon, authenticated;
 grant execute on function tryout_eval_form_data_by_team_token   to anon, authenticated;
 grant execute on function tryout_submit_eval_by_team_token      to anon, authenticated;

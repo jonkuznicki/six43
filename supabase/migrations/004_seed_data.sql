@@ -38,6 +38,13 @@ declare
 
 begin
 
+-- Skip on databases where the sample owner doesn't exist (e.g. a fresh
+-- local `supabase start`), instead of failing on teams_user_id_fkey.
+if not exists (select 1 from auth.users where id = v_user_id) then
+  raise notice 'Blue Jays sample data skipped: auth user % not found.', v_user_id;
+  return;
+end if;
+
 -- ----------------------------------------------------------------
 -- Team
 -- ----------------------------------------------------------------
