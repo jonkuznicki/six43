@@ -4,173 +4,228 @@
 
 ---
 
-## Getting started from scratch
+## Local development setup (Windows + WSL + Docker)
 
-Follow these steps in order. Each one should take 5–10 minutes.
+Six43 runs as two pieces on your machine:
 
----
+| Piece | Where it runs | URL |
+|---|---|---|
+| Next.js app | Windows (PowerShell) | http://localhost:3000 |
+| Supabase (Postgres, Auth, API, Studio, Mailpit) | Docker containers, controlled from Ubuntu (WSL) | http://127.0.0.1:54321 |
 
-### Step 1: Install the tools you need
+Everything below uses **local-only** credentials. You never need production
+keys to develop.
 
-You need Node.js and Docker installed on your computer.
+### 1. Install the tools (one time)
 
-- **Node.js**: Download from https://nodejs.org — get the "LTS" version
-- **Docker Desktop**: Download from https://docker.com/products/docker-desktop
-  - Docker is used to run Supabase locally (a local database on your machine)
-  - Start Docker Desktop before running any `supabase` commands
+**Windows**
+- **Node.js 22 LTS** (22.13 or newer). Several dev dependencies require
+  `^20.19 || >=22.12`. Using a version manager such as
+  [nvm-windows](https://github.com/coreybutler/nvm-windows) or
+  [fnm](https://github.com/Schniz/fnm) makes switching easy.
+- **Git**
+- **Docker Desktop**, with *Settings → General → Use the WSL 2 based engine*
+  on, and *Settings → Resources → WSL integration* enabled for **Ubuntu**.
 
-Verify they installed correctly by opening Terminal and running:
-```bash
-node --version    # should print v20 or higher
-docker --version  # should print something like Docker version 26.x
+**Ubuntu (WSL)**
+- Install from PowerShell: `wsl --install -d Ubuntu`
+- Inside Ubuntu, check Docker is reachable: `docker ps`
+- Install **Node.js 22** inside Ubuntu (for example with
+  [nvm](https://github.com/nvm-sh/nvm): `nvm install 22`). Ubuntu only needs
+  Node for `npx`, which downloads and runs the Supabase CLI. Nothing else
+  needs installing there.
+
+> **Why run the Supabase CLI from WSL?** On this Windows setup, the Windows
+> Supabase CLI (`node_modules\supabase\bin\supabase.exe`, from the `supabase`
+> devDependency) is **blocked by Windows Device Guard**. Running the Linux CLI
+> through `npx` inside Ubuntu avoids that and talks to Docker Desktop through
+> WSL integration.
+
+#### Pinning the Supabase CLI version
+
+The commands below use `npx --yes supabase@<version>`. Each run downloads the
+CLI version you name (cached after the first time), so there's no global
+install to keep in sync.
+
+- **Use an exact version, not `@latest`**, so every machine runs the same CLI
+  and gets the same Docker image versions (Postgres, Auth, Mailpit, ...).
+  The current pinned version is **`3.1.0`**:
+
+  ```bash
+  npx --yes supabase@3.1.0 start
+  ```
+
+- **To upgrade:** change the version in this README in a dedicated commit,
+  then in Ubuntu run `npx --yes supabase@<new> stop` followed by
+  `npx --yes supabase@<new> start`. Read the
+  [CLI release notes](https://github.com/supabase/cli/releases) first, since
+  major versions can change the local Docker images.
+- **Optional shortcut:** add an alias to `~/.bashrc` in Ubuntu so you don't
+  repeat the version:
+
+  ```bash
+  alias supabase='npx --yes supabase@3.1.0'
+  ```
+
+  The rest of this README writes `supabase …`, which means either the alias
+  or the full `npx --yes supabase@3.1.0 …` command.
+
+Verify on Windows:
+```powershell
+node --version     # v22.13+ recommended
+docker --version
 ```
 
----
+### 2. Get the code and install dependencies (Windows)
 
-### Step 2: Get the code running locally
-
-```bash
-# 1. Clone or download this project, then navigate into it
+```powershell
+git clone <repo-url> six43
 cd six43
-
-# 2. Install all dependencies (this reads package.json)
 npm install
-
-# 3. Start the local Supabase database
-npx supabase start
 ```
 
-After `supabase start` finishes, it will print something like:
-```
-API URL:    http://127.0.0.1:54321
-DB URL:     postgresql://postgres:postgres@127.0.0.1:54322/postgres
-Studio URL: http://127.0.0.1:54323    ← open this to see your local database
-anon key:   eyJhbGc...                ← copy this
-```
+Run `npm install` from **Windows**, not WSL. `node_modules` contains
+platform-specific binaries, so it must be installed by the same OS that runs
+`npm run dev`.
 
-Keep that terminal open. Supabase runs in the background.
+### 3. Start local Supabase (Ubuntu / WSL)
 
----
-
-### Step 3: Set up your environment variables
+Open Ubuntu and go to the project through the Windows mount:
 
 ```bash
-# Copy the example file
-cp .env.example .env.local
+cd /mnt/c/Users/<you>/Projects/six43
+npx --yes supabase@3.1.0 start
 ```
 
-Open `.env.local` in any text editor and fill in the values printed by `supabase start`:
+The first run downloads the Docker images (several minutes). It then applies
+every file in `supabase/migrations/` in order, so you do **not** need to run
+migrations by hand.
+
+When it finishes, show the local URLs and keys any time with:
+
+```bash
+supabase status
+```
+
+Local services:
+
+| Service | URL |
+|---|---|
+| API | http://127.0.0.1:54321 |
+| Postgres | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| Studio (database UI) | http://127.0.0.1:54323 |
+| Mailpit (catches all local email) | http://127.0.0.1:54324 |
+
+Local configuration lives in `supabase/config.toml` (committed). It applies
+only to the local stack, never to production. Auth redirects are set up for
+`http://localhost:3000` (with `127.0.0.1:3000` also allowed), and email
+confirmation is off. After editing `config.toml`, restart with `stop` and then
+`start`. The
+migrations that load sample data (`004`, `032`) skip themselves on a fresh
+database where their owner user doesn't exist.
+
+### 4. Create `.env.local` (Windows, one time)
+
+```powershell
+copy .env.example .env.local
+```
+
+Fill it in with values from `supabase status` (the legacy JWT-style
+`ANON_KEY` / `SERVICE_ROLE_KEY`, which start with `eyJ`):
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...  (the anon key from above)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY from supabase status>
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+ADMIN_EMAIL=<the email you sign up with locally, for /admin>
 ```
 
----
+Leave `RESEND_API_KEY`, `RESEND_AUDIENCE_ID` and `ANTHROPIC_API_KEY` unset
+for local work. Features that send email or call Claude are skipped or
+return an error without them.
 
-### Step 4: Run the database migrations
+`.env.local` and every other `.env*` file except `.env.example` are
+git-ignored. **Never put production keys in `.env.local`.**
 
-This creates all the tables. Run each migration file in order:
+### 5. Start the app (Windows)
 
-```bash
-# Open the Supabase Studio at http://127.0.0.1:54323
-# Click "SQL Editor" in the left sidebar
-# Paste and run each file in this order:
-
-supabase/migrations/001_core_tables.sql
-supabase/migrations/002_season_stats_view.sql
-supabase/migrations/003_row_level_security.sql
-```
-
-**Don't run 004_seed_data.sql yet** — that needs your user account first.
-
----
-
-### Step 5: Start the app
-
-```bash
+```powershell
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser. You should see the app.
+Open http://localhost:3000 and sign up. With the current local config,
+email confirmation is off, so new accounts are confirmed and signed in
+immediately. Any email Auth does send shows up in Mailpit.
 
 ---
 
-### Step 6: Create your account and load sample data
+## Daily workflow
 
-1. Sign up with an email and password in the app
-2. Go to Supabase Studio → Authentication → Users
-3. Copy your user UUID (looks like `8f3a2b1c-...`)
-4. Open `supabase/migrations/004_seed_data.sql`
-5. Replace `'YOUR-USER-UUID-HERE'` with your UUID
-6. Run it in SQL Editor
+**Start**
+1. Start **Docker Desktop** (wait until it says *Engine running*).
+2. In **Ubuntu**: `cd /mnt/c/Users/<you>/Projects/six43 && npx --yes supabase@3.1.0 start`
+3. In **PowerShell**: `cd C:\Users\<you>\Projects\six43; npm run dev`
+4. Open http://localhost:3000
 
-You'll now have the Blue Jays roster and 2 games loaded from the original spreadsheet.
+**Stop**
+1. `Ctrl+C` in the PowerShell window running `npm run dev`.
+2. In Ubuntu: `npx --yes supabase@3.1.0 stop`. Your local data is kept for next time.
+3. Quit Docker Desktop if you want the memory back.
+
+**Useful commands**
+
+```bash
+# Ubuntu / WSL  (supabase = alias for `npx --yes supabase@3.1.0`, see above)
+supabase gen types typescript --local > src/lib/database.types.ts
+                             # regenerate DB types (use this instead of `npm run db:types`,
+                             # which calls the Device Guard-blocked Windows CLI)
+supabase status              # URLs + local keys
+supabase migration new name  # create a new migration file
+supabase db reset            # ⚠ wipes local DB and re-runs all migrations (local only)
+supabase stop --no-backup    # ⚠ stop AND delete local data
+```
+
+```powershell
+# Windows
+npm run dev        # dev server
+npm test           # unit tests (vitest)
+npx tsc --noEmit   # type-check
+npm run build      # production build (stop `npm run dev` first; both use .next/)
+```
+
+Never run `supabase link`, `supabase db push`, or anything with
+`--project-ref` against production from a dev machine unless you mean to.
 
 ---
 
-## Project structure explained
+## Project structure
 
 ```
 six43/
 ├── supabase/
-│   └── migrations/          # Database setup files — run these in order
-│       ├── 001_core_tables.sql      # Creates all tables
-│       ├── 002_season_stats_view.sql # The "Positions" sheet replacement
-│       ├── 003_row_level_security.sql # Security rules
-│       └── 004_seed_data.sql        # Sample data (dev only)
+│   ├── config.toml          # Local Supabase settings (ports, auth, email)
+│   └── migrations/          # Database schema, applied in order by `supabase start`
 │
 └── src/
-    ├── types/
-    │   └── index.ts          # TypeScript types for every table
-    │
-    ├── lib/
-    │   ├── supabase.ts       # Database client setup
-    │   └── queries.ts        # All database queries live here
-    │
-    ├── components/
-    │   ├── ui/               # Reusable UI bits (buttons, inputs)
-    │   ├── lineup/           # Lineup grid, position picker, etc.
-    │   └── fairness/         # Bench % bars, fairness dashboard
-    │
-    └── app/                  # Next.js pages (one folder = one URL)
-        ├── login/            # /login
-        ├── dashboard/        # /dashboard — home screen
-        ├── roster/           # /roster — manage players
-        ├── games/
-        │   ├── new/          # /games/new — create a game
-        │   └── [gameId]/     # /games/abc123 — view a game
-        │       ├── lineup/   # /games/abc123/lineup — build lineup
-        │       └── postgame/ # /games/abc123/postgame — finalize
-        └── fairness/         # /fairness — season stats
+    ├── types/               # TypeScript types
+    ├── lib/                 # Supabase clients and queries
+    ├── components/          # UI components
+    └── app/                 # Next.js pages and API routes (one folder = one URL)
 ```
 
 ---
 
-## Common commands
+## Deploying to production
 
-```bash
-npm run dev          # Start the development server
-npm run build        # Build for production
-npx supabase start   # Start local database
-npx supabase stop    # Stop local database
-npm run db:types     # Regenerate TypeScript types from DB schema
-```
-
----
-
-## Deploying to production (when you're ready)
-
-1. Create a free project at https://supabase.com
-2. Run migrations 001–003 in Supabase's SQL Editor (not 004)
-3. Create a Vercel account at https://vercel.com
-4. Connect your GitHub repo to Vercel
-5. Add your production Supabase URL and anon key as environment variables in Vercel
-6. Deploy — Vercel builds and hosts automatically on every push
+Production runs on a hosted Supabase project and Vercel. Production
+credentials live only in Vercel's environment settings, never in this repo or
+in `.env.local`. Vercel deploys automatically when changes are pushed to the
+production branch.
 
 ---
 
 ## Getting help
 
-Every file in this project has comments explaining what it does and why.
 When something isn't working, paste the error message into Claude and include
 which file and which step you're on.
