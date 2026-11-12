@@ -1,0 +1,72 @@
+# Six43 CI: runs on every pull request and on pushes to main.
+#
+# SECURITY: this workflow uses NO repository secrets and never talks to
+# production. The build uses placeholder public values, and the database job
+# runs a throwaway local Supabase stack inside the runner with its well-known
+# local demo keys.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Tests, type-check, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Placeholders: the build must never embed real project URLs or keys.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Production build
+        run: npm run build
+
+  db-security:
+    name: Migrations + cross-team access tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.1.0          # keep in sync with README and scripts/db/*.sh
+      - name: Start local Supabase (applies every migration from scratch)
+        run: supabase start -x studio,imgproxy,realtime,storage-api,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+      - name: Export LOCAL stack URL and demo keys
+        run: |
+          supabase status -o env \
+            | sed -nE 's/^API_URL="?([^"]*)"?$/NEXT_PUBLIC_SUPABASE_URL=\1/p;
+                       s/^ANON_KEY="?([^"]*)"?$/NEXT_PUBLIC_SUPABASE_ANON_KEY=\1/p;
+                       s/^SERVICE_ROLE_KEY="?([^"]*)"?$/SUPABASE_SERVICE_ROLE_KEY=\1/p' >> "$GITHUB_ENV"
+      - name: Cross-team / anonymous access tests
+        run: npm run test:rls
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
