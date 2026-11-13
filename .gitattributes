@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings so they run in Ubuntu/WSL
+*.sh text eol=lf
