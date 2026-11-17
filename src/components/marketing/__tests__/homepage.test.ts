@@ -131,7 +131,7 @@ describe('homepage content', () => {
   })
 
   it('every link goes to an existing route, an in-page anchor or the support address', () => {
-    const hrefs = [...new Set(Array.from((html + render(true)).matchAll(/href="([^"]+)"/g), m => m[1]))]
+    const hrefs = Array.from(new Set(Array.from((html + render(true)).matchAll(/href="([^"]+)"/g), m => m[1])))
     expect(hrefs.length).toBeGreaterThan(5)
     for (const h of hrefs) {
       if (h.startsWith('#')) { expect(html, h).toContain(`id="${h.slice(1)}"`); continue }
