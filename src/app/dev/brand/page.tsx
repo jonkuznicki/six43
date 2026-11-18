@@ -46,6 +46,8 @@ const HIDE_CHROME = `
   .app-content { margin-left: 0 !important; }
   .app-content main.brand-review-page { max-width: none !important; }
   body { background: #FAFAF7 !important; }
+  /* app install prompt (root layout) */
+  div[style*="translateX(-50%)"][style*="bottom: 72px"], div[style*="translateX(-50%)"][style*="bottom:72px"] { display: none !important; }
 `
 
 const page: CSSProperties = {
@@ -193,9 +195,11 @@ export default function BrandReviewPage() {
             <Tile bg={cream} caption="Full detail at the same sizes, for comparison">
               {[24, 32, 36, 44].map(s => <DiamondBadge key={s} size={s} detail="full" />)}
             </Tile>
-            <Tile bg={forest} caption="Small-size version on forest · primary and reverse">
+            <Tile bg={forest} caption="Small-size version on forest · 24 / 36 / 44">
               {[24, 36, 44].map(s => <DiamondBadge key={s} size={s} />)}
-              {[24, 36, 44].map(s => <DiamondBadge key={`r${s}`} size={s} variant="reverse" />)}
+            </Tile>
+            <Tile bg={charcoal} caption="Small-size reverse on charcoal · 24 / 36 / 44">
+              {[24, 36, 44].map(s => <DiamondBadge key={s} size={s} variant="reverse" />)}
             </Tile>
             <Tile bg={WHITE} caption="Full detail · 48 / 64 / 128">
               {[48, 64, 128].map(s => <DiamondBadge key={s} size={s} />)}
