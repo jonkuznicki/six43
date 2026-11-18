@@ -21,8 +21,8 @@ const sha256 = (s: string) => createHash('sha256').update(s).digest('hex')
 
 // React escapes apostrophes, ampersands and quotes in HTML output.
 const unescape = (s: string) => s.replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"')
-const render = (loggedIn: boolean, draftLogos = true) =>
-  unescape(renderToStaticMarkup(createElement(Homepage, { loggedIn, draftLogos })))
+const render = (loggedIn: boolean) =>
+  unescape(renderToStaticMarkup(createElement(Homepage, { loggedIn })))
 const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
 const html = render(false)
@@ -124,10 +124,13 @@ describe('homepage content', () => {
     expect(member).toContain('Open app →')
   })
 
-  it('labels the logos "Draft logo" while the artwork is draft, and only then', () => {
-    expect(html.match(/Draft logo/g)).toHaveLength(2) // nav + footer
-    expect(html).toContain('data-artwork="draft"')
-    expect(render(false, false)).not.toContain('Draft logo')
+  it('shows the approved logo artwork with no draft labels', () => {
+    for (const h of [html, render(true)]) {
+      expect(h).not.toMatch(/draft/i)
+      expect(h.match(/data-artwork="final"/g)!.length).toBeGreaterThanOrEqual(4) // nav badge + wordmark, hero badge, footer wordmark
+    }
+    expect(read('src/components/marketing/marketing.module.css')).not.toMatch(/draft/i)
+    expect(read('src/components/marketing/shared.tsx')).not.toMatch(/draft/i)
   })
 
   it('every link goes to an existing route, an in-page anchor or the support address', () => {
@@ -250,10 +253,10 @@ describe('homepage photography', () => {
 describe('served at / without changing SEO, auth or the app layout', () => {
   const page = read('src/app/page.tsx')
 
-  it('the route renders the homepage with the signed-in state and artwork status', () => {
+  it('the route renders the homepage with the signed-in state', () => {
     expect(page).toContain("import { createServerClient } from '../lib/supabase-server'")
     expect(page).toContain('await supabase.auth.getUser()')
-    expect(page).toContain("<Homepage loggedIn={!!user} draftLogos={ARTWORK_STATUS === 'draft'} />")
+    expect(page).toContain('<Homepage loggedIn={!!user} />')
   })
 
   it('page metadata still comes from the root layout', () => {

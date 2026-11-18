@@ -131,8 +131,8 @@ export default function BrandReviewPage() {
           ) : (
             <>
               <strong>Outlined SVG artwork, awaiting visual approval.</strong>{' '}
-              The wordmark and 643 badge are now vector paths converted from the approved working designs
-              (no live text, no font needed). They stay labeled “Draft logo” on the homepage until approved.
+              The wordmark and 643 badge are vector paths converted from the approved working designs
+              (no live text, no font needed). Set ARTWORK_STATUS to &apos;final&apos; once they are approved.
             </>
           )}{' '}
           This page exists only in local development and returns 404 in production.
@@ -376,7 +376,7 @@ export default function BrandReviewPage() {
             <li>Badge: cream interior, green numerals, curved red stitching, red accents either side of 643.</li>
             <li>Reverse (dark) badge reads well on cream and charcoal.</li>
             <li>Small-size badge is recognizable at 24–44px (nav and hero kicker).</li>
-            <li>On approval: set ARTWORK_STATUS to &apos;final&apos; (removes the “Draft logo” labels).</li>
+            <li>{approved ? <>Approved for launch on 2026-11-17 (ARTWORK_STATUS is &apos;final&apos;).</> : <>On approval: set ARTWORK_STATUS to &apos;final&apos;.</>}</li>
           </ul>
         </Section>
       </div>

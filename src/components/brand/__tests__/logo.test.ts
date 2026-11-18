@@ -63,9 +63,9 @@ describe('logo artwork', () => {
     expect((b.minX + b.maxX) / 2).toBeCloseTo(60, 0)
   })
 
-  it('stays labeled draft until the outlined artwork is visually approved', () => {
-    expect(ARTWORK_STATUS).toBe('draft')
-    for (const html of [render(Wordmark), render(DiamondBadge)]) expect(html).toContain('data-artwork="draft"')
+  it('records the outlined artwork as visually approved (final)', () => {
+    expect(ARTWORK_STATUS).toBe('final')
+    for (const html of [render(Wordmark), render(DiamondBadge)]) expect(html).toContain('data-artwork="final"')
   })
 })
 

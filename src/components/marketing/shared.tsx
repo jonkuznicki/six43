@@ -17,14 +17,13 @@ export type NavLink = { href: string; label: string }
 
 /* ── Navigation ────────────────────────────────────────────────────────────── */
 
-export function Nav({ loggedIn, draftLogos, links }: { loggedIn: boolean; draftLogos: boolean; links: NavLink[] }) {
+export function Nav({ loggedIn, links }: { loggedIn: boolean; links: NavLink[] }) {
   return (
     <header className={styles.nav}>
       <div className={cx(styles.container, styles.navInner)}>
         <Link href="/" className={styles.brandLink} aria-label="Six43 home">
           <span className={styles.navBadge}><DiamondBadge size={36} title="" /></span>
           <Wordmark variant="compact" height={30} title="" />
-          {draftLogos && <span className={styles.draftTag}>Draft logo</span>}
         </Link>
         <nav className={styles.navLinks} aria-label="Primary">
           {links.map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
@@ -103,15 +102,14 @@ export function Pricing() {
 
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 
-export function Footer({ draftLogos, productLinks }: { draftLogos: boolean; productLinks: NavLink[] }) {
+export function Footer({ productLinks }: { productLinks: NavLink[] }) {
   return (
     <footer className={styles.footer}>
       <div className={styles.container}>
         <div className={styles.footerGrid}>
           <div className={styles.footerBrand}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex' }}>
               <Wordmark tone="onDark" height={44} />
-              {draftLogos && <span className={cx(styles.draftTag, styles.draftTagOnDark)}>Draft logo</span>}
             </div>
             <p className={styles.footerTagline}>{BRAND_TAGLINE}</p>
             <p style={{ margin: 0 }}>Lineups, game day and playing time for youth baseball &amp; softball coaches.</p>

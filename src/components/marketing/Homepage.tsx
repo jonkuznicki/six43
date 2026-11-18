@@ -24,8 +24,6 @@ import { MobileLineupDemo } from './mockups/MobileLineupDemo'
 
 export type HomepageProps = {
   loggedIn: boolean
-  /** Show "Draft logo" tags next to the logos. Must be true while ARTWORK_STATUS is 'draft'. */
-  draftLogos: boolean
 }
 
 export const NAV_LINKS: NavLink[] = [
@@ -45,18 +43,18 @@ export const HERO_COPY = {
   micro: 'For youth baseball & softball coaches · Free to start · No credit card required',
 }
 
-export function Homepage({ loggedIn, draftLogos }: HomepageProps) {
+export function Homepage({ loggedIn }: HomepageProps) {
   return (
     <div className={cx(styles.shell, bitter.variable, inter.variable, 'brand-fonts')}>
       <a href="#main" className={styles.srOnly}>Skip to content</a>
-      <Nav loggedIn={loggedIn} draftLogos={draftLogos} links={NAV_LINKS} />
+      <Nav loggedIn={loggedIn} links={NAV_LINKS} />
       <main id="main" className={styles.main}>
         <Hero />
         <Highlights />
         <Pricing />
         <ClosingCta />
       </main>
-      <Footer draftLogos={draftLogos} productLinks={PRODUCT_LINKS} />
+      <Footer productLinks={PRODUCT_LINKS} />
     </div>
   )
 }

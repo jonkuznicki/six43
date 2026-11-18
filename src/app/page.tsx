@@ -1,6 +1,5 @@
 import { createServerClient } from '../lib/supabase-server'
 import { Homepage } from '../components/marketing/Homepage'
-import { ARTWORK_STATUS } from '../components/brand'
 
 // The marketing homepage. Page metadata (title, description, canonical URL,
 // Open Graph and structured data) comes from the root layout, unchanged.
@@ -9,5 +8,5 @@ export default async function HomePage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  return <Homepage loggedIn={!!user} draftLogos={ARTWORK_STATUS === 'draft'} />
+  return <Homepage loggedIn={!!user} />
 }

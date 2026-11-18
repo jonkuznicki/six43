@@ -137,24 +137,6 @@
 .btnBlockMobile { width: 100%; }
 @media (min-width: 640px) { .btnBlockMobile { width: auto; } }
 
-/* ── Draft markers ────────────────────────────────────────────────────────── */
-
-.draftTag {
-  display: inline-block;
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--mk-clay);
-  border: 1px dashed var(--mk-clay);
-  border-radius: 3px;
-  padding: 1px 5px;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-.draftTagOnDark { color: #F2B8A8; border-color: #F2B8A8; }
-
 /* ── Navigation ───────────────────────────────────────────────────────────── */
 
 .nav {
