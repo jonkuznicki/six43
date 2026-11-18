@@ -1,0 +1,35 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Six43 brand tokens
+
+   Used by the marketing homepage (and the dev-only brand review page). The
+   application screens don't use them yet. The existing app palette (--bg, --fg, --accent, --status-*, position colors)
+   lives in globals.css and is intentionally untouched. Later phases will map
+   the app tokens onto these brand tokens, one reviewed step at a time.
+
+   Keep the hex values in sync with src/styles/brand.ts (enforced by
+   src/styles/__tests__/brand.test.ts).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Approved brand colors */
+  --brand-forest:       #0B3D2E;
+  --brand-forest-rgb:   11, 61, 46;
+  --brand-cream:        #F7EAD2;
+  --brand-cream-rgb:    247, 234, 210;
+  --brand-clay:         #B23A2B;
+  --brand-clay-rgb:     178, 58, 43;
+  --brand-charcoal:     #2E2E2E;
+  --brand-charcoal-rgb: 46, 46, 46;
+}
+
+/* Typography tokens.
+   --font-brand-* are set by next/font (src/styles/fonts.ts) on whichever
+   element carries the font class names. Until a later phase adds those class
+   names to <html>, these resolve to the fallbacks below, which match what
+   production uses today. `.brand-fonts` re-evaluates the tokens on a scoped
+   element (the marketing homepage and the dev-only brand review page). */
+:root,
+.brand-fonts {
+  --font-display: var(--font-brand-display, Georgia, 'Times New Roman', serif);
+  --font-ui:      var(--font-brand-ui, sans-serif);
+}
