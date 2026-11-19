@@ -8,6 +8,12 @@ import FieldView from './FieldView'
 import GameEditButton from '../../GameEditButton'
 import BoxScoreInput from '../../BoxScoreInput'
 import { buildCopyUpdates, selectPrevGame, isBeforeGame } from '../../../../../lib/lineup'
+import {
+  applyCellEdits, benchPerInning as benchLimitFor, copyInning, editMessage, setAbsent, swapInInning, type CellEdit,
+} from '../../../../../lib/lineup/rules'
+import { useLineupSaver, saveLabel } from '../../../../../lib/lineup/useLineupSaver'
+import { describeWriteError } from '../../../../../lib/lineup/persist'
+import { leaveMessage, saveThenNavigate, startGame } from '../../../../../lib/lineup/navigation'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -136,29 +142,17 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   const isDraggingCellRef  = useRef(false)
   const dragCellAnchorRef  = useRef<{ si: number; ii: number } | null>(null)
   useEffect(() => { selectedCellsRef.current = selectedCells }, [selectedCells])
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSaveRef = useRef<{ slots: any[]; ids: string[] } | null>(null)
+  // Lineup saving: changed rows accumulate and are written together (atomic),
+  // 500 ms after the last edit, before navigation, and when the page is hidden.
+  const saver = useLineupSaver({ client: supabase, getSlots: () => slotsRef.current, delayMs: 500 })
+  const [navError, setNavError] = useState<string | null>(null)
+  const [leaving, setLeaving] = useState(false)
 
   useEffect(() => { loadData() }, [])
   useEffect(() => {
     const up = () => { isDraggingCellRef.current = false }
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
-  }, [])
-
-  // Flush any pending debounced save immediately when navigating away
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      const pending = pendingSaveRef.current
-      if (pending) {
-        pending.slots
-          .filter((s: any) => pending.ids.includes(s.id))
-          .forEach((s: any) => {
-            supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
-          })
-      }
-    }
   }, [])
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -507,170 +501,104 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
   }
 
   // ── Position assignment ───────────────────────────────────────────────────
+  // All edits go through the shared rules (src/lib/lineup/rules.ts) and are
+  // saved by the save queue: every changed row, in one atomic write.
 
   function commit(newSlots: any[], changedIds: string[]) {
-    setHistory(h => [...h.slice(-49), slotsRef.current])
+    if (!changedIds.length) return
+    // Capture now: state updaters run later, after slotsRef has moved on.
+    const before = slotsRef.current
+    setHistory(h => [...h.slice(-49), before])
     setFuture([])
+    slotsRef.current = newSlots
     setSlots(newSlots)
-    pendingSaveRef.current = { slots: newSlots, ids: changedIds }
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      const pending = pendingSaveRef.current
-      if (!pending) return
-      pendingSaveRef.current = null
-      await Promise.all(
-        pending.slots
-          .filter(s => pending.ids.includes(s.id))
-          .map(s => supabase.from('lineup_slots').update({
-            inning_positions: s.inning_positions,
-          }).eq('id', s.id))
-      )
-    }, 500)
+    saver.markDirty(changedIds)
+  }
+
+  /** Apply cell edits with the shared rules; show any warning; returns true if something changed. */
+  function applyEdits(edits: CellEdit[]): boolean {
+    if (readOnly || !edits.length) return false
+    for (const e of edits) {
+      if (!e.position || e.position === 'Bench') continue
+      const slot = slotsRef.current.find(s => s.id === e.slotId)
+      if (slot && restrictedSet.has(`${slot.player_id}::${e.position}`)) {
+        const name = slot.player?.first_name ?? 'This player'
+        setDcWarning(`${name} is marked "should not play" at ${e.position} in the Depth Chart.`)
+      }
+    }
+    const r = applyCellEdits(slotsRef.current, edits, teamPositions)
+    const msg = editMessage(r, benchLimitFor(slotsRef.current, teamPositions))
+    if (msg) showBenchWarning(msg)
+    commit(r.slots, r.changedIds)
+    return r.changedIds.length > 0
   }
 
   function assignPosition(slotId: string, ii: number, newPos: string | null) {
-    if (newPos && newPos !== 'Bench') {
-      const slot = slotsRef.current.find(s => s.id === slotId)
-      if (slot && restrictedSet.has(`${slot.player_id}::${newPos}`)) {
-        const name = slot.player?.first_name ?? 'This player'
-        setDcWarning(`${name} is marked "should not play" at ${newPos} in the Depth Chart.`)
-      }
-    }
-    if (newPos === 'Bench') {
-      const active = slotsRef.current.filter(s => s.availability !== 'absent')
-      const fieldCount = teamPositions.filter(p => p !== 'Bench').length
-      const bpi = Math.max(0, active.length - fieldCount)
-      if (bpi === 0) {
-        showBenchWarning('Your roster size fills all field positions — there are no bench spots this inning.')
-        return
-      }
-      const currentBench = active.filter(s => s.id !== slotId && (s.inning_positions ?? [])[ii] === 'Bench').length
-      if (currentBench >= bpi) {
-        showBenchWarning(`Inning ${ii + 1} already has a full bench. Move a bench player to a field position first.`)
-        return
-      }
-    }
-    const next = slotsRef.current.map(s => ({
-      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
-    }))
-    const changedIds = [slotId]
-    // Swap: if assigning a non-bench position, clear the current holder (go blank, not bench)
-    if (newPos && newPos !== 'Bench') {
-      const holder = next.find(s => s.id !== slotId && s.inning_positions[ii] === newPos)
-      if (holder) { holder.inning_positions[ii] = null; changedIds.push(holder.id) }
-    }
-    const target = next.find(s => s.id === slotId)
-    if (target) target.inning_positions[ii] = newPos
-    commit(next, changedIds)
+    applyEdits([{ slotId, inning: ii, position: newPos }])
   }
 
   function swapPositions(slotId1: string, slotId2: string, ii: number) {
-    const s1 = slotsRef.current.find(s => s.id === slotId1)
-    const s2 = slotsRef.current.find(s => s.id === slotId2)
-    if (!s1 || !s2) return
-    const pos1 = (s1.inning_positions ?? [])[ii] as string | null
-    const pos2 = (s2.inning_positions ?? [])[ii] as string | null
-    const next = slotsRef.current.map(s => ({
-      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
-    }))
-    const n1 = next.find(s => s.id === slotId1)
-    const n2 = next.find(s => s.id === slotId2)
-    if (n1) n1.inning_positions[ii] = pos2 ?? null
-    if (n2) n2.inning_positions[ii] = pos1 ?? null
-    commit(next, [slotId1, slotId2])
+    if (readOnly) return
+    const r = swapInInning(slotsRef.current, slotId1, slotId2, ii)
+    commit(r.slots, r.changedIds)
   }
 
   function copyInningToAll(from: number, to: number[]) {
-    const next = slotsRef.current.map(s => {
-      if (s.availability === 'absent') return { ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])] }
-      const sourcePos = (s.inning_positions ?? [])[from] ?? null
-      const newPositions = [...(s.inning_positions ?? [...BLANK])]
-      for (const ii of to) newPositions[ii] = sourcePos
-      return { ...s, inning_positions: newPositions }
-    })
-    const changedIds = next.filter(s => s.availability !== 'absent').map(s => s.id)
-    commit(next, changedIds)
+    if (readOnly) return
+    const r = copyInning(slotsRef.current, from, to)
+    commit(r.slots, r.changedIds)
+  }
+
+  /** Selected cell keys ("si-ii", si = index among active players) → cell edits. */
+  function editsForSelection(keys: Iterable<string>, pos: string | null): CellEdit[] {
+    const active = slotsRef.current.filter(s => s.availability !== 'absent')
+    const edits: CellEdit[] = []
+    for (const key of Array.from(keys)) {
+      const [si, ii] = key.split('-').map(Number)
+      const slot = active[si]
+      if (slot) edits.push({ slotId: slot.id, inning: ii, position: pos })
+    }
+    return edits
   }
 
   // Fill all currently selected cells with a position (called from palette or key shortcut)
   function fillSelected(pos: string) {
-    if (readOnly) return
+    if (readOnly) return false
     const sel = selectedCellsRef.current
-    if (sel.size === 0) return
-    const active = slotsRef.current.filter(s => s.availability !== 'absent')
-    const fieldCount = teamPositions.filter(p => p !== 'Bench').length
-    const bpi = Math.max(0, active.length - fieldCount)
-    const next = slotsRef.current.map(s => ({
-      ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
-    }))
-    const changedIds = new Set<string>()
-    // Track bench count added per inning during this fill to respect the limit
-    const benchAdded: Record<number, number> = {}
-    let benchBlocked = 0
-    for (const key of Array.from(sel)) {
-      const [siStr, iiStr] = key.split('-')
-      const si = parseInt(siStr), ii = parseInt(iiStr)
-      const slot = active[si]
-      if (!slot) continue
-      if (pos === 'Bench') {
-        const currentBench = next.filter(s => s.id !== slot.id && s.availability !== 'absent' && s.inning_positions[ii] === 'Bench').length
-        const added = benchAdded[ii] ?? 0
-        if (bpi === 0 || currentBench + added >= bpi) { benchBlocked++; continue }
-        benchAdded[ii] = added + 1
-      } else {
-        const holder = next.find(s => s.id !== slot.id && s.inning_positions[ii] === pos)
-        if (holder) { holder.inning_positions[ii] = null; changedIds.add(holder.id) }
-      }
-      const target = next.find(s => s.id === slot.id)
-      if (target) { target.inning_positions[ii] = pos; changedIds.add(target.id) }
-    }
-    if (benchBlocked > 0) showBenchWarning(`Bench is already full in ${benchBlocked} inning${benchBlocked !== 1 ? 's' : ''} — those slots were left unchanged.`)
-    if (changedIds.size) commit(next, Array.from(changedIds))
-    return changedIds.size > 0
+    if (sel.size === 0) return false
+    return applyEdits(editsForSelection(sel, pos))
   }
 
   // ── Undo / Redo ───────────────────────────────────────────────────────────
+  // Undo/redo save every row (positions AND availability), so the database
+  // always matches what's on screen.
 
   const undo = useCallback(() => {
     setHistory(h => {
       if (!h.length) return h
       const prev = h[h.length - 1]
-      setFuture(f => [slotsRef.current, ...f.slice(0, 49)])
-      setSlots(prev)
+      const current = slotsRef.current
+      setFuture(f => [current, ...f.slice(0, 49)])
       slotsRef.current = prev
-      pendingSaveRef.current = { slots: prev, ids: prev.map((s: any) => s.id) }
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(async () => {
-        const pending = pendingSaveRef.current
-        if (!pending) return
-        pendingSaveRef.current = null
-        await Promise.all(pending.slots.map((s: any) =>
-          supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
-        ))
-      }, 300)
+      setSlots(prev)
+      saver.markDirty(prev.map((s: any) => s.id))
       return h.slice(0, -1)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const redo = useCallback(() => {
     setFuture(f => {
       if (!f.length) return f
       const next = f[0]
-      setHistory(h => [...h.slice(-49), slotsRef.current])
-      setSlots(next)
+      const current = slotsRef.current
+      setHistory(h => [...h.slice(-49), current])
       slotsRef.current = next
-      pendingSaveRef.current = { slots: next, ids: next.map((s: any) => s.id) }
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(async () => {
-        const pending = pendingSaveRef.current
-        if (!pending) return
-        pendingSaveRef.current = null
-        await Promise.all(pending.slots.map((s: any) =>
-          supabase.from('lineup_slots').update({ inning_positions: s.inning_positions }).eq('id', s.id)
-        ))
-      }, 300)
+      setSlots(next)
+      saver.markDirty(next.map((s: any) => s.id))
       return f.slice(1)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Attendance ────────────────────────────────────────────────────────────
@@ -679,26 +607,21 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     if (readOnly) return
     const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
-    const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
-
-    let newPos: (string|null)[]
-    if (newAvail === 'absent') {
+    const makeAbsent = slot.availability !== 'absent'
+    let restore: (string | null)[] | undefined
+    if (makeAbsent) {
       // Snapshot positions before clearing so we can restore on un-absent
       const current = slot.inning_positions ?? [...BLANK]
       if (current.some((p: string|null) => p !== null)) savedPositionsRef.current[slotId] = [...current]
-      newPos = [...BLANK]
     } else {
-      // Restore saved snapshot if available, otherwise keep whatever is in the slot
-      newPos = savedPositionsRef.current[slotId] ?? slot.inning_positions ?? [...BLANK]
+      restore = savedPositionsRef.current[slotId]
       delete savedPositionsRef.current[slotId]
     }
-    const next = slotsRef.current.map(s =>
-      s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPos } : s
-    )
-    setSlots(next)
+    // Part of history (undoable) and saved with the same queue as positions
+    const r = setAbsent(slotsRef.current, slotId, makeAbsent, restore)
+    commit(r.slots, r.changedIds)
     setSelectedCells(new Set())
     setFocused(null)
-    supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPos }).eq('id', slotId).then(() => {})
   }
 
   // ── Batting order ─────────────────────────────────────────────────────────
@@ -713,9 +636,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     [reordered[idx], reordered[swap]] = [reordered[swap], reordered[idx]]
     const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     const next = [...updated, ...slotsRef.current.filter(s => s.availability === 'absent')]
+    slotsRef.current = next
     setSlots(next)
-    await supabase.from('lineup_slots').update({ batting_order: swap + 1 }).eq('id', reordered[swap].id)
-    await supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id)
+    saver.markDirty([reordered[swap].id, reordered[idx].id])
   }
 
   async function handleDrop(targetId: string) {
@@ -729,11 +652,10 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     reordered.splice(ti, 0, moved)
     const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
     const next = [...updated, ...slotsRef.current.filter(s => s.availability === 'absent')]
+    slotsRef.current = next
     setSlots(next)
     setDragId(null); setDragOverId(null)
-    await Promise.all(updated.map(s =>
-      supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id)
-    ))
+    saver.markDirty(updated.map(s => s.id))
   }
 
   // ── Copy from game ────────────────────────────────────────────────────────
@@ -765,11 +687,9 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
     const merged = slotsRef.current.map(s => updateMap.has(s.id) ? { ...s, ...updateMap.get(s.id)! } : s)
     const active = merged.filter(s => s.availability !== 'absent').sort((a: any, b: any) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
     const next = [...active, ...merged.filter(s => s.availability === 'absent')]
-    setSlots(next)
-    // Persist all active slots (matched + unmatched) with clean batting orders
-    await Promise.all(updates.map(u =>
-      supabase.from('lineup_slots').update({ batting_order: u.batting_order, inning_positions: u.inning_positions }).eq('id', u.id)
-    ))
+    // Persist all active slots (matched + unmatched) with clean batting orders, in one write
+    commit(next, updates.map(u => u.id))
+    await saver.flush()
     setCopying(false); setCopyOpen(false)
   }
 
@@ -830,19 +750,66 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
 
   // ── Game notes ────────────────────────────────────────────────────────────
 
+  const pendingNotesRef = useRef<string | null>(null)
+
+  async function saveNotes(val: string): Promise<boolean> {
+    let parsed: any = {}
+    try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
+    parsed._notes = val
+    const newRaw = JSON.stringify(parsed)
+    const { error } = await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
+    if (error) return false
+    notesRawRef.current = newRaw
+    if (pendingNotesRef.current === val) pendingNotesRef.current = null
+    setNotesSaved(true)
+    return true
+  }
+
   function handleNotesChange(val: string) {
     setGameNotes(val)
     setNotesSaved(false)
+    pendingNotesRef.current = val
     if (notesTimer.current) clearTimeout(notesTimer.current)
-    notesTimer.current = setTimeout(async () => {
-      let parsed: any = {}
-      try { parsed = JSON.parse(notesRawRef.current ?? '{}') } catch {}
-      parsed._notes = val
-      const newRaw = JSON.stringify(parsed)
-      await supabase.from('games').update({ notes: newRaw }).eq('id', params.id)
-      notesRawRef.current = newRaw
-      setNotesSaved(true)
-    }, 800)
+    notesTimer.current = setTimeout(() => { void saveNotes(val) }, 800)
+  }
+
+  /** Save everything pending on this page: lineup rows, then game notes. */
+  async function flushAll(): Promise<boolean> {
+    const lineupOk = await saver.flush()
+    if (notesTimer.current) { clearTimeout(notesTimer.current); notesTimer.current = null }
+    const notesOk = pendingNotesRef.current === null || await saveNotes(pendingNotesRef.current)
+    return lineupOk && notesOk
+  }
+
+  /** In-app navigation that waits for pending saves; stays put (with a message) if they fail. */
+  async function leaveTo(href: string, opts: { fullLoad?: boolean } = {}) {
+    if (leaving) return
+    setNavError(null)
+    setLeaving(true)
+    const r = await saveThenNavigate({
+      flush: flushAll,
+      navigate: () => (opts.fullLoad ? window.location.assign(href) : router.push(href)),
+    })
+    setLeaving(false)
+    if (!r.ok) setNavError(leaveMessage(r))
+  }
+
+  /** Play Game: save the lineup, then the game status, then open the in-game view. */
+  async function playGame() {
+    if (leaving) return
+    setNavError(null)
+    setLeaving(true)
+    const r = await startGame({
+      flush: flushAll,
+      currentStatus: game?.status,
+      setStatusInProgress: () => supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id),
+      navigate: () => {
+        setGame((g: any) => (g ? { ...g, status: 'in_progress' } : g))
+        router.push(`/games/${params.id}/in-game`)
+      },
+    })
+    setLeaving(false)
+    if (!r.ok) setNavError(leaveMessage(r))
   }
 
   // ── Innings control ───────────────────────────────────────────────────────
@@ -904,23 +871,19 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           const srcBySi = new Map<number, string | null>()
           srcOrdered.forEach(c => { if (!srcBySi.has(c.si)) srcBySi.set(c.si, c.pos) })
 
-          const next = slotsRef.current.map(s => ({
-            ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
-          }))
-          const changedIds = new Set<string>()
-
+          // Paste goes through the same rules as typing: no duplicate field
+          // positions in an inning, bench limit enforced.
+          const edits: CellEdit[] = []
           for (const [ii, rows] of Array.from(byInning.entries())) {
             rows.forEach((tsi, idx) => {
               const srcPos = srcBySi.has(tsi)
                 ? srcBySi.get(tsi)!
                 : (srcOrdered[idx % srcOrdered.length]?.pos ?? null)
               const slot = active[tsi]
-              if (!slot) return
-              const t = next.find(s => s.id === slot.id)
-              if (t) { t.inning_positions[ii] = srcPos; changedIds.add(t.id) }
+              if (slot) edits.push({ slotId: slot.id, inning: ii, position: srcPos })
             })
           }
-          if (changedIds.size) commit(next, Array.from(changedIds))
+          applyEdits(edits)
         }
         return
       }
@@ -994,19 +957,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         case 'Delete': case 'Backspace': {
           e.preventDefault()
           // Clear all selected cells
-          const active = slotsRef.current.filter(s => s.availability !== 'absent')
-          const next = slotsRef.current.map(s => ({
-            ...s, inning_positions: [...(s.inning_positions ?? [...BLANK])],
-          }))
-          const changedIds = new Set<string>()
-          for (const key of Array.from(selectedCellsRef.current)) {
-            const [siStr, iiStr] = key.split('-')
-            const slot = active[parseInt(siStr)]
-            if (!slot) continue
-            const t = next.find(s => s.id === slot.id)
-            if (t) { t.inning_positions[parseInt(iiStr)] = null; changedIds.add(t.id) }
-          }
-          if (changedIds.size) commit(next, Array.from(changedIds))
+          applyEdits(editsForSelection(selectedCellsRef.current, null))
           return
         }
       }
@@ -1083,13 +1034,15 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
         background: NAVY, display: 'flex', alignItems: 'center',
         gap: 12, padding: '0 16px', height: 48, flexShrink: 0,
       }}>
-        <a href="/games" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: 13 }}>
+        <a href="/games" onClick={e => { e.preventDefault(); void leaveTo('/games') }}
+          style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: 13 }}>
           ← Games
         </a>
         <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
           {prevGameId ? (
             <a href={`/games/${prevGameId}/lineup/desktop`}
+              onClick={e => { e.preventDefault(); void leaveTo(`/games/${prevGameId}/lineup/desktop`, { fullLoad: true }) }}
               title="Previous game"
               style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>
               ‹
@@ -1104,6 +1057,14 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, marginLeft: 10 }}>
               {gameDate}{game?.game_time ? ` · ${formatTime(game.game_time)}` : ''}
             </span>
+            {/* Lineup save status: shown only while saving or after a failure */}
+            <span aria-live="polite" style={{
+              fontSize: 12, marginLeft: 8, whiteSpace: 'nowrap',
+              color: saver.state.status === 'error' ? '#E87060' : 'rgba(255,255,255,0.45)',
+              fontWeight: saver.state.status === 'error' ? 700 : 400,
+            }}>
+              {saver.state.status === 'saved' ? '' : saver.state.status === 'error' ? `· ⚠ ${saveLabel(saver.state)}` : `· ${saveLabel(saver.state)}`}
+            </span>
             {readOnly && (
               <span style={{
                 marginLeft: 10, fontSize: 10, fontWeight: 700, padding: '2px 7px',
@@ -1115,6 +1076,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </div>
           {nextGameId ? (
             <a href={`/games/${nextGameId}/lineup/desktop`}
+              onClick={e => { e.preventDefault(); void leaveTo(`/games/${nextGameId}/lineup/desktop`, { fullLoad: true }) }}
               title="Next game"
               style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 18, lineHeight: 1, flexShrink: 0, padding: '0 2px' }}>
               ›
@@ -1188,6 +1150,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           </>)}
           <a
             href={`/games/${params.id}/print`}
+            onClick={() => { void flushAll() }}
             target="_blank" rel="noopener noreferrer"
             style={{ ...topBtn(true) as any, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
           >
@@ -1252,13 +1215,11 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           {(game?.status === 'scheduled' || game?.status === 'lineup_ready' || game?.status === 'in_progress') && (
             <a
               href={`/games/${params.id}/in-game`}
-              onClick={async () => {
-                if (game?.status !== 'in_progress') {
-                  await supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id)
-                }
-              }}
+              onClick={e => { e.preventDefault(); void playGame() }}
+              aria-disabled={leaving}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
+                opacity: leaving ? 0.6 : 1,
                 padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
                 textDecoration: 'none', flexShrink: 0,
                 background: game?.status === 'in_progress' ? 'rgba(232,160,32,0.2)' : 'rgba(109,184,117,0.15)',
@@ -1318,6 +1279,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
           <span style={{ fontSize: 12, color: '#E8A020', fontWeight: 700 }}>▶ Game in progress</span>
           <a
             href={`/games/${params.id}/in-game`}
+            onClick={e => { e.preventDefault(); void playGame() }}
             style={{
               fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 5,
               background: 'rgba(232,160,32,0.18)', border: '1px solid rgba(232,160,32,0.4)',
@@ -1362,6 +1324,35 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
             style={{ border: 'none', background: 'transparent', cursor: 'pointer',
               color: `rgba(var(--fg-rgb),0.35)`, fontSize: 16, padding: '0 4px', flexShrink: 0 }}
           >×</button>
+        </div>
+      )}
+
+      {/* ─── SAVE FAILURE / BLOCKED NAVIGATION ─── */}
+      {(saver.state.status === 'error' || navError) && (
+        <div role="alert" style={{
+          background: 'rgba(232,112,96,0.09)', borderBottom: '1px solid rgba(232,112,96,0.3)',
+          padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 13, color: '#E87060' }}>
+            ⚠ {[
+              saver.state.status === 'error' && saver.state.error ? describeWriteError(saver.state.error) : null,
+              navError,
+            ].filter(Boolean).join(' ')}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={async () => { setNavError(null); await saver.retry() }}
+            style={{
+              background: 'rgba(232,112,96,0.15)', border: '1px solid rgba(232,112,96,0.4)', color: '#E87060',
+              borderRadius: 5, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+            }}
+          >Retry</button>
+          {navError && (
+            <button onClick={() => setNavError(null)} style={{
+              background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+              fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0,
+            }} aria-label="Dismiss">×</button>
+          )}
         </div>
       )}
 
@@ -1577,6 +1568,7 @@ export default function DesktopLineupEditor({ params }: { params: { id: string }
                       return (
                         <td
                           key={ii}
+                          data-cell={cellKey}
                           onMouseDown={(e) => {
                             if (e.button !== 0) return
                             if (e.shiftKey && focused !== null) {

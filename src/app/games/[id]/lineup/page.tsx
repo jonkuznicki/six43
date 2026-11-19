@@ -7,6 +7,12 @@ import Link from 'next/link'
 import PrintLineupCard from '../PrintLineupCard'
 import FieldView from './desktop/FieldView'
 import { buildCopyUpdates } from '../../../../lib/lineup'
+import {
+  applyCellEdits, benchPerInning as benchLimitFor, clearAll, copyInning, editMessage, setAbsent, swapInInning,
+} from '../../../../lib/lineup/rules'
+import { useLineupSaver, saveLabel } from '../../../../lib/lineup/useLineupSaver'
+import { describeWriteError } from '../../../../lib/lineup/persist'
+import { leaveMessage, saveThenNavigate, startGame } from '../../../../lib/lineup/navigation'
 import { shareLineupPdf, makeLineupFilename } from '../../../../lib/shareLineup'
 
 const POSITION_COLORS: Record<string, { bg: string; color: string }> = {
@@ -69,6 +75,48 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   useEffect(() => { slotsRef.current = slots }, [slots])
   // Snapshot of inning_positions before marking absent so they can be restored
   const savedPositionsRef = useRef<Record<string, (string|null)[]>>({})
+
+  // Lineup saving (shared with desktop): every changed row is written in one
+  // atomic request; navigation waits for pending saves; failures show Retry.
+  const saver = useLineupSaver({ client: supabase, getSlots: () => slotsRef.current, delayMs: 300 })
+  const [benchWarning, setBenchWarning] = useState<string | null>(null)
+  const [navError, setNavError] = useState<string | null>(null)
+  const [leaving, setLeaving] = useState(false)
+
+  /** Show new slots and queue the changed rows for saving. */
+  function commitSlots(next: any[], changedIds: string[]) {
+    if (!changedIds.length) return
+    slotsRef.current = next
+    setSlots(next)
+    saver.markDirty(changedIds)
+  }
+
+  async function leaveTo(href: string) {
+    if (leaving) return
+    setNavError(null)
+    setLeaving(true)
+    const r = await saveThenNavigate({ flush: saver.flush, navigate: () => router.push(href) })
+    setLeaving(false)
+    if (!r.ok) setNavError(leaveMessage(r))
+  }
+
+  /** Play Game: save the lineup, then the game status, then open the in-game view. */
+  async function playGame() {
+    if (leaving) return
+    setNavError(null)
+    setLeaving(true)
+    const r = await startGame({
+      flush: saver.flush,
+      currentStatus: game?.status,
+      setStatusInProgress: () => supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id),
+      navigate: () => {
+        setGame((g: any) => (g ? { ...g, status: 'in_progress' } : g))
+        router.push(`/games/${params.id}/in-game`)
+      },
+    })
+    setLeaving(false)
+    if (!r.ok) setNavError(leaveMessage(r))
+  }
 
   useEffect(() => { loadData() }, [])
 
@@ -148,13 +196,8 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     ;[reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]]
 
     const updatedActive = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
-    setSlots(prev => [...updatedActive, ...prev.filter(s => s.availability === 'absent')])
-
-    const [r1, r2] = await Promise.all([
-      supabase.from('lineup_slots').update({ batting_order: swapIdx + 1 }).eq('id', reordered[swapIdx].id),
-      supabase.from('lineup_slots').update({ batting_order: idx + 1 }).eq('id', reordered[idx].id),
-    ])
-    if (r1.error || r2.error) setSaveError('Could not save batting order. You may not have permission to edit this lineup.')
+    const next = [...updatedActive, ...slotsRef.current.filter(s => s.availability === 'absent')]
+    commitSlots(next, [reordered[swapIdx].id, reordered[idx].id])
   }
 
   // ── DRAG & DROP ────────────────────────────────────────────
@@ -170,34 +213,26 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
     const [moved] = reordered.splice(fromIdx, 1)
     reordered.splice(toIdx, 0, moved)
     const updated = reordered.map((s, i) => ({ ...s, batting_order: i + 1 }))
-    setSlots(prev => [...updated, ...prev.filter(s => s.availability === 'absent')])
     setDragSlotId(null)
-    const results = await Promise.all(
-      updated.map(s => supabase.from('lineup_slots').update({ batting_order: s.batting_order }).eq('id', s.id))
-    )
-    if (results.some(r => r.error)) setSaveError('Could not save batting order. You may not have permission to edit this lineup.')
+    commitSlots([...updated, ...slotsRef.current.filter(s => s.availability === 'absent')], updated.map(s => s.id))
   }
 
   // ── AVAILABILITY ───────────────────────────────────────────
-  async function toggleAvailability(slotId: string) {
-    const slot = slots.find(s => s.id === slotId)
+  function toggleAvailability(slotId: string) {
+    const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
-    const newAvail = slot.availability === 'absent' ? 'available' : 'absent'
-
-    let newPositions: (string|null)[]
-    if (newAvail === 'absent') {
+    const makeAbsent = slot.availability !== 'absent'
+    let restore: (string | null)[] | undefined
+    if (makeAbsent) {
       const current = slot.inning_positions ?? [null,null,null,null,null,null,null,null,null]
       if (current.some((p: string|null) => p !== null)) savedPositionsRef.current[slotId] = [...current]
-      newPositions = [null,null,null,null,null,null,null,null,null]
     } else {
-      newPositions = savedPositionsRef.current[slotId] ?? slot.inning_positions ?? [null,null,null,null,null,null,null,null,null]
+      restore = savedPositionsRef.current[slotId]
       delete savedPositionsRef.current[slotId]
     }
-
-    setSlots(prev => prev.map(s =>
-      s.id === slotId ? { ...s, availability: newAvail, inning_positions: newPositions } : s
-    ))
-    await supabase.from('lineup_slots').update({ availability: newAvail, inning_positions: newPositions }).eq('id', slotId)
+    // Availability and positions are saved together, in the same row write
+    const r = setAbsent(slotsRef.current, slotId, makeAbsent, restore)
+    commitSlots(r.slots, r.changedIds)
   }
 
   // ── STATUS & SCORE ─────────────────────────────────────────
@@ -249,11 +284,9 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
   // ── CLEAR LINEUP ───────────────────────────────────────────
   async function clearGame() {
     setClearing(true)
-    const blank = [null,null,null,null,null,null,null,null,null]
-    setSlots(prev => prev.map(s => ({ ...s, inning_positions: blank })))
-    await Promise.all(slots.map(slot =>
-      supabase.from('lineup_slots').update({ inning_positions: blank }).eq('id', slot.id)
-    ))
+    const r = clearAll(slotsRef.current)
+    commitSlots(r.slots, r.changedIds)
+    await saver.flush()
     setShowClearConfirm(false)
     setClearing(false)
   }
@@ -289,34 +322,27 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
 
     const updates = buildCopyUpdates(slotsRef.current, sourceByPlayer, copyMode)
 
-    // Optimistic update
-    setSlots(prev => {
-      const updateMap = new Map(updates.map(u => [u.id, u]))
-      const updated = prev.map(s => updateMap.has(s.id)
-        ? { ...s, ...updateMap.get(s.id)! }
-        : s
-      )
-      const active = updated
-        .filter(s => s.availability !== 'absent')
-        .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
-      return [...active, ...updated.filter(s => s.availability === 'absent')]
-    })
-
-    // Persist all active slots (matched + unmatched) with clean batting orders
-    await Promise.all(updates.map(u =>
-      supabase.from('lineup_slots').update({
-        batting_order: u.batting_order,
-        inning_positions: u.inning_positions,
-      }).eq('id', u.id)
-    ))
+    const updateMap = new Map(updates.map(u => [u.id, u]))
+    const updated = slotsRef.current.map(s => updateMap.has(s.id)
+      ? { ...s, ...updateMap.get(s.id)! }
+      : s
+    )
+    const active = updated
+      .filter(s => s.availability !== 'absent')
+      .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
+    // Persist all active slots (matched + unmatched) with clean batting orders, in one write
+    commitSlots([...active, ...updated.filter(s => s.availability === 'absent')], updates.map(u => u.id))
+    await saver.flush()
 
     setCopying(false)
     setShowCopyPicker(false)
   }
 
   // ── ASSIGN POSITION (shared by both modes) ─────────────────
-  async function assignPosition(slotId: string, inningIndex: number, newPos: string | null) {
-    // Use slotsRef so rapid taps read the latest state rather than a potentially stale closure
+  // Same rules as desktop (src/lib/lineup/rules.ts): the previous holder of a
+  // field position becomes unassigned, and the bench limit is enforced. Every
+  // changed row is saved together in one write.
+  function assignPosition(slotId: string, inningIndex: number, newPos: string | null) {
     const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
 
@@ -325,76 +351,24 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
       setDcWarning(`${name} is marked "should not play" at ${newPos} in the Depth Chart.`)
     }
 
-    setSlots(prev => {
-      const next = prev.map(s => ({ ...s, inning_positions: [...s.inning_positions] }))
-      if (newPos && newPos !== 'Bench') {
-        const holder = next.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
-        if (holder) holder.inning_positions[inningIndex] = 'Bench'
-      }
-      const me = next.find(s => s.id === slotId)
-      if (me) me.inning_positions[inningIndex] = newPos
-      return next
-    })
-
-    // Build DB payload from slotsRef (latest state) to avoid saving stale positions
-    const latestSlot = slotsRef.current.find(s => s.id === slotId)
-    if (!latestSlot) return
-    const updatedPositions = [...latestSlot.inning_positions]
-    updatedPositions[inningIndex] = newPos
-    await supabase.from('lineup_slots').update({ inning_positions: updatedPositions }).eq('id', slotId)
-
-    if (newPos && newPos !== 'Bench') {
-      const holder = slotsRef.current.find(s => s.id !== slotId && s.inning_positions[inningIndex] === newPos)
-      if (holder) {
-        const holderUpdated = [...holder.inning_positions]
-        holderUpdated[inningIndex] = 'Bench'
-        await supabase.from('lineup_slots').update({ inning_positions: holderUpdated }).eq('id', holder.id)
-      }
-    }
+    const r = applyCellEdits(slotsRef.current, [{ slotId, inning: inningIndex, position: newPos }], teamPositions)
+    setBenchWarning(editMessage(r, benchLimitFor(slotsRef.current, teamPositions)))
+    commitSlots(r.slots, r.changedIds)
   }
 
-  async function swapPositions(slotId1: string, slotId2: string, ii: number) {
-    const s1 = slotsRef.current.find(s => s.id === slotId1)
-    const s2 = slotsRef.current.find(s => s.id === slotId2)
-    if (!s1 || !s2) return
-    const pos1 = (s1.inning_positions ?? [])[ii] as string | null
-    const pos2 = (s2.inning_positions ?? [])[ii] as string | null
-    setSlots(prev => {
-      const next = prev.map(s => ({ ...s, inning_positions: [...(s.inning_positions ?? [])] }))
-      const n1 = next.find(s => s.id === slotId1)
-      const n2 = next.find(s => s.id === slotId2)
-      if (n1) n1.inning_positions[ii] = pos2 ?? null
-      if (n2) n2.inning_positions[ii] = pos1 ?? null
-      return next
-    })
-    const upd1 = [...(s1.inning_positions ?? [])]; upd1[ii] = pos2 ?? null
-    const upd2 = [...(s2.inning_positions ?? [])]; upd2[ii] = pos1 ?? null
-    await Promise.all([
-      supabase.from('lineup_slots').update({ inning_positions: upd1 }).eq('id', slotId1),
-      supabase.from('lineup_slots').update({ inning_positions: upd2 }).eq('id', slotId2),
-    ])
+  function swapPositions(slotId1: string, slotId2: string, ii: number) {
+    const r = swapInInning(slotsRef.current, slotId1, slotId2, ii)
+    commitSlots(r.slots, r.changedIds)
   }
 
-  async function copyInningToAll(from: number, to: number[]) {
-    const activeS = slotsRef.current.filter(s => s.availability !== 'absent')
-    const updates = activeS.map(s => {
-      const sourcePos = (s.inning_positions ?? [])[from] ?? null
-      const newPositions = [...(s.inning_positions ?? [])]
-      for (const ii of to) newPositions[ii] = sourcePos
-      return { id: s.id, inning_positions: newPositions }
-    })
-    setSlots(prev => prev.map(s => {
-      const u = updates.find(u => u.id === s.id)
-      return u ? { ...s, inning_positions: u.inning_positions } : s
-    }))
-    await Promise.all(updates.map(u =>
-      supabase.from('lineup_slots').update({ inning_positions: u.inning_positions }).eq('id', u.id)
-    ))
+  function copyInningToAll(from: number, to: number[]) {
+    const r = copyInning(slotsRef.current, from, to)
+    commitSlots(r.slots, r.changedIds)
   }
 
   // ── PAINT CELL (paint mode: toggle active position) ────────
   function paintCell(slotId: string, inningIndex: number) {
-    const slot = slots.find(s => s.id === slotId)
+    const slot = slotsRef.current.find(s => s.id === slotId)
     if (!slot) return
     const currentPos = slot.inning_positions[inningIndex]
     const newPos: string | null = currentPos === activePosition ? null : activePosition
@@ -491,7 +465,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
 
         {/* ── HEADER ── */}
         <div style={{ padding: '1rem 1rem 0' }}>
-          <Link href="/games" style={{
+          <Link href="/games" onClick={e => { e.preventDefault(); void leaveTo('/games') }} style={{
             fontSize: '13px', color: `rgba(var(--fg-rgb), 0.45)`,
             textDecoration: 'none', display: 'block', marginBottom: '0.75rem',
           }}>
@@ -508,10 +482,15 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                   {new Date(game.game_date + 'T12:00:00').toLocaleDateString('en-US', {
                     weekday: 'short', month: 'short', day: 'numeric',
                   })}
+                  <span aria-live="polite" style={{
+                    marginLeft: 8,
+                    color: saver.state.status === 'error' ? '#E87060' : undefined,
+                    fontWeight: saver.state.status === 'error' ? 700 : 400,
+                  }}>{saver.state.status === 'saved' ? '' : `· ${saver.state.status === 'error' ? '⚠ ' : ''}${saveLabel(saver.state)}`}</span>
                 </div>
               )}
             </div>
-            <Link href="/games" style={{
+            <Link href="/games" onClick={e => { e.preventDefault(); void leaveTo('/games') }} style={{
               padding: '8px 16px', borderRadius: '6px',
               background: 'var(--accent)', color: 'var(--accent-text)',
               fontSize: '13px', fontWeight: 700, textDecoration: 'none',
@@ -569,13 +548,11 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             {(game?.status === 'scheduled' || game?.status === 'lineup_ready' || game?.status === 'in_progress') && (
               <a
                 href={`/games/${params.id}/in-game`}
-                onClick={async () => {
-                  if (game?.status !== 'in_progress') {
-                    await supabase.from('games').update({ status: 'in_progress' }).eq('id', params.id)
-                  }
-                }}
+                onClick={e => { e.preventDefault(); void playGame() }}
+                aria-disabled={leaving}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
+                  opacity: leaving ? 0.6 : 1,
                   padding: '5px 12px', borderRadius: '5px', fontSize: '12px', fontWeight: 700,
                   textDecoration: 'none', flexShrink: 0,
                   background: game?.status === 'in_progress' ? 'rgba(232,160,32,0.18)' : 'rgba(109,184,117,0.14)',
@@ -648,17 +625,46 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
             }}>?</button>
           </div>
 
-          {/* Save error banner */}
-          {saveError && (
-            <div style={{
+          {/* Save error banner (lineup saves and blocked navigation), with Retry */}
+          {(saver.state.status === 'error' || navError || saveError) && (
+            <div role="alert" style={{
               background: 'rgba(232,112,96,0.12)', border: '0.5px solid rgba(232,112,96,0.5)',
               borderRadius: '8px', padding: '10px 12px', marginBottom: '10px',
               fontSize: '13px', color: '#E87060', lineHeight: 1.5,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
             }}>
-              <span>{saveError}</span>
-              <button onClick={() => setSaveError(null)} style={{
-                background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+              <span>{[
+                saver.state.status === 'error' && saver.state.error ? describeWriteError(saver.state.error) : null,
+                navError, saveError,
+              ].filter(Boolean).join(' ')}</span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                {(saver.state.status === 'error' || navError) && (
+                  <button onClick={async () => { setNavError(null); await saver.retry() }} style={{
+                    background: 'rgba(232,112,96,0.15)', border: '0.5px solid rgba(232,112,96,0.5)', color: '#E87060',
+                    borderRadius: '5px', padding: '4px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                  }}>Retry</button>
+                )}
+                {(navError || saveError) && (
+                  <button aria-label="Dismiss" onClick={() => { setNavError(null); setSaveError(null) }} style={{
+                    background: 'none', border: 'none', color: '#E87060', cursor: 'pointer',
+                    fontSize: '16px', lineHeight: 1, padding: '0 2px',
+                  }}>×</button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bench limit / bulk-edit warning (same rules as desktop) */}
+          {benchWarning && (
+            <div style={{
+              background: 'rgba(232,160,32,0.12)', border: '0.5px solid rgba(232,160,32,0.4)',
+              borderRadius: '8px', padding: '10px 12px', marginBottom: '10px',
+              fontSize: '13px', color: '#E8A020', lineHeight: 1.5,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+            }}>
+              <span>⚠ {benchWarning}</span>
+              <button onClick={() => setBenchWarning(null)} style={{
+                background: 'none', border: 'none', color: '#E8A020', cursor: 'pointer',
                 fontSize: '16px', lineHeight: 1, padding: '0 2px', flexShrink: 0,
               }}>×</button>
             </div>
@@ -947,6 +953,7 @@ export default function LineupBuilder({ params }: { params: { id: string } }) {
                     <div key={i} style={{ width: COL_INN, flexShrink: 0,
                       display: 'flex', justifyContent: 'center', padding: '3px 0' }}>
                       <button
+                        aria-label={`${slot.player?.first_name ?? ''} ${slot.player?.last_name ?? ''}, inning ${i + 1}: ${pos ?? 'empty'}`}
                         onClick={() => {
                           if (editorMode === 'pick') {
                             setPickTarget({ slotId: slot.id, inningIndex: i })
